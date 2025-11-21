@@ -554,7 +554,7 @@ class ElementorCompiler {
             if (name.startsWith(widgetPrefix)) {
                 const widgetSlug = name.substring(widgetPrefix.length).split(' ')[0].trim();
                 if (widgetSlug) {
-                    if (['container', 'section', 'image-box', 'icon-box', 'image-box-card'].includes(widgetSlug)) {
+                    if (['container', 'section', 'image-box-card'].includes(widgetSlug)) {
                         return this.createContainer(node);
                     }
                     return this.createExplicitWidget(node, widgetSlug);
@@ -775,6 +775,190 @@ class ElementorCompiler {
                 }
                 // View (Default, Stacked, Framed) - simplified to default for now
                 settings.view = 'default';
+            }
+            else if (widgetSlug === 'image-box') {
+                let imageNode = null;
+                let titleNode = null;
+                let descNode = null;
+                // Find children
+                if ('children' in node) {
+                    const frame = node;
+                    // Find Image
+                    imageNode = frame.children.find(c => (c.type === 'RECTANGLE' && hasFills(c)) ||
+                        (c.type === 'INSTANCE' || c.type === 'FRAME') && c.name.toLowerCase().includes('image')) || null;
+                    // Find Texts
+                    const textNodes = frame.children.filter(c => c.type === 'TEXT');
+                    if (textNodes.length > 0)
+                        titleNode = textNodes[0];
+                    if (textNodes.length > 1)
+                        descNode = textNodes[1];
+                }
+                // Handle Image
+                if (imageNode) {
+                    const url = yield this.uploadImageToWordPress(imageNode, 'PNG');
+                    if (url) {
+                        settings.image = {
+                            url,
+                            id: 0,
+                            size: 'full',
+                            source: 'library'
+                        };
+                    }
+                    else {
+                        let pngBytes = yield exportNodeAsPng(imageNode);
+                        if (pngBytes) {
+                            settings.image = {
+                                url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`
+                            };
+                        }
+                        else {
+                            settings.image = {
+                                url: 'https://via.placeholder.com/800x600?text=Upload+Failed'
+                            };
+                        }
+                    }
+                }
+                // Handle Title
+                if (titleNode) {
+                    settings.title_text = titleNode.characters;
+                    const typo = extractTypography(titleNode);
+                    const color = extractTextColor(titleNode);
+                    // Map typography to title_typography
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'title_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                    if (color)
+                        settings.title_color = color;
+                }
+                else {
+                    settings.title_text = 'This is the heading';
+                }
+                // Handle Description
+                if (descNode) {
+                    settings.description_text = descNode.characters;
+                    const typo = extractTypography(descNode);
+                    const color = extractTextColor(descNode);
+                    // Map typography to description_typography
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'description_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                    if (color)
+                        settings.description_color = color;
+                }
+                else {
+                    settings.description_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+                }
+            }
+            else if (widgetSlug === 'icon-list') {
+                const iconListItems = [];
+                // Variáveis para estilos globais da lista
+                let firstTextNode = null;
+                let firstIconNode = null;
+                if ('children' in node) {
+                    const frame = node;
+                    // Processar cada item da lista
+                    for (const child of frame.children) {
+                        if (!('children' in child))
+                            continue;
+                        const itemFrame = child;
+                        let iconNode = null;
+                        let textNode = null;
+                        // Encontrar ícone e texto dentro do item
+                        for (const itemChild of itemFrame.children) {
+                            if (itemChild.type === 'TEXT') {
+                                textNode = itemChild;
+                            }
+                            else if (['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE', 'RECTANGLE'].includes(itemChild.type)) {
+                                iconNode = itemChild;
+                            }
+                        }
+                        // Guardar primeiro nó para estilos globais
+                        if (!firstTextNode && textNode)
+                            firstTextNode = textNode;
+                        if (!firstIconNode && iconNode)
+                            firstIconNode = iconNode;
+                        // Criar item da lista
+                        const listItem = {
+                            text: textNode ? textNode.characters : 'List Item',
+                            _id: generateGUID().substring(0, 7)
+                        };
+                        // Processar ícone
+                        if (iconNode) {
+                            const iconUrl = yield this.uploadImageToWordPress(iconNode, 'SVG');
+                            if (iconUrl) {
+                                listItem.selected_icon = {
+                                    value: { url: iconUrl, id: 0, source: 'library' },
+                                    library: 'svg'
+                                };
+                            }
+                            else {
+                                const svgBytes = yield exportNodeAsSvg(iconNode);
+                                if (svgBytes) {
+                                    listItem.selected_icon = {
+                                        value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                                        library: 'svg'
+                                    };
+                                }
+                                else {
+                                    listItem.selected_icon = {
+                                        value: 'fas fa-check',
+                                        library: 'fa-solid'
+                                    };
+                                }
+                            }
+                        }
+                        else {
+                            listItem.selected_icon = {
+                                value: 'fas fa-check',
+                                library: 'fa-solid'
+                            };
+                        }
+                        // Link (opcional)
+                        listItem.link = { url: '', is_external: false, nofollow: false };
+                        iconListItems.push(listItem);
+                    }
+                }
+                // Configurar settings do widget
+                settings.icon_list = iconListItems;
+                // Estilos dos ícones
+                if (firstIconNode) {
+                    if (hasFills(firstIconNode) && Array.isArray(firstIconNode.fills) && firstIconNode.fills.length > 0) {
+                        const fill = firstIconNode.fills[0];
+                        if (fill.type === 'SOLID') {
+                            settings.icon_color = convertColor(fill);
+                        }
+                    }
+                    // Tamanho do ícone baseado nas dimensões
+                    if ('width' in firstIconNode) {
+                        settings.icon_size = {
+                            unit: 'px',
+                            size: Math.round(firstIconNode.width)
+                        };
+                    }
+                }
+                // Estilos do texto
+                if (firstTextNode) {
+                    const textColor = extractTextColor(firstTextNode);
+                    if (textColor)
+                        settings.text_color = textColor;
+                    const typo = extractTypography(firstTextNode);
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'text_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                }
+                // Layout e espaçamento
+                settings.icon_align = 'left';
+                settings.space_between = {
+                    unit: 'px',
+                    size: 10
+                };
+                // Divisor (opcional)
+                settings.divider = 'no';
+                settings.divider_style = 'solid';
+                settings.divider_weight = { unit: 'px', size: 1 };
             }
             else if (widgetSlug === 'image') {
                 const url = yield this.uploadImageToWordPress(node, 'PNG');
