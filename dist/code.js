@@ -34,6 +34,8 @@ function hasCornerRadius(node) {
 // -------------------- Extraction Functions --------------------
 function extractTypography(node) {
     const settings = {};
+    // Force custom typography to override theme defaults
+    settings.typography_typography = 'custom';
     if (node.fontSize !== figma.mixed) {
         settings.typography_font_size = { unit: 'px', size: Math.round(node.fontSize) };
     }
@@ -338,14 +340,78 @@ function extractDimensions(node) {
     return dims;
 }
 function extractBackgroundAdvanced(node) {
-    // Placeholder – real implementation would map fills, gradients, images, etc.
-    return {};
+    const settings = {};
+    if (!hasFills(node) || !Array.isArray(node.fills) || node.fills.length === 0)
+        return settings;
+    // Prioritize the top-most visible fill
+    const fill = node.fills[node.fills.length - 1];
+    if (!fill.visible)
+        return settings;
+    if (fill.type === 'SOLID') {
+        settings.background_background = 'classic';
+        settings.background_color = convertColor(fill);
+    }
+    else if (fill.type === 'GRADIENT_LINEAR') {
+        settings.background_background = 'gradient';
+        settings.background_gradient_type = 'linear';
+        if (fill.gradientStops.length >= 2) {
+            settings.background_color = convertColor({ type: 'SOLID', color: fill.gradientStops[0].color, opacity: fill.gradientStops[0].color.a });
+            settings.background_color_b = convertColor({ type: 'SOLID', color: fill.gradientStops[fill.gradientStops.length - 1].color, opacity: fill.gradientStops[fill.gradientStops.length - 1].color.a });
+            settings.background_gradient_angle = { unit: 'deg', size: 180 };
+        }
+    }
+    return settings;
 }
 function extractCustomCSS(node) {
     // Placeholder for custom CSS handling.
     return {};
 }
-// -------------------- Icon Helpers --------------------
+function extractFlexLayout(node) {
+    if (!hasLayout(node) || node.layoutMode === 'NONE')
+        return {};
+    const settings = {};
+    const isRow = node.layoutMode === 'HORIZONTAL';
+    // Direction
+    settings.flex_direction = isRow ? 'row' : 'column';
+    // Justify Content (Primary Axis)
+    const justifyMap = {
+        MIN: 'start',
+        CENTER: 'center',
+        MAX: 'end',
+        SPACE_BETWEEN: 'space-between'
+    };
+    if (node.primaryAxisAlignItems && justifyMap[node.primaryAxisAlignItems]) {
+        settings.justify_content = justifyMap[node.primaryAxisAlignItems];
+    }
+    // Align Items (Counter Axis)
+    const alignMap = {
+        MIN: 'start',
+        CENTER: 'center',
+        MAX: 'end',
+        BASELINE: 'baseline'
+    };
+    if (node.counterAxisAlignItems && alignMap[node.counterAxisAlignItems]) {
+        settings.align_items = alignMap[node.counterAxisAlignItems];
+    }
+    // Gap
+    if (node.itemSpacing && node.itemSpacing > 0) {
+        settings.gap = {
+            unit: 'px',
+            size: node.itemSpacing,
+            column: node.itemSpacing,
+            row: node.itemSpacing,
+            isLinked: true
+        };
+    }
+    // Wrap
+    if (node.layoutWrap === 'WRAP') {
+        settings.flex_wrap = 'wrap';
+    }
+    else {
+        settings.flex_wrap = 'nowrap';
+    }
+    return settings;
+}
 function isIconNode(node) {
     const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'];
     const isVector = vectorTypes.includes(node.type);
@@ -398,7 +464,7 @@ class ElementorCompiler {
         if (name.startsWith(widgetPrefix)) {
             const widgetSlug = name.substring(widgetPrefix.length).split(' ')[0].trim();
             if (widgetSlug) {
-                if (widgetSlug === 'container') {
+                if (widgetSlug === 'container' || widgetSlug === 'section') {
                     return this.createContainer(node);
                 }
                 return this.createExplicitWidget(node, widgetSlug);
@@ -431,6 +497,15 @@ class ElementorCompiler {
         Object.assign(settings, extractOverflow(node));
         Object.assign(settings, extractPositioning(node));
         Object.assign(settings, extractCustomCSS(node));
+        // Integrate Flexbox extraction
+        Object.assign(settings, extractFlexLayout(node));
+        // Boxed Container Logic
+        // Heuristic: If frame is wide (>800px) and content is centered, assume it's a boxed section.
+        if ('width' in node && node.width > 800) {
+            if ('primaryAxisAlignItems' in node && (node.primaryAxisAlignItems === 'CENTER' || node.counterAxisAlignItems === 'CENTER')) {
+                settings.content_width = 'boxed';
+            }
+        }
         if (settings._position === 'absolute') {
             delete settings._position;
             delete settings._offset_x;
@@ -444,43 +519,91 @@ class ElementorCompiler {
     }
     createExplicitWidget(node, widgetSlug) {
         const settings = {};
-        const textChildren = [];
-        if ('children' in node) {
-            const frame = node;
-            frame.children.forEach(c => {
-                if (c.type === 'TEXT')
-                    textChildren.push(c);
-            });
-        }
-        else if (node.type === 'TEXT') {
-            textChildren.push(node);
-        }
-        if (textChildren.length > 0) {
-            const titleNode = textChildren[0];
-            settings.title = titleNode.characters;
-            settings.title_text = titleNode.characters;
-            settings.heading = titleNode.characters;
-            const typo = extractTypography(titleNode);
-            const color = extractTextColor(titleNode);
-            Object.assign(settings, typo);
-            if (color)
-                settings.title_color = color;
-            for (const key in typo) {
-                const newKey = key.replace('typography_', 'title_typography_');
-                settings[newKey] = typo[key];
+        // --- Button Handling ---
+        if (widgetSlug === 'button') {
+            let textNode = null;
+            let bgNode = null;
+            if (node.type === 'TEXT') {
+                textNode = node;
             }
+            else if ('children' in node) {
+                const frame = node;
+                textNode = frame.children.find(c => c.type === 'TEXT') || null;
+                if (hasFills(frame) && frame.fills !== figma.mixed && frame.fills.length > 0) {
+                    bgNode = frame;
+                }
+                else {
+                    bgNode = frame.children.find(c => (c.type === 'RECTANGLE' || c.type === 'FRAME') && hasFills(c)) || null;
+                }
+            }
+            if (textNode) {
+                settings.text = textNode.characters;
+                settings.typography_typography = 'custom';
+                const typo = extractTypography(textNode);
+                Object.assign(settings, typo);
+                const textColor = extractTextColor(textNode);
+                if (textColor)
+                    settings.button_text_color = textColor;
+            }
+            else {
+                settings.text = "Click Here";
+            }
+            if (bgNode || (hasFills(node) && node.type !== 'TEXT')) {
+                const bgSource = bgNode || node;
+                Object.assign(settings, extractBackgroundAdvanced(bgSource));
+            }
+            settings.link = { url: '#', is_external: false, nofollow: false };
         }
-        if (textChildren.length > 1) {
-            const descNode = textChildren[1];
-            settings.description_text = descNode.characters;
-            const typo = extractTypography(descNode);
-            const color = extractTextColor(descNode);
-            Object.assign(settings, typo);
-            if (color)
-                settings.description_color = color;
-            for (const key in typo) {
-                const newKey = key.replace('typography_', 'description_typography_');
-                settings[newKey] = typo[key];
+        // --- Icon Handling ---
+        else if (widgetSlug === 'icon') {
+            if (hasFills(node) && Array.isArray(node.fills) && node.fills.length > 0) {
+                const fill = node.fills[0];
+                if (fill.type === 'SOLID') {
+                    settings.primary_color = convertColor(fill);
+                }
+            }
+            settings.icon = { value: 'fas fa-star', library: 'fa-solid' };
+        }
+        // --- General Handling ---
+        else {
+            const textChildren = [];
+            if ('children' in node) {
+                const frame = node;
+                frame.children.forEach(c => {
+                    if (c.type === 'TEXT')
+                        textChildren.push(c);
+                });
+            }
+            else if (node.type === 'TEXT') {
+                textChildren.push(node);
+            }
+            if (textChildren.length > 0) {
+                const titleNode = textChildren[0];
+                settings.title = titleNode.characters;
+                settings.title_text = titleNode.characters;
+                settings.heading = titleNode.characters;
+                const typo = extractTypography(titleNode);
+                const color = extractTextColor(titleNode);
+                Object.assign(settings, typo);
+                if (color)
+                    settings.title_color = color;
+                for (const key in typo) {
+                    const newKey = key.replace('typography_', 'title_typography_');
+                    settings[newKey] = typo[key];
+                }
+            }
+            if (textChildren.length > 1) {
+                const descNode = textChildren[1];
+                settings.description_text = descNode.characters;
+                const typo = extractTypography(descNode);
+                const color = extractTextColor(descNode);
+                Object.assign(settings, typo);
+                if (color)
+                    settings.description_color = color;
+                for (const key in typo) {
+                    const newKey = key.replace('typography_', 'description_typography_');
+                    settings[newKey] = typo[key];
+                }
             }
         }
         Object.assign(settings, extractBorderStyles(node));
