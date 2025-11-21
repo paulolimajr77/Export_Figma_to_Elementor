@@ -9,12 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 // Elementor JSON Compiler – Full Implementation (TypeScript)
-// This file provides a complete, syntactically correct implementation of the Elementor compiler
-// for the Figma plugin. It includes all extraction utilities, helper functions, and the
-// ElementorCompiler class required for exporting frames, text, and containers.
+// Exporta frames do Figma para JSON compatível com Elementor (clipboard).
+// Suporta containers, textos, botões, imagem, icon, icon-box, image-box, etc.
 // -------------------- Helper Utilities --------------------
 function generateGUID() {
-    // Simple GUID generator – sufficient for plugin usage
     return 'xxxxxxxxxx'.replace(/[x]/g, () => ((Math.random() * 36) | 0).toString(36));
 }
 function convertColor(paint) {
@@ -43,7 +41,6 @@ function hasCornerRadius(node) {
 // -------------------- Extraction Functions --------------------
 function extractTypography(node) {
     const settings = {};
-    // Force custom typography to override theme defaults
     settings.typography_typography = 'custom';
     if (node.fontSize !== figma.mixed) {
         settings.typography_font_size = { unit: 'px', size: Math.round(node.fontSize) };
@@ -113,35 +110,38 @@ function extractBorderStyles(node) {
             settings.border_color = convertColor(stroke);
             settings.border_border = 'solid';
             if (node.strokeWeight !== figma.mixed) {
+                const w = node.strokeWeight;
                 settings.border_width = {
                     unit: 'px',
-                    top: node.strokeWeight,
-                    right: node.strokeWeight,
-                    bottom: node.strokeWeight,
-                    left: node.strokeWeight,
+                    top: w,
+                    right: w,
+                    bottom: w,
+                    left: w,
                     isLinked: true
                 };
             }
         }
     }
     if (hasCornerRadius(node)) {
-        if (node.cornerRadius !== figma.mixed) {
+        const anyNode = node;
+        if (anyNode.cornerRadius !== figma.mixed && typeof anyNode.cornerRadius === 'number') {
+            const r = anyNode.cornerRadius;
             settings.border_radius = {
                 unit: 'px',
-                top: node.cornerRadius,
-                right: node.cornerRadius,
-                bottom: node.cornerRadius,
-                left: node.cornerRadius,
+                top: r,
+                right: r,
+                bottom: r,
+                left: r,
                 isLinked: true
             };
         }
         else {
             settings.border_radius = {
                 unit: 'px',
-                top: node.topLeftRadius,
-                right: node.topRightRadius,
-                bottom: node.bottomRightRadius,
-                left: node.bottomLeftRadius,
+                top: anyNode.topLeftRadius || 0,
+                right: anyNode.topRightRadius || 0,
+                bottom: anyNode.bottomRightRadius || 0,
+                left: anyNode.bottomLeftRadius || 0,
                 isLinked: false
             };
         }
@@ -352,7 +352,6 @@ function extractBackgroundAdvanced(node) {
     const settings = {};
     if (!hasFills(node) || !Array.isArray(node.fills) || node.fills.length === 0)
         return settings;
-    // Prioritize the top-most visible fill
     const fill = node.fills[node.fills.length - 1];
     if (!fill.visible)
         return settings;
@@ -361,18 +360,26 @@ function extractBackgroundAdvanced(node) {
         settings.background_color = convertColor(fill);
     }
     else if (fill.type === 'GRADIENT_LINEAR') {
+        const g = fill;
         settings.background_background = 'gradient';
         settings.background_gradient_type = 'linear';
-        if (fill.gradientStops.length >= 2) {
-            settings.background_color = convertColor({ type: 'SOLID', color: fill.gradientStops[0].color, opacity: fill.gradientStops[0].color.a });
-            settings.background_color_b = convertColor({ type: 'SOLID', color: fill.gradientStops[fill.gradientStops.length - 1].color, opacity: fill.gradientStops[fill.gradientStops.length - 1].color.a });
+        if (g.gradientStops.length >= 2) {
+            settings.background_color = convertColor({
+                type: 'SOLID',
+                color: g.gradientStops[0].color,
+                opacity: g.gradientStops[0].color.a
+            });
+            settings.background_color_b = convertColor({
+                type: 'SOLID',
+                color: g.gradientStops[g.gradientStops.length - 1].color,
+                opacity: g.gradientStops[g.gradientStops.length - 1].color.a
+            });
             settings.background_gradient_angle = { unit: 'deg', size: 180 };
         }
     }
     return settings;
 }
-function extractCustomCSS(node) {
-    // Placeholder for custom CSS handling.
+function extractCustomCSS(_node) {
     return {};
 }
 function extractFlexLayout(node) {
@@ -380,9 +387,7 @@ function extractFlexLayout(node) {
         return {};
     const settings = {};
     const isRow = node.layoutMode === 'HORIZONTAL';
-    // Direction
     settings.flex_direction = isRow ? 'row' : 'column';
-    // Justify Content (Primary Axis)
     const justifyMap = {
         MIN: 'start',
         CENTER: 'center',
@@ -392,7 +397,6 @@ function extractFlexLayout(node) {
     if (node.primaryAxisAlignItems && justifyMap[node.primaryAxisAlignItems]) {
         settings.justify_content = justifyMap[node.primaryAxisAlignItems];
     }
-    // Align Items (Counter Axis)
     const alignMap = {
         MIN: 'start',
         CENTER: 'center',
@@ -402,7 +406,6 @@ function extractFlexLayout(node) {
     if (node.counterAxisAlignItems && alignMap[node.counterAxisAlignItems]) {
         settings.align_items = alignMap[node.counterAxisAlignItems];
     }
-    // Gap
     if (node.itemSpacing && node.itemSpacing > 0) {
         settings.gap = {
             unit: 'px',
@@ -412,13 +415,7 @@ function extractFlexLayout(node) {
             isLinked: true
         };
     }
-    // Wrap
-    if (node.layoutWrap === 'WRAP') {
-        settings.flex_wrap = 'wrap';
-    }
-    else {
-        settings.flex_wrap = 'nowrap';
-    }
+    settings.flex_wrap = node.layoutWrap === 'WRAP' ? 'wrap' : 'nowrap';
     return settings;
 }
 function isIconNode(node) {
@@ -435,10 +432,11 @@ function hasImageFill(node) {
 function exportNodeAsSvg(node) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            return yield node.exportAsync({ format: 'SVG' });
+            const bytes = yield node.exportAsync({ format: 'SVG' });
+            return bytes;
         }
         catch (e) {
-            console.error(`Failed to export SVG for ${node.name}:`, e);
+            console.error(`[F2E] Failed to export SVG for "${node.name}" (${node.id}):`, e);
             return null;
         }
     });
@@ -446,17 +444,19 @@ function exportNodeAsSvg(node) {
 function exportNodeAsPng(node) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            return yield node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
+            const bytes = yield node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
+            return bytes;
         }
         catch (e) {
-            console.error(`Failed to export PNG for ${node.name}:`, e);
+            console.error(`[F2E] Failed to export PNG for "${node.name}" (${node.id}):`, e);
             return null;
         }
     });
 }
 // -------------------- Widget Creation --------------------
 function createTextWidget(node) {
-    const isHeading = node.fontSize > 24 || node.fontName.style.toLowerCase().includes('bold');
+    const isHeading = node.fontSize > 24 ||
+        node.fontName.style.toLowerCase().includes('bold');
     const widgetType = isHeading ? 'heading' : 'text-editor';
     const settings = { title: node.characters, editor: node.characters };
     Object.assign(settings, extractTypography(node));
@@ -476,16 +476,70 @@ function createTextWidget(node) {
 // -------------------- Main Compiler Class --------------------
 class ElementorCompiler {
     constructor(config) {
-        this.config = config;
+        this.pendingUploads = new Map();
+        this.wpConfig = config || {};
+        this.pendingUploads = new Map();
+    }
+    uploadImageToWordPress(node, format) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
+                return null;
+            }
+            try {
+                let bytes = null;
+                let mimeType = '';
+                if (format === 'SVG') {
+                    bytes = yield exportNodeAsSvg(node);
+                    mimeType = 'image/svg+xml';
+                }
+                else {
+                    bytes = yield exportNodeAsPng(node);
+                    mimeType = 'image/png';
+                }
+                if (!bytes)
+                    return null;
+                const id = generateGUID();
+                const name = `${node.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${format.toLowerCase()}`;
+                return new Promise((resolve) => {
+                    const timeout = setTimeout(() => {
+                        if (this.pendingUploads.has(id)) {
+                            this.pendingUploads.delete(id);
+                            console.warn(`[F2E] Upload timeout for ${name}`);
+                            resolve(null);
+                        }
+                    }, 30000);
+                    this.pendingUploads.set(id, (result) => {
+                        clearTimeout(timeout);
+                        if (result.success) {
+                            resolve(result.url);
+                        }
+                        else {
+                            console.warn(`[F2E] Upload failed for ${name}: ${result.error}`);
+                            resolve(null);
+                        }
+                    });
+                    figma.ui.postMessage({
+                        type: 'upload-image-request',
+                        id,
+                        name,
+                        mimeType,
+                        data: bytes
+                    });
+                });
+            }
+            catch (e) {
+                console.error('Error preparing upload:', e);
+                return null;
+            }
+        });
     }
     compile(nodes) {
         return __awaiter(this, void 0, void 0, function* () {
-            const elements = yield Promise.all(nodes.map((node) => __awaiter(this, void 0, void 0, function* () {
+            const elements = yield Promise.all(Array.from(nodes).map((node) => __awaiter(this, void 0, void 0, function* () {
                 const element = yield this.processNode(node);
-                // If the top-level element is a container widget, convert it to a root container
                 if (element.elType === 'widget' && element.widgetType === 'container') {
                     element.elType = 'container';
-                    element.isInner = false; // Add for root container parity
+                    element.isInner = false;
                     delete element.widgetType;
                 }
                 return element;
@@ -496,11 +550,11 @@ class ElementorCompiler {
     processNode(node) {
         return __awaiter(this, void 0, void 0, function* () {
             const name = node.name.toLowerCase();
-            const widgetPrefix = "w:";
+            const widgetPrefix = 'w:';
             if (name.startsWith(widgetPrefix)) {
                 const widgetSlug = name.substring(widgetPrefix.length).split(' ')[0].trim();
                 if (widgetSlug) {
-                    if (widgetSlug === 'container' || widgetSlug === 'section') {
+                    if (['container', 'section', 'image-box', 'icon-box', 'image-box-card'].includes(widgetSlug)) {
                         return this.createContainer(node);
                     }
                     return this.createExplicitWidget(node, widgetSlug);
@@ -509,14 +563,28 @@ class ElementorCompiler {
             if (node.type === 'TEXT') {
                 return createTextWidget(node);
             }
-            if (node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT' || node.type === 'GROUP') {
+            if (node.type === 'FRAME' ||
+                node.type === 'INSTANCE' ||
+                node.type === 'COMPONENT' ||
+                node.type === 'GROUP') {
                 return this.createContainer(node);
             }
-            // Return a placeholder for unhandled types to make them visible in the output
+            if (['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'].includes(node.type)) {
+                return this.createExplicitWidget(node, 'icon');
+            }
+            if (node.type === 'RECTANGLE') {
+                return this.createExplicitWidget(node, 'image');
+            }
             const settings = {
                 editor: `Unsupported node type: ${node.type}. Please wrap it in a frame and name it with a 'w:' prefix if you want to export it.`
             };
-            return { id: generateGUID(), elType: 'widget', widgetType: 'text-editor', settings, elements: [] };
+            return {
+                id: generateGUID(),
+                elType: 'widget',
+                widgetType: 'text-editor',
+                settings,
+                elements: []
+            };
         });
     }
     createContainer(node) {
@@ -535,12 +603,12 @@ class ElementorCompiler {
             Object.assign(settings, extractOverflow(node));
             Object.assign(settings, extractPositioning(node));
             Object.assign(settings, extractCustomCSS(node));
-            // Integrate Flexbox extraction
             Object.assign(settings, extractFlexLayout(node));
-            // Boxed Container Logic
-            // Heuristic: If frame is wide (>800px) and content is centered, assume it's a boxed section.
             if ('width' in node && node.width > 800) {
-                if ('primaryAxisAlignItems' in node && (node.primaryAxisAlignItems === 'CENTER' || node.counterAxisAlignItems === 'CENTER')) {
+                const anyNode = node;
+                if ('primaryAxisAlignItems' in anyNode &&
+                    (anyNode.primaryAxisAlignItems === 'CENTER' ||
+                        anyNode.counterAxisAlignItems === 'CENTER')) {
                     settings.content_width = 'boxed';
                 }
             }
@@ -553,14 +621,18 @@ class ElementorCompiler {
             if ('children' in node) {
                 childElements = yield Promise.all(node.children.map(child => this.processNode(child)));
             }
-            return { id: generateGUID(), elType: 'container', settings, elements: childElements };
+            return {
+                id: generateGUID(),
+                elType: 'container',
+                settings,
+                elements: childElements
+            };
         });
     }
     createExplicitWidget(node, widgetSlug) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log(`[Debug] Processing widget: ${widgetSlug} for node: ${node.name}`);
+            console.log(`[F2E Debug] Processing widget: ${widgetSlug} for node: ${node.name} (${node.id})`);
             const settings = {};
-            // --- Button Handling ---
             if (widgetSlug === 'button') {
                 let textNode = null;
                 let bgNode = null;
@@ -569,12 +641,13 @@ class ElementorCompiler {
                 }
                 else if ('children' in node) {
                     const frame = node;
-                    textNode = frame.children.find(c => c.type === 'TEXT') || null;
+                    textNode = frame.children.find(c => c.type === 'TEXT');
                     if (hasFills(frame) && frame.fills !== figma.mixed && frame.fills.length > 0) {
                         bgNode = frame;
                     }
                     else {
-                        bgNode = frame.children.find(c => (c.type === 'RECTANGLE' || c.type === 'FRAME') && hasFills(c)) || null;
+                        bgNode = frame.children.find(c => (c.type === 'RECTANGLE' || c.type === 'FRAME') &&
+                            hasFills(c));
                     }
                 }
                 if (textNode) {
@@ -587,26 +660,33 @@ class ElementorCompiler {
                         settings.button_text_color = textColor;
                 }
                 else {
-                    settings.text = "Click Here";
+                    settings.text = 'Click Here';
                 }
                 if (bgNode || (hasFills(node) && node.type !== 'TEXT')) {
-                    const bgSource = bgNode || node;
+                    const bgSource = (bgNode || node);
                     Object.assign(settings, extractBackgroundAdvanced(bgSource));
                 }
                 settings.link = { url: '#', is_external: false, nofollow: false };
             }
-            // --- Icon Handling ---
             else if (widgetSlug === 'icon') {
-                const svgBytes = yield exportNodeAsSvg(node);
-                if (svgBytes) {
-                    settings.icon = {
-                        value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                const url = yield this.uploadImageToWordPress(node, 'SVG');
+                if (url) {
+                    settings.selected_icon = {
+                        value: { url, id: 0, source: 'library' },
                         library: 'svg'
                     };
                 }
                 else {
-                    // Fallback if export fails or no fill
-                    settings.icon = { value: 'fas fa-star', library: 'fa-solid' };
+                    let svgBytes = yield exportNodeAsSvg(node);
+                    if (svgBytes) {
+                        settings.selected_icon = {
+                            value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                            library: 'svg'
+                        };
+                    }
+                    else {
+                        settings.selected_icon = { value: 'fas fa-star', library: 'fa-solid' };
+                    }
                 }
                 if (hasFills(node) && Array.isArray(node.fills) && node.fills.length > 0) {
                     const fill = node.fills[0];
@@ -615,53 +695,111 @@ class ElementorCompiler {
                     }
                 }
             }
-            // --- Image Handling ---
-            else if (widgetSlug === 'image') {
-                const pngBytes = yield exportNodeAsPng(node);
-                if (pngBytes) {
-                    settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
-                }
-            }
-            // --- Icon Box / Image Box Handling ---
-            else if (widgetSlug === 'icon-box' || widgetSlug === 'image-box') {
-                let iconOrImageNode = null;
-                const textChildren = [];
+            else if (widgetSlug === 'icon-box') {
+                let iconNode = null;
+                let titleNode = null;
+                let descNode = null;
+                // Find children
                 if ('children' in node) {
-                    node.children.forEach(child => {
-                        if (child.type === 'TEXT') {
-                            textChildren.push(child);
-                        }
-                        else if (!iconOrImageNode && (isIconNode(child) || (hasFills(child) && hasImageFill(child)))) {
-                            iconOrImageNode = child;
-                        }
-                    });
+                    const frame = node;
+                    // Find Icon (Vector-like or Image)
+                    iconNode = frame.children.find(c => ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'].includes(c.type) ||
+                        (c.type === 'INSTANCE' || c.type === 'FRAME') && c.name.toLowerCase().includes('icon')) || null;
+                    // Find Texts
+                    const textNodes = frame.children.filter(c => c.type === 'TEXT');
+                    if (textNodes.length > 0)
+                        titleNode = textNodes[0];
+                    if (textNodes.length > 1)
+                        descNode = textNodes[1];
                 }
-                if (iconOrImageNode) {
-                    if (widgetSlug === 'icon-box') {
-                        const svgBytes = yield exportNodeAsSvg(iconOrImageNode);
+                // Handle Icon
+                if (iconNode) {
+                    const url = yield this.uploadImageToWordPress(iconNode, 'SVG');
+                    if (url) {
+                        settings.selected_icon = {
+                            value: { url, id: 0, source: 'library' },
+                            library: 'svg'
+                        };
+                    }
+                    else {
+                        let svgBytes = yield exportNodeAsSvg(iconNode);
                         if (svgBytes) {
-                            settings.icon = {
+                            settings.selected_icon = {
                                 value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
                                 library: 'svg'
                             };
                         }
+                        else {
+                            settings.selected_icon = { value: 'fas fa-star', library: 'fa-solid' };
+                        }
                     }
-                    else { // image-box
-                        const pngBytes = yield exportNodeAsPng(iconOrImageNode);
-                        if (pngBytes) {
-                            settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
+                    // Icon Color
+                    if (hasFills(iconNode) && Array.isArray(iconNode.fills) && iconNode.fills.length > 0) {
+                        const fill = iconNode.fills[0];
+                        if (fill.type === 'SOLID') {
+                            settings.primary_color = convertColor(fill);
                         }
                     }
                 }
-                if (textChildren.length > 0) {
-                    settings.title_text = textChildren[0].characters;
-                    Object.assign(settings, extractTypography(textChildren[0])); // Apply typo to title
+                // Handle Title
+                if (titleNode) {
+                    settings.title_text = titleNode.characters;
+                    const typo = extractTypography(titleNode);
+                    const color = extractTextColor(titleNode);
+                    // Map typography to title_typography
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'title_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                    if (color)
+                        settings.title_color = color;
                 }
-                if (textChildren.length > 1) {
-                    settings.description_text = textChildren[1].characters;
+                else {
+                    settings.title_text = 'This is the heading';
+                }
+                // Handle Description
+                if (descNode) {
+                    settings.description_text = descNode.characters;
+                    const typo = extractTypography(descNode);
+                    const color = extractTextColor(descNode);
+                    // Map typography to description_typography
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'description_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                    if (color)
+                        settings.description_color = color;
+                }
+                else {
+                    settings.description_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+                }
+                // View (Default, Stacked, Framed) - simplified to default for now
+                settings.view = 'default';
+            }
+            else if (widgetSlug === 'image') {
+                const url = yield this.uploadImageToWordPress(node, 'PNG');
+                if (url) {
+                    settings.image = {
+                        url,
+                        id: 0,
+                        size: 'full',
+                        source: 'library'
+                    };
+                }
+                else {
+                    let pngBytes = yield exportNodeAsPng(node);
+                    if (pngBytes) {
+                        settings.image = {
+                            url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`
+                        };
+                    }
+                    else {
+                        settings.image = {
+                            url: 'https://via.placeholder.com/800x600?text=Upload+Failed'
+                        };
+                    }
                 }
             }
-            // --- General Handling ---
             else {
                 const textChildren = [];
                 if ('children' in node) {
@@ -715,7 +853,13 @@ class ElementorCompiler {
             Object.assign(settings, extractOverflow(node));
             Object.assign(settings, extractPositioning(node));
             Object.assign(settings, extractCustomCSS(node));
-            return { id: generateGUID(), elType: 'widget', widgetType: widgetSlug, settings, elements: [] };
+            return {
+                id: generateGUID(),
+                elType: 'widget',
+                widgetType: widgetSlug,
+                settings,
+                elements: []
+            };
         });
     }
     debugNodeRecursive(node, depth) {
@@ -734,45 +878,86 @@ class ElementorCompiler {
         return info;
     }
 }
-// -------------------- UI Interaction --------------------
-figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+// -------------------- Main Execution --------------------
+figma.showUI(__html__, { width: 400, height: 600 });
+// We need a global instance to handle the message callbacks
+let compiler;
+// Load saved WP config and initialize compiler
+figma.clientStorage.getAsync('wp_config').then(config => {
+    compiler = new ElementorCompiler(config || {});
+    if (config) {
+        figma.ui.postMessage({ type: 'load-wp-config', config });
+    }
+});
 figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
-    const compiler = new ElementorCompiler(msg.config || {});
+    var _a;
+    // Ensure compiler is initialized before processing messages
+    if (!compiler) {
+        console.warn('Compiler not yet initialized. Message deferred or ignored.');
+        return;
+    }
     if (msg.type === 'export-elementor') {
         const selection = figma.currentPage.selection;
         if (selection.length === 0) {
-            figma.notify('Selecione ao menos um frame para exportar.');
+            figma.notify('Selecione pelo menos um frame para exportar.');
             return;
         }
+        figma.notify('Gerando JSON... (Isso pode demorar se houver uploads)');
         try {
             const elements = yield compiler.compile(selection);
-            // This is the root structure Elementor expects for clipboard data.
-            const exportData = {
-                version: '3.33.1', // Match user's exact Elementor version
-                type: 'elementor', // This must be 'elementor'
-                siteurl: '', // Keep this empty for broad compatibility
-                elements: elements,
+            const template = {
+                type: 'elementor',
+                siteurl: ((_a = compiler.wpConfig) === null || _a === void 0 ? void 0 : _a.url) || '',
+                elements,
+                version: '0.4'
             };
-            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(exportData, null, 2) });
+            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(template, null, 2) });
+            figma.notify('JSON gerado! Copie e cole no Elementor (Ctrl+V).');
         }
-        catch (error) {
-            console.error("Export failed:", error);
-            figma.notify("Falha na exportação. Verifique o console.");
+        catch (e) {
+            console.error(e);
+            figma.notify('Erro na exportação. Verifique o console.');
         }
-    }
-    else if (msg.type === 'debug-structure') {
-        const dump = figma.currentPage.selection.map(n => compiler.debugNodeRecursive(n, 0));
-        figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(dump, null, 2) });
     }
     else if (msg.type === 'rename-layer') {
-        if (figma.currentPage.selection.length === 0) {
-            figma.notify('Selecione uma camada para aplicar o widget.');
-            return;
+        const selection = figma.currentPage.selection;
+        if (selection.length === 1) {
+            selection[0].name = msg.newName;
+            figma.notify(`Camada renomeada para: ${msg.newName}`);
         }
-        figma.currentPage.selection.forEach(node => { node.name = msg.newName; });
-        figma.notify('Camada(s) renomeada(s) para: ' + msg.newName);
+        else {
+            figma.notify('Selecione apenas uma camada para renomear.');
+        }
+    }
+    else if (msg.type === 'create-component') {
+        // ... (Create component logic if needed, or keep existing)
+        figma.notify('Inserção de componentes ainda não implementada.');
     }
     else if (msg.type === 'resize-window') {
         figma.ui.resize(msg.width, msg.height);
+    }
+    else if (msg.type === 'debug-structure') {
+        const selection = figma.currentPage.selection;
+        if (selection.length === 0)
+            return;
+        const debugData = selection.map(node => ({
+            name: node.name,
+            type: node.type,
+            id: node.id,
+            children: 'children' in node ? node.children.length : 0
+        }));
+        figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(debugData, null, 2) });
+    }
+    else if (msg.type === 'upload-image-response') {
+        const resolver = compiler.pendingUploads.get(msg.id);
+        if (resolver) {
+            resolver(msg);
+            compiler.pendingUploads.delete(msg.id);
+        }
+    }
+    else if (msg.type === 'save-wp-config') {
+        yield figma.clientStorage.setAsync('wp_config', msg.config);
+        compiler.wpConfig = msg.config; // Update compiler's config
+        figma.notify('Configuração WP salva!');
     }
 });

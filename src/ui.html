@@ -8,21 +8,21 @@
             --primary: #0d6efd;
             --primary-hover: #0b5ed7;
             --bg: #ffffff;
-            --bg-secondary: #f8f9fa;
             --text: #212529;
             --text-muted: #6c757d;
             --border: #dee2e6;
+            --bg-light: #f8f9fa;
             --success: #198754;
-            --warning: #ffc107;
             --danger: #dc3545;
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
             background-color: var(--bg);
             color: var(--text);
+            font-size: 13px;
             display: flex;
             flex-direction: column;
             height: 100vh;
@@ -33,192 +33,144 @@
         .tabs {
             display: flex;
             border-bottom: 1px solid var(--border);
-            background: var(--bg-secondary);
+            background: var(--bg-light);
         }
 
-        .tab {
+        .tab-btn {
             flex: 1;
-            padding: 12px;
-            text-align: center;
+            padding: 10px;
+            border: none;
+            background: none;
             cursor: pointer;
             font-weight: 500;
-            font-size: 13px;
             color: var(--text-muted);
-            transition: all 0.2s;
             border-bottom: 2px solid transparent;
+            transition: all 0.2s;
         }
 
-        .tab:hover {
+        .tab-btn:hover {
             color: var(--primary);
             background: rgba(13, 110, 253, 0.05);
         }
 
-        .tab.active {
+        .tab-btn.active {
             color: var(--primary);
             border-bottom-color: var(--primary);
             background: #fff;
         }
 
-        /* CONTENT AREAS */
-        .content {
+        /* CONTENT PANELS */
+        .tab-content {
             display: none;
+            padding: 16px;
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
         }
 
-        .content.active {
-            display: flex;
-            flex-direction: column;
+        .tab-content.active {
+            display: block;
         }
 
-        h2 {
-            font-size: 16px;
-            margin: 0 0 10px 0;
-            font-weight: 600;
+        /* FORMS & INPUTS */
+        .form-group {
+            margin-bottom: 12px;
         }
 
-        p {
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="url"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+            /* Fix padding issue */
             font-size: 13px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
+        }
+
+        .help-text {
+            font-size: 11px;
             color: var(--text-muted);
-            margin: 0 0 20px 0;
-            line-height: 1.5;
+            margin-top: 4px;
         }
 
         /* BUTTONS */
-        button {
-            border: none;
-            border-radius: 6px;
-            padding: 10px 16px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-
-        .btn-primary {
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 10px;
             background-color: var(--primary);
             color: white;
-            width: 100%;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background 0.2s;
+            text-align: center;
         }
 
-        .btn-primary:hover {
+        .btn:hover {
             background-color: var(--primary-hover);
-            transform: translateY(-1px);
         }
 
-        .btn-apply {
-            background-color: transparent;
-            color: var(--primary);
-            border: 1px solid var(--primary);
-            padding: 4px 10px;
-            font-size: 11px;
+        .btn-secondary {
+            background-color: var(--bg-light);
+            color: var(--text);
+            border: 1px solid var(--border);
         }
 
-        .btn-apply:hover {
-            background-color: rgba(13, 110, 253, 0.1);
+        .btn-secondary:hover {
+            background-color: #e9ecef;
         }
 
-        /* TEXTAREA */
+        /* JSON OUTPUT */
         textarea {
             width: 100%;
             height: 150px;
-            padding: 12px;
+            padding: 8px;
             border: 1px solid var(--border);
-            border-radius: 6px;
-            font-family: 'Fira Code', monospace;
-            font-size: 11px;
-            resize: none;
-            background: var(--bg-secondary);
-            color: var(--text);
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-        }
-
-        /* SEARCH BOX */
-        .search-box {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            margin-bottom: 15px;
-            font-size: 13px;
-            box-sizing: border-box;
-        }
-
-        .search-box:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* WIDGET LIST */
-        .widget-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .widget-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: #fff;
-            transition: all 0.2s;
-        }
-
-        .widget-item:hover {
-            border-color: var(--primary);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-
-        .widget-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .widget-name {
-            font-weight: 600;
-            font-size: 13px;
-        }
-
-        .widget-slug {
+            border-radius: 4px;
             font-family: monospace;
-            font-size: 10px;
-            color: var(--primary);
-            background: rgba(13, 110, 253, 0.1);
-            padding: 2px 4px;
-            border-radius: 3px;
-            width: fit-content;
-        }
-
-        .widget-desc {
             font-size: 11px;
-            color: var(--text-muted);
+            resize: vertical;
+            box-sizing: border-box;
+            margin-bottom: 10px;
         }
 
-        /* STATUS MSG */
-        .status {
+        /* STATUS MESSAGES */
+        .status-msg {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
             font-size: 12px;
-            margin-bottom: 10px;
-            min-height: 18px;
             text-align: center;
-            font-weight: 500;
+            display: none;
+        }
+
+        .status-msg.success {
+            background: #d1e7dd;
+            color: #0f5132;
+            display: block;
+        }
+
+        .status-msg.error {
+            background: #f8d7da;
+            color: #842029;
+            display: block;
         }
 
         /* RESIZE HANDLE */
@@ -237,248 +189,381 @@
 
 <body>
 
-    <!-- TABS -->
+    <!-- TABS HEADER -->
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('export')">🚀 Exportar</div>
-        <div class="tab" onclick="switchTab('library')">📚 Biblioteca & Tags</div>
+        <button class="tab-btn active" data-tab="export">Exportar</button>
+        <button class="tab-btn" data-tab="wordpress">WordPress</button>
+        <button class="tab-btn" data-tab="help">Ajuda</button>
     </div>
 
-    <!-- EXPORT TAB -->
-    <div id="export" class="content active">
-        <h2>Exportar Layout</h2>
-        <p>Selecione seus frames no Figma e clique para gerar o JSON.</p>
+    <!-- TAB: EXPORT -->
+    <div id="export" class="tab-content active">
+        <p style="margin-top: 0; color: var(--text-muted);">Selecione um frame no Figma e clique abaixo para gerar o
+            JSON.</p>
 
-        <button class="btn-primary" id="exportBtn">✨ Gerar Código Elementor</button>
+        <button id="exportBtn" class="btn">Exportar para Elementor</button>
 
-        <div class="status" id="statusMsg"></div>
+        <div id="exportStatus" class="status-msg"></div>
 
-        <textarea id="output" placeholder="O código JSON aparecerá aqui..." readonly></textarea>
-
-        <button class="btn-apply" style="width:100%; margin:0; padding:12px;" id="copyBtn">Copiar para Área de
-            Transferência</button>
-
-        <div style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
-            <h3 style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">
-                Ferramentas</h3>
-            <button class="btn-apply" style="width:100%; margin:0; text-align:center;" id="debugBtn">🔍 Debug
-                Estrutura</button>
+        <div style="margin-top: 15px;">
+            <label>JSON Result:</label>
+            <textarea id="jsonOutput" readonly placeholder="O JSON aparecerá aqui..."></textarea>
+            <button id="copyBtn" class="btn btn-secondary">Copiar JSON</button>
         </div>
     </div>
 
-    <!-- LIBRARY TAB -->
-    <div id="library" class="content">
-        <p>Pesquise um widget e clique em <strong>Aplicar</strong> para definir a camada selecionada no Figma
-            automaticamente.</p>
+    <!-- TAB: WORDPRESS -->
+    <div id="wordpress" class="tab-content">
+        <p style="margin-top: 0; color: var(--text-muted);">Configure seu site para upload automático de imagens.</p>
 
-        <input type="text" class="search-box" id="searchWidgets"
-            placeholder="🔍 Pesquisar widget (ex: botão, slide, form)...">
-
-        <div class="widget-list" id="widgetList">
-            <!-- Items will be injected here via JS -->
+        <div class="form-group">
+            <label>URL do Site</label>
+            <input type="url" id="wpUrl" placeholder="https://seusite.com">
         </div>
+
+        <div class="form-group">
+            <label>Usuário</label>
+            <input type="text" id="wpUser" placeholder="admin">
+        </div>
+
+        <div class="form-group">
+            <label>Senha de Aplicação</label>
+            <input type="password" id="wpPassword" placeholder="xxxx xxxx xxxx xxxx">
+            <div class="help-text">Gere em: Usuários > Perfil > Senhas de Aplicação. Não use sua senha de login.</div>
+        </div>
+
+        <button id="saveWpConfig" class="btn">Salvar Configuração</button>
+        <div id="wpStatus" class="status-msg"></div>
+    </div>
+
+    <!-- TAB: HELP -->
+    <div id="help" class="tab-content">
+        <h3>Como usar</h3>
+        <ol style="padding-left: 20px; line-height: 1.6;">
+            <li>Crie seu design usando Auto Layout.</li>
+            <li>Selecione uma camada e clique no botão <strong>Renomear</strong> ao lado do widget desejado na lista
+                abaixo.</li>
+            <li>Configure o WordPress na aba ao lado para uploads de imagem.</li>
+            <li>Selecione o frame principal e clique em <strong>Exportar</strong>.</li>
+            <li>Copie o JSON e cole diretamente no editor do Elementor (Ctrl+V).</li>
+        </ol>
+
+        <style>
+            .widget-category {
+                margin-top: 20px;
+                margin-bottom: 10px;
+                font-weight: 700;
+                color: var(--primary);
+                border-bottom: 1px solid #eee;
+                padding-bottom: 5px;
+            }
+
+            .widget-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+
+            .widget-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 6px 0;
+                border-bottom: 1px solid #f0f0f0;
+                font-size: 12px;
+            }
+
+            .widget-name {
+                color: var(--text);
+            }
+
+            .widget-tag {
+                color: var(--text-muted);
+                font-family: monospace;
+                margin-right: 10px;
+                font-size: 11px;
+            }
+
+            .btn-rename {
+                padding: 2px 8px;
+                font-size: 10px;
+                background: #e9ecef;
+                color: var(--text);
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+
+            .btn-rename:hover {
+                background: var(--primary);
+                color: white;
+                border-color: var(--primary);
+            }
+        </style>
+
+        <div id="widget-list-container"></div>
+
+        <p class="help-text" style="margin-top: 20px;">Versão 1.0.0</p>
     </div>
 
     <!-- RESIZE HANDLE -->
     <div id="resize-handle"></div>
 
     <script>
-        // --- WIDGET DATABASE (COMPLETE) ---
-        const widgets = [
-            // --- BÁSICOS ---
-            { name: "Seção Interna (Container)", slug: "w:container", desc: "Container para colunas.", tags: "layout, coluna, linha, section" },
-            { name: "Seção Externa (Container)", slug: "w:section", desc: "Container principal (Boxed/Full).", tags: "layout, section, container, externo, boxed" },
-            { name: "Título (Heading)", slug: "w:heading", desc: "H1, H2, H3...", tags: "texto, titulo, headline, header" },
-            { name: "Imagem", slug: "w:image", desc: "Imagem simples.", tags: "foto, picture, media" },
-            { name: "Editor de Texto", slug: "w:text-editor", desc: "Parágrafo rico.", tags: "texto, conteudo, paragrafo, wysiwyg" },
-            { name: "Vídeo", slug: "w:video", desc: "YouTube / Vimeo.", tags: "player, filme, media" },
-            { name: "Botão", slug: "w:button", desc: "Botão de ação.", tags: "btn, click, link, cta" },
-            { name: "Divisor", slug: "w:divider", desc: "Linha separadora.", tags: "linha, hr, separador" },
-            { name: "Espaçador", slug: "w:spacer", desc: "Espaço em branco.", tags: "space, gap, margem" },
-            { name: "Google Maps", slug: "w:google-maps", desc: "Mapa integrado.", tags: "localizacao, endereco, mapa" },
-            { name: "Ícone", slug: "w:icon", desc: "Ícone vetorial (FontAwesome).", tags: "svg, simbolo" },
-
-            // --- GERAL (ELEMENTOR FREE) ---
-            { name: "Caixa de Imagem (Image Box)", slug: "w:image-box", desc: "Imagem + Título + Texto.", tags: "card, destaque, servico, caixa de imagem" },
-            { name: "Caixa de Ícone (Icon Box)", slug: "w:icon-box", desc: "Ícone + Título + Texto.", tags: "card, destaque, servico, caixa de icone" },
-            { name: "Avaliação (Star Rating)", slug: "w:star-rating", desc: "Estrelas de avaliação.", tags: "review, estrelas, nota" },
-            { name: "Carrossel de Imagens", slug: "w:image-carousel", desc: "Slider simples de imagens.", tags: "slider, galeria, fotos" },
-            { name: "Galeria Básica", slug: "w:gallery", desc: "Grid de imagens.", tags: "fotos, portfolio, grid" },
-            { name: "Lista de Ícones", slug: "w:icon-list", desc: "Lista com bullets personalizados.", tags: "lista, topicos, check" },
-            { name: "Contador", slug: "w:counter", desc: "Números animados.", tags: "estatistica, numeros, animacao" },
-            { name: "Barra de Progresso", slug: "w:progress", desc: "Barra de porcentagem.", tags: "skills, loading, barra" },
-            { name: "Depoimento", slug: "w:testimonial", desc: "Depoimento único.", tags: "quote, citacao, cliente" },
-            { name: "Abas (Tabs)", slug: "w:tabs", desc: "Conteúdo em abas.", tags: "navegacao, conteudo, tabs" },
-            { name: "Sanfona (Accordion)", slug: "w:accordion", desc: "Lista expansível.", tags: "faq, perguntas, collapse" },
-            { name: "Alternador (Toggle)", slug: "w:toggle", desc: "Similar a sanfona, itens independentes.", tags: "faq, perguntas, collapse" },
-            { name: "Ícones Sociais", slug: "w:social-icons", desc: "Links para redes sociais.", tags: "facebook, instagram, twitter, social" },
-            { name: "Alerta", slug: "w:alert", desc: "Caixa de aviso colorida.", tags: "aviso, mensagem, box" },
-            { name: "SoundCloud", slug: "w:soundcloud", desc: "Áudio player.", tags: "audio, musica, podcast" },
-            { name: "Shortcode", slug: "w:shortcode", desc: "Inserir shortcode WP.", tags: "codigo, plugin" },
-            { name: "HTML", slug: "w:html", desc: "Código HTML puro.", tags: "codigo, script, embed" },
-            { name: "Âncora de Menu", slug: "w:menu-anchor", desc: "Link para rolagem na página.", tags: "scroll, link, id" },
-            { name: "Ler Mais", slug: "w:read-more", desc: "Separador de resumo.", tags: "blog, texto" },
-
-            // --- PRO (ELEMENTOR PRO) ---
-            { name: "Posts", slug: "w:posts", desc: "Grid de blog posts.", tags: "blog, noticias, grid, loop" },
-            { name: "Portfolio", slug: "w:portfolio", desc: "Galeria filtrável.", tags: "projetos, galeria, filtro" },
-            { name: "Galeria Pro", slug: "w:pro-gallery", desc: "Galeria avançada.", tags: "fotos, masonry, grid" },
-            { name: "Slides", slug: "w:slides", desc: "Slider avançado com conteúdo.", tags: "banner, hero, carrossel" },
-            { name: "Formulário", slug: "w:form", desc: "Formulário de contato/lead.", tags: "contato, input, email, form" },
-            { name: "Login", slug: "w:login", desc: "Formulário de login.", tags: "acesso, usuario" },
-            { name: "Slides (Media Carousel)", slug: "w:media-carousel", desc: "Carrossel de mídia.", tags: "slider, video, imagem" },
-            { name: "Carrossel de Depoimentos", slug: "w:testimonial-carousel", desc: "Slider de reviews.", tags: "social proof, clientes" },
-            { name: "Call to Action (CTA)", slug: "w:call-to-action", desc: "Bloco de destaque.", tags: "marketing, banner, botao" },
-            { name: "Flip Box", slug: "w:flip-box", desc: "Caixa que gira.", tags: "animacao, card, frente verso" },
-            { name: "Tabela de Preço", slug: "w:price-table", desc: "Card de plano.", tags: "vendas, preco, plano" },
-            { name: "Lista de Preços", slug: "w:price-list", desc: "Menu estilo restaurante.", tags: "cardapio, lista, preco" },
-            { name: "Contagem Regressiva", slug: "w:countdown", desc: "Timer para datas.", tags: "tempo, lancamento, timer" },
-            { name: "Botões de Compartilhar", slug: "w:share-buttons", desc: "Share social.", tags: "social, compartilhar" },
-            { name: "Blockquote", slug: "w:blockquote", desc: "Citação estilizada.", tags: "texto, citacao" },
-            { name: "Facebook Embed", slug: "w:facebook-embed", desc: "Post do Facebook.", tags: "social, post" },
-            { name: "Facebook Page", slug: "w:facebook-page", desc: "Like box do Facebook.", tags: "social, fanpage" },
-            { name: "Template", slug: "w:template", desc: "Inserir template salvo.", tags: "global, bloco" },
-            { name: "Lottie", slug: "w:lottie", desc: "Animação JSON.", tags: "animacao, vetor, movimento" },
-            { name: "Code Highlight", slug: "w:code-highlight", desc: "Código colorido.", tags: "dev, codigo, sintaxe" },
-            { name: "Playlist de Vídeo", slug: "w:video-playlist", desc: "Lista de vídeos.", tags: "youtube, curso" },
-            { name: "Botão PayPal", slug: "w:paypal-button", desc: "Pagamento.", tags: "loja, pagamento" },
-            { name: "Botão Stripe", slug: "w:stripe-button", desc: "Pagamento.", tags: "loja, pagamento" },
-            { name: "Progress Tracker", slug: "w:progress-tracker", desc: "Passo a passo horizontal/vertical.", tags: "steps, passos, fluxo" },
-
-            // --- WORDPRESS / WOOCOMMERCE ---
-            { name: "Menu de Navegação", slug: "w:nav-menu", desc: "Menu do site.", tags: "header, links, menu" },
-            { name: "Busca", slug: "w:search-form", desc: "Campo de busca.", tags: "pesquisa, find" },
-            { name: "Breadcrumbs", slug: "w:breadcrumbs", desc: "Caminho de navegação.", tags: "seo, links, caminho" },
-            { name: "Sitemap", slug: "w:sitemap", desc: "Mapa do site.", tags: "lista, seo" }
+        // --- WIDGET DATA ---
+        const widgetCategories = [
+            {
+                title: "Widgets Nativos do Elementor (Gratuito)",
+                widgets: [
+                    { name: "Container / Seção", tag: "w:container" },
+                    { name: "Caixa de Imagem (Image Box)", tag: "w:image-box" },
+                    { name: "Caixa de Ícone (Icon Box)", tag: "w:icon-box" },
+                    { name: "Imagem", tag: "w:image" },
+                    { name: "Vídeo", tag: "w:video" },
+                    { name: "Botão", tag: "w:button" },
+                    { name: "Divisor (Divider)", tag: "w:divider" },
+                    { name: "Espaçador", tag: "w:spacer" },
+                    { name: "Título (Heading)", tag: "w:heading" },
+                    { name: "Editor de Texto", tag: "w:text-editor" },
+                    { name: "Galeria Básica", tag: "w:basic-gallery" },
+                    { name: "Lista de Ícones", tag: "w:icon-list" },
+                    { name: "Alerta", tag: "w:alert" },
+                    { name: "SoundCloud", tag: "w:soundcloud" },
+                    { name: "Google Maps", tag: "w:google_maps" },
+                    { name: "Abas (Tabs)", tag: "w:tabs" },
+                    { name: "Acordeão (Accordion)", tag: "w:accordion" },
+                    { name: "Barra de Progresso", tag: "w:progress" },
+                    { name: "Contador", tag: "w:counter" },
+                    { name: "HTML Customizado", tag: "w:html" },
+                    { name: "Shortcode", tag: "w:shortcode" }
+                ]
+            },
+            {
+                title: "Widgets do Elementor Pro",
+                widgets: [
+                    { name: "Formulário", tag: "w:form" },
+                    { name: "Posts", tag: "w:posts" },
+                    { name: "Slides", tag: "w:slides" },
+                    { name: "Testemunhos", tag: "w:testimonial" },
+                    { name: "Portfólio", tag: "w:portfolio" },
+                    { name: "Lista de Preços", tag: "w:price-list" },
+                    { name: "Tabela de Preços", tag: "w:price-table" },
+                    { name: "Call to Action", tag: "w:call-to-action" },
+                    { name: "Flip Box", tag: "w:flip-box" },
+                    { name: "Carrossel de Mídia", tag: "w:media-carousel" },
+                    { name: "Login", tag: "w:login" },
+                    { name: "Menu de Navegação", tag: "w:nav-menu" },
+                    { name: "Busca", tag: "w:search-form" },
+                    { name: "Posts Archive", tag: "w:archive-posts" },
+                    { name: "Breadcrumbs", tag: "w:breadcrumbs" }
+                ]
+            },
+            {
+                title: "Widgets Nativos do WordPress",
+                widgets: [
+                    { name: "Arquivos", tag: "w:wp-archives" },
+                    { name: "Áudio", tag: "w:wp-audio" },
+                    { name: "Calendário", tag: "w:wp-calendar" },
+                    { name: "Categorias", tag: "w:wp-categories" },
+                    { name: "Galeria WP", tag: "w:wp-gallery" },
+                    { name: "Imagem WP", tag: "w:wp-image" },
+                    { name: "Menu Personalizado", tag: "w:wp-custom-menu" },
+                    { name: "Páginas", tag: "w:wp-pages" },
+                    { name: "Pesquisar", tag: "w:wp-search" },
+                    { name: "Posts Recentes", tag: "w:wp-recent-posts" },
+                    { name: "Tag Cloud", tag: "w:wp-tag-cloud" },
+                    { name: "Vídeo WP", tag: "w:wp-video" }
+                ]
+            },
+            {
+                title: "WooCommerce",
+                widgets: [
+                    { name: "Adicionar ao Carrinho", tag: "w:wc-add-to-cart" },
+                    { name: "Grid de Produtos", tag: "w:wc-products" },
+                    { name: "Categorias de Produto", tag: "w:wc-categories" }
+                ]
+            }
         ];
 
-        // Mapeamento Slug -> UI Kit Name
-        const slugToUIKit = { "w:heading": "Heading", "w:text-editor": "Text Editor", "w:image": "Image", "w:button": "Button", "w:divider": "Divider", "w:image-box": "Image Box", "w:icon-box": "Icon Box", "w:star-rating": "Star Rating", "w:image-carousel": "Image Carousel", "w:gallery": "Basic Gallery", "w:icon-list": "Icon List", "w:counter": "Counter", "w:progress": "ProgressBar", "w:testimonial": "Testimonial", "w:tabs": "Tabs", "w:accordion": "Accordion", "w:toggle": "Toggle", "w:social-icons": "Social Icons", "w:alert": "Alert", "w:soundcloud": "SoundCloud", "w:shortcode": "Shortcode", "w:html": "HTML", "w:menu-anchor": "Menu Anchor", "w:read-more": "Read More", "w:container": "Inner Section", "w:section": "Container" };
+        // Render Widget List
+        const container = document.getElementById('widget-list-container');
+        widgetCategories.forEach(cat => {
+            const catTitle = document.createElement('div');
+            catTitle.className = 'widget-category';
+            catTitle.textContent = cat.title;
+            container.appendChild(catTitle);
 
-        // --- RENDER LIBRARY ---
-        const listContainer = document.getElementById('widgetList');
-        const searchInput = document.getElementById('searchWidgets');
+            const list = document.createElement('ul');
+            list.className = 'widget-list';
 
-        function renderList(filter = "") {
-            listContainer.innerHTML = "";
-            const term = filter.toLowerCase();
+            cat.widgets.forEach(widget => {
+                const item = document.createElement('li');
+                item.className = 'widget-item';
+                item.innerHTML = `
+                    <span class="widget-name">${widget.name} <span class="widget-tag">(${widget.tag})</span></span>
+                    <button class="btn-rename" onclick="renameLayer('${widget.tag}')">Renomear</button>
+                `;
+                list.appendChild(item);
+            });
+            container.appendChild(list);
+        });
 
-            const filtered = widgets.filter(w =>
-                w.name.toLowerCase().includes(term) ||
-                w.slug.toLowerCase().includes(term) ||
-                w.tags.toLowerCase().includes(term)
-            );
+        function renameLayer(newName) {
+            parent.postMessage({ pluginMessage: { type: 'rename-layer', newName } }, '*');
+        }
 
-            if (filtered.length === 0) {
-                listContainer.innerHTML = `<div style="text-align:center; color:#666; padding:20px;">Nenhum widget encontrado. <br> Tente usar <code>w:slug-customizado</code></div>`;
+        // --- TABS LOGIC ---
+        const tabs = document.querySelectorAll('.tab-btn');
+        const contents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class
+                tabs.forEach(t => t.classList.remove('active'));
+                contents.forEach(c => c.classList.remove('active'));
+
+                // Add active class
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // --- WORDPRESS CONFIG ---
+        let wpConfig = { url: '', user: '', password: '' };
+
+        document.getElementById('saveWpConfig').onclick = () => {
+            const url = document.getElementById('wpUrl').value.replace(/\/$/, ""); // Remove trailing slash
+            const user = document.getElementById('wpUser').value;
+            const password = document.getElementById('wpPassword').value;
+
+            if (!url || !user || !password) {
+                showStatus('wpStatus', 'Preencha todos os campos.', 'error');
                 return;
             }
 
-            filtered.forEach(w => {
-                const item = document.createElement('div');
-                item.className = 'widget-item';
-                item.innerHTML = `
-          <div class="widget-info">
-            <div class="widget-name">${w.name}</div>
-            <span class="widget-slug">${w.slug}</span>
-            <span class="widget-desc">${w.desc}</span>
-          </div>
-          
-          <div style="display:flex; gap:5px;">
-            <button class="btn-apply" onclick="applyWidget('${w.slug}')" title="Renomear camada selecionada">Tag</button>
-            ${slugToUIKit[w.slug] ? `<button class="btn-apply" style="background:rgba(0,200,83,0.1); color:#00c853; border-color:#00c853;" onclick="createWidget('${w.slug}')" title="Inserir novo componente">Inserir</button>` : ''}
-          </div>
-        `;
+            wpConfig = { url, user, password };
+            // Save to plugin storage via main thread
+            parent.postMessage({ pluginMessage: { type: 'save-wp-config', config: wpConfig } }, '*');
 
-                listContainer.appendChild(item);
-            });
-        }
-
-        // Initial Render
-        renderList();
-
-        // Search Handler
-        searchInput.addEventListener('input', (e) => {
-            renderList(e.target.value);
-        });
-
-        // Apply Handler
-        window.applyWidget = (slug) => {
-            parent.postMessage({ pluginMessage: { type: 'rename-layer', newName: slug } }, '*');
+            showStatus('wpStatus', 'Configuração salva!', 'success');
         };
 
-        // Create Handler
-        window.createWidget = (slug) => {
-            const uiKitName = slugToUIKit[slug];
-            if (uiKitName) {
-                parent.postMessage({ pluginMessage: { type: 'create-component', componentName: uiKitName } }, '*');
-            } else {
-                alert("Este componente ainda não está disponível na biblioteca de inserção.");
-            }
-        };
-
-        // --- TABS LOGIC ---
-        window.switchTab = (tabId) => {
-            document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-
-            // Highlight correct tab
-            const tabs = document.querySelectorAll('.tab');
-            if (tabId === 'export') tabs[0].classList.add('active');
-            if (tabId === 'library') tabs[1].classList.add('active');
+        function showStatus(elementId, msg, type) {
+            const el = document.getElementById(elementId);
+            el.textContent = msg;
+            el.className = 'status-msg ' + type;
+            setTimeout(() => { el.style.display = 'none'; }, 3000);
         }
 
-        // --- MESSAGING LOGIC ---
+        // --- EXPORT LOGIC ---
         document.getElementById('exportBtn').onclick = () => {
+            document.getElementById('jsonOutput').value = 'Processando...';
             parent.postMessage({ pluginMessage: { type: 'export-elementor' } }, '*');
         };
 
-        document.getElementById('debugBtn').onclick = () => {
-            parent.postMessage({ pluginMessage: { type: 'debug-structure' } }, '*');
-        };
-
         document.getElementById('copyBtn').onclick = () => {
-            const textArea = document.getElementById('output');
-            if (!textArea.value) {
-                document.getElementById('statusMsg').textContent = "Nada para copiar. Gere o código primeiro.";
-                return;
-            }
-            textArea.select();
+            const textarea = document.getElementById('jsonOutput');
+            textarea.select();
             document.execCommand('copy');
-            const status = document.getElementById('statusMsg');
-            status.innerHTML = `
-                <div style="text-align: left; padding: 5px;">
-                    Copiado! Para colar, <b>ATIVE</b> no Elementor:
-                    <ul style="margin: 8px 0 0 20px; padding: 0; list-style-type: '✅  ';">
-                        <li><b>Copiar e colar entre sites</b></li>
-                        <li style="margin-top: 4px;"><b>Flexbox Container</b></li>
-                    </ul>
-                    <div style="font-size: 11px; margin-top: 8px; color: var(--text-muted);">(Em: Elementor > Configurações > Recursos)</div>
-                </div>
-            `;
-            status.style.color = 'var(--warning)';
-            setTimeout(() => {
-                status.innerHTML = "";
-                status.style.color = 'var(--success)';
-            }, 12000); // Keep message for 12s
+            document.getElementById('copyBtn').textContent = 'Copiado!';
+            setTimeout(() => document.getElementById('copyBtn').textContent = 'Copiar JSON', 2000);
         };
 
-        window.onmessage = (event) => {
+        // --- MESSAGE HANDLING ---
+        window.onmessage = async (event) => {
             const msg = event.data.pluginMessage;
-            if (msg.type === 'export-result' || msg.type === 'debug-result') {
-                document.getElementById('output').value = msg.data;
-                document.getElementById('statusMsg').textContent = "Sucesso! Código gerado.";
+            if (!msg) return;
 
-                // Auto-copy logic
-                if (msg.type === 'export-result') {
-                    setTimeout(() => {
-                        document.getElementById('copyBtn').click();
-                    }, 100);
+            if (msg.type === 'export-result') {
+                document.getElementById('jsonOutput').value = msg.data;
+                // Auto copy
+                document.getElementById('jsonOutput').select();
+                document.execCommand('copy');
+                showStatus('exportStatus', 'JSON gerado e copiado!', 'success');
+            }
+            else if (msg.type === 'load-wp-config') {
+                if (msg.config) {
+                    wpConfig = msg.config;
+                    document.getElementById('wpUrl').value = wpConfig.url || '';
+                    document.getElementById('wpUser').value = wpConfig.user || '';
+                    document.getElementById('wpPassword').value = wpConfig.password || '';
+                }
+            }
+            else if (msg.type === 'upload-image-request') {
+                // Handle Image Upload
+                const { id, name, mimeType, data } = msg;
+
+                if (!wpConfig.url || !wpConfig.password) {
+                    parent.postMessage({
+                        pluginMessage: {
+                            type: 'upload-image-response',
+                            id,
+                            success: false,
+                            error: 'WP não configurado'
+                        }
+                    }, '*');
+                    return;
+                }
+
+                try {
+                    let blob;
+                    if (typeof data === 'string') {
+                        const byteCharacters = atob(data);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        blob = new Blob([byteArray], { type: mimeType });
+                    } else {
+                        blob = new Blob([data], { type: mimeType });
+                    }
+
+                    const formData = new FormData();
+                    formData.append('file', blob, name);
+                    formData.append('title', name.split('.')[0]);
+                    formData.append('caption', 'Exported from Figma');
+
+                    const response = await fetch(`${wpConfig.url}/wp-json/wp/v2/media`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Basic ' + btoa(`${wpConfig.user}:${wpConfig.password}`)
+                        },
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errText}`);
+                    }
+
+                    const json = await response.json();
+
+                    parent.postMessage({
+                        pluginMessage: {
+                            type: 'upload-image-response',
+                            id,
+                            success: true,
+                            url: json.source_url,
+                            mediaId: json.id
+                        }
+                    }, '*');
+
+                } catch (error) {
+                    console.error("Upload failed:", error);
+                    parent.postMessage({
+                        pluginMessage: {
+                            type: 'upload-image-response',
+                            id,
+                            success: false,
+                            error: error.message
+                        }
+                    }, '*');
                 }
             }
         };
 
-        // --- RESIZE LOGIC (THROTTLED) ---
+        // --- RESIZE LOGIC ---
         const handle = document.getElementById('resize-handle');
         let isResizing = false;
         let animationFrameId = null;
@@ -491,13 +576,10 @@
 
         window.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
-
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
-
             animationFrameId = requestAnimationFrame(() => {
                 const newWidth = Math.max(300, e.clientX + 5);
                 const newHeight = Math.max(400, e.clientY + 5);
-
                 parent.postMessage({
                     pluginMessage: {
                         type: 'resize-window',

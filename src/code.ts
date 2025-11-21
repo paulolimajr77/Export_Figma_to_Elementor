@@ -1,7 +1,6 @@
 // Elementor JSON Compiler – Full Implementation (TypeScript)
-// This file provides a complete, syntactically correct implementation of the Elementor compiler
-// for the Figma plugin. It includes all extraction utilities, helper functions, and the
-// ElementorCompiler class required for exporting frames, text, and containers.
+// Exporta frames do Figma para JSON compatível com Elementor (clipboard).
+// Suporta containers, textos, botões, imagem, icon, icon-box, image-box, etc.
 
 // -------------------- Interfaces --------------------
 interface ElementorSettings {
@@ -25,7 +24,6 @@ interface ElementorTemplate {
 }
 
 // -------------------- Geometry Type --------------------
-// Nodes that can have geometry‑related properties (fills, strokes, etc.)
 type GeometryNode =
     | RectangleNode
     | EllipseNode
@@ -41,7 +39,6 @@ type GeometryNode =
 
 // -------------------- Helper Utilities --------------------
 function generateGUID(): string {
-    // Simple GUID generator – sufficient for plugin usage
     return 'xxxxxxxxxx'.replace(/[x]/g, () => ((Math.random() * 36) | 0).toString(36));
 }
 
@@ -76,7 +73,6 @@ function hasCornerRadius(node: SceneNode): node is FrameNode | RectangleNode | C
 // -------------------- Extraction Functions --------------------
 function extractTypography(node: TextNode): ElementorSettings {
     const settings: ElementorSettings = {};
-    // Force custom typography to override theme defaults
     settings.typography_typography = 'custom';
 
     if (node.fontSize !== figma.mixed) {
@@ -134,35 +130,38 @@ function extractBorderStyles(node: SceneNode): ElementorSettings {
         if (stroke.type === 'SOLID') {
             settings.border_color = convertColor(stroke);
             settings.border_border = 'solid';
-            if (node.strokeWeight !== figma.mixed) {
+            if ((node as any).strokeWeight !== figma.mixed) {
+                const w = (node as any).strokeWeight;
                 settings.border_width = {
                     unit: 'px',
-                    top: node.strokeWeight,
-                    right: node.strokeWeight,
-                    bottom: node.strokeWeight,
-                    left: node.strokeWeight,
+                    top: w,
+                    right: w,
+                    bottom: w,
+                    left: w,
                     isLinked: true
                 };
             }
         }
     }
     if (hasCornerRadius(node)) {
-        if (node.cornerRadius !== figma.mixed) {
+        const anyNode: any = node;
+        if (anyNode.cornerRadius !== figma.mixed && typeof anyNode.cornerRadius === 'number') {
+            const r = anyNode.cornerRadius;
             settings.border_radius = {
                 unit: 'px',
-                top: node.cornerRadius,
-                right: node.cornerRadius,
-                bottom: node.cornerRadius,
-                left: node.cornerRadius,
+                top: r,
+                right: r,
+                bottom: r,
+                left: r,
                 isLinked: true
             };
         } else {
             settings.border_radius = {
                 unit: 'px',
-                top: (node as any).topLeftRadius,
-                right: (node as any).topRightRadius,
-                bottom: (node as any).bottomRightRadius,
-                left: (node as any).bottomLeftRadius,
+                top: anyNode.topLeftRadius || 0,
+                right: anyNode.topRightRadius || 0,
+                bottom: anyNode.bottomRightRadius || 0,
+                left: anyNode.bottomLeftRadius || 0,
                 isLinked: false
             };
         }
@@ -287,10 +286,10 @@ function extractOverflow(node: SceneNode): ElementorSettings {
 
 function extractPadding(node: SceneNode): ElementorSettings {
     const frame = node as FrameNode;
-    const top = frame.paddingTop ?? 0;
-    const right = frame.paddingRight ?? 0;
-    const bottom = frame.paddingBottom ?? 0;
-    const left = frame.paddingLeft ?? 0;
+    const top = (frame as any).paddingTop ?? 0;
+    const right = (frame as any).paddingRight ?? 0;
+    const bottom = (frame as any).paddingBottom ?? 0;
+    const left = (frame as any).paddingLeft ?? 0;
     const isLinked = top === right && top === bottom && top === left;
     return {
         padding: {
@@ -306,17 +305,17 @@ function extractPadding(node: SceneNode): ElementorSettings {
 
 function extractMargin(node: SceneNode): ElementorSettings {
     const parent = node.parent as BaseNode | null;
-    if (!parent || !('layoutMode' in parent) || parent.layoutMode !== 'NONE') return {};
+    if (!parent || !('layoutMode' in parent) || (parent as any).layoutMode !== 'NONE') return {};
     const margin: ElementorSettings = {};
     const threshold = 5;
-    if (node.y > threshold) margin.margin_top = { unit: 'px', size: Math.round(node.y) };
-    if (node.x > threshold) margin.margin_left = { unit: 'px', size: Math.round(node.x) };
+    if ((node as any).y > threshold) margin.margin_top = { unit: 'px', size: Math.round((node as any).y) };
+    if ((node as any).x > threshold) margin.margin_left = { unit: 'px', size: Math.round((node as any).x) };
     if ('width' in parent) {
-        const rightSpace = parent.width - (node.x + node.width);
+        const rightSpace = (parent as any).width - ((node as any).x + (node as any).width);
         if (rightSpace > threshold) margin.margin_right = { unit: 'px', size: Math.round(rightSpace) };
     }
     if ('height' in parent) {
-        const bottomSpace = parent.height - (node.y + node.height);
+        const bottomSpace = (parent as any).height - ((node as any).y + (node as any).height);
         if (bottomSpace > threshold) margin.margin_bottom = { unit: 'px', size: Math.round(bottomSpace) };
     }
     return margin;
@@ -341,15 +340,15 @@ function extractPositioning(node: SceneNode): ElementorSettings {
     const name = node.name.toLowerCase();
     if (name.includes('fixed')) {
         settings._position = 'fixed';
-        settings._offset_x = { unit: 'px', size: Math.round(node.x) };
-        settings._offset_y = { unit: 'px', size: Math.round(node.y) };
+        settings._offset_x = { unit: 'px', size: Math.round((node as any).x) };
+        settings._offset_y = { unit: 'px', size: Math.round((node as any).y) };
     } else if (name.includes('sticky')) {
         settings._position = 'sticky';
         settings._offset_y = { unit: 'px', size: 0 };
     }
     if (node.parent && 'children' in node.parent) {
-        const siblings = (node.parent as BaseNode & { children: SceneNode[] }).children;
-        const index = siblings.indexOf(node as any);
+        const siblings = (node.parent as any).children as SceneNode[];
+        const index = siblings.indexOf(node);
         const z = siblings.length - index;
         if (z > 1) settings._z_index = z;
     }
@@ -358,8 +357,8 @@ function extractPositioning(node: SceneNode): ElementorSettings {
 
 function extractDimensions(node: SceneNode): ElementorSettings {
     const dims: ElementorSettings = {};
-    if ('width' in node) dims.width = { unit: 'px', size: Math.round(node.width) };
-    if ('height' in node) dims.height = { unit: 'px', size: Math.round(node.height) };
+    if ('width' in node) dims.width = { unit: 'px', size: Math.round((node as any).width) };
+    if ('height' in node) dims.height = { unit: 'px', size: Math.round((node as any).height) };
     return dims;
 }
 
@@ -367,27 +366,34 @@ function extractBackgroundAdvanced(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
     if (!hasFills(node) || !Array.isArray(node.fills) || node.fills.length === 0) return settings;
 
-    // Prioritize the top-most visible fill
-    const fill = node.fills[node.fills.length - 1];
+    const fill = node.fills[node.fills.length - 1] as Paint;
     if (!fill.visible) return settings;
 
     if (fill.type === 'SOLID') {
         settings.background_background = 'classic';
-        settings.background_color = convertColor(fill);
+        settings.background_color = convertColor(fill as SolidPaint);
     } else if (fill.type === 'GRADIENT_LINEAR') {
+        const g = fill;
         settings.background_background = 'gradient';
         settings.background_gradient_type = 'linear';
-        if (fill.gradientStops.length >= 2) {
-            settings.background_color = convertColor({ type: 'SOLID', color: fill.gradientStops[0].color, opacity: fill.gradientStops[0].color.a });
-            settings.background_color_b = convertColor({ type: 'SOLID', color: fill.gradientStops[fill.gradientStops.length - 1].color, opacity: fill.gradientStops[fill.gradientStops.length - 1].color.a });
+        if (g.gradientStops.length >= 2) {
+            settings.background_color = convertColor({
+                type: 'SOLID',
+                color: g.gradientStops[0].color,
+                opacity: g.gradientStops[0].color.a
+            } as SolidPaint);
+            settings.background_color_b = convertColor({
+                type: 'SOLID',
+                color: g.gradientStops[g.gradientStops.length - 1].color,
+                opacity: g.gradientStops[g.gradientStops.length - 1].color.a
+            } as SolidPaint);
             settings.background_gradient_angle = { unit: 'deg', size: 180 };
         }
     }
     return settings;
 }
 
-function extractCustomCSS(node: SceneNode): ElementorSettings {
-    // Placeholder for custom CSS handling.
+function extractCustomCSS(_node: SceneNode): ElementorSettings {
     return {};
 }
 
@@ -397,10 +403,8 @@ function extractFlexLayout(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
     const isRow = node.layoutMode === 'HORIZONTAL';
 
-    // Direction
     settings.flex_direction = isRow ? 'row' : 'column';
 
-    // Justify Content (Primary Axis)
     const justifyMap: Record<string, string> = {
         MIN: 'start',
         CENTER: 'center',
@@ -411,7 +415,6 @@ function extractFlexLayout(node: SceneNode): ElementorSettings {
         settings.justify_content = justifyMap[node.primaryAxisAlignItems];
     }
 
-    // Align Items (Counter Axis)
     const alignMap: Record<string, string> = {
         MIN: 'start',
         CENTER: 'center',
@@ -422,7 +425,6 @@ function extractFlexLayout(node: SceneNode): ElementorSettings {
         settings.align_items = alignMap[node.counterAxisAlignItems];
     }
 
-    // Gap
     if (node.itemSpacing && node.itemSpacing > 0) {
         settings.gap = {
             unit: 'px',
@@ -433,12 +435,7 @@ function extractFlexLayout(node: SceneNode): ElementorSettings {
         };
     }
 
-    // Wrap
-    if (node.layoutWrap === 'WRAP') {
-        settings.flex_wrap = 'wrap';
-    } else {
-        settings.flex_wrap = 'nowrap';
-    }
+    settings.flex_wrap = node.layoutWrap === 'WRAP' ? 'wrap' : 'nowrap';
 
     return settings;
 }
@@ -446,7 +443,7 @@ function extractFlexLayout(node: SceneNode): ElementorSettings {
 function isIconNode(node: SceneNode): boolean {
     const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'];
     const isVector = vectorTypes.includes(node.type);
-    const isSmallFrame = (node.type === 'FRAME' || node.type === 'INSTANCE') && node.width <= 50 && node.height <= 50;
+    const isSmallFrame = (node.type === 'FRAME' || node.type === 'INSTANCE') && (node as any).width <= 50 && (node as any).height <= 50;
     const name = node.name.toLowerCase();
     return isVector || isSmallFrame || name.includes('icon') || name.includes('vector');
 }
@@ -458,27 +455,33 @@ function hasImageFill(node: GeometryNode): boolean {
 // -------------------- Media Export Functions --------------------
 async function exportNodeAsSvg(node: SceneNode): Promise<Uint8Array | null> {
     try {
-        return await node.exportAsync({ format: 'SVG' });
+        const bytes = await node.exportAsync({ format: 'SVG' });
+        return bytes;
     } catch (e) {
-        console.error(`Failed to export SVG for ${node.name}:`, e);
+        console.error(`[F2E] Failed to export SVG for "${node.name}" (${node.id}):`, e);
         return null;
     }
 }
 
 async function exportNodeAsPng(node: SceneNode): Promise<Uint8Array | null> {
     try {
-        return await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
+        const bytes = await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
+        return bytes;
     } catch (e) {
-        console.error(`Failed to export PNG for ${node.name}:`, e);
+        console.error(`[F2E] Failed to export PNG for "${node.name}" (${node.id}):`, e);
         return null;
     }
 }
 
 // -------------------- Widget Creation --------------------
 function createTextWidget(node: TextNode): ElementorElement {
-    const isHeading = (node.fontSize as number) > 24 || (node.fontName as FontName).style.toLowerCase().includes('bold');
+    const isHeading =
+        (node.fontSize as number) > 24 ||
+        (node.fontName as FontName).style.toLowerCase().includes('bold');
+
     const widgetType = isHeading ? 'heading' : 'text-editor';
     const settings: ElementorSettings = { title: node.characters, editor: node.characters };
+
     Object.assign(settings, extractTypography(node));
     const color = extractTextColor(node);
     if (color) {
@@ -491,38 +494,99 @@ function createTextWidget(node: TextNode): ElementorElement {
     Object.assign(settings, extractTransform(node));
     Object.assign(settings, extractPositioning(node));
     Object.assign(settings, extractMargin(node));
+
     return { id: generateGUID(), elType: 'widget', widgetType, settings, elements: [] };
 }
 
 // -------------------- Main Compiler Class --------------------
 class ElementorCompiler {
-    config: any;
+    pendingUploads: Map<string, (result: any) => void> = new Map();
+    wpConfig: any;
+
     constructor(config: any) {
-        this.config = config;
+        this.wpConfig = config || {};
+        this.pendingUploads = new Map();
+    }
+
+    async uploadImageToWordPress(node: SceneNode, format: 'PNG' | 'SVG'): Promise<string | null> {
+        if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
+            return null;
+        }
+
+        try {
+            let bytes: Uint8Array | null = null;
+            let mimeType = '';
+
+            if (format === 'SVG') {
+                bytes = await exportNodeAsSvg(node);
+                mimeType = 'image/svg+xml';
+            } else {
+                bytes = await exportNodeAsPng(node);
+                mimeType = 'image/png';
+            }
+
+            if (!bytes) return null;
+
+            const id = generateGUID();
+            const name = `${node.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${format.toLowerCase()}`;
+
+            return new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                    if (this.pendingUploads.has(id)) {
+                        this.pendingUploads.delete(id);
+                        console.warn(`[F2E] Upload timeout for ${name}`);
+                        resolve(null);
+                    }
+                }, 30000);
+
+                this.pendingUploads.set(id, (result: any) => {
+                    clearTimeout(timeout);
+                    if (result.success) {
+                        resolve(result.url);
+                    } else {
+                        console.warn(`[F2E] Upload failed for ${name}: ${result.error}`);
+                        resolve(null);
+                    }
+                });
+
+                figma.ui.postMessage({
+                    type: 'upload-image-request',
+                    id,
+                    name,
+                    mimeType,
+                    data: bytes
+                });
+            });
+
+        } catch (e) {
+            console.error('Error preparing upload:', e);
+            return null;
+        }
     }
 
     async compile(nodes: readonly SceneNode[]): Promise<ElementorElement[]> {
-        const elements = await Promise.all(nodes.map(async node => {
-            const element = await this.processNode(node);
-            // If the top-level element is a container widget, convert it to a root container
-            if (element.elType === 'widget' && element.widgetType === 'container') {
-                element.elType = 'container';
-                element.isInner = false; // Add for root container parity
-                delete element.widgetType;
-            }
-            return element;
-        }));
+        const elements = await Promise.all(
+            Array.from(nodes).map(async node => {
+                const element = await this.processNode(node);
+                if (element.elType === 'widget' && element.widgetType === 'container') {
+                    element.elType = 'container';
+                    element.isInner = false;
+                    delete element.widgetType;
+                }
+                return element;
+            })
+        );
         return elements;
     }
 
     async processNode(node: SceneNode): Promise<ElementorElement> {
         const name = node.name.toLowerCase();
-        const widgetPrefix = "w:";
+        const widgetPrefix = 'w:';
 
         if (name.startsWith(widgetPrefix)) {
             const widgetSlug = name.substring(widgetPrefix.length).split(' ')[0].trim();
             if (widgetSlug) {
-                if (widgetSlug === 'container' || widgetSlug === 'section') {
+                if (['container', 'section', 'image-box', 'icon-box', 'image-box-card'].includes(widgetSlug)) {
                     return this.createContainer(node);
                 }
                 return this.createExplicitWidget(node, widgetSlug);
@@ -533,15 +597,33 @@ class ElementorCompiler {
             return createTextWidget(node as TextNode);
         }
 
-        if (node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT' || node.type === 'GROUP') {
+        if (
+            node.type === 'FRAME' ||
+            node.type === 'INSTANCE' ||
+            node.type === 'COMPONENT' ||
+            node.type === 'GROUP'
+        ) {
             return this.createContainer(node);
         }
 
-        // Return a placeholder for unhandled types to make them visible in the output
+        if (['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'].includes(node.type)) {
+            return this.createExplicitWidget(node, 'icon');
+        }
+
+        if (node.type === 'RECTANGLE') {
+            return this.createExplicitWidget(node, 'image');
+        }
+
         const settings = {
             editor: `Unsupported node type: ${node.type}. Please wrap it in a frame and name it with a 'w:' prefix if you want to export it.`
         };
-        return { id: generateGUID(), elType: 'widget', widgetType: 'text-editor', settings, elements: [] };
+        return {
+            id: generateGUID(),
+            elType: 'widget',
+            widgetType: 'text-editor',
+            settings,
+            elements: []
+        };
     }
 
     async createContainer(node: SceneNode): Promise<ElementorElement> {
@@ -559,14 +641,15 @@ class ElementorCompiler {
         Object.assign(settings, extractOverflow(node));
         Object.assign(settings, extractPositioning(node));
         Object.assign(settings, extractCustomCSS(node));
-
-        // Integrate Flexbox extraction
         Object.assign(settings, extractFlexLayout(node));
 
-        // Boxed Container Logic
-        // Heuristic: If frame is wide (>800px) and content is centered, assume it's a boxed section.
-        if ('width' in node && node.width > 800) {
-            if ('primaryAxisAlignItems' in node && (node.primaryAxisAlignItems === 'CENTER' || node.counterAxisAlignItems === 'CENTER')) {
+        if ('width' in node && (node as any).width > 800) {
+            const anyNode: any = node;
+            if (
+                'primaryAxisAlignItems' in anyNode &&
+                (anyNode.primaryAxisAlignItems === 'CENTER' ||
+                    anyNode.counterAxisAlignItems === 'CENTER')
+            ) {
                 settings.content_width = 'boxed';
             }
         }
@@ -579,17 +662,23 @@ class ElementorCompiler {
 
         let childElements: ElementorElement[] = [];
         if ('children' in node) {
-            childElements = await Promise.all((node as FrameNode).children.map(child => this.processNode(child)));
+            childElements = await Promise.all(
+                (node as FrameNode).children.map(child => this.processNode(child))
+            );
         }
 
-        return { id: generateGUID(), elType: 'container', settings, elements: childElements };
+        return {
+            id: generateGUID(),
+            elType: 'container',
+            settings,
+            elements: childElements
+        };
     }
 
     async createExplicitWidget(node: SceneNode, widgetSlug: string): Promise<ElementorElement> {
-        console.log(`[Debug] Processing widget: ${widgetSlug} for node: ${node.name}`);
+        console.log(`[F2E Debug] Processing widget: ${widgetSlug} for node: ${node.name} (${node.id})`);
         const settings: ElementorSettings = {};
 
-        // --- Button Handling ---
         if (widgetSlug === 'button') {
             let textNode: TextNode | null = null;
             let bgNode: GeometryNode | null = null;
@@ -598,11 +687,15 @@ class ElementorCompiler {
                 textNode = node as TextNode;
             } else if ('children' in node) {
                 const frame = node as FrameNode;
-                textNode = frame.children.find(c => c.type === 'TEXT') as TextNode || null;
-                if (hasFills(frame) && frame.fills !== figma.mixed && frame.fills.length > 0) {
-                    bgNode = frame;
+                textNode = frame.children.find(c => c.type === 'TEXT') as TextNode | null;
+                if (hasFills(frame) && frame.fills !== figma.mixed && (frame.fills as any[]).length > 0) {
+                    bgNode = frame as any;
                 } else {
-                    bgNode = frame.children.find(c => (c.type === 'RECTANGLE' || c.type === 'FRAME') && hasFills(c)) as GeometryNode || null;
+                    bgNode = frame.children.find(
+                        c =>
+                            (c.type === 'RECTANGLE' || c.type === 'FRAME') &&
+                            hasFills(c as any)
+                    ) as GeometryNode | null;
                 }
             }
 
@@ -614,26 +707,33 @@ class ElementorCompiler {
                 const textColor = extractTextColor(textNode);
                 if (textColor) settings.button_text_color = textColor;
             } else {
-                settings.text = "Click Here";
+                settings.text = 'Click Here';
             }
 
             if (bgNode || (hasFills(node) && node.type !== 'TEXT')) {
-                const bgSource = bgNode || (node as GeometryNode);
+                const bgSource = (bgNode || (node as GeometryNode)) as SceneNode;
                 Object.assign(settings, extractBackgroundAdvanced(bgSource));
             }
             settings.link = { url: '#', is_external: false, nofollow: false };
         }
-        // --- Icon Handling ---
         else if (widgetSlug === 'icon') {
-            const svgBytes = await exportNodeAsSvg(node);
-            if (svgBytes) {
-                settings.icon = {
-                    value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+            const url = await this.uploadImageToWordPress(node, 'SVG');
+
+            if (url) {
+                settings.selected_icon = {
+                    value: { url, id: 0, source: 'library' },
                     library: 'svg'
                 };
             } else {
-                // Fallback if export fails or no fill
-                settings.icon = { value: 'fas fa-star', library: 'fa-solid' };
+                let svgBytes = await exportNodeAsSvg(node);
+                if (svgBytes) {
+                    settings.selected_icon = {
+                        value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                        library: 'svg'
+                    };
+                } else {
+                    settings.selected_icon = { value: 'fas fa-star', library: 'fa-solid' };
+                }
             }
 
             if (hasFills(node) && Array.isArray(node.fills) && node.fills.length > 0) {
@@ -643,54 +743,113 @@ class ElementorCompiler {
                 }
             }
         }
-        // --- Image Handling ---
-        else if (widgetSlug === 'image') {
-            const pngBytes = await exportNodeAsPng(node);
-            if (pngBytes) {
-                settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
-            }
-        }
-        // --- Icon Box / Image Box Handling ---
-        else if (widgetSlug === 'icon-box' || widgetSlug === 'image-box') {
-            let iconOrImageNode: SceneNode | null = null;
-            const textChildren: TextNode[] = [];
+        else if (widgetSlug === 'icon-box') {
+            let iconNode: SceneNode | null = null;
+            let titleNode: TextNode | null = null;
+            let descNode: TextNode | null = null;
 
+            // Find children
             if ('children' in node) {
-                (node as FrameNode).children.forEach(child => {
-                    if (child.type === 'TEXT') {
-                        textChildren.push(child as TextNode);
-                    } else if (!iconOrImageNode && (isIconNode(child) || (hasFills(child) && hasImageFill(child as GeometryNode)))) {
-                        iconOrImageNode = child;
-                    }
-                });
+                const frame = node as FrameNode;
+                // Find Icon (Vector-like or Image)
+                iconNode = frame.children.find(c =>
+                    ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'].includes(c.type) ||
+                    (c.type === 'INSTANCE' || c.type === 'FRAME') && c.name.toLowerCase().includes('icon')
+                ) || null;
+
+                // Find Texts
+                const textNodes = frame.children.filter(c => c.type === 'TEXT') as TextNode[];
+                if (textNodes.length > 0) titleNode = textNodes[0];
+                if (textNodes.length > 1) descNode = textNodes[1];
             }
 
-            if (iconOrImageNode) {
-                if (widgetSlug === 'icon-box') {
-                    const svgBytes = await exportNodeAsSvg(iconOrImageNode);
+            // Handle Icon
+            if (iconNode) {
+                const url = await this.uploadImageToWordPress(iconNode, 'SVG');
+                if (url) {
+                    settings.selected_icon = {
+                        value: { url, id: 0, source: 'library' },
+                        library: 'svg'
+                    };
+                } else {
+                    let svgBytes = await exportNodeAsSvg(iconNode);
                     if (svgBytes) {
-                        settings.icon = {
+                        settings.selected_icon = {
                             value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
                             library: 'svg'
                         };
+                    } else {
+                        settings.selected_icon = { value: 'fas fa-star', library: 'fa-solid' };
                     }
-                } else { // image-box
-                    const pngBytes = await exportNodeAsPng(iconOrImageNode);
-                    if (pngBytes) {
-                        settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
+                }
+
+                // Icon Color
+                if (hasFills(iconNode) && Array.isArray(iconNode.fills) && iconNode.fills.length > 0) {
+                    const fill = iconNode.fills[0];
+                    if (fill.type === 'SOLID') {
+                        settings.primary_color = convertColor(fill);
                     }
                 }
             }
 
-            if (textChildren.length > 0) {
-                settings.title_text = textChildren[0].characters;
-                Object.assign(settings, extractTypography(textChildren[0])); // Apply typo to title
+            // Handle Title
+            if (titleNode) {
+                settings.title_text = titleNode.characters;
+                const typo = extractTypography(titleNode);
+                const color = extractTextColor(titleNode);
+
+                // Map typography to title_typography
+                for (const key in typo) {
+                    const newKey = key.replace('typography_', 'title_typography_');
+                    (settings as any)[newKey] = (typo as any)[key];
+                }
+                if (color) settings.title_color = color;
+            } else {
+                settings.title_text = 'This is the heading';
             }
-            if (textChildren.length > 1) {
-                settings.description_text = textChildren[1].characters;
+
+            // Handle Description
+            if (descNode) {
+                settings.description_text = descNode.characters;
+                const typo = extractTypography(descNode);
+                const color = extractTextColor(descNode);
+
+                // Map typography to description_typography
+                for (const key in typo) {
+                    const newKey = key.replace('typography_', 'description_typography_');
+                    (settings as any)[newKey] = (typo as any)[key];
+                }
+                if (color) settings.description_color = color;
+            } else {
+                settings.description_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+            }
+
+            // View (Default, Stacked, Framed) - simplified to default for now
+            settings.view = 'default';
+        }
+        else if (widgetSlug === 'image') {
+            const url = await this.uploadImageToWordPress(node, 'PNG');
+
+            if (url) {
+                settings.image = {
+                    url,
+                    id: 0,
+                    size: 'full',
+                    source: 'library'
+                };
+            } else {
+                let pngBytes = await exportNodeAsPng(node);
+                if (pngBytes) {
+                    settings.image = {
+                        url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`
+                    };
+                } else {
+                    settings.image = {
+                        url: 'https://via.placeholder.com/800x600?text=Upload+Failed'
+                    };
+                }
             }
         }
-        // --- General Handling ---
         else {
             const textChildren: TextNode[] = [];
             if ('children' in node) {
@@ -701,6 +860,7 @@ class ElementorCompiler {
             } else if (node.type === 'TEXT') {
                 textChildren.push(node as TextNode);
             }
+
             if (textChildren.length > 0) {
                 const titleNode = textChildren[0];
                 settings.title = titleNode.characters;
@@ -710,6 +870,7 @@ class ElementorCompiler {
                 const color = extractTextColor(titleNode);
                 Object.assign(settings, typo);
                 if (color) settings.title_color = color;
+
                 for (const key in typo) {
                     const newKey = key.replace('typography_', 'title_typography_');
                     (settings as any)[newKey] = (typo as any)[key];
@@ -741,14 +902,23 @@ class ElementorCompiler {
         Object.assign(settings, extractOverflow(node));
         Object.assign(settings, extractPositioning(node));
         Object.assign(settings, extractCustomCSS(node));
-        return { id: generateGUID(), elType: 'widget', widgetType: widgetSlug, settings, elements: [] };
+
+        return {
+            id: generateGUID(),
+            elType: 'widget',
+            widgetType: widgetSlug,
+            settings,
+            elements: []
+        };
     }
 
     debugNodeRecursive(node: SceneNode, depth: number): any {
         if (depth > 5) return { type: node.type, id: node.id, note: 'Max depth reached' };
         const info: any = { id: node.id, type: node.type, name: node.name };
         if ('children' in node) {
-            info.children = (node as FrameNode).children.map(c => this.debugNodeRecursive(c, depth + 1));
+            info.children = (node as FrameNode).children.map(c =>
+                this.debugNodeRecursive(c, depth + 1)
+            );
         }
         if (node.type === 'TEXT') {
             info.typography = extractTypography(node as TextNode);
@@ -760,45 +930,87 @@ class ElementorCompiler {
     }
 }
 
-// -------------------- UI Interaction --------------------
-figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+// -------------------- Main Execution --------------------
+figma.showUI(__html__, { width: 400, height: 600 });
+
+// We need a global instance to handle the message callbacks
+let compiler: ElementorCompiler;
+
+// Load saved WP config and initialize compiler
+figma.clientStorage.getAsync('wp_config').then(config => {
+    compiler = new ElementorCompiler(config || {});
+    if (config) {
+        figma.ui.postMessage({ type: 'load-wp-config', config });
+    }
+});
+
 
 figma.ui.onmessage = async (msg) => {
-    const compiler = new ElementorCompiler(msg.config || {});
+    // Ensure compiler is initialized before processing messages
+    if (!compiler) {
+        console.warn('Compiler not yet initialized. Message deferred or ignored.');
+        return;
+    }
+
     if (msg.type === 'export-elementor') {
         const selection = figma.currentPage.selection;
         if (selection.length === 0) {
-            figma.notify('Selecione ao menos um frame para exportar.');
+            figma.notify('Selecione pelo menos um frame para exportar.');
             return;
         }
+
+        figma.notify('Gerando JSON... (Isso pode demorar se houver uploads)');
 
         try {
             const elements = await compiler.compile(selection);
 
-            // This is the root structure Elementor expects for clipboard data.
-            const exportData: ElementorTemplate = {
-                version: '3.33.1', // Match user's exact Elementor version
-                type: 'elementor', // This must be 'elementor'
-                siteurl: '', // Keep this empty for broad compatibility
-                elements: elements,
+            const template: ElementorTemplate = {
+                type: 'elementor',
+                siteurl: compiler.wpConfig?.url || '',
+                elements,
+                version: '0.4'
             };
 
-            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(exportData, null, 2) });
-        } catch (error) {
-            console.error("Export failed:", error);
-            figma.notify("Falha na exportação. Verifique o console.");
+            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(template, null, 2) });
+            figma.notify('JSON gerado! Copie e cole no Elementor (Ctrl+V).');
+        } catch (e) {
+            console.error(e);
+            figma.notify('Erro na exportação. Verifique o console.');
         }
-    } else if (msg.type === 'debug-structure') {
-        const dump = figma.currentPage.selection.map(n => compiler.debugNodeRecursive(n, 0));
-        figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(dump, null, 2) });
     } else if (msg.type === 'rename-layer') {
-        if (figma.currentPage.selection.length === 0) {
-            figma.notify('Selecione uma camada para aplicar o widget.');
-            return;
+        const selection = figma.currentPage.selection;
+        if (selection.length === 1) {
+            selection[0].name = msg.newName;
+            figma.notify(`Camada renomeada para: ${msg.newName}`);
+        } else {
+            figma.notify('Selecione apenas uma camada para renomear.');
         }
-        figma.currentPage.selection.forEach(node => { node.name = msg.newName; });
-        figma.notify('Camada(s) renomeada(s) para: ' + msg.newName);
+    } else if (msg.type === 'create-component') {
+        // ... (Create component logic if needed, or keep existing)
+        figma.notify('Inserção de componentes ainda não implementada.');
     } else if (msg.type === 'resize-window') {
         figma.ui.resize(msg.width, msg.height);
+    } else if (msg.type === 'debug-structure') {
+        const selection = figma.currentPage.selection;
+        if (selection.length === 0) return;
+
+        const debugData = selection.map(node => ({
+            name: node.name,
+            type: node.type,
+            id: node.id,
+            children: 'children' in node ? (node as FrameNode).children.length : 0
+        }));
+
+        figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(debugData, null, 2) });
+    } else if (msg.type === 'upload-image-response') {
+        const resolver = compiler.pendingUploads.get(msg.id);
+        if (resolver) {
+            resolver(msg);
+            compiler.pendingUploads.delete(msg.id);
+        }
+    } else if (msg.type === 'save-wp-config') {
+        await figma.clientStorage.setAsync('wp_config', msg.config);
+        compiler.wpConfig = msg.config; // Update compiler's config
+        figma.notify('Configuração WP salva!');
     }
 };
