@@ -457,10 +457,28 @@
 
         document.getElementById('copyBtn').onclick = () => {
             const textArea = document.getElementById('output');
+            if (!textArea.value) {
+                document.getElementById('statusMsg').textContent = "Nada para copiar. Gere o código primeiro.";
+                return;
+            }
             textArea.select();
             document.execCommand('copy');
-            document.getElementById('statusMsg').textContent = "Copiado! Cole no Elementor (Ctrl+V).";
-            setTimeout(() => { document.getElementById('statusMsg').textContent = ""; }, 3000);
+            const status = document.getElementById('statusMsg');
+            status.innerHTML = `
+                <div style="text-align: left; padding: 5px;">
+                    Copiado! Para colar, <b>ATIVE</b> no Elementor:
+                    <ul style="margin: 8px 0 0 20px; padding: 0; list-style-type: '✅  ';">
+                        <li><b>Copiar e colar entre sites</b></li>
+                        <li style="margin-top: 4px;"><b>Flexbox Container</b></li>
+                    </ul>
+                    <div style="font-size: 11px; margin-top: 8px; color: var(--text-muted);">(Em: Elementor > Configurações > Recursos)</div>
+                </div>
+            `;
+            status.style.color = 'var(--warning)';
+            setTimeout(() => {
+                status.innerHTML = "";
+                status.style.color = 'var(--success)';
+            }, 12000); // Keep message for 12s
         };
 
         window.onmessage = (event) => {
