@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 // Elementor JSON Compiler – Full Implementation (TypeScript)
 // This file provides a complete, syntactically correct implementation of the Elementor compiler
 // for the Figma plugin. It includes all extraction utilities, helper functions, and the
@@ -422,6 +431,29 @@ function isIconNode(node) {
 function hasImageFill(node) {
     return hasFills(node) && Array.isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
 }
+// -------------------- Media Export Functions --------------------
+function exportNodeAsSvg(node) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            return yield node.exportAsync({ format: 'SVG' });
+        }
+        catch (e) {
+            console.error(`Failed to export SVG for ${node.name}:`, e);
+            return null;
+        }
+    });
+}
+function exportNodeAsPng(node) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            return yield node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
+        }
+        catch (e) {
+            console.error(`Failed to export PNG for ${node.name}:`, e);
+            return null;
+        }
+    });
+}
 // -------------------- Widget Creation --------------------
 function createTextWidget(node) {
     const isHeading = node.fontSize > 24 || node.fontName.style.toLowerCase().includes('bold');
@@ -447,178 +479,243 @@ class ElementorCompiler {
         this.config = config;
     }
     compile(nodes) {
-        return nodes.map(node => {
-            const element = this.processNode(node);
-            // If the top-level element is a container widget, convert it to a root container
-            if (element.elType === 'widget' && element.widgetType === 'container') {
-                element.elType = 'container';
-                element.isInner = false; // Add for root container parity
-                delete element.widgetType;
-            }
-            return element;
+        return __awaiter(this, void 0, void 0, function* () {
+            const elements = yield Promise.all(nodes.map((node) => __awaiter(this, void 0, void 0, function* () {
+                const element = yield this.processNode(node);
+                // If the top-level element is a container widget, convert it to a root container
+                if (element.elType === 'widget' && element.widgetType === 'container') {
+                    element.elType = 'container';
+                    element.isInner = false; // Add for root container parity
+                    delete element.widgetType;
+                }
+                return element;
+            })));
+            return elements;
         });
     }
     processNode(node) {
-        const name = node.name.toLowerCase();
-        const widgetPrefix = "w:";
-        if (name.startsWith(widgetPrefix)) {
-            const widgetSlug = name.substring(widgetPrefix.length).split(' ')[0].trim();
-            if (widgetSlug) {
-                if (widgetSlug === 'container' || widgetSlug === 'section') {
-                    return this.createContainer(node);
+        return __awaiter(this, void 0, void 0, function* () {
+            const name = node.name.toLowerCase();
+            const widgetPrefix = "w:";
+            if (name.startsWith(widgetPrefix)) {
+                const widgetSlug = name.substring(widgetPrefix.length).split(' ')[0].trim();
+                if (widgetSlug) {
+                    if (widgetSlug === 'container' || widgetSlug === 'section') {
+                        return this.createContainer(node);
+                    }
+                    return this.createExplicitWidget(node, widgetSlug);
                 }
-                return this.createExplicitWidget(node, widgetSlug);
             }
-        }
-        if (node.type === 'TEXT') {
-            return createTextWidget(node);
-        }
-        if (node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT' || node.type === 'GROUP') {
-            return this.createContainer(node);
-        }
-        // Return a placeholder for unhandled types to make them visible in the output
-        const settings = {
-            editor: `Unsupported node type: ${node.type}. Please wrap it in a frame and name it with a 'w:' prefix if you want to export it.`
-        };
-        return { id: generateGUID(), elType: 'widget', widgetType: 'text-editor', settings, elements: [] };
+            if (node.type === 'TEXT') {
+                return createTextWidget(node);
+            }
+            if (node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT' || node.type === 'GROUP') {
+                return this.createContainer(node);
+            }
+            // Return a placeholder for unhandled types to make them visible in the output
+            const settings = {
+                editor: `Unsupported node type: ${node.type}. Please wrap it in a frame and name it with a 'w:' prefix if you want to export it.`
+            };
+            return { id: generateGUID(), elType: 'widget', widgetType: 'text-editor', settings, elements: [] };
+        });
     }
     createContainer(node) {
-        const settings = {};
-        Object.assign(settings, extractBorderStyles(node));
-        Object.assign(settings, extractShadows(node));
-        Object.assign(settings, extractBackgroundAdvanced(node));
-        Object.assign(settings, extractPadding(node));
-        Object.assign(settings, extractDimensions(node));
-        Object.assign(settings, extractOpacity(node));
-        Object.assign(settings, extractTransform(node));
-        Object.assign(settings, extractInnerShadow(node));
-        Object.assign(settings, extractBlendMode(node));
-        Object.assign(settings, extractCSSFilters(node));
-        Object.assign(settings, extractOverflow(node));
-        Object.assign(settings, extractPositioning(node));
-        Object.assign(settings, extractCustomCSS(node));
-        // Integrate Flexbox extraction
-        Object.assign(settings, extractFlexLayout(node));
-        // Boxed Container Logic
-        // Heuristic: If frame is wide (>800px) and content is centered, assume it's a boxed section.
-        if ('width' in node && node.width > 800) {
-            if ('primaryAxisAlignItems' in node && (node.primaryAxisAlignItems === 'CENTER' || node.counterAxisAlignItems === 'CENTER')) {
-                settings.content_width = 'boxed';
+        return __awaiter(this, void 0, void 0, function* () {
+            const settings = {};
+            Object.assign(settings, extractBorderStyles(node));
+            Object.assign(settings, extractShadows(node));
+            Object.assign(settings, extractBackgroundAdvanced(node));
+            Object.assign(settings, extractPadding(node));
+            Object.assign(settings, extractDimensions(node));
+            Object.assign(settings, extractOpacity(node));
+            Object.assign(settings, extractTransform(node));
+            Object.assign(settings, extractInnerShadow(node));
+            Object.assign(settings, extractBlendMode(node));
+            Object.assign(settings, extractCSSFilters(node));
+            Object.assign(settings, extractOverflow(node));
+            Object.assign(settings, extractPositioning(node));
+            Object.assign(settings, extractCustomCSS(node));
+            // Integrate Flexbox extraction
+            Object.assign(settings, extractFlexLayout(node));
+            // Boxed Container Logic
+            // Heuristic: If frame is wide (>800px) and content is centered, assume it's a boxed section.
+            if ('width' in node && node.width > 800) {
+                if ('primaryAxisAlignItems' in node && (node.primaryAxisAlignItems === 'CENTER' || node.counterAxisAlignItems === 'CENTER')) {
+                    settings.content_width = 'boxed';
+                }
             }
-        }
-        if (settings._position === 'absolute') {
-            delete settings._position;
-            delete settings._offset_x;
-            delete settings._offset_y;
-        }
-        let childElements = [];
-        if ('children' in node) {
-            childElements = node.children.map(child => this.processNode(child));
-        }
-        return { id: generateGUID(), elType: 'widget', widgetType: 'container', settings, elements: childElements };
+            if (settings._position === 'absolute') {
+                delete settings._position;
+                delete settings._offset_x;
+                delete settings._offset_y;
+            }
+            let childElements = [];
+            if ('children' in node) {
+                childElements = yield Promise.all(node.children.map(child => this.processNode(child)));
+            }
+            return { id: generateGUID(), elType: 'widget', widgetType: 'container', settings, elements: childElements };
+        });
     }
     createExplicitWidget(node, widgetSlug) {
-        const settings = {};
-        // --- Button Handling ---
-        if (widgetSlug === 'button') {
-            let textNode = null;
-            let bgNode = null;
-            if (node.type === 'TEXT') {
-                textNode = node;
-            }
-            else if ('children' in node) {
-                const frame = node;
-                textNode = frame.children.find(c => c.type === 'TEXT') || null;
-                if (hasFills(frame) && frame.fills !== figma.mixed && frame.fills.length > 0) {
-                    bgNode = frame;
+        return __awaiter(this, void 0, void 0, function* () {
+            const settings = {};
+            // --- Button Handling ---
+            if (widgetSlug === 'button') {
+                let textNode = null;
+                let bgNode = null;
+                if (node.type === 'TEXT') {
+                    textNode = node;
+                }
+                else if ('children' in node) {
+                    const frame = node;
+                    textNode = frame.children.find(c => c.type === 'TEXT') || null;
+                    if (hasFills(frame) && frame.fills !== figma.mixed && frame.fills.length > 0) {
+                        bgNode = frame;
+                    }
+                    else {
+                        bgNode = frame.children.find(c => (c.type === 'RECTANGLE' || c.type === 'FRAME') && hasFills(c)) || null;
+                    }
+                }
+                if (textNode) {
+                    settings.text = textNode.characters;
+                    settings.typography_typography = 'custom';
+                    const typo = extractTypography(textNode);
+                    Object.assign(settings, typo);
+                    const textColor = extractTextColor(textNode);
+                    if (textColor)
+                        settings.button_text_color = textColor;
                 }
                 else {
-                    bgNode = frame.children.find(c => (c.type === 'RECTANGLE' || c.type === 'FRAME') && hasFills(c)) || null;
+                    settings.text = "Click Here";
+                }
+                if (bgNode || (hasFills(node) && node.type !== 'TEXT')) {
+                    const bgSource = bgNode || node;
+                    Object.assign(settings, extractBackgroundAdvanced(bgSource));
+                }
+                settings.link = { url: '#', is_external: false, nofollow: false };
+            }
+            // --- Icon Handling ---
+            else if (widgetSlug === 'icon') {
+                const svgBytes = yield exportNodeAsSvg(node);
+                if (svgBytes) {
+                    settings.icon = {
+                        value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                        library: 'svg'
+                    };
+                }
+                else {
+                    // Fallback if export fails or no fill
+                    settings.icon = { value: 'fas fa-star', library: 'fa-solid' };
+                }
+                if (hasFills(node) && Array.isArray(node.fills) && node.fills.length > 0) {
+                    const fill = node.fills[0];
+                    if (fill.type === 'SOLID') {
+                        settings.primary_color = convertColor(fill);
+                    }
                 }
             }
-            if (textNode) {
-                settings.text = textNode.characters;
-                settings.typography_typography = 'custom';
-                const typo = extractTypography(textNode);
-                Object.assign(settings, typo);
-                const textColor = extractTextColor(textNode);
-                if (textColor)
-                    settings.button_text_color = textColor;
+            // --- Image Handling ---
+            else if (widgetSlug === 'image') {
+                const pngBytes = yield exportNodeAsPng(node);
+                if (pngBytes) {
+                    settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
+                }
             }
+            // --- Icon Box / Image Box Handling ---
+            else if (widgetSlug === 'icon-box' || widgetSlug === 'image-box') {
+                let iconOrImageNode = null;
+                const textChildren = [];
+                if ('children' in node) {
+                    node.children.forEach(child => {
+                        if (child.type === 'TEXT') {
+                            textChildren.push(child);
+                        }
+                        else if (!iconOrImageNode && (isIconNode(child) || (hasFills(child) && hasImageFill(child)))) {
+                            iconOrImageNode = child;
+                        }
+                    });
+                }
+                if (iconOrImageNode) {
+                    if (widgetSlug === 'icon-box') {
+                        const svgBytes = yield exportNodeAsSvg(iconOrImageNode);
+                        if (svgBytes) {
+                            settings.icon = {
+                                value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                                library: 'svg'
+                            };
+                        }
+                    }
+                    else { // image-box
+                        const pngBytes = yield exportNodeAsPng(iconOrImageNode);
+                        if (pngBytes) {
+                            settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
+                        }
+                    }
+                }
+                if (textChildren.length > 0) {
+                    settings.title_text = textChildren[0].characters;
+                    Object.assign(settings, extractTypography(textChildren[0])); // Apply typo to title
+                }
+                if (textChildren.length > 1) {
+                    settings.description_text = textChildren[1].characters;
+                }
+            }
+            // --- General Handling ---
             else {
-                settings.text = "Click Here";
-            }
-            if (bgNode || (hasFills(node) && node.type !== 'TEXT')) {
-                const bgSource = bgNode || node;
-                Object.assign(settings, extractBackgroundAdvanced(bgSource));
-            }
-            settings.link = { url: '#', is_external: false, nofollow: false };
-        }
-        // --- Icon Handling ---
-        else if (widgetSlug === 'icon') {
-            if (hasFills(node) && Array.isArray(node.fills) && node.fills.length > 0) {
-                const fill = node.fills[0];
-                if (fill.type === 'SOLID') {
-                    settings.primary_color = convertColor(fill);
+                const textChildren = [];
+                if ('children' in node) {
+                    const frame = node;
+                    frame.children.forEach(c => {
+                        if (c.type === 'TEXT')
+                            textChildren.push(c);
+                    });
+                }
+                else if (node.type === 'TEXT') {
+                    textChildren.push(node);
+                }
+                if (textChildren.length > 0) {
+                    const titleNode = textChildren[0];
+                    settings.title = titleNode.characters;
+                    settings.title_text = titleNode.characters;
+                    settings.heading = titleNode.characters;
+                    const typo = extractTypography(titleNode);
+                    const color = extractTextColor(titleNode);
+                    Object.assign(settings, typo);
+                    if (color)
+                        settings.title_color = color;
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'title_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                }
+                if (textChildren.length > 1) {
+                    const descNode = textChildren[1];
+                    settings.description_text = descNode.characters;
+                    const typo = extractTypography(descNode);
+                    const color = extractTextColor(descNode);
+                    Object.assign(settings, typo);
+                    if (color)
+                        settings.description_color = color;
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'description_typography_');
+                        settings[newKey] = typo[key];
+                    }
                 }
             }
-            settings.icon = { value: 'fas fa-star', library: 'fa-solid' };
-        }
-        // --- General Handling ---
-        else {
-            const textChildren = [];
-            if ('children' in node) {
-                const frame = node;
-                frame.children.forEach(c => {
-                    if (c.type === 'TEXT')
-                        textChildren.push(c);
-                });
-            }
-            else if (node.type === 'TEXT') {
-                textChildren.push(node);
-            }
-            if (textChildren.length > 0) {
-                const titleNode = textChildren[0];
-                settings.title = titleNode.characters;
-                settings.title_text = titleNode.characters;
-                settings.heading = titleNode.characters;
-                const typo = extractTypography(titleNode);
-                const color = extractTextColor(titleNode);
-                Object.assign(settings, typo);
-                if (color)
-                    settings.title_color = color;
-                for (const key in typo) {
-                    const newKey = key.replace('typography_', 'title_typography_');
-                    settings[newKey] = typo[key];
-                }
-            }
-            if (textChildren.length > 1) {
-                const descNode = textChildren[1];
-                settings.description_text = descNode.characters;
-                const typo = extractTypography(descNode);
-                const color = extractTextColor(descNode);
-                Object.assign(settings, typo);
-                if (color)
-                    settings.description_color = color;
-                for (const key in typo) {
-                    const newKey = key.replace('typography_', 'description_typography_');
-                    settings[newKey] = typo[key];
-                }
-            }
-        }
-        Object.assign(settings, extractBorderStyles(node));
-        Object.assign(settings, extractShadows(node));
-        Object.assign(settings, extractBackgroundAdvanced(node));
-        Object.assign(settings, extractPadding(node));
-        Object.assign(settings, extractOpacity(node));
-        Object.assign(settings, extractTransform(node));
-        Object.assign(settings, extractInnerShadow(node));
-        Object.assign(settings, extractBlendMode(node));
-        Object.assign(settings, extractCSSFilters(node));
-        Object.assign(settings, extractOverflow(node));
-        Object.assign(settings, extractPositioning(node));
-        Object.assign(settings, extractCustomCSS(node));
-        return { id: generateGUID(), elType: 'widget', widgetType: widgetSlug, settings, elements: [] };
+            Object.assign(settings, extractBorderStyles(node));
+            Object.assign(settings, extractShadows(node));
+            Object.assign(settings, extractBackgroundAdvanced(node));
+            Object.assign(settings, extractPadding(node));
+            Object.assign(settings, extractOpacity(node));
+            Object.assign(settings, extractTransform(node));
+            Object.assign(settings, extractInnerShadow(node));
+            Object.assign(settings, extractBlendMode(node));
+            Object.assign(settings, extractCSSFilters(node));
+            Object.assign(settings, extractOverflow(node));
+            Object.assign(settings, extractPositioning(node));
+            Object.assign(settings, extractCustomCSS(node));
+            return { id: generateGUID(), elType: 'widget', widgetType: widgetSlug, settings, elements: [] };
+        });
     }
     debugNodeRecursive(node, depth) {
         if (depth > 5)
@@ -638,7 +735,7 @@ class ElementorCompiler {
 }
 // -------------------- UI Interaction --------------------
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
-figma.ui.onmessage = (msg) => {
+figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
     const compiler = new ElementorCompiler(msg.config || {});
     if (msg.type === 'export-elementor') {
         const selection = figma.currentPage.selection;
@@ -646,15 +743,21 @@ figma.ui.onmessage = (msg) => {
             figma.notify('Selecione ao menos um frame para exportar.');
             return;
         }
-        const elements = compiler.compile(selection);
-        // This is the root structure Elementor expects for clipboard data.
-        const exportData = {
-            version: '3.33.1', // Match user's exact Elementor version
-            type: 'elementor', // This must be 'elementor'
-            siteurl: '', // Keep this empty for broad compatibility
-            elements: elements,
-        };
-        figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(exportData, null, 2) });
+        try {
+            const elements = yield compiler.compile(selection);
+            // This is the root structure Elementor expects for clipboard data.
+            const exportData = {
+                version: '3.33.1', // Match user's exact Elementor version
+                type: 'elementor', // This must be 'elementor'
+                siteurl: '', // Keep this empty for broad compatibility
+                elements: elements,
+            };
+            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(exportData, null, 2) });
+        }
+        catch (error) {
+            console.error("Export failed:", error);
+            figma.notify("Falha na exportação. Verifique o console.");
+        }
     }
     else if (msg.type === 'debug-structure') {
         const dump = figma.currentPage.selection.map(n => compiler.debugNodeRecursive(n, 0));
@@ -671,4 +774,4 @@ figma.ui.onmessage = (msg) => {
     else if (msg.type === 'resize-window') {
         figma.ui.resize(msg.width, msg.height);
     }
-};
+});

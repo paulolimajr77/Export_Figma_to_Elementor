@@ -455,6 +455,25 @@ function hasImageFill(node: GeometryNode): boolean {
     return hasFills(node) && Array.isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
 }
 
+// -------------------- Media Export Functions --------------------
+async function exportNodeAsSvg(node: SceneNode): Promise<Uint8Array | null> {
+    try {
+        return await node.exportAsync({ format: 'SVG' });
+    } catch (e) {
+        console.error(`Failed to export SVG for ${node.name}:`, e);
+        return null;
+    }
+}
+
+async function exportNodeAsPng(node: SceneNode): Promise<Uint8Array | null> {
+    try {
+        return await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
+    } catch (e) {
+        console.error(`Failed to export PNG for ${node.name}:`, e);
+        return null;
+    }
+}
+
 // -------------------- Widget Creation --------------------
 function createTextWidget(node: TextNode): ElementorElement {
     const isHeading = (node.fontSize as number) > 24 || (node.fontName as FontName).style.toLowerCase().includes('bold');
@@ -482,9 +501,9 @@ class ElementorCompiler {
         this.config = config;
     }
 
-    compile(nodes: readonly SceneNode[]): ElementorElement[] {
-        return nodes.map(node => {
-            const element = this.processNode(node);
+    async compile(nodes: readonly SceneNode[]): Promise<ElementorElement[]> {
+        const elements = await Promise.all(nodes.map(async node => {
+            const element = await this.processNode(node);
             // If the top-level element is a container widget, convert it to a root container
             if (element.elType === 'widget' && element.widgetType === 'container') {
                 element.elType = 'container';
@@ -492,10 +511,11 @@ class ElementorCompiler {
                 delete element.widgetType;
             }
             return element;
-        });
+        }));
+        return elements;
     }
 
-    processNode(node: SceneNode): ElementorElement {
+    async processNode(node: SceneNode): Promise<ElementorElement> {
         const name = node.name.toLowerCase();
         const widgetPrefix = "w:";
 
@@ -524,7 +544,7 @@ class ElementorCompiler {
         return { id: generateGUID(), elType: 'widget', widgetType: 'text-editor', settings, elements: [] };
     }
 
-    createContainer(node: SceneNode): ElementorElement {
+    async createContainer(node: SceneNode): Promise<ElementorElement> {
         const settings: ElementorSettings = {};
         Object.assign(settings, extractBorderStyles(node));
         Object.assign(settings, extractShadows(node));
@@ -559,13 +579,13 @@ class ElementorCompiler {
 
         let childElements: ElementorElement[] = [];
         if ('children' in node) {
-            childElements = (node as FrameNode).children.map(child => this.processNode(child));
+            childElements = await Promise.all((node as FrameNode).children.map(child => this.processNode(child)));
         }
 
         return { id: generateGUID(), elType: 'widget', widgetType: 'container', settings, elements: childElements };
     }
 
-    createExplicitWidget(node: SceneNode, widgetSlug: string): ElementorElement {
+    async createExplicitWidget(node: SceneNode, widgetSlug: string): Promise<ElementorElement> {
         const settings: ElementorSettings = {};
 
         // --- Button Handling ---
@@ -604,13 +624,70 @@ class ElementorCompiler {
         }
         // --- Icon Handling ---
         else if (widgetSlug === 'icon') {
+            const svgBytes = await exportNodeAsSvg(node);
+            if (svgBytes) {
+                settings.icon = {
+                    value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                    library: 'svg'
+                };
+            } else {
+                // Fallback if export fails or no fill
+                settings.icon = { value: 'fas fa-star', library: 'fa-solid' };
+            }
+
             if (hasFills(node) && Array.isArray(node.fills) && node.fills.length > 0) {
                 const fill = node.fills[0];
                 if (fill.type === 'SOLID') {
                     settings.primary_color = convertColor(fill);
                 }
             }
-            settings.icon = { value: 'fas fa-star', library: 'fa-solid' };
+        }
+        // --- Image Handling ---
+        else if (widgetSlug === 'image') {
+            const pngBytes = await exportNodeAsPng(node);
+            if (pngBytes) {
+                settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
+            }
+        }
+        // --- Icon Box / Image Box Handling ---
+        else if (widgetSlug === 'icon-box' || widgetSlug === 'image-box') {
+            let iconOrImageNode: SceneNode | null = null;
+            const textChildren: TextNode[] = [];
+
+            if ('children' in node) {
+                (node as FrameNode).children.forEach(child => {
+                    if (child.type === 'TEXT') {
+                        textChildren.push(child as TextNode);
+                    } else if (!iconOrImageNode && (isIconNode(child) || (hasFills(child) && hasImageFill(child as GeometryNode)))) {
+                        iconOrImageNode = child;
+                    }
+                });
+            }
+
+            if (iconOrImageNode) {
+                if (widgetSlug === 'icon-box') {
+                    const svgBytes = await exportNodeAsSvg(iconOrImageNode);
+                    if (svgBytes) {
+                        settings.icon = {
+                            value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                            library: 'svg'
+                        };
+                    }
+                } else { // image-box
+                    const pngBytes = await exportNodeAsPng(iconOrImageNode);
+                    if (pngBytes) {
+                        settings.image = { url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`, id: -1 };
+                    }
+                }
+            }
+
+            if (textChildren.length > 0) {
+                settings.title_text = textChildren[0].characters;
+                Object.assign(settings, extractTypography(textChildren[0])); // Apply typo to title
+            }
+            if (textChildren.length > 1) {
+                settings.description_text = textChildren[1].characters;
+            }
         }
         // --- General Handling ---
         else {
@@ -685,7 +762,7 @@ class ElementorCompiler {
 // -------------------- UI Interaction --------------------
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
 
-figma.ui.onmessage = (msg) => {
+figma.ui.onmessage = async (msg) => {
     const compiler = new ElementorCompiler(msg.config || {});
     if (msg.type === 'export-elementor') {
         const selection = figma.currentPage.selection;
@@ -693,17 +770,23 @@ figma.ui.onmessage = (msg) => {
             figma.notify('Selecione ao menos um frame para exportar.');
             return;
         }
-        const elements = compiler.compile(selection);
 
-        // This is the root structure Elementor expects for clipboard data.
-        const exportData: ElementorTemplate = {
-            version: '3.33.1', // Match user's exact Elementor version
-            type: 'elementor', // This must be 'elementor'
-            siteurl: '', // Keep this empty for broad compatibility
-            elements: elements,
-        };
+        try {
+            const elements = await compiler.compile(selection);
 
-        figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(exportData, null, 2) });
+            // This is the root structure Elementor expects for clipboard data.
+            const exportData: ElementorTemplate = {
+                version: '3.33.1', // Match user's exact Elementor version
+                type: 'elementor', // This must be 'elementor'
+                siteurl: '', // Keep this empty for broad compatibility
+                elements: elements,
+            };
+
+            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(exportData, null, 2) });
+        } catch (error) {
+            console.error("Export failed:", error);
+            figma.notify("Falha na exportação. Verifique o console.");
+        }
     } else if (msg.type === 'debug-structure') {
         const dump = figma.currentPage.selection.map(n => compiler.debugNodeRecursive(n, 0));
         figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(dump, null, 2) });
