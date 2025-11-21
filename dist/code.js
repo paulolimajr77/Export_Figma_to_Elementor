@@ -553,11 +553,12 @@ class ElementorCompiler {
             if ('children' in node) {
                 childElements = yield Promise.all(node.children.map(child => this.processNode(child)));
             }
-            return { id: generateGUID(), elType: 'widget', widgetType: 'container', settings, elements: childElements };
+            return { id: generateGUID(), elType: 'container', settings, elements: childElements };
         });
     }
     createExplicitWidget(node, widgetSlug) {
         return __awaiter(this, void 0, void 0, function* () {
+            console.log(`[Debug] Processing widget: ${widgetSlug} for node: ${node.name}`);
             const settings = {};
             // --- Button Handling ---
             if (widgetSlug === 'button') {

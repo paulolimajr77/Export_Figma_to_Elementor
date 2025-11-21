@@ -582,10 +582,11 @@ class ElementorCompiler {
             childElements = await Promise.all((node as FrameNode).children.map(child => this.processNode(child)));
         }
 
-        return { id: generateGUID(), elType: 'widget', widgetType: 'container', settings, elements: childElements };
+        return { id: generateGUID(), elType: 'container', settings, elements: childElements };
     }
 
     async createExplicitWidget(node: SceneNode, widgetSlug: string): Promise<ElementorElement> {
+        console.log(`[Debug] Processing widget: ${widgetSlug} for node: ${node.name}`);
         const settings: ElementorSettings = {};
 
         // --- Button Handling ---
