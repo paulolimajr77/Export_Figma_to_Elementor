@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+        "target": "es6",
+        "lib": [
+            "es6",
+            "dom",
+            "es2017"
+        ],
+        "strict": true,
+        "typeRoots": [
+            "./node_modules/@types",
+            "./node_modules/@figma"
+        ],
+        "outFile": "./dist/code.js",
+        "skipLibCheck": true,
+        "noImplicitAny": false
+    },
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "backups",
+        "**/*.backup_*"
+    ]
+}

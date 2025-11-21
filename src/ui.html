@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        /* --- RESET & BASE --- */
+        :root {
+            --primary: #0d99ff;
+            --primary-hover: #007be5;
+            --bg: #1e1e1e;
+            --surface: #2c2c2c;
+            --surface-hover: #3a3a3a;
+            --border: #444;
+            --text: #ffffff;
+            --text-muted: #aaaaaa;
+            --success: #00c853;
+            --warning: #ffc107;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-size: 12px;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- TABS --- */
+        .tabs {
+            display: flex;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            height: 45px;
+        }
+
+        .tab {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            font-size: 13px;
+        }
+
+        .tab:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        /* --- CONTENT AREAS --- */
+        .content {
+            display: none;
+            height: calc(100vh - 45px);
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .content.active {
+            display: block;
+        }
+
+        /* --- EXPORT TAB --- */
+        h2 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0 0 20px 0;
+            color: var(--text-muted);
+            line-height: 1.5;
+            font-size: 13px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            background: var(--primary);
+            color: white;
+            transition: background 0.2s;
+            margin-bottom: 16px;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: #a0ffc0;
+            font-family: 'Menlo', monospace;
+            font-size: 12px;
+            padding: 12px;
+            border-radius: 6px;
+            resize: none;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+        }
+
+        .status {
+            font-size: 12px;
+            color: var(--success);
+            min-height: 20px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        /* --- LIBRARY TAB --- */
+        .search-box {
+            width: 100%;
+            padding: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            margin-bottom: 16px;
+            outline: none;
+        }
+
+        .search-box:focus {
+            border-color: var(--primary);
+        }
+
+        .widget-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .widget-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--surface);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .widget-item:hover {
+            background: var(--surface-hover);
+            border-color: var(--border);
+        }
+
+        .widget-info {
+            flex: 1;
+        }
+
+        .widget-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .widget-slug {
+            font-family: monospace;
+            font-size: 11px;
+            color: var(--primary);
+            background: rgba(13, 153, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .widget-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: block;
+        }
+
+        .btn-apply {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 12px;
+            white-space: nowrap;
+        }
+
+        .btn-apply:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* --- RESIZE HANDLE --- */
+        #resize-handle {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: nwse-resize;
+            z-index: 100;
+            background: linear-gradient(135deg, transparent 50%, var(--border) 50%);
+        }
+
+        #resize-handle:hover {
+            background: linear-gradient(135deg, transparent 50%, var(--primary) 50%);
+        }
+
+        /* --- SCROLLBAR --- */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- TABS -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('export')">🚀 Exportar</div>
+        <div class="tab" onclick="switchTab('library')">📚 Biblioteca & Tags</div>
+    </div>
+
+    <!-- EXPORT TAB -->
+    <div id="export" class="content active">
+        <h2>Exportar Layout</h2>
+        <p>Selecione seus frames no Figma e clique para gerar o JSON.</p>
+
+        <button class="btn-primary" id="exportBtn">✨ Gerar Código Elementor</button>
+
+        <div class="status" id="statusMsg"></div>
+
+        <textarea id="output" placeholder="O código JSON aparecerá aqui..." readonly></textarea>
+
+        <button class="btn-apply" style="width:100%; margin:0; padding:12px;" id="copyBtn">Copiar para Área de
+            Transferência</button>
+
+        <div style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
+            <h3 style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">
+                Ferramentas</h3>
+            <button class="btn-apply" style="width:100%; margin:0; text-align:center;" id="debugBtn">🔍 Debug
+                Estrutura</button>
+        </div>
+    </div>
+
+    <!-- LIBRARY TAB -->
+    <div id="library" class="content">
+        <p>Pesquise um widget e clique em <strong>Aplicar</strong> para definir a camada selecionada no Figma
+            automaticamente.</p>
+
+        <input type="text" class="search-box" id="searchWidgets"
+            placeholder="🔍 Pesquisar widget (ex: botão, slide, form)...">
+
+        <div class="widget-list" id="widgetList">
+            <!-- Items will be injected here via JS -->
+        </div>
+    </div>
+
+    <!-- RESIZE HANDLE -->
+    <div id="resize-handle"></div>
+
+    <script>
+        // --- WIDGET DATABASE (COMPLETE) ---
+        const widgets = [
+            // --- BÁSICOS ---
+            { name: "Seção Interna (Container)", slug: "w:container", desc: "Container para colunas.", tags: "layout, coluna, linha, section" },
+            { name: "Título (Heading)", slug: "w:heading", desc: "H1, H2, H3...", tags: "texto, titulo, headline, header" },
+            { name: "Imagem", slug: "w:image", desc: "Imagem simples.", tags: "foto, picture, media" },
+            { name: "Editor de Texto", slug: "w:text-editor", desc: "Parágrafo rico.", tags: "texto, conteudo, paragrafo, wysiwyg" },
+            { name: "Vídeo", slug: "w:video", desc: "YouTube / Vimeo.", tags: "player, filme, media" },
+            { name: "Botão", slug: "w:button", desc: "Botão de ação.", tags: "btn, click, link, cta" },
+            { name: "Divisor", slug: "w:divider", desc: "Linha separadora.", tags: "linha, hr, separador" },
+            { name: "Espaçador", slug: "w:spacer", desc: "Espaço em branco.", tags: "space, gap, margem" },
+            { name: "Google Maps", slug: "w:google-maps", desc: "Mapa integrado.", tags: "localizacao, endereco, mapa" },
+            { name: "Ícone", slug: "w:icon", desc: "Ícone vetorial (FontAwesome).", tags: "svg, simbolo" },
+
+            // --- GERAL (ELEMENTOR FREE) ---
+            { name: "Caixa de Imagem (Image Box)", slug: "w:image-box", desc: "Imagem + Título + Texto.", tags: "card, destaque, servico, caixa de imagem" },
+            { name: "Caixa de Ícone (Icon Box)", slug: "w:icon-box", desc: "Ícone + Título + Texto.", tags: "card, destaque, servico, caixa de icone" },
+            { name: "Avaliação (Star Rating)", slug: "w:star-rating", desc: "Estrelas de avaliação.", tags: "review, estrelas, nota" },
+            { name: "Carrossel de Imagens", slug: "w:image-carousel", desc: "Slider simples de imagens.", tags: "slider, galeria, fotos" },
+            { name: "Galeria Básica", slug: "w:gallery", desc: "Grid de imagens.", tags: "fotos, portfolio, grid" },
+            { name: "Lista de Ícones", slug: "w:icon-list", desc: "Lista com bullets personalizados.", tags: "lista, topicos, check" },
+            { name: "Contador", slug: "w:counter", desc: "Números animados.", tags: "estatistica, numeros, animacao" },
+            { name: "Barra de Progresso", slug: "w:progress", desc: "Barra de porcentagem.", tags: "skills, loading, barra" },
+            { name: "Depoimento", slug: "w:testimonial", desc: "Depoimento único.", tags: "quote, citacao, cliente" },
+            { name: "Abas (Tabs)", slug: "w:tabs", desc: "Conteúdo em abas.", tags: "navegacao, conteudo, tabs" },
+            { name: "Sanfona (Accordion)", slug: "w:accordion", desc: "Lista expansível.", tags: "faq, perguntas, collapse" },
+            { name: "Alternador (Toggle)", slug: "w:toggle", desc: "Similar a sanfona, itens independentes.", tags: "faq, perguntas, collapse" },
+            { name: "Ícones Sociais", slug: "w:social-icons", desc: "Links para redes sociais.", tags: "facebook, instagram, twitter, social" },
+            { name: "Alerta", slug: "w:alert", desc: "Caixa de aviso colorida.", tags: "aviso, mensagem, box" },
+            { name: "SoundCloud", slug: "w:soundcloud", desc: "Áudio player.", tags: "audio, musica, podcast" },
+            { name: "Shortcode", slug: "w:shortcode", desc: "Inserir shortcode WP.", tags: "codigo, plugin" },
+            { name: "HTML", slug: "w:html", desc: "Código HTML puro.", tags: "codigo, script, embed" },
+            { name: "Âncora de Menu", slug: "w:menu-anchor", desc: "Link para rolagem na página.", tags: "scroll, link, id" },
+            { name: "Ler Mais", slug: "w:read-more", desc: "Separador de resumo.", tags: "blog, texto" },
+
+            // --- PRO (ELEMENTOR PRO) ---
+            { name: "Posts", slug: "w:posts", desc: "Grid de blog posts.", tags: "blog, noticias, grid, loop" },
+            { name: "Portfolio", slug: "w:portfolio", desc: "Galeria filtrável.", tags: "projetos, galeria, filtro" },
+            { name: "Galeria Pro", slug: "w:pro-gallery", desc: "Galeria avançada.", tags: "fotos, masonry, grid" },
+            { name: "Slides", slug: "w:slides", desc: "Slider avançado com conteúdo.", tags: "banner, hero, carrossel" },
+            { name: "Formulário", slug: "w:form", desc: "Formulário de contato/lead.", tags: "contato, input, email, form" },
+            { name: "Login", slug: "w:login", desc: "Formulário de login.", tags: "acesso, usuario" },
+            { name: "Slides (Media Carousel)", slug: "w:media-carousel", desc: "Carrossel de mídia.", tags: "slider, video, imagem" },
+            { name: "Carrossel de Depoimentos", slug: "w:testimonial-carousel", desc: "Slider de reviews.", tags: "social proof, clientes" },
+            { name: "Call to Action (CTA)", slug: "w:call-to-action", desc: "Bloco de destaque.", tags: "marketing, banner, botao" },
+            { name: "Flip Box", slug: "w:flip-box", desc: "Caixa que gira.", tags: "animacao, card, frente verso" },
+            { name: "Tabela de Preço", slug: "w:price-table", desc: "Card de plano.", tags: "vendas, preco, plano" },
+            { name: "Lista de Preços", slug: "w:price-list", desc: "Menu estilo restaurante.", tags: "cardapio, lista, preco" },
+            { name: "Contagem Regressiva", slug: "w:countdown", desc: "Timer para datas.", tags: "tempo, lancamento, timer" },
+            { name: "Botões de Compartilhar", slug: "w:share-buttons", desc: "Share social.", tags: "social, compartilhar" },
+            { name: "Blockquote", slug: "w:blockquote", desc: "Citação estilizada.", tags: "texto, citacao" },
+            { name: "Facebook Embed", slug: "w:facebook-embed", desc: "Post do Facebook.", tags: "social, post" },
+            { name: "Facebook Page", slug: "w:facebook-page", desc: "Like box do Facebook.", tags: "social, fanpage" },
+            { name: "Template", slug: "w:template", desc: "Inserir template salvo.", tags: "global, bloco" },
+            { name: "Lottie", slug: "w:lottie", desc: "Animação JSON.", tags: "animacao, vetor, movimento" },
+            { name: "Code Highlight", slug: "w:code-highlight", desc: "Código colorido.", tags: "dev, codigo, sintaxe" },
+            { name: "Playlist de Vídeo", slug: "w:video-playlist", desc: "Lista de vídeos.", tags: "youtube, curso" },
+            { name: "Botão PayPal", slug: "w:paypal-button", desc: "Pagamento.", tags: "loja, pagamento" },
+            { name: "Botão Stripe", slug: "w:stripe-button", desc: "Pagamento.", tags: "loja, pagamento" },
+            { name: "Progress Tracker", slug: "w:progress-tracker", desc: "Passo a passo horizontal/vertical.", tags: "steps, passos, fluxo" },
+
+            // --- WORDPRESS / WOOCOMMERCE ---
+            { name: "Menu de Navegação", slug: "w:nav-menu", desc: "Menu do site.", tags: "header, links, menu" },
+            { name: "Busca", slug: "w:search-form", desc: "Campo de busca.", tags: "pesquisa, find" },
+            { name: "Breadcrumbs", slug: "w:breadcrumbs", desc: "Caminho de navegação.", tags: "seo, links, caminho" },
+            { name: "Sitemap", slug: "w:sitemap", desc: "Mapa do site.", tags: "lista, seo" }
+        ];
+
+        // Mapeamento Slug -> UI Kit Name
+        const slugToUIKit = { "w:heading": "Heading", "w:text-editor": "Text Editor", "w:image": "Image", "w:button": "Button", "w:divider": "Divider", "w:image-box": "Image Box", "w:icon-box": "Icon Box", "w:star-rating": "Star Rating", "w:image-carousel": "Image Carousel", "w:gallery": "Basic Gallery", "w:icon-list": "Icon List", "w:counter": "Counter", "w:progress": "Progress Bar", "w:testimonial": "Testimonial", "w:tabs": "Tabs", "w:accordion": "Accordion", "w:toggle": "Toggle", "w:social-icons": "Social Icons", "w:alert": "Alert", "w:soundcloud": "SoundCloud", "w:shortcode": "Shortcode", "w:html": "HTML", "w:menu-anchor": "Menu Anchor", "w:read-more": "Read More", "w:container": "Inner Section" };
+
+        // --- RENDER LIBRARY ---
+        const listContainer = document.getElementById('widgetList');
+        const searchInput = document.getElementById('searchWidgets');
+
+        function renderList(filter = "") {
+            listContainer.innerHTML = "";
+            const term = filter.toLowerCase();
+
+            const filtered = widgets.filter(w =>
+                w.name.toLowerCase().includes(term) ||
+                w.slug.toLowerCase().includes(term) ||
+                w.tags.toLowerCase().includes(term)
+            );
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `<div style="text-align:center; color:#666; padding:20px;">Nenhum widget encontrado. <br> Tente usar <code>w:slug-customizado</code></div>`;
+                return;
+            }
+
+            filtered.forEach(w => {
+                const item = document.createElement('div');
+                item.className = 'widget-item';
+                item.innerHTML = `
+          <div class="widget-info">
+            <div class="widget-name">${w.name}</div>
+            <span class="widget-slug">${w.slug}</span>
+            <span class="widget-desc">${w.desc}</span>
+          </div>
+          
+          <div style="display:flex; gap:5px;">
+            <button class="btn-apply" onclick="applyWidget('${w.slug}')" title="Renomear camada selecionada">Tag</button>
+            ${slugToUIKit[w.slug] ? `<button class="btn-apply" style="background:rgba(0,200,83,0.1); color:#00c853; border-color:#00c853;" onclick="createWidget('${w.slug}')" title="Inserir novo componente">Inserir</button>` : ''}
+          </div>
+        `;
+
+                listContainer.appendChild(item);
+            });
+        }
+
+        // Initial Render
+        renderList();
+
+        // Search Handler
+        searchInput.addEventListener('input', (e) => {
+            renderList(e.target.value);
+        });
+
+        // Apply Handler
+        window.applyWidget = (slug) => {
+            parent.postMessage({ pluginMessage: { type: 'rename-layer', newName: slug } }, '*');
+        };
+
+        // Create Handler
+        window.createWidget = (slug) => {
+            const uiKitName = slugToUIKit[slug];
+            if (uiKitName) {
+                parent.postMessage({ pluginMessage: { type: 'create-component', componentName: uiKitName } }, '*');
+            } else {
+                alert("Este componente ainda não está disponível na biblioteca de inserção.");
+            }
+        };
+
+        // --- TABS LOGIC ---
+        window.switchTab = (tabId) => {
+            document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+
+            // Highlight correct tab
+            const tabs = document.querySelectorAll('.tab');
+            if (tabId === 'export') tabs[0].classList.add('active');
+            if (tabId === 'library') tabs[1].classList.add('active');
+        }
+
+        // --- MESSAGING LOGIC ---
+        document.getElementById('exportBtn').onclick = () => {
+            parent.postMessage({ pluginMessage: { type: 'export-elementor' } }, '*');
+        };
+
+        document.getElementById('debugBtn').onclick = () => {
+            parent.postMessage({ pluginMessage: { type: 'debug-structure' } }, '*');
+        };
+
+        document.getElementById('copyBtn').onclick = () => {
+            const textArea = document.getElementById('output');
+            textArea.select();
+            document.execCommand('copy');
+            document.getElementById('statusMsg').textContent = "Copiado! Cole no Elementor (Ctrl+V).";
+            setTimeout(() => { document.getElementById('statusMsg').textContent = ""; }, 3000);
+        };
+
+        window.onmessage = (event) => {
+            const msg = event.data.pluginMessage;
+            if (msg.type === 'export-result' || msg.type === 'debug-result') {
+                document.getElementById('output').value = msg.data;
+                document.getElementById('statusMsg').textContent = "Sucesso! Código gerado.";
+            }
+        };
+
+        // --- RESIZE LOGIC (THROTTLED) ---
+        const handle = document.getElementById('resize-handle');
+        let isResizing = false;
+        let animationFrameId = null;
+
+        handle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            e.preventDefault();
+            document.body.style.cursor = 'nwse-resize';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            animationFrameId = requestAnimationFrame(() => {
+                const newWidth = Math.max(300, e.clientX + 5);
+                const newHeight = Math.max(400, e.clientY + 5);
+
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'resize-window',
+                        width: Math.round(newWidth),
+                        height: Math.round(newHeight)
+                    }
+                }, '*');
+            });
+        });
+
+        window.addEventListener('mouseup', () => {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        });
+
+    </script>
+</body>
+
+</html>
