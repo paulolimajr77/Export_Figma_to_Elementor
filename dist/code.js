@@ -554,7 +554,7 @@ class ElementorCompiler {
             if (name.startsWith(widgetPrefix)) {
                 const widgetSlug = name.substring(widgetPrefix.length).split(' ')[0].trim();
                 if (widgetSlug) {
-                    if (['container', 'section', 'image-box-card'].includes(widgetSlug)) {
+                    if (['container', 'section', 'image-box', 'icon-box', 'image-box-card'].includes(widgetSlug)) {
                         return this.createContainer(node);
                     }
                     return this.createExplicitWidget(node, widgetSlug);
@@ -631,17 +631,21 @@ class ElementorCompiler {
     }
     createExplicitWidget(node, widgetSlug) {
         return __awaiter(this, void 0, void 0, function* () {
+            var _a;
             console.log(`[F2E Debug] Processing widget: ${widgetSlug} for node: ${node.name} (${node.id})`);
             const settings = {};
             if (widgetSlug === 'button') {
                 let textNode = null;
                 let bgNode = null;
+                let iconNode = null;
                 if (node.type === 'TEXT') {
                     textNode = node;
                 }
                 else if ('children' in node) {
                     const frame = node;
                     textNode = frame.children.find(c => c.type === 'TEXT');
+                    // Procurar ícone
+                    iconNode = frame.children.find(c => ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'].includes(c.type)) || null;
                     if (hasFills(frame) && frame.fills !== figma.mixed && frame.fills.length > 0) {
                         bgNode = frame;
                     }
@@ -650,6 +654,7 @@ class ElementorCompiler {
                             hasFills(c));
                     }
                 }
+                // Texto do botão
                 if (textNode) {
                     settings.text = textNode.characters;
                     settings.typography_typography = 'custom';
@@ -662,11 +667,64 @@ class ElementorCompiler {
                 else {
                     settings.text = 'Click Here';
                 }
+                // Background
                 if (bgNode || (hasFills(node) && node.type !== 'TEXT')) {
                     const bgSource = (bgNode || node);
-                    Object.assign(settings, extractBackgroundAdvanced(bgSource));
+                    const bgStyles = extractBackgroundAdvanced(bgSource);
+                    if (bgStyles.background_color) {
+                        settings.button_background_color = bgStyles.background_color;
+                    }
                 }
+                // Ícone
+                if (iconNode) {
+                    const iconUrl = yield this.uploadImageToWordPress(iconNode, 'SVG');
+                    if (iconUrl) {
+                        settings.selected_icon = {
+                            value: { url: iconUrl, id: 0, source: 'library' },
+                            library: 'svg'
+                        };
+                    }
+                    else {
+                        const svgBytes = yield exportNodeAsSvg(iconNode);
+                        if (svgBytes) {
+                            settings.selected_icon = {
+                                value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                                library: 'svg'
+                            };
+                        }
+                        else {
+                            settings.selected_icon = { value: 'fas fa-arrow-right', library: 'fa-solid' };
+                        }
+                    }
+                    settings.icon_align = 'right';
+                    settings.icon_indent = { unit: 'px', size: 10 };
+                }
+                // Size baseado na altura
+                if ('height' in node) {
+                    const height = node.height;
+                    if (height < 30)
+                        settings.size = 'xs';
+                    else if (height < 40)
+                        settings.size = 'sm';
+                    else if (height < 50)
+                        settings.size = 'md';
+                    else if (height < 60)
+                        settings.size = 'lg';
+                    else
+                        settings.size = 'xl';
+                }
+                else {
+                    settings.size = 'md';
+                }
+                settings.align = 'left';
                 settings.link = { url: '#', is_external: false, nofollow: false };
+                // Hover (cores padrão)
+                if (settings.button_text_color) {
+                    settings.hover_color = settings.button_text_color;
+                }
+                if (settings.button_background_color) {
+                    settings.button_background_hover_color = settings.button_background_color;
+                }
             }
             else if (widgetSlug === 'icon') {
                 const url = yield this.uploadImageToWordPress(node, 'SVG');
@@ -776,189 +834,94 @@ class ElementorCompiler {
                 // View (Default, Stacked, Framed) - simplified to default for now
                 settings.view = 'default';
             }
-            else if (widgetSlug === 'image-box') {
-                let imageNode = null;
-                let titleNode = null;
-                let descNode = null;
-                // Find children
-                if ('children' in node) {
+            else if (widgetSlug === 'heading') {
+                let textNode = null;
+                if (node.type === 'TEXT') {
+                    textNode = node;
+                }
+                else if ('children' in node) {
                     const frame = node;
-                    // Find Image
-                    imageNode = frame.children.find(c => (c.type === 'RECTANGLE' && hasFills(c)) ||
-                        (c.type === 'INSTANCE' || c.type === 'FRAME') && c.name.toLowerCase().includes('image')) || null;
-                    // Find Texts
-                    const textNodes = frame.children.filter(c => c.type === 'TEXT');
-                    if (textNodes.length > 0)
-                        titleNode = textNodes[0];
-                    if (textNodes.length > 1)
-                        descNode = textNodes[1];
+                    textNode = frame.children.find(c => c.type === 'TEXT');
                 }
-                // Handle Image
-                if (imageNode) {
-                    const url = yield this.uploadImageToWordPress(imageNode, 'PNG');
-                    if (url) {
-                        settings.image = {
-                            url,
-                            id: 0,
-                            size: 'full',
-                            source: 'library'
-                        };
-                    }
-                    else {
-                        let pngBytes = yield exportNodeAsPng(imageNode);
-                        if (pngBytes) {
-                            settings.image = {
-                                url: `data:image/png;base64,${figma.base64Encode(pngBytes)}`
-                            };
-                        }
-                        else {
-                            settings.image = {
-                                url: 'https://via.placeholder.com/800x600?text=Upload+Failed'
-                            };
-                        }
-                    }
-                }
-                // Handle Title
-                if (titleNode) {
-                    settings.title_text = titleNode.characters;
-                    const typo = extractTypography(titleNode);
-                    const color = extractTextColor(titleNode);
-                    // Map typography to title_typography
-                    for (const key in typo) {
-                        const newKey = key.replace('typography_', 'title_typography_');
-                        settings[newKey] = typo[key];
-                    }
+                if (textNode) {
+                    settings.title = textNode.characters;
+                    const typo = extractTypography(textNode);
+                    const color = extractTextColor(textNode);
+                    Object.assign(settings, typo);
                     if (color)
                         settings.title_color = color;
+                    // Detectar tag HTML baseado no tamanho da fonte
+                    const fontSize = ((_a = typo.typography_font_size) === null || _a === void 0 ? void 0 : _a.size) || 32;
+                    if (fontSize >= 48)
+                        settings.header_size = 'h1';
+                    else if (fontSize >= 36)
+                        settings.header_size = 'h2';
+                    else if (fontSize >= 28)
+                        settings.header_size = 'h3';
+                    else if (fontSize >= 24)
+                        settings.header_size = 'h4';
+                    else if (fontSize >= 20)
+                        settings.header_size = 'h5';
+                    else
+                        settings.header_size = 'h6';
                 }
                 else {
-                    settings.title_text = 'This is the heading';
+                    settings.title = 'Your Title Here';
+                    settings.header_size = 'h2';
                 }
-                // Handle Description
-                if (descNode) {
-                    settings.description_text = descNode.characters;
-                    const typo = extractTypography(descNode);
-                    const color = extractTextColor(descNode);
-                    // Map typography to description_typography
-                    for (const key in typo) {
-                        const newKey = key.replace('typography_', 'description_typography_');
-                        settings[newKey] = typo[key];
-                    }
+                settings.align = 'left';
+            }
+            else if (widgetSlug === 'text-editor') {
+                let textNode = null;
+                if (node.type === 'TEXT') {
+                    textNode = node;
+                }
+                else if ('children' in node) {
+                    const frame = node;
+                    textNode = frame.children.find(c => c.type === 'TEXT');
+                }
+                if (textNode) {
+                    // Converter para HTML básico
+                    const text = textNode.characters;
+                    settings.editor = `<p>${text.replace(/\n/g, '</p><p>')}</p>`;
+                    const typo = extractTypography(textNode);
+                    const color = extractTextColor(textNode);
+                    Object.assign(settings, typo);
                     if (color)
-                        settings.description_color = color;
+                        settings.text_color = color;
                 }
                 else {
-                    settings.description_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+                    settings.editor = '<p>Your text here...</p>';
+                }
+                settings.align = 'left';
+                settings.text_columns = 1;
+                settings.column_gap = { unit: 'px', size: 20 };
+            }
+            else if (widgetSlug === 'divider') {
+                settings.style = 'solid';
+                settings.weight = { unit: 'px', size: 1 };
+                settings.width = { unit: '%', size: 100 };
+                settings.align = 'center';
+                settings.gap = { unit: 'px', size: 15 };
+                settings.look = 'line';
+                // Extrair cor da borda se houver
+                const borderStyles = extractBorderStyles(node);
+                if (borderStyles.border_color) {
+                    settings.color = borderStyles.border_color;
+                }
+                else {
+                    settings.color = 'rgba(0, 0, 0, 0.1)';
                 }
             }
-            else if (widgetSlug === 'icon-list') {
-                const iconListItems = [];
-                // Variáveis para estilos globais da lista
-                let firstTextNode = null;
-                let firstIconNode = null;
-                if ('children' in node) {
-                    const frame = node;
-                    // Processar cada item da lista
-                    for (const child of frame.children) {
-                        if (!('children' in child))
-                            continue;
-                        const itemFrame = child;
-                        let iconNode = null;
-                        let textNode = null;
-                        // Encontrar ícone e texto dentro do item
-                        for (const itemChild of itemFrame.children) {
-                            if (itemChild.type === 'TEXT') {
-                                textNode = itemChild;
-                            }
-                            else if (['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE', 'RECTANGLE'].includes(itemChild.type)) {
-                                iconNode = itemChild;
-                            }
-                        }
-                        // Guardar primeiro nó para estilos globais
-                        if (!firstTextNode && textNode)
-                            firstTextNode = textNode;
-                        if (!firstIconNode && iconNode)
-                            firstIconNode = iconNode;
-                        // Criar item da lista
-                        const listItem = {
-                            text: textNode ? textNode.characters : 'List Item',
-                            _id: generateGUID().substring(0, 7)
-                        };
-                        // Processar ícone
-                        if (iconNode) {
-                            const iconUrl = yield this.uploadImageToWordPress(iconNode, 'SVG');
-                            if (iconUrl) {
-                                listItem.selected_icon = {
-                                    value: { url: iconUrl, id: 0, source: 'library' },
-                                    library: 'svg'
-                                };
-                            }
-                            else {
-                                const svgBytes = yield exportNodeAsSvg(iconNode);
-                                if (svgBytes) {
-                                    listItem.selected_icon = {
-                                        value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
-                                        library: 'svg'
-                                    };
-                                }
-                                else {
-                                    listItem.selected_icon = {
-                                        value: 'fas fa-check',
-                                        library: 'fa-solid'
-                                    };
-                                }
-                            }
-                        }
-                        else {
-                            listItem.selected_icon = {
-                                value: 'fas fa-check',
-                                library: 'fa-solid'
-                            };
-                        }
-                        // Link (opcional)
-                        listItem.link = { url: '', is_external: false, nofollow: false };
-                        iconListItems.push(listItem);
-                    }
+            else if (widgetSlug === 'spacer') {
+                // Extrair altura do node
+                let spaceSize = 50;
+                if ('height' in node) {
+                    spaceSize = Math.round(node.height);
                 }
-                // Configurar settings do widget
-                settings.icon_list = iconListItems;
-                // Estilos dos ícones
-                if (firstIconNode) {
-                    if (hasFills(firstIconNode) && Array.isArray(firstIconNode.fills) && firstIconNode.fills.length > 0) {
-                        const fill = firstIconNode.fills[0];
-                        if (fill.type === 'SOLID') {
-                            settings.icon_color = convertColor(fill);
-                        }
-                    }
-                    // Tamanho do ícone baseado nas dimensões
-                    if ('width' in firstIconNode) {
-                        settings.icon_size = {
-                            unit: 'px',
-                            size: Math.round(firstIconNode.width)
-                        };
-                    }
-                }
-                // Estilos do texto
-                if (firstTextNode) {
-                    const textColor = extractTextColor(firstTextNode);
-                    if (textColor)
-                        settings.text_color = textColor;
-                    const typo = extractTypography(firstTextNode);
-                    for (const key in typo) {
-                        const newKey = key.replace('typography_', 'text_typography_');
-                        settings[newKey] = typo[key];
-                    }
-                }
-                // Layout e espaçamento
-                settings.icon_align = 'left';
-                settings.space_between = {
-                    unit: 'px',
-                    size: 10
-                };
-                // Divisor (opcional)
-                settings.divider = 'no';
-                settings.divider_style = 'solid';
-                settings.divider_weight = { unit: 'px', size: 1 };
+                settings.space = { unit: 'px', size: spaceSize };
+                settings.space_tablet = { unit: 'px', size: Math.round(spaceSize * 0.6) };
+                settings.space_mobile = { unit: 'px', size: Math.round(spaceSize * 0.4) };
             }
             else if (widgetSlug === 'image') {
                 const url = yield this.uploadImageToWordPress(node, 'PNG');
@@ -983,6 +946,21 @@ class ElementorCompiler {
                         };
                     }
                 }
+                // Image settings
+                settings.image_size = 'full';
+                settings.align = 'center';
+                settings.caption_source = 'none';
+                settings.link_to = 'none';
+                settings.open_lightbox = 'default';
+                // Dimensões
+                if ('width' in node && 'height' in node) {
+                    const nodeWidth = node.width;
+                    const nodeHeight = node.height;
+                    settings.width = { unit: 'px', size: Math.round(nodeWidth) };
+                    settings.height = 'auto';
+                    settings.object_fit = 'cover';
+                }
+                // CSS Filters (aplicados automaticamente no final)
             }
             else {
                 const textChildren = [];

@@ -682,12 +682,19 @@ class ElementorCompiler {
         if (widgetSlug === 'button') {
             let textNode: TextNode | null = null;
             let bgNode: GeometryNode | null = null;
+            let iconNode: SceneNode | null = null;
 
             if (node.type === 'TEXT') {
                 textNode = node as TextNode;
             } else if ('children' in node) {
                 const frame = node as FrameNode;
                 textNode = frame.children.find(c => c.type === 'TEXT') as TextNode | null;
+
+                // Procurar ícone
+                iconNode = frame.children.find(c =>
+                    ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'].includes(c.type)
+                ) || null;
+
                 if (hasFills(frame) && frame.fills !== figma.mixed && (frame.fills as any[]).length > 0) {
                     bgNode = frame as any;
                 } else {
@@ -699,6 +706,7 @@ class ElementorCompiler {
                 }
             }
 
+            // Texto do botão
             if (textNode) {
                 settings.text = textNode.characters;
                 settings.typography_typography = 'custom';
@@ -710,11 +718,60 @@ class ElementorCompiler {
                 settings.text = 'Click Here';
             }
 
+            // Background
             if (bgNode || (hasFills(node) && node.type !== 'TEXT')) {
                 const bgSource = (bgNode || (node as GeometryNode)) as SceneNode;
-                Object.assign(settings, extractBackgroundAdvanced(bgSource));
+                const bgStyles = extractBackgroundAdvanced(bgSource);
+                if (bgStyles.background_color) {
+                    settings.button_background_color = bgStyles.background_color;
+                }
             }
+
+            // Ícone
+            if (iconNode) {
+                const iconUrl = await this.uploadImageToWordPress(iconNode, 'SVG');
+                if (iconUrl) {
+                    settings.selected_icon = {
+                        value: { url: iconUrl, id: 0, source: 'library' },
+                        library: 'svg'
+                    };
+                } else {
+                    const svgBytes = await exportNodeAsSvg(iconNode);
+                    if (svgBytes) {
+                        settings.selected_icon = {
+                            value: { url: `data:image/svg+xml;base64,${figma.base64Encode(svgBytes)}` },
+                            library: 'svg'
+                        };
+                    } else {
+                        settings.selected_icon = { value: 'fas fa-arrow-right', library: 'fa-solid' };
+                    }
+                }
+                settings.icon_align = 'right';
+                settings.icon_indent = { unit: 'px', size: 10 };
+            }
+
+            // Size baseado na altura
+            if ('height' in node) {
+                const height = (node as any).height;
+                if (height < 30) settings.size = 'xs';
+                else if (height < 40) settings.size = 'sm';
+                else if (height < 50) settings.size = 'md';
+                else if (height < 60) settings.size = 'lg';
+                else settings.size = 'xl';
+            } else {
+                settings.size = 'md';
+            }
+
+            settings.align = 'left';
             settings.link = { url: '#', is_external: false, nofollow: false };
+
+            // Hover (cores padrão)
+            if (settings.button_text_color) {
+                settings.hover_color = settings.button_text_color;
+            }
+            if (settings.button_background_color) {
+                settings.button_background_hover_color = settings.button_background_color;
+            }
         }
         else if (widgetSlug === 'icon') {
             const url = await this.uploadImageToWordPress(node, 'SVG');
@@ -827,6 +884,94 @@ class ElementorCompiler {
             // View (Default, Stacked, Framed) - simplified to default for now
             settings.view = 'default';
         }
+        else if (widgetSlug === 'heading') {
+            let textNode: TextNode | null = null;
+
+            if (node.type === 'TEXT') {
+                textNode = node as TextNode;
+            } else if ('children' in node) {
+                const frame = node as FrameNode;
+                textNode = frame.children.find(c => c.type === 'TEXT') as TextNode | null;
+            }
+
+            if (textNode) {
+                settings.title = textNode.characters;
+                const typo = extractTypography(textNode);
+                const color = extractTextColor(textNode);
+
+                Object.assign(settings, typo);
+                if (color) settings.title_color = color;
+
+                // Detectar tag HTML baseado no tamanho da fonte
+                const fontSize = typo.typography_font_size?.size || 32;
+                if (fontSize >= 48) settings.header_size = 'h1';
+                else if (fontSize >= 36) settings.header_size = 'h2';
+                else if (fontSize >= 28) settings.header_size = 'h3';
+                else if (fontSize >= 24) settings.header_size = 'h4';
+                else if (fontSize >= 20) settings.header_size = 'h5';
+                else settings.header_size = 'h6';
+            } else {
+                settings.title = 'Your Title Here';
+                settings.header_size = 'h2';
+            }
+
+            settings.align = 'left';
+        }
+        else if (widgetSlug === 'text-editor') {
+            let textNode: TextNode | null = null;
+
+            if (node.type === 'TEXT') {
+                textNode = node as TextNode;
+            } else if ('children' in node) {
+                const frame = node as FrameNode;
+                textNode = frame.children.find(c => c.type === 'TEXT') as TextNode | null;
+            }
+
+            if (textNode) {
+                // Converter para HTML básico
+                const text = textNode.characters;
+                settings.editor = `<p>${text.replace(/\n/g, '</p><p>')}</p>`;
+
+                const typo = extractTypography(textNode);
+                const color = extractTextColor(textNode);
+
+                Object.assign(settings, typo);
+                if (color) settings.text_color = color;
+            } else {
+                settings.editor = '<p>Your text here...</p>';
+            }
+
+            settings.align = 'left';
+            settings.text_columns = 1;
+            settings.column_gap = { unit: 'px', size: 20 };
+        }
+        else if (widgetSlug === 'divider') {
+            settings.style = 'solid';
+            settings.weight = { unit: 'px', size: 1 };
+            settings.width = { unit: '%', size: 100 };
+            settings.align = 'center';
+            settings.gap = { unit: 'px', size: 15 };
+            settings.look = 'line';
+
+            // Extrair cor da borda se houver
+            const borderStyles = extractBorderStyles(node);
+            if (borderStyles.border_color) {
+                settings.color = borderStyles.border_color;
+            } else {
+                settings.color = 'rgba(0, 0, 0, 0.1)';
+            }
+        }
+        else if (widgetSlug === 'spacer') {
+            // Extrair altura do node
+            let spaceSize = 50;
+            if ('height' in node) {
+                spaceSize = Math.round((node as any).height);
+            }
+
+            settings.space = { unit: 'px', size: spaceSize };
+            settings.space_tablet = { unit: 'px', size: Math.round(spaceSize * 0.6) };
+            settings.space_mobile = { unit: 'px', size: Math.round(spaceSize * 0.4) };
+        }
         else if (widgetSlug === 'image') {
             const url = await this.uploadImageToWordPress(node, 'PNG');
 
@@ -849,6 +994,25 @@ class ElementorCompiler {
                     };
                 }
             }
+
+            // Image settings
+            settings.image_size = 'full';
+            settings.align = 'center';
+            settings.caption_source = 'none';
+            settings.link_to = 'none';
+            settings.open_lightbox = 'default';
+
+            // Dimensões
+            if ('width' in node && 'height' in node) {
+                const nodeWidth = (node as any).width;
+                const nodeHeight = (node as any).height;
+
+                settings.width = { unit: 'px', size: Math.round(nodeWidth) };
+                settings.height = 'auto';
+                settings.object_fit = 'cover';
+            }
+
+            // CSS Filters (aplicados automaticamente no final)
         }
         else {
             const textChildren: TextNode[] = [];
