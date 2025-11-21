@@ -1014,6 +1014,189 @@ class ElementorCompiler {
 
             // CSS Filters (aplicados automaticamente no final)
         }
+        else if (widgetSlug === 'video') {
+            settings.video_type = 'youtube';
+            settings.youtube_url = 'https://www.youtube.com/watch?v=XHOmBV4js_E';
+            settings.aspect_ratio = '169';
+            settings.autoplay = 'no';
+            settings.mute = 'no';
+        }
+        else if (widgetSlug === 'alert') {
+            let titleNode: TextNode | null = null;
+            let descNode: TextNode | null = null;
+
+            if ('children' in node) {
+                const frame = node as FrameNode;
+                const textNodes = frame.children.filter(c => c.type === 'TEXT') as TextNode[];
+                if (textNodes.length > 0) titleNode = textNodes[0];
+                if (textNodes.length > 1) descNode = textNodes[1];
+            }
+
+            settings.alert_type = 'info';
+            settings.alert_title = titleNode ? titleNode.characters : 'Atenção!';
+            settings.alert_description = descNode ? descNode.characters : 'Mensagem informativa.';
+            settings.show_dismiss = 'yes';
+        }
+        else if (widgetSlug === 'counter') {
+            let numberNode: TextNode | null = null;
+            let titleNode: TextNode | null = null;
+
+            if ('children' in node) {
+                const frame = node as FrameNode;
+                const textNodes = frame.children.filter(c => c.type === 'TEXT') as TextNode[];
+                if (textNodes.length > 0) numberNode = textNodes[0];
+                if (textNodes.length > 1) titleNode = textNodes[1];
+            }
+
+            const numberText = numberNode ? numberNode.characters : '100';
+            settings.starting_number = 0;
+            settings.ending_number = parseInt(numberText.replace(/\D/g, '')) || 100;
+            settings.duration = 2000;
+            settings.thousand_separator = ',';
+            settings.title = titleNode ? titleNode.characters : 'Título';
+
+            if (numberNode) {
+                const typo = extractTypography(numberNode);
+                const color = extractTextColor(numberNode);
+                for (const key in typo) {
+                    const newKey = key.replace('typography_', 'number_typography_');
+                    (settings as any)[newKey] = (typo as any)[key];
+                }
+                if (color) settings.number_color = color;
+            }
+
+            if (titleNode) {
+                const typo = extractTypography(titleNode);
+                const color = extractTextColor(titleNode);
+                for (const key in typo) {
+                    const newKey = key.replace('typography_', 'title_typography_');
+                    (settings as any)[newKey] = (typo as any)[key];
+                }
+                if (color) settings.title_color = color;
+            }
+        }
+        else if (widgetSlug === 'progress') {
+            let titleNode: TextNode | null = null;
+
+            if ('children' in node) {
+                const frame = node as FrameNode;
+                titleNode = frame.children.find(c => c.type === 'TEXT') as TextNode | null;
+            }
+
+            settings.title = titleNode ? titleNode.characters : 'Progresso';
+            settings.percent = { unit: '%', size: 70 };
+            settings.inner_text = 'yes';
+            settings.display_percentage = 'show';
+
+            // Cor da barra baseada no background
+            const bgStyles = extractBackgroundAdvanced(node);
+            if (bgStyles.background_color) {
+                settings.progress_color = bgStyles.background_color;
+            }
+        }
+        else if (widgetSlug === 'accordion') {
+            const items: any[] = [];
+
+            if ('children' in node) {
+                const frame = node as FrameNode;
+                for (const child of frame.children) {
+                    if (!('children' in child)) continue;
+
+                    const itemFrame = child as FrameNode;
+                    const textNodes = itemFrame.children.filter(c => c.type === 'TEXT') as TextNode[];
+
+                    items.push({
+                        tab_title: textNodes[0]?.characters || 'Título do Acordeão',
+                        tab_content: textNodes[1]?.characters || 'Conteúdo do acordeão.',
+                        _id: generateGUID().substring(0, 7)
+                    });
+                }
+            }
+
+            settings.tabs = items.length > 0 ? items : [
+                { tab_title: 'Título 1', tab_content: 'Conteúdo 1', _id: generateGUID().substring(0, 7) }
+            ];
+            settings.selected_item = '1';
+        }
+        else if (widgetSlug === 'tabs') {
+            const items: any[] = [];
+
+            if ('children' in node) {
+                const frame = node as FrameNode;
+                for (const child of frame.children) {
+                    if (!('children' in child)) continue;
+
+                    const itemFrame = child as FrameNode;
+                    const textNodes = itemFrame.children.filter(c => c.type === 'TEXT') as TextNode[];
+
+                    items.push({
+                        tab_title: textNodes[0]?.characters || 'Tab',
+                        tab_content: textNodes[1]?.characters || 'Conteúdo da tab.',
+                        _id: generateGUID().substring(0, 7)
+                    });
+                }
+            }
+
+            settings.tabs = items.length > 0 ? items : [
+                { tab_title: 'Tab 1', tab_content: 'Conteúdo 1', _id: generateGUID().substring(0, 7) }
+            ];
+            settings.type = 'horizontal';
+        }
+        else if (widgetSlug === 'basic-gallery' || widgetSlug === 'gallery') {
+            const galleryImages: any[] = [];
+
+            if ('children' in node) {
+                const frame = node as FrameNode;
+                for (const child of frame.children) {
+                    if (child.type === 'RECTANGLE' || (hasFills(child) && child.type !== 'TEXT')) {
+                        const url = await this.uploadImageToWordPress(child, 'PNG');
+                        if (url) {
+                            galleryImages.push({ id: 0, url });
+                        }
+                    }
+                }
+            }
+
+            settings.gallery = galleryImages.length > 0 ? galleryImages : [];
+            settings.gallery_layout = 'grid';
+            settings.columns = 3;
+            settings.image_size = 'medium';
+            settings.gap = { unit: 'px', size: 10 };
+        }
+        else if (widgetSlug === 'soundcloud') {
+            settings.url = 'https://soundcloud.com/';
+            settings.visual = 'yes';
+            settings.auto_play = 'no';
+        }
+        else if (widgetSlug === 'google-maps' || widgetSlug === 'google_maps') {
+            settings.address = 'São Paulo, Brasil';
+            settings.zoom = { size: 10 };
+            settings.height = { unit: 'px', size: 300 };
+        }
+        else if (widgetSlug === 'html') {
+            let textNode: TextNode | null = null;
+
+            if (node.type === 'TEXT') {
+                textNode = node as TextNode;
+            } else if ('children' in node) {
+                const frame = node as FrameNode;
+                textNode = frame.children.find(c => c.type === 'TEXT') as TextNode | null;
+            }
+
+            settings.html = textNode ? textNode.characters : '<!-- HTML personalizado -->';
+        }
+        else if (widgetSlug === 'shortcode') {
+            let textNode: TextNode | null = null;
+
+            if (node.type === 'TEXT') {
+                textNode = node as TextNode;
+            } else if ('children' in node) {
+                const frame = node as FrameNode;
+                textNode = frame.children.find(c => c.type === 'TEXT') as TextNode | null;
+            }
+
+            settings.shortcode = textNode ? textNode.characters : '[seu_shortcode]';
+        }
         else {
             const textChildren: TextNode[] = [];
             if ('children' in node) {

@@ -631,7 +631,7 @@ class ElementorCompiler {
     }
     createExplicitWidget(node, widgetSlug) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a;
+            var _a, _b, _c, _d, _e;
             console.log(`[F2E Debug] Processing widget: ${widgetSlug} for node: ${node.name} (${node.id})`);
             const settings = {};
             if (widgetSlug === 'button') {
@@ -961,6 +961,176 @@ class ElementorCompiler {
                     settings.object_fit = 'cover';
                 }
                 // CSS Filters (aplicados automaticamente no final)
+            }
+            else if (widgetSlug === 'video') {
+                settings.video_type = 'youtube';
+                settings.youtube_url = 'https://www.youtube.com/watch?v=XHOmBV4js_E';
+                settings.aspect_ratio = '169';
+                settings.autoplay = 'no';
+                settings.mute = 'no';
+            }
+            else if (widgetSlug === 'alert') {
+                let titleNode = null;
+                let descNode = null;
+                if ('children' in node) {
+                    const frame = node;
+                    const textNodes = frame.children.filter(c => c.type === 'TEXT');
+                    if (textNodes.length > 0)
+                        titleNode = textNodes[0];
+                    if (textNodes.length > 1)
+                        descNode = textNodes[1];
+                }
+                settings.alert_type = 'info';
+                settings.alert_title = titleNode ? titleNode.characters : 'Atenção!';
+                settings.alert_description = descNode ? descNode.characters : 'Mensagem informativa.';
+                settings.show_dismiss = 'yes';
+            }
+            else if (widgetSlug === 'counter') {
+                let numberNode = null;
+                let titleNode = null;
+                if ('children' in node) {
+                    const frame = node;
+                    const textNodes = frame.children.filter(c => c.type === 'TEXT');
+                    if (textNodes.length > 0)
+                        numberNode = textNodes[0];
+                    if (textNodes.length > 1)
+                        titleNode = textNodes[1];
+                }
+                const numberText = numberNode ? numberNode.characters : '100';
+                settings.starting_number = 0;
+                settings.ending_number = parseInt(numberText.replace(/\D/g, '')) || 100;
+                settings.duration = 2000;
+                settings.thousand_separator = ',';
+                settings.title = titleNode ? titleNode.characters : 'Título';
+                if (numberNode) {
+                    const typo = extractTypography(numberNode);
+                    const color = extractTextColor(numberNode);
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'number_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                    if (color)
+                        settings.number_color = color;
+                }
+                if (titleNode) {
+                    const typo = extractTypography(titleNode);
+                    const color = extractTextColor(titleNode);
+                    for (const key in typo) {
+                        const newKey = key.replace('typography_', 'title_typography_');
+                        settings[newKey] = typo[key];
+                    }
+                    if (color)
+                        settings.title_color = color;
+                }
+            }
+            else if (widgetSlug === 'progress') {
+                let titleNode = null;
+                if ('children' in node) {
+                    const frame = node;
+                    titleNode = frame.children.find(c => c.type === 'TEXT');
+                }
+                settings.title = titleNode ? titleNode.characters : 'Progresso';
+                settings.percent = { unit: '%', size: 70 };
+                settings.inner_text = 'yes';
+                settings.display_percentage = 'show';
+                // Cor da barra baseada no background
+                const bgStyles = extractBackgroundAdvanced(node);
+                if (bgStyles.background_color) {
+                    settings.progress_color = bgStyles.background_color;
+                }
+            }
+            else if (widgetSlug === 'accordion') {
+                const items = [];
+                if ('children' in node) {
+                    const frame = node;
+                    for (const child of frame.children) {
+                        if (!('children' in child))
+                            continue;
+                        const itemFrame = child;
+                        const textNodes = itemFrame.children.filter(c => c.type === 'TEXT');
+                        items.push({
+                            tab_title: ((_b = textNodes[0]) === null || _b === void 0 ? void 0 : _b.characters) || 'Título do Acordeão',
+                            tab_content: ((_c = textNodes[1]) === null || _c === void 0 ? void 0 : _c.characters) || 'Conteúdo do acordeão.',
+                            _id: generateGUID().substring(0, 7)
+                        });
+                    }
+                }
+                settings.tabs = items.length > 0 ? items : [
+                    { tab_title: 'Título 1', tab_content: 'Conteúdo 1', _id: generateGUID().substring(0, 7) }
+                ];
+                settings.selected_item = '1';
+            }
+            else if (widgetSlug === 'tabs') {
+                const items = [];
+                if ('children' in node) {
+                    const frame = node;
+                    for (const child of frame.children) {
+                        if (!('children' in child))
+                            continue;
+                        const itemFrame = child;
+                        const textNodes = itemFrame.children.filter(c => c.type === 'TEXT');
+                        items.push({
+                            tab_title: ((_d = textNodes[0]) === null || _d === void 0 ? void 0 : _d.characters) || 'Tab',
+                            tab_content: ((_e = textNodes[1]) === null || _e === void 0 ? void 0 : _e.characters) || 'Conteúdo da tab.',
+                            _id: generateGUID().substring(0, 7)
+                        });
+                    }
+                }
+                settings.tabs = items.length > 0 ? items : [
+                    { tab_title: 'Tab 1', tab_content: 'Conteúdo 1', _id: generateGUID().substring(0, 7) }
+                ];
+                settings.type = 'horizontal';
+            }
+            else if (widgetSlug === 'basic-gallery' || widgetSlug === 'gallery') {
+                const galleryImages = [];
+                if ('children' in node) {
+                    const frame = node;
+                    for (const child of frame.children) {
+                        if (child.type === 'RECTANGLE' || (hasFills(child) && child.type !== 'TEXT')) {
+                            const url = yield this.uploadImageToWordPress(child, 'PNG');
+                            if (url) {
+                                galleryImages.push({ id: 0, url });
+                            }
+                        }
+                    }
+                }
+                settings.gallery = galleryImages.length > 0 ? galleryImages : [];
+                settings.gallery_layout = 'grid';
+                settings.columns = 3;
+                settings.image_size = 'medium';
+                settings.gap = { unit: 'px', size: 10 };
+            }
+            else if (widgetSlug === 'soundcloud') {
+                settings.url = 'https://soundcloud.com/';
+                settings.visual = 'yes';
+                settings.auto_play = 'no';
+            }
+            else if (widgetSlug === 'google-maps' || widgetSlug === 'google_maps') {
+                settings.address = 'São Paulo, Brasil';
+                settings.zoom = { size: 10 };
+                settings.height = { unit: 'px', size: 300 };
+            }
+            else if (widgetSlug === 'html') {
+                let textNode = null;
+                if (node.type === 'TEXT') {
+                    textNode = node;
+                }
+                else if ('children' in node) {
+                    const frame = node;
+                    textNode = frame.children.find(c => c.type === 'TEXT');
+                }
+                settings.html = textNode ? textNode.characters : '<!-- HTML personalizado -->';
+            }
+            else if (widgetSlug === 'shortcode') {
+                let textNode = null;
+                if (node.type === 'TEXT') {
+                    textNode = node;
+                }
+                else if ('children' in node) {
+                    const frame = node;
+                    textNode = frame.children.find(c => c.type === 'TEXT');
+                }
+                settings.shortcode = textNode ? textNode.characters : '[seu_shortcode]';
             }
             else {
                 const textChildren = [];
