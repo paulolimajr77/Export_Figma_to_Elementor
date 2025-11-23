@@ -1,0 +1,33 @@
+--- a/src/ui.html
++++ b/src/ui.html
+@@ -201,6 +201,7 @@
+             JSON.</p>
+ 
+         <button id="exportBtn" class="btn">Exportar para Elementor</button>
++        <button id="debugBtn" class="btn btn-secondary" style="margin-top: 10px;">🐛 Debug Structure</button>
+ 
+         <div id="exportStatus" class="status-msg"></div>
+ 
+@@ -467,6 +468,11 @@
+             setTimeout(() => document.getElementById('copyBtn').textContent = 'Copiar JSON', 2000);
+         };
+ 
++        document.getElementById('debugBtn').onclick = () => {
++            document.getElementById('jsonOutput').value = 'Gerando debug...';
++            parent.postMessage({ pluginMessage: { type: 'debug-structure' } }, '*');
++        };
++
+         // --- MESSAGE HANDLING ---
+         window.onmessage = async (event) => {
+             const msg = event.data.pluginMessage;
+@@ -479,6 +485,10 @@
+                 document.execCommand('copy');
+                 showStatus('exportStatus', 'JSON gerado e copiado!', 'success');
+             }
++            else if (msg.type === 'debug-result') {
++                document.getElementById('jsonOutput').value = msg.data;
++                showStatus('exportStatus', 'Debug gerado!', 'success');
++            }
+             else if (msg.type === 'load-wp-config') {
+                 if (msg.config) {
+                     wpConfig = msg.config;
