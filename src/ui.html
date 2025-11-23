@@ -15,12 +15,10 @@
             --input-bg: #ffffff;
             --code-bg: #f0f0f0;
             --log-bg: #fff0f0;
-            /* Levemente avermelhado para diferenciar logs se quiser, ou neutro */
-            --section-header: #fafafa;
             --tree-line: #ddd;
         }
 
-        /* Dark Mode Support */
+        /* Dark Mode */
         @media (prefers-color-scheme: dark) {
             :root {
                 --bg: #2c2c2c;
@@ -30,9 +28,12 @@
                 --input-bg: #3a3a3a;
                 --code-bg: #1e1e1e;
                 --log-bg: #252525;
-                --section-header: #333;
                 --tree-line: #555;
             }
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
@@ -67,6 +68,9 @@
             border-bottom: 2px solid transparent;
             opacity: 0.6;
             transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .tab-btn.active {
@@ -79,19 +83,26 @@
             background-color: var(--hover);
         }
 
-        /* Content Areas */
+        /* Content Containers */
         .content {
             flex: 1;
             overflow-y: auto;
             padding: 16px;
             display: none;
+            padding-bottom: 40px;
+            /* Espaço para o resizer */
         }
 
         .content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #tab-help.content.active {
             display: block;
         }
 
-        /* Forms & Inputs */
+        /* Inputs */
         .form-group {
             margin-bottom: 16px;
         }
@@ -114,7 +125,6 @@
             border-radius: 4px;
             background-color: var(--input-bg);
             color: var(--text);
-            box-sizing: border-box;
             font-family: inherit;
         }
 
@@ -122,6 +132,23 @@
         textarea:focus {
             outline: 2px solid var(--primary);
             border-color: transparent;
+        }
+
+        /* Range Input Wrapper */
+        .range-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .range-wrapper input {
+            flex: 1;
+        }
+
+        .range-wrapper span {
+            font-weight: 600;
+            width: 40px;
+            text-align: right;
         }
 
         /* Buttons */
@@ -164,51 +191,190 @@
             width: auto;
         }
 
-        /* Output Area */
+        /* Textareas */
         #output-area {
             height: 120px;
-            /* Reduzido levemente para caber o log */
             font-family: monospace;
             font-size: 11px;
-            white-space: pre;
             background-color: var(--code-bg);
             resize: vertical;
             margin-bottom: 12px;
+            white-space: pre;
         }
 
-        /* Log Area (NOVO) */
         #log-area {
             height: 100px;
             font-family: 'Courier New', monospace;
             font-size: 10px;
             background-color: var(--code-bg);
-            /* ou var(--log-bg) */
             color: var(--text);
             border: 1px solid var(--border);
             resize: vertical;
             padding: 8px;
             line-height: 1.3;
+            white-space: pre-wrap;
         }
 
-        /* Help/Widgets Section & Tree View */
-        .search-bar {
-            position: sticky;
-            top: 0;
-            background: var(--bg);
+        /* --- PREVIEW STYLES --- */
+        #preview-wrapper {
+            flex: 1;
+            width: 100%;
+            background-color: #e0e0e0;
+            /* Fundo neutro */
+            border: 1px solid var(--border);
+            overflow: auto;
+            position: relative;
+            /* Padrão xadrez para ver transparência */
+            background-image:
+                linear-gradient(45deg, #ccc 25%, transparent 25%),
+                linear-gradient(-45deg, #ccc 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #ccc 75%),
+                linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        #preview-container {
+            /* O container em si não deve ter cor de fundo forçada a menos que venha do JSON */
+            /* background-color: #fff;  <-- Removido para permitir ver o xadrez se for transparente */
+            color: #333;
+            min-height: 100%;
+            width: 100%;
+            /* Responsivo */
+            transform-origin: 0 0;
+            overflow: visible;
+            padding: 20px;
+            /* Margem de respiro */
+        }
+
+        .preview-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
             padding-bottom: 10px;
-            z-index: 10;
+            border-bottom: 1px solid var(--border);
         }
 
-        .info-box {
-            background-color: rgba(13, 153, 255, 0.1);
-            border-left: 3px solid var(--primary);
-            padding: 10px;
+        .preview-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Elementor Simulation Classes */
+        .e-con {
+            display: flex;
+            position: relative;
+            box-sizing: border-box;
+            width: 100%;
+            align-items: flex-start;
+            /* Permite quebrar linha se necessário */
+            flex-wrap: nowrap;
+        }
+
+        .e-widget {
+            position: relative;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .e-img img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Image Box Styles Simulation */
+        .e-image-box {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        /* Posições */
+        .e-image-box.pos-left {
+            flex-direction: row;
+        }
+
+        .e-image-box.pos-right {
+            flex-direction: row-reverse;
+        }
+
+        .e-image-box.pos-top {
+            flex-direction: column;
+        }
+
+        /* Espaçamento e Alinhamento */
+        .e-image-box-img {
             margin-bottom: 15px;
-            font-size: 11px;
-            line-height: 1.4;
+            flex-shrink: 0;
         }
 
-        /* Tree Structure Styles */
+        .e-image-box.pos-left .e-image-box-img {
+            margin-right: 15px;
+            margin-bottom: 0;
+        }
+
+        .e-image-box.pos-right .e-image-box-img {
+            margin-left: 15px;
+            margin-bottom: 0;
+        }
+
+        .e-image-box-content {
+            flex: 1;
+        }
+
+        /* --- UTILS --- */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            z-index: 2000;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* RESIZER HANDLE */
+        #resizer {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nwse-resize;
+            z-index: 9999;
+            background: linear-gradient(135deg, transparent 50%, #ff6600 50%);
+            box-shadow: -1px -1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Widgets Help Tree (Styles from previous valid version) */
         .category-block {
             margin-bottom: 20px;
         }
@@ -233,7 +399,7 @@
         .tree-item {
             display: flex;
             align-items: center;
-            padding: 4px 0;
+            padding: 2px 0;
         }
 
         .widget-btn {
@@ -248,6 +414,7 @@
             align-items: center;
             transition: all 0.1s;
             text-align: left;
+            width: 100%;
         }
 
         .widget-btn:hover {
@@ -258,625 +425,479 @@
 
         .widget-btn span.prefix {
             opacity: 0.5;
-            margin-right: 4px;
+            margin-right: 6px;
             font-size: 10px;
             font-family: monospace;
         }
 
-        /* Hierarchical Lines */
         .tree-children {
-            margin-left: 20px;
+            margin-left: 15px;
             padding-left: 10px;
             border-left: 1px dashed var(--tree-line);
             display: flex;
             flex-direction: column;
-            gap: 4px;
-            margin-top: 4px;
-            margin-bottom: 8px;
-        }
-
-        /* Loading Overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
-            z-index: 100;
-        }
-
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #fff;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 10px;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            gap: 2px;
+            margin-top: 2px;
+            margin-bottom: 4px;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- Tabs -->
+    <!-- NAVEGAÇÃO -->
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('export')">Gerar JSON</button>
-        <button class="tab-btn" onclick="openTab('wp')">WordPress</button>
-        <button class="tab-btn" onclick="openTab('help')">Ajuda & Widgets</button>
+        <button class="tab-btn active" onclick="openTab('export')">1. Gerar JSON</button>
+        <button class="tab-btn" onclick="openTab('preview')">2. Preview</button>
+        <button class="tab-btn" onclick="openTab('wp')">Config WP</button>
+        <button class="tab-btn" onclick="openTab('help')">Ajuda</button>
     </div>
 
-    <!-- Tab: Export -->
+    <!-- ABA 1: EXPORTAÇÃO -->
     <div id="tab-export" class="content active">
-        <div class="info-box">
-            Selecione Frames ou Grupos no Figma e clique em "Gerar JSON" para criar o código compatível com Elementor.
+        <div class="form-group">
+            <label>Selecione o frame no Figma e clique abaixo:</label>
+            <div class="range-wrapper">
+                <label style="margin:0; font-weight:400; font-size:11px;">Qualidade Img:</label>
+                <input type="range" id="quality" min="0.1" max="1.0" step="0.05" value="0.85">
+                <span id="quality-value">85%</span>
+            </div>
+            <button id="btn-export" class="btn btn-primary" style="margin-top:10px;">Gerar JSON Elementor</button>
         </div>
 
-        <div class="form-group">
-            <label>Qualidade de Imagem (JPEG/WEBP)</label>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <input type="range" id="quality" min="0.1" max="1.0" step="0.05" value="0.85" style="flex:1">
-                <span id="quality-val">85%</span>
+        <label>Código JSON (Copie e cole no Elementor):</label>
+        <textarea id="output-area" readonly></textarea>
+        <button id="btn-copy" class="btn btn-secondary" style="margin-bottom:15px;">Copiar JSON</button>
+
+        <label>Logs de Processamento:</label>
+        <textarea id="log-area" readonly></textarea>
+    </div>
+
+    <!-- ABA 2: PREVIEW -->
+    <div id="tab-preview" class="content" style="height: 100%;">
+        <div class="preview-toolbar">
+            <strong>Simulação</strong>
+            <div class="preview-controls">
+                <label style="margin:0; font-size:11px;">Zoom:</label>
+                <select id="zoom-select" style="width:70px;">
+                    <option value="0.25">25%</option>
+                    <option value="0.5">50%</option>
+                    <option value="0.75">75%</option>
+                    <option value="1" selected>100%</option>
+                </select>
+                <button onclick="updatePreview()" class="btn btn-secondary btn-small"
+                    style="width:auto;">Recarregar</button>
             </div>
         </div>
 
-        <button id="btn-export" class="btn btn-primary" style="margin-bottom: 12px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            Gerar JSON Elementor
-        </button>
-
-        <div style="display:flex; gap: 8px; margin-bottom: 12px;">
-            <button id="btn-debug" class="btn btn-secondary btn-small">Debug Estrutura</button>
-            <button id="btn-copy" class="btn btn-secondary btn-small" disabled>Copiar JSON</button>
+        <div id="preview-wrapper">
+            <div id="preview-container">
+                <div
+                    style="text-align:center; color:#666; padding-top:50px; background:rgba(255,255,255,0.8); padding:20px; border-radius:8px; display:inline-block;">
+                    Gere o JSON primeiro na aba anterior.<br>
+                    O fundo xadrez indica transparência.
+                </div>
+            </div>
         </div>
-
-        <label>Saída JSON:</label>
-        <textarea id="output-area" readonly placeholder="O JSON aparecerá aqui..."></textarea>
-
-        <!-- NOVA ÁREA DE LOGS -->
-        <label>Logs & Erros:</label>
-        <textarea id="log-area" readonly
-            placeholder="Logs de processamento, erros de upload e respostas do servidor aparecerão aqui..."></textarea>
     </div>
 
-    <!-- Tab: WordPress -->
+    <!-- ABA 3: WORDPRESS -->
     <div id="tab-wp" class="content">
-        <div class="info-box">
-            Configure para que o plugin faça upload automático de imagens para sua biblioteca.
-            Use "Application Passwords" no seu perfil de usuário WP.
-        </div>
-
-        <div class="form-group">
-            <label>URL do Site (com https://)</label>
-            <input type="text" id="wp-url" placeholder="https://meusite.com">
-        </div>
-
-        <div class="form-group">
-            <label>Usuário (Login/Email)</label>
-            <input type="text" id="wp-user" placeholder="admin">
-        </div>
-
-        <div class="form-group">
-            <label>Senha de Aplicativo</label>
-            <input type="password" id="wp-pass" placeholder="xxxx xxxx xxxx xxxx">
-            <small style="opacity: 0.7; display:block; margin-top:4px;">Não use sua senha normal. Gere uma Application
-                Password no painel do WP.</small>
-        </div>
-
+        <div class="info-box">Configure upload automático de imagens para a biblioteca do WP.</div>
+        <div class="form-group"><label>URL do Site (com https://)</label><input type="text" id="wp-url"
+                placeholder="https://meusite.com"></div>
+        <div class="form-group"><label>Usuário</label><input type="text" id="wp-user" placeholder="admin"></div>
+        <div class="form-group"><label>Senha de Aplicativo</label><input type="password" id="wp-pass"></div>
         <button id="btn-save-wp" class="btn btn-primary">Salvar Configuração</button>
     </div>
 
-    <!-- Tab: Help & Widgets -->
+    <!-- ABA 4: AJUDA -->
     <div id="tab-help" class="content">
         <div class="search-bar">
             <input type="text" id="search-widgets" placeholder="Buscar widget (ex: produto, loop)...">
         </div>
 
         <div class="info-box">
-            Clique em um item para renomear a layer selecionada. A indentação sugere a hierarquia correta no Figma (Pai
-            > Filho).
+            Clique em um item para renomear a layer selecionada no Figma automaticamente.
         </div>
 
-        <div id="widgets-container">
-            <!-- Widgets injected here -->
-        </div>
+        <div id="widgets-container"></div>
     </div>
 
+    <!-- MANIPULADOR DE REDIMENSIONAMENTO -->
+    <div id="resizer" title="Arraste para redimensionar"></div>
+
+    <!-- LOADER -->
     <div class="loading-overlay" id="loader">
         <div class="spinner"></div>
         <div id="loader-text">Processando...</div>
     </div>
 
     <script>
-        // --- DADOS HIERÁRQUICOS ---
+        // --- DADOS HIERÁRQUICOS DA ABA AJUDA ---
         const widgetTreeData = [
             {
                 category: "Estrutura & Layout",
                 items: [
-                    {
-                        name: "container", prefix: "c:",
-                        children: [
-                            { name: "inner-container", prefix: "c:" }
-                        ]
-                    },
-                    { name: "divider", prefix: "w:" },
-                    { name: "spacer", prefix: "w:" },
-                    { name: "menu-anchor", prefix: "w:" },
-                    { name: "sidebar", prefix: "w:" }
+                    { name: "container", prefix: "c:", label: "Container" },
+                    { name: "inner-container", prefix: "c:", label: "Inner Container" },
+                    { name: "divider", prefix: "w:", label: "Divisor" },
+                    { name: "spacer", prefix: "w:", label: "Espaçador" },
+                    { name: "menu-anchor", prefix: "w:", label: "Âncora de Menu" }
                 ]
             },
             {
                 category: "Conteúdo Básico",
                 items: [
-                    { name: "heading", prefix: "w:" },
-                    { name: "text-editor", prefix: "w:" },
-                    { name: "image", prefix: "w:" },
-                    { name: "video", prefix: "w:" },
-                    { name: "button", prefix: "w:" },
-                    { name: "icon", prefix: "w:" },
-                    { name: "read-more", prefix: "w:" }
-                ]
-            },
-            {
-                category: "Loop Builder & Grids",
-                items: [
-                    {
-                        name: "loop-grid", prefix: "loop:",
-                        children: [
-                            {
-                                name: "loop-item", prefix: "loop:",
-                                children: [
-                                    { name: "loop-title", prefix: "loop:" },
-                                    { name: "loop-image", prefix: "loop:" },
-                                    { name: "loop-content", prefix: "loop:" }, // Alias common
-                                    { name: "loop-price", prefix: "loop:" },
-                                    { name: "loop-add-to-cart", prefix: "loop:" },
-                                    { name: "loop-rating", prefix: "loop:" },
-                                    { name: "loop-meta", prefix: "loop:" },
-                                    { name: "loop-terms", prefix: "loop:" },
-                                    { name: "loop-read-more", prefix: "loop:" },
-                                    { name: "loop-featured-image", prefix: "loop:" }
-                                ]
-                            }
-                        ]
-                    },
-                    { name: "loop-carousel", prefix: "loop:" },
-                    { name: "loop-grid-advanced", prefix: "pro:" }
-                ]
-            },
-            {
-                category: "WooCommerce (Produto Único)",
-                items: [
-                    {
-                        name: "products", prefix: "woo:", label: "Products Archive (Grid)",
-                    },
-                    {
-                        name: "Product Page Layout", prefix: "", isLabel: true,
-                        children: [
-                            { name: "product-title", prefix: "woo:" },
-                            { name: "product-image", prefix: "woo:" },
-                            { name: "product-price", prefix: "woo:" },
-                            { name: "product-add-to-cart", prefix: "woo:" },
-                            { name: "product-short-description", prefix: "woo:" },
-                            { name: "product-meta", prefix: "woo:" },
-                            { name: "product-rating", prefix: "woo:" },
-                            { name: "product-stock", prefix: "woo:" },
-                            { name: "product-tabs", prefix: "woo:" },
-                            { name: "product-related", prefix: "woo:" },
-                            { name: "product-upsells", prefix: "woo:" }
-                        ]
-                    },
-                    { name: "cart", prefix: "woo:" },
-                    { name: "checkout", prefix: "woo:" },
-                    { name: "my-account", prefix: "woo:" }
+                    { name: "heading", prefix: "w:", label: "Título" },
+                    { name: "text-editor", prefix: "w:", label: "Editor de Texto" },
+                    { name: "image", prefix: "w:", label: "Imagem" },
+                    { name: "video", prefix: "w:", label: "Vídeo" },
+                    { name: "button", prefix: "w:", label: "Botão" },
+                    { name: "icon", prefix: "w:", label: "Ícone" }
                 ]
             },
             {
                 category: "Cards & Boxes",
                 items: [
-                    { name: "icon-box", prefix: "w:" },
-                    { name: "image-box", prefix: "w:" },
-                    { name: "flip-box", prefix: "pro:" },
-                    { name: "call-to-action", prefix: "pro:" },
-                    { name: "author-box", prefix: "pro:" },
-                    { name: "review-box", prefix: "pro:" },
-                    { name: "alert", prefix: "w:" }
-                ]
-            },
-            {
-                category: "Carrosséis & Sliders",
-                items: [
-                    { name: "image-carousel", prefix: "w:" },
-                    { name: "media-carousel", prefix: "pro:" },
-                    { name: "testimonial-carousel", prefix: "pro:" },
-                    {
-                        name: "slides", prefix: "slider:",
-                        label: "Slides (Slider)",
-                        children: [
-                            { name: "Slide Item (Auto)", prefix: "", isLabel: true }
-                        ]
-                    }
-                ]
-            },
-            {
-                category: "Blog & Post Single",
-                items: [
-                    { name: "post-title", prefix: "pro:" },
-                    { name: "post-excerpt", prefix: "pro:" },
-                    { name: "post-content", prefix: "pro:" },
-                    { name: "post-featured-image", prefix: "pro:" },
-                    { name: "post-info", prefix: "pro:" },
-                    { name: "post-navigation", prefix: "pro:" },
-                    { name: "share-buttons", prefix: "pro:" },
-                    { name: "author-box", prefix: "pro:" }
-                ]
-            },
-            {
-                category: "Site & Header",
-                items: [
-                    { name: "site-logo", prefix: "pro:" },
-                    { name: "site-title", prefix: "pro:" },
-                    { name: "nav-menu", prefix: "w:" },
-                    { name: "search-form", prefix: "w:" },
-                    { name: "sitemap", prefix: "pro:" },
-                    { name: "breadcrumb", prefix: "pro:" }
-                ]
-            },
-            {
-                category: "Outros & Avançado",
-                items: [
-                    { name: "form", prefix: "pro:" },
-                    { name: "login", prefix: "pro:" },
-                    { name: "gallery", prefix: "w:" },
-                    { name: "lottie", prefix: "w:" },
-                    { name: "html", prefix: "w:" },
-                    { name: "shortcode", prefix: "w:" },
-                    { name: "google-maps", prefix: "w:" },
-                    { name: "progress", prefix: "w:" },
-                    { name: "counter", prefix: "w:" },
-                    { name: "accordion", prefix: "w:" },
-                    { name: "tabs", prefix: "w:" },
-                    { name: "toggle", prefix: "w:" }
+                    { name: "image-box", prefix: "w:", label: "Caixa de Imagem" },
+                    { name: "icon-box", prefix: "w:", label: "Caixa de Ícone" },
+                    { name: "alert", prefix: "w:", label: "Alerta" }
                 ]
             }
         ];
 
-        // --- UI LOGIC ---
+        // --- LÓGICA DE UI ---
+        function openTab(name) {
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-${name}`).classList.add('active');
 
-        function openTab(tabName) {
-            document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-
-            const btns = document.querySelectorAll('.tab-btn');
-            if (tabName === 'export') btns[0].classList.add('active');
-            if (tabName === 'wp') btns[1].classList.add('active');
-            if (tabName === 'help') btns[2].classList.add('active');
+            const tabMap = { 'export': 0, 'preview': 1, 'wp': 2, 'help': 3 };
+            if (tabMap[name] !== undefined) {
+                document.querySelectorAll('.tab-btn')[tabMap[name]].classList.add('active');
+            }
+            if (name === 'preview') updatePreview();
         }
 
-        // --- LOGGING HELPER ---
-        function addLog(message, type = 'info') {
-            const logArea = document.getElementById('log-area');
-            const now = new Date();
-            const time = now.toLocaleTimeString();
-            let prefix = '[INFO]';
-            if (type === 'error') prefix = '[ERRO]';
-            if (type === 'success') prefix = '[SUCESSO]';
-
-            const logLine = `[${time}] ${prefix} ${message}\n`;
-            logArea.value += logLine;
-            // Auto scroll to bottom
-            logArea.scrollTop = logArea.scrollHeight;
+        function addLog(msg, type = 'info') {
+            const area = document.getElementById('log-area');
+            area.value += `[${type.toUpperCase()}] ${msg}\n`;
+            area.scrollTop = area.scrollHeight;
         }
 
-        // Função Recursiva para renderizar a árvore
-        function renderTreeItem(item, container) {
-            const el = document.createElement('div');
+        // Slider Porcentagem
+        const qualityInput = document.getElementById('quality');
+        const qualityValue = document.getElementById('quality-value');
+        qualityInput.addEventListener('input', (e) => {
+            qualityValue.textContent = Math.round(e.target.value * 100) + '%';
+        });
 
-            if (item.isLabel) {
-                el.className = 'tree-item';
-                el.innerHTML = `<span style="font-size:11px; color:#888; font-style:italic;">${item.name || item.label}</span>`;
-            } else {
+        // --- REDIMENSIONAMENTO ---
+        const resizer = document.getElementById('resizer');
+        resizer.addEventListener('pointerdown', (e) => {
+            resizer.setPointerCapture(e.pointerId);
+            resizer.addEventListener('pointermove', onResize);
+            resizer.addEventListener('pointerup', stopResize);
+        });
+        function onResize(e) {
+            const width = Math.max(350, e.clientX + 20);
+            const height = Math.max(500, e.clientY + 20);
+            parent.postMessage({ pluginMessage: { type: 'resize-ui', width, height } }, '*');
+        }
+        function stopResize(e) {
+            resizer.releasePointerCapture(e.pointerId);
+            resizer.removeEventListener('pointermove', onResize);
+            resizer.removeEventListener('pointerup', stopResize);
+        }
+
+        // --- HELP TREE RENDERER ---
+        function renderHelpTree(filterText = '') {
+            const container = document.getElementById('widgets-container');
+            container.innerHTML = '';
+            filterText = filterText.toLowerCase();
+
+            const drawItem = (item, parentEl) => {
                 const btn = document.createElement('div');
                 btn.className = 'widget-btn';
                 btn.innerHTML = `<span class="prefix">${item.prefix}</span>${item.label || item.name}`;
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    renameLayer(`${item.prefix}${item.name}`);
+                btn.onclick = () => {
+                    addLog(`Renomeando para: ${item.prefix}${item.name}`);
+                    parent.postMessage({ pluginMessage: { type: 'rename-layer', newName: `${item.prefix}${item.name}` } }, '*');
                 };
-                el.className = 'tree-item';
-                el.appendChild(btn);
-            }
+                const wrapper = document.createElement('div');
+                wrapper.className = 'tree-item';
+                wrapper.appendChild(btn);
+                parentEl.appendChild(wrapper);
 
-            container.appendChild(el);
+                if (item.children) {
+                    const childCont = document.createElement('div');
+                    childCont.className = 'tree-children';
+                    item.children.forEach(c => drawItem(c, childCont));
+                    parentEl.appendChild(childCont);
+                }
+            };
 
-            if (item.children && item.children.length > 0) {
-                const childContainer = document.createElement('div');
-                childContainer.className = 'tree-children';
-                item.children.forEach(child => renderTreeItem(child, childContainer));
-                container.appendChild(childContainer);
-            }
+            widgetTreeData.forEach(cat => {
+                const block = document.createElement('div');
+                block.className = 'category-block';
+                const title = document.createElement('div');
+                title.className = 'category-title';
+                title.textContent = cat.category;
+                block.appendChild(title);
+                const root = document.createElement('div');
+                root.className = 'tree-root';
+
+                cat.items.forEach(item => {
+                    if (!filterText || item.name.includes(filterText) || item.label.includes(filterText)) {
+                        drawItem(item, root);
+                    }
+                });
+                block.appendChild(root);
+                container.appendChild(block);
+            });
         }
+        document.getElementById('search-widgets').addEventListener('input', (e) => renderHelpTree(e.target.value));
 
-        function renderWidgets(filterText = '') {
-            const container = document.getElementById('widgets-container');
+        // --- PREVIEW ENGINE ---
+        document.getElementById('zoom-select').addEventListener('change', (e) => {
+            document.getElementById('preview-container').style.transform = `scale(${e.target.value})`;
+            // Adjust width to prevent clipping
+            document.getElementById('preview-container').style.width = `${100 / e.target.value}%`;
+        });
+
+        function updatePreview() {
+            const jsonStr = document.getElementById('output-area').value;
+            const container = document.getElementById('preview-container');
             container.innerHTML = '';
 
-            filterText = filterText.toLowerCase();
-
-            // Modo Busca (Lista Plana)
-            if (filterText.length > 0) {
-                const results = [];
-                // Flatten search
-                const searchRecursive = (items) => {
-                    items.forEach(item => {
-                        if ((item.name && item.name.toLowerCase().includes(filterText)) ||
-                            (item.label && item.label.toLowerCase().includes(filterText))) {
-                            if (!item.isLabel) results.push(item);
-                        }
-                        if (item.children) searchRecursive(item.children);
-                    });
-                };
-
-                widgetTreeData.forEach(cat => searchRecursive(cat.items));
-
-                if (results.length > 0) {
-                    const grid = document.createElement('div');
-                    grid.style.display = 'flex';
-                    grid.style.flexWrap = 'wrap';
-                    grid.style.gap = '6px';
-
-                    results.forEach(item => {
-                        const btn = document.createElement('div');
-                        btn.className = 'widget-btn';
-                        btn.innerHTML = `<span class="prefix">${item.prefix}</span>${item.name}`;
-                        btn.onclick = () => renameLayer(`${item.prefix}${item.name}`);
-                        grid.appendChild(btn);
-                    });
-                    container.appendChild(grid);
-                } else {
-                    container.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">Nenhum widget encontrado.</div>';
-                }
-            }
-            // Modo Hierárquico (Árvore)
-            else {
-                widgetTreeData.forEach(cat => {
-                    const block = document.createElement('div');
-                    block.className = 'category-block';
-
-                    const title = document.createElement('div');
-                    title.className = 'category-title';
-                    title.textContent = cat.category;
-                    block.appendChild(title);
-
-                    const root = document.createElement('div');
-                    root.className = 'tree-root';
-
-                    cat.items.forEach(item => renderTreeItem(item, root));
-
-                    block.appendChild(root);
-                    container.appendChild(block);
-                });
-            }
-        }
-
-        function renameLayer(newName) {
-            addLog(`Solicitando renomeação para: ${newName}`);
-            parent.postMessage({
-                pluginMessage: {
-                    type: 'rename-layer',
-                    newName: newName
-                }
-            }, '*');
-        }
-
-        // --- EVENT LISTENERS ---
-
-        document.getElementById('search-widgets').addEventListener('input', (e) => {
-            renderWidgets(e.target.value);
-        });
-
-        document.getElementById('quality').addEventListener('input', (e) => {
-            document.getElementById('quality-val').textContent = Math.round(e.target.value * 100) + '%';
-        });
-
-        document.getElementById('btn-export').onclick = () => {
-            const quality = parseFloat(document.getElementById('quality').value);
-            document.getElementById('output-area').value = '';
-            document.getElementById('btn-copy').disabled = true;
-
-            addLog("Iniciando processo de exportação...");
-            parent.postMessage({ pluginMessage: { type: 'export-elementor', quality } }, '*');
-        };
-
-        document.getElementById('btn-debug').onclick = () => {
-            addLog("Solicitando debug de estrutura...");
-            parent.postMessage({ pluginMessage: { type: 'debug-structure' } }, '*');
-        };
-
-        document.getElementById('btn-copy').onclick = () => {
-            const el = document.getElementById('output-area');
-            el.select();
-            document.execCommand('copy');
-            const btn = document.getElementById('btn-copy');
-            const originalText = btn.textContent;
-            btn.textContent = 'Copiado!';
-            setTimeout(() => btn.textContent = originalText, 2000);
-            addLog("JSON copiado para área de transferência.", 'success');
-        };
-
-        document.getElementById('btn-save-wp').onclick = () => {
-            const url = document.getElementById('wp-url').value.replace(/\/$/, "");
-            const user = document.getElementById('wp-user').value;
-            const pass = document.getElementById('wp-pass').value;
-
-            if (!url || !user || !pass) {
-                alert('Preencha todos os campos.');
+            if (!jsonStr) {
+                container.innerHTML = '<div style="text-align:center; padding:50px;">Gere o JSON primeiro.</div>';
                 return;
             }
 
-            parent.postMessage({
-                pluginMessage: {
-                    type: 'save-wp-config',
-                    config: { url, user, password: pass }
+            try {
+                const data = JSON.parse(jsonStr);
+                if (data.elements) {
+                    data.elements.forEach(el => container.appendChild(createDomElement(el)));
                 }
-            }, '*');
-            addLog("Configurações WP salvas localmente.", 'success');
+            } catch (e) {
+                container.innerHTML = `<div style="color:red;">Erro JSON: ${e.message}</div>`;
+            }
+        }
+
+        function getUnitValue(val) {
+            if (!val) return '';
+            if (typeof val === 'object' && val.size !== undefined) return `${val.size}${val.unit || 'px'}`;
+            return val;
+        }
+
+        function applyStyles(dom, s) {
+            const st = dom.style;
+            // Box Model
+            if (s.padding) st.padding = `${s.padding.top || 0}px ${s.padding.right || 0}px ${s.padding.bottom || 0}px ${s.padding.left || 0}px`;
+            if (s.margin) st.margin = `${s.margin.top || 0}px ${s.margin.right || 0}px ${s.margin.bottom || 0}px ${s.margin.left || 0}px`;
+
+            // Backgrounds
+            if (s.background_background === 'gradient') {
+                const angle = s.background_gradient_angle?.size || 180;
+                const c1 = s.background_color || 'transparent';
+                const c2 = s.background_color_b || 'transparent';
+                st.background = `linear-gradient(${angle}deg, ${c1}, ${c2})`;
+            } else if (s.background_image?.url) {
+                st.backgroundImage = `url('${s.background_image.url}')`;
+                st.backgroundSize = s.background_size || 'cover';
+                if (s.background_color) st.backgroundColor = s.background_color;
+            } else if (s.background_color) {
+                st.backgroundColor = s.background_color;
+            }
+
+            // Flex
+            if (s.flex_direction) st.flexDirection = s.flex_direction;
+            if (s.justify_content) st.justifyContent = s.justify_content;
+            if (s.align_items) st.alignItems = s.align_items;
+            if (s.gap) st.gap = `${s.gap.size || s.gap.column || 0}px`;
+
+            // Size
+            if (s.width) st.width = getUnitValue(s.width);
+            if (s.min_height) st.minHeight = getUnitValue(s.min_height);
+
+            // Border
+            if (s.border_radius) st.borderRadius = `${s.border_radius.size || s.border_radius.top || 0}px`;
+        }
+
+        function applyTypography(dom, s, prefix = '') {
+            const st = dom.style;
+            const color = s[`${prefix}color`] || s[`${prefix}text_color`] || s.title_color || s.text_color;
+            const size = s[`${prefix}typography_font_size`];
+            const weight = s[`${prefix}typography_font_weight`];
+            const align = s.align || s.text_align;
+
+            if (color) st.color = color;
+            if (size) st.fontSize = getUnitValue(size);
+            if (weight) st.fontWeight = weight;
+            if (align) st.textAlign = align;
+        }
+
+        function createDomElement(el) {
+            const s = el.settings || {};
+            let dom;
+
+            if (el.elType === 'container') {
+                dom = document.createElement('div');
+                dom.className = 'e-con';
+                applyStyles(dom, s);
+                if (el.elements) el.elements.forEach(c => dom.appendChild(createDomElement(c)));
+            } else if (el.widgetType === 'image-box') {
+                dom = document.createElement('div');
+                dom.className = 'e-widget';
+                applyStyles(dom, s); // Wrapper styles (background etc)
+
+                const inner = document.createElement('div');
+                inner.className = `e-image-box pos-${s.position || 'top'}`;
+                if (s.content_vertical_alignment) inner.style.alignItems = s.content_vertical_alignment === 'middle' ? 'center' : 'flex-start';
+
+                const imgDiv = document.createElement('div');
+                imgDiv.className = 'e-image-box-img';
+                const img = document.createElement('img');
+                img.src = s.image?.url || '';
+                if (s.image_width) img.style.width = getUnitValue(s.image_width);
+                imgDiv.appendChild(img);
+
+                const txtDiv = document.createElement('div');
+                txtDiv.className = 'e-image-box-content';
+                if (s.text_align) txtDiv.style.textAlign = s.text_align; // Apply text align to content wrapper
+
+                const t = document.createElement('h3');
+                t.innerText = s.title_text || 'Title';
+                t.style.margin = '0 0 10px 0';
+                applyTypography(t, s, 'title_');
+
+                const d = document.createElement('p');
+                d.innerText = s.description_text || 'Desc';
+                d.style.margin = 0;
+                applyTypography(d, s, 'description_');
+
+                txtDiv.appendChild(t);
+                txtDiv.appendChild(d);
+
+                inner.appendChild(imgDiv);
+                inner.appendChild(txtDiv);
+                dom.appendChild(inner);
+            } else {
+                // Standard Widgets
+                dom = document.createElement('div');
+                dom.className = 'e-widget';
+                applyStyles(dom, s);
+
+                if (el.widgetType === 'heading') {
+                    const h = document.createElement(s.header_size || 'h2');
+                    h.innerText = s.title || 'Heading';
+                    h.style.margin = 0;
+                    applyTypography(h, s, 'title_');
+                    if (!h.style.fontSize) applyTypography(h, s, '');
+                    dom.appendChild(h);
+                } else if (el.widgetType === 'image') {
+                    const img = document.createElement('img');
+                    img.src = s.image?.url || '';
+                    if (s.width) img.style.width = getUnitValue(s.width);
+                    if (s.align) dom.style.textAlign = s.align;
+                    dom.appendChild(img);
+                } else if (el.widgetType === 'button') {
+                    const btn = document.createElement('button');
+                    btn.innerText = s.text || 'Button';
+                    btn.style.padding = '10px 20px';
+                    if (s.button_background_color) btn.style.backgroundColor = s.button_background_color;
+                    if (s.button_text_color) btn.style.color = s.button_text_color;
+                    applyTypography(btn, s, 'typography_');
+                    if (s.align) dom.style.textAlign = s.align;
+                    dom.appendChild(btn);
+                } else if (el.widgetType === 'text-editor') {
+                    const p = document.createElement('div');
+                    p.innerHTML = s.editor || 'Text';
+                    applyTypography(p, s, '');
+                    dom.appendChild(p);
+                }
+            }
+            return dom;
+        }
+
+        // --- EVENTS ---
+        document.getElementById('btn-export').onclick = () => {
+            const q = parseFloat(document.getElementById('quality').value);
+            parent.postMessage({ pluginMessage: { type: 'export-elementor', quality: q } }, '*');
+        };
+        document.getElementById('btn-copy').onclick = () => {
+            document.getElementById('output-area').select();
+            document.execCommand('copy');
+            addLog("Copiado!", 'success');
+        };
+        document.getElementById('btn-save-wp').onclick = () => {
+            const url = document.getElementById('wp-url').value;
+            const user = document.getElementById('wp-user').value;
+            const pass = document.getElementById('wp-pass').value;
+            parent.postMessage({ pluginMessage: { type: 'save-wp-config', config: { url, user, password: pass } } }, '*');
         };
 
-        // --- MESSAGING FROM CODE.TS ---
-
-        window.onmessage = async (event) => {
+        window.onmessage = (event) => {
             const msg = event.data.pluginMessage;
             if (!msg) return;
 
             if (msg.type === 'export-result') {
                 document.getElementById('output-area').value = msg.data;
                 document.getElementById('btn-copy').disabled = false;
-                addLog("JSON gerado com sucesso!", 'success');
+                addLog("JSON Gerado!", 'success');
+                if (document.getElementById('tab-preview').classList.contains('active')) updatePreview();
             }
-
-            else if (msg.type === 'debug-result') {
-                document.getElementById('output-area').value = msg.data;
-                addLog("Debug recebido.");
-            }
-
-            else if (msg.type === 'load-wp-config') {
-                if (msg.config) {
-                    document.getElementById('wp-url').value = msg.config.url || '';
-                    document.getElementById('wp-user').value = msg.config.user || '';
-                    document.getElementById('wp-pass').value = msg.config.password || '';
-                    addLog("Configurações WP carregadas.");
-                }
-            }
-
             else if (msg.type === 'upload-image-request') {
-                showLoader(true, `Enviando ${msg.name}...`);
-                addLog(`Iniciando upload: ${msg.name} (${msg.targetMimeType || msg.mimeType})`);
+                document.getElementById('loader').style.display = 'flex';
+                const wpUrl = document.getElementById('wp-url').value.replace(/\/$/, "");
+                const wpUser = document.getElementById('wp-user').value;
+                const wpPass = document.getElementById('wp-pass').value;
 
-                try {
-                    const wpUrl = document.getElementById('wp-url').value.replace(/\/$/, "");
-                    const wpUser = document.getElementById('wp-user').value;
-                    const wpPass = document.getElementById('wp-pass').value;
-
-                    if (!wpUrl || !wpUser || !wpPass) {
-                        throw new Error("Credenciais WP ausentes. Configure na aba WordPress.");
-                    }
-
-                    // Conversão para WebP se solicitado (Sandbox do Figma envia PNG e pede WebP)
-                    let blobToUpload;
-
-                    if (msg.needsConversion && msg.targetMimeType === 'image/webp') {
-                        addLog(`Convertendo ${msg.name} para WebP...`);
-
-                        // Criar Blob do PNG original
-                        const pngBlob = new Blob([msg.data], { type: msg.mimeType });
-                        const bitmap = await createImageBitmap(pngBlob);
-
-                        // Desenhar em Canvas para converter
-                        const canvas = document.createElement('canvas');
-                        canvas.width = bitmap.width;
-                        canvas.height = bitmap.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(bitmap, 0, 0);
-
-                        // Exportar como WebP
-                        blobToUpload = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.85));
-                        addLog(`Conversão concluída.`);
-                    } else {
-                        blobToUpload = new Blob([msg.data], { type: msg.mimeType });
-                    }
-
-                    const formData = new FormData();
-                    // Forçar extensão .webp no nome se foi convertido
-                    const fileName = msg.needsConversion ? msg.name.replace(/\.(png|jpg|jpeg)$/i, '.webp') : msg.name;
-
-                    formData.append('file', blobToUpload, fileName);
-                    formData.append('title', fileName.split('.')[0]);
-
-                    const response = await fetch(`${wpUrl}/wp-json/wp/v2/media`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': 'Basic ' + btoa(wpUser + ":" + wpPass)
-                        },
-                        body: formData
-                    });
-
-                    if (!response.ok) {
-                        const err = await response.json();
-                        throw new Error(err.message || 'Upload falhou no servidor');
-                    }
-
-                    const json = await response.json();
-                    addLog(`Upload sucesso: ${json.source_url}`, 'success');
-
-                    parent.postMessage({
-                        pluginMessage: {
-                            type: 'upload-image-response',
-                            id: msg.id,
-                            success: true,
-                            url: json.source_url
-                        }
-                    }, '*');
-
-                } catch (e) {
-                    console.error("Upload Error:", e);
-                    addLog(`Erro no upload de ${msg.name}: ${e.message}`, 'error');
-
-                    parent.postMessage({
-                        pluginMessage: {
-                            type: 'upload-image-response',
-                            id: msg.id,
-                            success: false,
-                            error: e.message
-                        }
-                    }, '*');
-                } finally {
-                    showLoader(false);
+                if (!wpUrl) {
+                    addLog(`Falta Config WP para: ${msg.name}`, 'error');
+                    parent.postMessage({ pluginMessage: { type: 'upload-image-response', id: msg.id, success: false } }, '*');
+                    document.getElementById('loader').style.display = 'none';
+                    return;
                 }
+
+                (async () => {
+                    try {
+                        let blob = new Blob([msg.data], { type: msg.mimeType });
+                        // WebP Conversion
+                        if (msg.needsConversion && msg.targetMimeType === 'image/webp') {
+                            addLog(`Convertendo: ${msg.name}`);
+                            const b = await createImageBitmap(blob);
+                            const c = document.createElement('canvas'); c.width = b.width; c.height = b.height;
+                            c.getContext('2d').drawImage(b, 0, 0);
+                            blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.85));
+                        }
+
+                        const fd = new FormData();
+                        const name = msg.needsConversion ? msg.name.replace(/\.\w+$/, '.webp') : msg.name;
+                        fd.append('file', blob, name);
+                        fd.append('title', name);
+
+                        const res = await fetch(`${wpUrl}/wp-json/wp/v2/media`, {
+                            method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(wpUser + ":" + wpPass) }, body: fd
+                        });
+
+                        if (!res.ok) throw new Error("Falha Upload");
+                        const json = await res.json();
+                        addLog(`Upload OK: ${json.source_url}`, 'success');
+                        parent.postMessage({ pluginMessage: { type: 'upload-image-response', id: msg.id, success: true, url: json.source_url } }, '*');
+                    } catch (e) {
+                        addLog(`Erro: ${e.message}`, 'error');
+                        parent.postMessage({ pluginMessage: { type: 'upload-image-response', id: msg.id, success: false } }, '*');
+                    } finally {
+                        document.getElementById('loader').style.display = 'none';
+                    }
+                })();
             }
         };
 
-        let activeUploads = 0;
-        function showLoader(show, text) {
-            const loader = document.getElementById('loader');
-            const txt = document.getElementById('loader-text');
-            if (show) {
-                activeUploads++;
-                loader.style.display = 'flex';
-                if (text) txt.textContent = text;
-            } else {
-                activeUploads--;
-                if (activeUploads <= 0) {
-                    loader.style.display = 'none';
-                    activeUploads = 0;
-                }
-            }
-        }
-
-        // Init
-        renderWidgets();
+        renderHelpTree();
     </script>
 </body>
 
