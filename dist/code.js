@@ -10,16 +10,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 // Elementor JSON Compiler – Full Implementation (TypeScript)
 // Exporta frames do Figma para JSON compatível com Elementor (clipboard).
-// Versão Estável Final:
-// - FIX: Persistência das configurações WP (carregamento garantido no início).
-// - FIX: Detecção robusta de Image Box, Icon Box, Button e Containers.
-// - FIX: Mapeamento preciso de estilos (Fundo, Borda, Sombra, Tamanho de Imagem).
-// - FIX: Detecção de Posição e Alinhamento.
-// - Suporte a Redimensionamento e WebP.
-// -------------------- Helpers --------------------
-function generateGUID() { return 'xxxxxxxxxx'.replace(/[x]/g, () => ((Math.random() * 36) | 0).toString(36)); }
-function normalizeName(name) { return name.trim().toLowerCase(); }
-function stripWidgetPrefix(name) { return name.replace(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i, '').trim(); }
+// Versão Final Corrigida (v2):
+// - FIX: Textos não são mais confundidos com Ícones/Imagens na detecção automática.
+// - FIX: Adiciona 'image_size' redundante em Image Box para forçar a largura.
+// - FIX: Garante tipos numéricos em padding/margin para compatibilidade.
+// - Mantém detecção robusta de Backgrounds e Bordas.
+// -------------------- Helper Utilities --------------------
+function generateGUID() {
+    return 'xxxxxxxxxx'.replace(/[x]/g, () => ((Math.random() * 36) | 0).toString(36));
+}
+function normalizeName(name) {
+    return name.trim().toLowerCase();
+}
+function stripWidgetPrefix(name) {
+    return name.replace(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i, '').trim();
+}
 function convertColor(paint) {
     if (!paint || paint.type !== 'SOLID')
         return '';
@@ -27,24 +32,27 @@ function convertColor(paint) {
     const a = paint.opacity !== undefined ? paint.opacity : 1;
     return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
 }
-function isArray(value) { return Array.isArray(value); }
-// Detecta posição (Top/Left/Right) baseada em sobreposição geométrica
+function isArray(value) {
+    return Array.isArray(value);
+}
+// Detecta a posição relativa entre dois nós (Top, Left, Right) para Image Box
 function detectRelativePosition(source, target) {
     if (!source.absoluteBoundingBox || !target.absoluteBoundingBox)
         return 'top';
-    const b1 = source.absoluteBoundingBox; // Imagem
-    const b2 = target.absoluteBoundingBox; // Texto
-    // Calcula a sobreposição no eixo X (Horizontal)
-    const xOverlap = Math.max(0, Math.min(b1.x + b1.width, b2.x + b2.width) - Math.max(b1.x, b2.x));
-    // Se houver sobreposição horizontal significativa (> 50% da largura da imagem), eles estão empilhados verticalmente
-    if (xOverlap > (b1.width * 0.5)) {
+    const b1 = source.absoluteBoundingBox;
+    const b2 = target.absoluteBoundingBox;
+    const c1 = { x: b1.x + b1.width / 2, y: b1.y + b1.height / 2 };
+    const c2 = { x: b2.x + b2.width / 2, y: b2.y + b2.height / 2 };
+    const dx = c1.x - c2.x;
+    const dy = c1.y - c2.y;
+    if (Math.abs(dy) > Math.abs(dx)) {
         return 'top';
     }
-    // Caso contrário, verifica quem está mais à esquerda
-    const c1x = b1.x + b1.width / 2;
-    const c2x = b2.x + b2.width / 2;
-    return c1x < c2x ? 'left' : 'right';
+    else {
+        return dx < 0 ? 'left' : 'right';
+    }
 }
+// Hash SHA-1
 function computeHash(bytes) {
     return __awaiter(this, void 0, void 0, function* () {
         const chrsz = 8;
@@ -63,7 +71,9 @@ function computeHash(bytes) {
                 return (b & c) | (b & d) | (c & d);
             return b ^ c ^ d;
         }
-        function sha1_kt(t) { return (t < 20) ? 1518500249 : (t < 40) ? 1859775393 : (t < 60) ? -1894007588 : -899497514; }
+        function sha1_kt(t) {
+            return (t < 20) ? 1518500249 : (t < 40) ? 1859775393 : (t < 60) ? -1894007588 : -899497514;
+        }
         function core_sha1(x, len) {
             x[len >> 5] |= 0x80 << (24 - len % 32);
             x[((len + 64 >> 9) << 4) + 15] = len;
@@ -95,7 +105,8 @@ function computeHash(bytes) {
             const hex_tab = "0123456789abcdef";
             let str = "";
             for (let i = 0; i < binarray.length * 4; i++) {
-                str += hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8 + 4)) & 0xF) + hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8)) & 0xF);
+                str += hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8 + 4)) & 0xF) +
+                    hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8)) & 0xF);
             }
             return str;
         }
@@ -109,12 +120,13 @@ function computeHash(bytes) {
         return binb2hex(core_sha1(bytesToWords(bytes), bytes.length * 8));
     });
 }
-// -------------------- Extraction Logic --------------------
+// -------------------- Type Guards --------------------
 function hasFills(node) { return 'fills' in node; }
 function hasStrokes(node) { return 'strokes' in node; }
 function hasEffects(node) { return 'effects' in node; }
 function hasLayout(node) { return 'layoutMode' in node; }
 function hasCornerRadius(node) { return 'cornerRadius' in node || 'topLeftRadius' in node; }
+// -------------------- Extraction Functions --------------------
 function extractTypography(node) {
     const settings = {};
     settings.typography_typography = 'custom';
@@ -132,6 +144,8 @@ function extractTypography(node) {
             settings.typography_font_weight = '300';
         else
             settings.typography_font_weight = '400';
+        if (style.includes('italic'))
+            settings.typography_font_style = 'italic';
         settings.typography_font_family = node.fontName.family;
     }
     if (node.lineHeight !== figma.mixed && node.lineHeight.unit !== 'AUTO') {
@@ -140,15 +154,19 @@ function extractTypography(node) {
         else if (node.lineHeight.unit === 'PERCENT')
             settings.typography_line_height = { unit: 'em', size: (node.lineHeight.value / 100).toFixed(2) };
     }
-    if (node.letterSpacing !== figma.mixed && node.letterSpacing.value !== 0)
+    if (node.letterSpacing !== figma.mixed && node.letterSpacing.value !== 0) {
         settings.typography_letter_spacing = { unit: 'px', size: node.letterSpacing.value };
-    // Alignment
+    }
     if (node.textAlignHorizontal) {
         const map = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'justify' };
         const key = node.textAlignHorizontal;
         if (map[key])
             settings.align = map[key];
     }
+    if (node.textDecoration === 'UNDERLINE')
+        settings.typography_text_decoration = 'underline';
+    if (node.textCase === 'UPPER')
+        settings.typography_text_transform = 'uppercase';
     return settings;
 }
 function extractTextColor(node) {
@@ -191,7 +209,7 @@ function extractBorderStyles(node) {
 }
 function extractShadows(node) {
     const settings = {};
-    if (!hasEffects(node) || !isArray(node.effects))
+    if (!hasEffects(node) || !Array.isArray(node.effects))
         return settings;
     const drop = node.effects.find(e => e.type === 'DROP_SHADOW' && e.visible !== false);
     if (drop) {
@@ -199,8 +217,11 @@ function extractShadows(node) {
         const rgba = `rgba(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)}, ${color.a})`;
         settings.box_shadow_box_shadow_type = 'yes';
         settings.box_shadow_box_shadow = {
-            horizontal: Math.round(offset.x), vertical: Math.round(offset.y),
-            blur: Math.round(radius), spread: Math.round(spread || 0), color: rgba
+            horizontal: Math.round(offset.x),
+            vertical: Math.round(offset.y),
+            blur: Math.round(radius),
+            spread: Math.round(spread || 0),
+            color: rgba
         };
     }
     return settings;
@@ -226,7 +247,8 @@ function extractPadding(node) {
     const bottom = (_c = frame.paddingBottom) !== null && _c !== void 0 ? _c : 0;
     const left = (_d = frame.paddingLeft) !== null && _d !== void 0 ? _d : 0;
     const isLinked = top === right && top === bottom && top === left;
-    return { padding: { unit: 'px', top, right, bottom, left, isLinked } };
+    // Enforce numbers here, although Elementor accepts strings, numbers are cleaner
+    return { padding: { unit: 'px', top: top, right: right, bottom: bottom, left: left, isLinked } };
 }
 function extractMargin(node) {
     const parent = node.parent;
@@ -271,6 +293,7 @@ function extractPositioning(node) {
     }
     return settings;
 }
+// -------------------- Background & Media Export --------------------
 function exportNodeAsImage(node_1, format_1) {
     return __awaiter(this, arguments, void 0, function* (node, format, quality = 0.85) {
         try {
@@ -282,14 +305,20 @@ function exportNodeAsImage(node_1, format_1) {
                 const bytes = yield node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
                 return { bytes, mime: 'image/png', ext: 'webp', needsConversion: true };
             }
+            if (format === 'JPG') {
+                const bytes = yield node.exportAsync({ format: 'JPG', constraint: { type: 'SCALE', value: 2 } });
+                return { bytes, mime: 'image/jpeg', ext: 'jpg' };
+            }
             const bytes = yield node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
             return { bytes, mime: 'image/png', ext: 'png' };
         }
         catch (e) {
+            console.error(`[F2E] Failed to export image for "${node.name}" (${node.id}):`, e);
             return null;
         }
     });
 }
+// Advanced Background Extraction (Solids, Gradients, Images)
 function extractBackgroundAdvanced(node, compiler) {
     return __awaiter(this, void 0, void 0, function* () {
         const settings = {};
@@ -308,8 +337,9 @@ function extractBackgroundAdvanced(node, compiler) {
             const bgUrl = yield compiler.uploadImageToWordPress(node, 'WEBP');
             if (bgUrl)
                 settings.background_image = { url: bgUrl, id: 0, source: 'library' };
-            settings.background_size = 'cover';
             settings.background_position = 'center center';
+            settings.background_size = 'cover';
+            settings.background_repeat = 'no-repeat';
         }
         else if (bgFill.type === 'GRADIENT_LINEAR' || bgFill.type === 'GRADIENT_RADIAL') {
             settings.background_background = 'gradient';
@@ -357,6 +387,7 @@ function isIconNode(node) {
 function hasImageFill(node) {
     return hasFills(node) && isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
 }
+// -------------------- Container Detection Logic --------------------
 function isExternalContainer(node, isTopLevel = false) {
     if (!hasLayout(node))
         return false;
@@ -392,61 +423,7 @@ function isInnerContainer(node, parentNode) {
         return true;
     return false;
 }
-function detectStyleNode(node, internalContentNodes) {
-    if ((hasFills(node) && isArray(node.fills) && node.fills.length > 0 && node.fills[0].visible !== false) ||
-        (hasStrokes(node) && isArray(node.strokes) && node.strokes.length > 0) ||
-        (hasEffects(node) && isArray(node.effects) && node.effects.length > 0)) {
-        return node;
-    }
-    if ('children' in node) {
-        const children = node.children;
-        for (let i = children.length - 1; i >= 0; i--) {
-            const child = children[i];
-            if (internalContentNodes.includes(child))
-                continue;
-            if (child.width < 10 || child.height < 10)
-                continue;
-            if ((child.type === 'RECTANGLE' || child.type === 'FRAME' || child.type === 'ELLIPSE') &&
-                ((hasFills(child) && isArray(child.fills) && child.fills.length > 0 && child.fills[0].visible !== false) ||
-                    (hasStrokes(child) && isArray(child.strokes) && child.strokes.length > 0) ||
-                    (hasEffects(child) && isArray(child.effects) && child.effects.length > 0))) {
-                return child;
-            }
-        }
-    }
-    return node;
-}
-function findAllChildren(node, result = []) {
-    if ('children' in node) {
-        for (const child of node.children) {
-            result.push(child);
-            findAllChildren(child, result);
-        }
-    }
-    return result;
-}
-function detectWidgetType(node) {
-    const lname = node.name.toLowerCase();
-    if (lname.includes('button') || lname.includes('btn'))
-        return 'button';
-    if (lname.includes('image-box') || lname.includes('card'))
-        return 'image-box';
-    if (lname.includes('icon-box'))
-        return 'icon-box';
-    if (node.type === 'TEXT') {
-        if (lname.includes('heading') || lname.includes('title'))
-            return 'heading';
-        return 'text-editor';
-    }
-    if (lname.includes('image') || lname.includes('img'))
-        return 'image';
-    if (lname.includes('icon') || lname.includes('ico'))
-        return 'icon';
-    if (hasLayout(node) || node.type === 'GROUP')
-        return 'container';
-    return null;
-}
-// -------------------- Main Class --------------------
+// -------------------- Main Compiler Class --------------------
 class ElementorCompiler {
     constructor(config) {
         this.pendingUploads = new Map();
@@ -457,8 +434,8 @@ class ElementorCompiler {
     }
     uploadImageToWordPress(node_1) {
         return __awaiter(this, arguments, void 0, function* (node, format = 'WEBP') {
-            if (!this.wpConfig || !this.wpConfig.url) {
-                console.warn('[F2E] WP missing');
+            if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
+                console.warn('[F2E] WP config ausente.');
                 return null;
             }
             try {
@@ -493,22 +470,98 @@ class ElementorCompiler {
                     });
                     figma.ui.postMessage({
                         type: 'upload-image-request', id, name, mimeType: mime, targetMimeType: 'image/webp',
-                        data: bytes, needsConversion: !!needsConversion, quality: this.quality // Pass quality to UI
+                        data: bytes, needsConversion: !!needsConversion
                     });
                 });
             }
             catch (e) {
+                console.error('Error preparing upload:', e);
                 return null;
             }
         });
     }
+    isTextNode(node) { return node.type === 'TEXT'; }
+    isImageNode(node) {
+        if (node.type === 'RECTANGLE')
+            return hasImageFill(node);
+        if (node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT') {
+            const g = node;
+            if (hasFills(g) && isArray(g.fills) && g.fills.some((f) => f.type === 'IMAGE'))
+                return true;
+        }
+        const lname = node.name.toLowerCase();
+        return lname.includes('image') || lname.includes('img') || lname.includes('foto');
+    }
+    findAllChildren(node, result = []) {
+        if ('children' in node) {
+            for (const child of node.children) {
+                result.push(child);
+                this.findAllChildren(child, result);
+            }
+        }
+        return result;
+    }
+    detectWidgetType(node) {
+        const lname = node.name.toLowerCase();
+        if (lname.includes('button') || lname.includes('btn'))
+            return 'button';
+        if (lname.includes('image-box') || lname.includes('card'))
+            return 'image-box';
+        if (lname.includes('icon-box'))
+            return 'icon-box';
+        // 1. Check Text FIRST to avoid "Icon" ambiguity
+        if (node.type === 'TEXT') {
+            if (lname.includes('heading') || lname.includes('title'))
+                return 'heading';
+            return 'text-editor';
+        }
+        if (lname.includes('image') || lname.includes('img'))
+            return 'image';
+        if (lname.includes('icon') || lname.includes('ico'))
+            return 'icon';
+        if (hasLayout(node) || node.type === 'GROUP')
+            return 'container';
+        return null;
+    }
+    // -------------------- SMART STYLE DETECTION (CORRIGIDO) --------------------
+    detectStyleNode(node, internalContentNodes) {
+        if ((hasFills(node) && isArray(node.fills) && node.fills.length > 0 && node.fills[0].visible !== false) ||
+            (hasStrokes(node) && isArray(node.strokes) && node.strokes.length > 0) ||
+            (hasEffects(node) && isArray(node.effects) && node.effects.length > 0)) {
+            return node;
+        }
+        if ('children' in node) {
+            const children = node.children;
+            for (let i = children.length - 1; i >= 0; i--) {
+                const child = children[i];
+                if (internalContentNodes.includes(child))
+                    continue;
+                if (child.width < 10 || child.height < 10)
+                    continue;
+                if ((child.type === 'RECTANGLE' || child.type === 'FRAME' || child.type === 'ELLIPSE') &&
+                    ((hasFills(child) && isArray(child.fills) && child.fills.length > 0 && child.fills[0].visible !== false) ||
+                        (hasStrokes(child) && isArray(child.strokes) && child.strokes.length > 0) ||
+                        (hasEffects(child) && isArray(child.effects) && child.effects.length > 0))) {
+                    return child;
+                }
+            }
+        }
+        return node;
+    }
     compile(nodes) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a;
-            if (nodes.length === 1 && nodes[0].type === 'FRAME' && ((_a = nodes[0].parent) === null || _a === void 0 ? void 0 : _a.type) === 'PAGE' && !nodes[0].name.match(/^(w:|c:)/i)) {
-                return Promise.all(nodes[0].children.map(child => this.processNode(child, null, true)));
+            if (nodes.length === 1) {
+                const node = nodes[0];
+                const isArtboard = node.parent && node.parent.type === 'PAGE';
+                const hasPrefix = node.name.match(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i);
+                if (node.type === 'FRAME' && isArtboard && !hasPrefix) {
+                    const frame = node;
+                    const children = yield Promise.all(frame.children.map(child => this.processNode(child, null, true)));
+                    return children;
+                }
             }
-            return Promise.all(Array.from(nodes).map((node) => __awaiter(this, void 0, void 0, function* () { return this.processNode(node, null, true); })));
+            const elements = yield Promise.all(Array.from(nodes).map((node) => __awaiter(this, void 0, void 0, function* () { return this.processNode(node, null, true); })));
+            return elements;
         });
     }
     processNode(node_1) {
@@ -524,22 +577,23 @@ class ElementorCompiler {
                     slug = `loop-${slug}`;
                 if (prefix === 'slider:')
                     slug = 'slides';
-                if (['container', 'section', 'inner-container', 'column', 'row'].includes(slug))
+                if (['container', 'section', 'inner-container', 'column', 'row'].includes(slug)) {
                     return this.createContainer(node, parentNode, isTopLevel);
+                }
                 return this.createExplicitWidget(node, slug);
             }
-            const detected = detectWidgetType(node);
+            const detected = this.detectWidgetType(node);
             if (detected === 'container')
                 return this.createContainer(node, parentNode, isTopLevel);
             if (detected)
                 return this.createExplicitWidget(node, detected);
             if (node.type === 'TEXT')
                 return createTextWidget(node);
-            if (hasImageFill(node))
+            if (this.isImageNode(node))
                 return this.createExplicitWidget(node, 'image');
             if (['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT'].includes(node.type))
                 return this.createContainer(node, parentNode, isTopLevel);
-            return { id: generateGUID(), elType: 'widget', widgetType: 'text-editor', settings: { editor: 'Node not supported' }, elements: [] };
+            return { id: generateGUID(), elType: 'widget', widgetType: 'text-editor', settings: { editor: 'Nó não suportado' }, elements: [] };
         });
     }
     createContainer(node_1) {
@@ -613,15 +667,17 @@ class ElementorCompiler {
             const settings = {};
             const cleanTitle = stripWidgetPrefix(node.name);
             settings._widget_title = cleanTitle || widgetSlug;
-            const allDescendants = findAllChildren(node);
+            const allDescendants = this.findAllChildren(node);
             let imageNode = null;
             let titleNode = null;
             let descNode = null;
             if (['image-box', 'icon-box', 'button', 'image'].includes(widgetSlug)) {
-                if (widgetSlug === 'image-box' || widgetSlug === 'image')
-                    imageNode = allDescendants.find(c => hasImageFill(c)) || null;
-                else if (widgetSlug === 'icon-box' || widgetSlug === 'icon')
+                if (widgetSlug === 'image-box' || widgetSlug === 'image') {
+                    imageNode = allDescendants.find(c => this.isImageNode(c)) || null;
+                }
+                else if (widgetSlug === 'icon-box' || widgetSlug === 'icon') {
                     imageNode = allDescendants.find(c => isIconNode(c)) || null;
+                }
                 const textNodes = allDescendants.filter(c => c.type === 'TEXT');
                 textNodes.sort((a, b) => {
                     var _a, _b;
@@ -635,7 +691,7 @@ class ElementorCompiler {
                     descNode = textNodes[1];
             }
             const contentNodes = [imageNode, titleNode, descNode].filter(n => n !== null);
-            const styleNode = detectStyleNode(node, contentNodes);
+            const styleNode = this.detectStyleNode(node, contentNodes);
             Object.assign(settings, extractMargin(node));
             Object.assign(settings, extractPositioning(node));
             Object.assign(settings, extractTransform(node));
@@ -644,8 +700,9 @@ class ElementorCompiler {
                 Object.assign(settings, yield extractBackgroundAdvanced(styleNode, this));
                 Object.assign(settings, extractBorderStyles(styleNode));
                 Object.assign(settings, extractShadows(styleNode));
-                if (hasLayout(styleNode) || hasCornerRadius(styleNode))
+                if (hasLayout(styleNode) || hasCornerRadius(styleNode)) {
                     Object.assign(settings, extractPadding(styleNode));
+                }
             }
             else {
                 Object.assign(settings, extractBorderStyles(node));
@@ -681,8 +738,9 @@ class ElementorCompiler {
                 if (imageNode && titleNode) {
                     const pos = detectRelativePosition(imageNode, titleNode);
                     settings.position = pos;
-                    if (pos === 'left' || pos === 'right')
+                    if (pos === 'left' || pos === 'right') {
                         settings.content_vertical_alignment = 'middle';
+                    }
                 }
                 if (imageNode) {
                     if (widgetSlug === 'image-box') {
@@ -713,12 +771,6 @@ class ElementorCompiler {
                         settings[key.replace('typography_', 'title_typography_')] = typo[key];
                     if (color)
                         settings.title_color = color;
-                    // FIX: Mapeia o alinhamento do texto para o alinhamento geral do widget
-                    // O alinhamento do título em TextNode é "textAlignHorizontal" -> extractTypography -> settings.align
-                    if (settings.align) {
-                        settings.text_align = settings.align;
-                        delete settings.align; // Limpa para evitar ambiguidade
-                    }
                 }
                 if (descNode) {
                     settings.description_text = descNode.characters;
@@ -753,34 +805,29 @@ class ElementorCompiler {
                 if (url)
                     settings.selected_icon = { value: { url, id: 0 }, library: 'svg' };
             }
-            return { id: generateGUID(), elType: 'widget', widgetType: widgetSlug, settings, elements: [] };
+            return {
+                id: generateGUID(),
+                elType: 'widget',
+                widgetType: widgetSlug,
+                settings,
+                elements: []
+            };
         });
     }
 }
 // -------------------- Main Execution --------------------
 figma.showUI(__html__, { width: 400, height: 600 });
-// Initialize Global Compiler Instance
-let compiler = new ElementorCompiler({});
-// Load configuration immediately upon startup
+let compiler;
 figma.clientStorage.getAsync('wp_config').then(config => {
-    if (config) {
-        compiler = new ElementorCompiler(config);
+    compiler = new ElementorCompiler(config || {});
+    if (config)
         figma.ui.postMessage({ type: 'load-wp-config', config });
-    }
-    else {
-        // Ensure compiler is initialized even without config
-        compiler = new ElementorCompiler({});
-    }
 });
 figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    // Fallback if compiler is somehow null (shouldn't happen due to init above)
     if (!compiler)
         compiler = new ElementorCompiler({});
-    if (msg.type === 'resize-ui') {
-        figma.ui.resize(msg.width, msg.height);
-    }
-    else if (msg.type === 'export-elementor') {
+    if (msg.type === 'export-elementor') {
         const selection = figma.currentPage.selection;
         if (selection.length === 0) {
             figma.notify('Selecione ao menos um frame.');
@@ -788,10 +835,15 @@ figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
         }
         if (msg.quality)
             compiler.quality = msg.quality;
-        figma.notify('Processando... (Uploads podem demorar)');
+        figma.notify('Processando... (Uploads de imagem podem demorar)');
         try {
             const elements = yield compiler.compile(selection);
-            const template = { type: 'elementor', siteurl: ((_a = compiler.wpConfig) === null || _a === void 0 ? void 0 : _a.url) || '', elements, version: '0.4' };
+            const template = {
+                type: 'elementor',
+                siteurl: ((_a = compiler.wpConfig) === null || _a === void 0 ? void 0 : _a.url) || '',
+                elements,
+                version: '0.4'
+            };
             figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(template, null, 2) });
             figma.notify('JSON gerado com sucesso!');
         }
@@ -824,7 +876,10 @@ figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
     }
     else if (msg.type === 'debug-structure') {
         const debug = figma.currentPage.selection.map(n => ({
-            id: n.id, name: n.name, type: n.type, layout: hasLayout(n) ? n.layoutMode : 'none'
+            id: n.id,
+            name: n.name,
+            type: n.type,
+            layout: hasLayout(n) ? n.layoutMode : 'none'
         }));
         figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(debug, null, 2) });
     }
@@ -846,5 +901,11 @@ function createTextWidget(node) {
             settings.text_color = color;
     }
     Object.assign(settings, extractMargin(node));
-    return { id: generateGUID(), elType: 'widget', widgetType, settings, elements: [] };
+    return {
+        id: generateGUID(),
+        elType: 'widget',
+        widgetType,
+        settings,
+        elements: []
+    };
 }

@@ -485,7 +485,8 @@
                     <option value="0.75">75%</option>
                     <option value="1" selected>100%</option>
                 </select>
-                <button onclick="updatePreview()" class="btn btn-secondary btn-small"
+                <!-- FIX: Botão agora dispara a exportação novamente -->
+                <button onclick="triggerExport()" class="btn btn-secondary btn-small"
                     style="width:auto;">Recarregar</button>
             </div>
         </div>
@@ -535,34 +536,200 @@
 
     <script>
         // --- DADOS HIERÁRQUICOS DA ABA AJUDA ---
-        const widgetTreeData = [
+        const widgetCategories = [
             {
-                category: "Estrutura & Layout",
-                items: [
-                    { name: "container", prefix: "c:", label: "Container" },
-                    { name: "inner-container", prefix: "c:", label: "Inner Container" },
-                    { name: "divider", prefix: "w:", label: "Divisor" },
-                    { name: "spacer", prefix: "w:", label: "Espaçador" },
-                    { name: "menu-anchor", prefix: "w:", label: "Âncora de Menu" }
+                title: "Widgets Básicos (Elementor Free)",
+                widgets: [
+                    { name: "Container", tag: "w:container" },
+                    { name: "Inner Container", tag: "w:inner-container" },
+                    { name: "Título (Heading)", tag: "w:heading" },
+                    { name: "Editor de Texto", tag: "w:text-editor" },
+                    { name: "Imagem", tag: "w:image" },
+                    { name: "Vídeo", tag: "w:video" },
+                    { name: "Botão", tag: "w:button" },
+                    { name: "Divisor", tag: "w:divider" },
+                    { name: "Espaçador", tag: "w:spacer" },
+                    { name: "Ícone", tag: "w:icon" },
+                    { name: "Caixa de Ícone", tag: "w:icon-box" },
+                    { name: "Caixa de Imagem", tag: "w:image-box" },
+                    { name: "Avaliação (Star Rating)", tag: "w:star-rating" },
+                    { name: "Contador", tag: "w:counter" },
+                    { name: "Barra de Progresso", tag: "w:progress" },
+                    { name: "Abas (Tabs)", tag: "w:tabs" },
+                    { name: "Acordeão", tag: "w:accordion" },
+                    { name: "Toggle", tag: "w:toggle" },
+                    { name: "Alerta", tag: "w:alert" },
+                    { name: "Ícones Sociais", tag: "w:social-icons" },
+                    { name: "SoundCloud", tag: "w:soundcloud" },
+                    { name: "Shortcode", tag: "w:shortcode" },
+                    { name: "HTML", tag: "w:html" },
+                    { name: "Menu Anchor", tag: "w:menu-anchor" },
+                    { name: "Sidebar", tag: "w:sidebar" },
+                    { name: "Ler Mais", tag: "w:read-more" },
+                    { name: "Carrossel de Imagens", tag: "w:image-carousel" },
+                    { name: "Galeria Básica", tag: "w:basic-gallery" },
+                    { name: "Galeria", tag: "w:gallery" },
+                    { name: "Lista de Ícones", tag: "w:icon-list" },
+                    { name: "Menu de Navegação", tag: "w:nav-menu" },
+                    { name: "Formulário de Busca", tag: "w:search-form" },
+                    { name: "Google Maps", tag: "w:google-maps" },
+                    { name: "Testemunho", tag: "w:testimonial" },
+                    { name: "Embed", tag: "w:embed" },
+                    { name: "Lottie", tag: "w:lottie" },
+                    { name: "Loop Grid", tag: "loop:grid" }
                 ]
             },
             {
-                category: "Conteúdo Básico",
-                items: [
-                    { name: "heading", prefix: "w:", label: "Título" },
-                    { name: "text-editor", prefix: "w:", label: "Editor de Texto" },
-                    { name: "image", prefix: "w:", label: "Imagem" },
-                    { name: "video", prefix: "w:", label: "Vídeo" },
-                    { name: "button", prefix: "w:", label: "Botão" },
-                    { name: "icon", prefix: "w:", label: "Ícone" }
+                title: "Widgets Elementor Pro",
+                widgets: [
+                    { name: "Formulário", tag: "w:form" },
+                    { name: "Login", tag: "w:login" },
+                    { name: "Subscription", tag: "w:subscription" },
+                    { name: "Call to Action", tag: "w:call-to-action" },
+                    { name: "Carrossel de Mídia", tag: "media:carousel" },
+                    { name: "Portfólio", tag: "w:portfolio" },
+                    { name: "Galeria Pro", tag: "w:gallery-pro" },
+                    { name: "Slides", tag: "slider:slides" },
+                    { name: "Slideshow", tag: "w:slideshow" },
+                    { name: "Flip Box", tag: "w:flip-box" },
+                    { name: "Animated Headline", tag: "w:animated-headline" },
+                    { name: "Post Navigation", tag: "w:post-navigation" },
+                    { name: "Share Buttons", tag: "w:share-buttons" },
+                    { name: "Table of Contents", tag: "w:table-of-contents" },
+                    { name: "Countdown", tag: "w:countdown" },
+                    { name: "Blockquote", tag: "w:blockquote" },
+                    { name: "Testimonial Carousel", tag: "w:testimonial-carousel" },
+                    { name: "Review Box", tag: "w:review-box" },
+                    { name: "Hotspots", tag: "w:hotspots" },
+                    { name: "Sitemap", tag: "w:sitemap" },
+                    { name: "Author Box", tag: "w:author-box" },
+                    { name: "Price Table", tag: "w:price-table" },
+                    { name: "Price List", tag: "w:price-list" },
+                    { name: "Progress Tracker", tag: "w:progress-tracker" },
+                    { name: "Animated Text", tag: "w:animated-text" },
+                    { name: "Nav Menu Pro", tag: "w:nav-menu-pro" },
+                    { name: "Breadcrumb", tag: "w:breadcrumb" },
+                    { name: "Facebook Button", tag: "w:facebook-button" },
+                    { name: "Facebook Comments", tag: "w:facebook-comments" },
+                    { name: "Facebook Embed", tag: "w:facebook-embed" },
+                    { name: "Facebook Page", tag: "w:facebook-page" },
+                    { name: "Loop Builder", tag: "loop:builder" },
+                    { name: "Loop Grid Advanced", tag: "loop:grid-advanced" },
+                    { name: "Loop Carousel", tag: "loop:carousel" },
+                    { name: "Post Excerpt", tag: "w:post-excerpt" },
+                    { name: "Post Content", tag: "w:post-content" },
+                    { name: "Post Title", tag: "w:post-title" },
+                    { name: "Post Info", tag: "w:post-info" },
+                    { name: "Post Featured Image", tag: "w:post-featured-image" },
+                    { name: "Post Author", tag: "w:post-author" },
+                    { name: "Post Date", tag: "w:post-date" },
+                    { name: "Post Terms", tag: "w:post-terms" },
+                    { name: "Archive Title", tag: "w:archive-title" },
+                    { name: "Archive Description", tag: "w:archive-description" },
+                    { name: "Site Logo", tag: "w:site-logo" },
+                    { name: "Site Title", tag: "w:site-title" },
+                    { name: "Site Tagline", tag: "w:site-tagline" },
+                    { name: "Search Results", tag: "w:search-results" },
+                    { name: "Global Widget", tag: "w:global-widget" },
+                    { name: "Video Playlist", tag: "w:video-playlist" },
+                    { name: "Video Gallery", tag: "w:video-gallery" }
                 ]
             },
             {
-                category: "Cards & Boxes",
-                items: [
-                    { name: "image-box", prefix: "w:", label: "Caixa de Imagem" },
-                    { name: "icon-box", prefix: "w:", label: "Caixa de Ícone" },
-                    { name: "alert", prefix: "w:", label: "Alerta" }
+                title: "WooCommerce Widgets",
+                widgets: [
+                    { name: "Product Title", tag: "woo:product-title" },
+                    { name: "Product Image", tag: "woo:product-image" },
+                    { name: "Product Price", tag: "woo:product-price" },
+                    { name: "Add to Cart", tag: "woo:product-add-to-cart" },
+                    { name: "Product Data Tabs", tag: "woo:product-data-tabs" },
+                    { name: "Product Excerpt", tag: "woo:product-excerpt" },
+                    { name: "Product Rating", tag: "woo:product-rating" },
+                    { name: "Product Stock", tag: "woo:product-stock" },
+                    { name: "Product Meta", tag: "woo:product-meta" },
+                    { name: "Additional Info", tag: "woo:product-additional-information" },
+                    { name: "Short Description", tag: "woo:product-short-description" },
+                    { name: "Related Products", tag: "woo:product-related" },
+                    { name: "Upsells", tag: "woo:product-upsells" },
+                    { name: "Product Tabs", tag: "woo:product-tabs" },
+                    { name: "Product Breadcrumb", tag: "woo:product-breadcrumb" },
+                    { name: "Product Gallery", tag: "woo:product-gallery" },
+                    { name: "Products", tag: "woo:products" },
+                    { name: "Product Grid", tag: "woo:product-grid" },
+                    { name: "Product Carousel", tag: "woo:product-carousel" },
+                    { name: "Product Loop Item", tag: "woo:product-loop-item" },
+                    { name: "Loop Product Title", tag: "woo:loop-product-title" },
+                    { name: "Loop Product Price", tag: "woo:loop-product-price" },
+                    { name: "Loop Product Rating", tag: "woo:loop-product-rating" },
+                    { name: "Loop Product Image", tag: "woo:loop-product-image" },
+                    { name: "Loop Product Button", tag: "woo:loop-product-button" },
+                    { name: "Loop Product Meta", tag: "woo:loop-product-meta" },
+                    { name: "Cart", tag: "woo:cart" },
+                    { name: "Checkout", tag: "woo:checkout" },
+                    { name: "My Account", tag: "woo:my-account" },
+                    { name: "Purchase Summary", tag: "woo:purchase-summary" },
+                    { name: "Order Tracking", tag: "woo:order-tracking" }
+                ]
+            },
+            {
+                title: "Loop Builder Widgets",
+                widgets: [
+                    { name: "Loop Grid", tag: "loop:grid" },
+                    { name: "Loop Carousel", tag: "loop:carousel" },
+                    { name: "Loop Item", tag: "loop:item" },
+                    { name: "Loop Image", tag: "loop:image" },
+                    { name: "Loop Title", tag: "loop:title" },
+                    { name: "Loop Meta", tag: "loop:meta" },
+                    { name: "Loop Terms", tag: "loop:terms" },
+                    { name: "Loop Rating", tag: "loop:rating" },
+                    { name: "Loop Price", tag: "loop:price" },
+                    { name: "Loop Add to Cart", tag: "loop:add-to-cart" },
+                    { name: "Loop Read More", tag: "loop:read-more" },
+                    { name: "Loop Featured Image", tag: "loop:featured-image" }
+                ]
+            },
+            {
+                title: "Carrosséis",
+                widgets: [
+                    { name: "Image Carousel", tag: "w:image-carousel" },
+                    { name: "Media Carousel", tag: "media:carousel" },
+                    { name: "Testimonial Carousel", tag: "w:testimonial-carousel" },
+                    { name: "Review Carousel", tag: "w:review-carousel" },
+                    { name: "Slides", tag: "slider:slides" },
+                    { name: "Slider", tag: "slider:slider" },
+                    { name: "Loop Carousel", tag: "loop:carousel" },
+                    { name: "Product Carousel", tag: "woo:product-carousel" },
+                    { name: "Posts Carousel", tag: "w:posts-carousel" },
+                    { name: "Gallery Carousel", tag: "w:gallery-carousel" }
+                ]
+            },
+            {
+                title: "Widgets Experimentais",
+                widgets: [
+                    { name: "Nested Tabs", tag: "w:nested-tabs" },
+                    { name: "Mega Menu", tag: "w:mega-menu" },
+                    { name: "Scroll Snap", tag: "w:scroll-snap" },
+                    { name: "Motion Effects", tag: "w:motion-effects" },
+                    { name: "Background Slideshow", tag: "w:background-slideshow" },
+                    { name: "CSS Transform", tag: "w:css-transform" },
+                    { name: "Custom Position", tag: "w:custom-position" },
+                    { name: "Dynamic Tags", tag: "w:dynamic-tags" },
+                    { name: "AJAX Pagination", tag: "w:ajax-pagination" },
+                    { name: "Loop Pagination", tag: "loop:pagination" },
+                    { name: "Aspect Ratio Container", tag: "w:aspect-ratio-container" }
+                ]
+            },
+            {
+                title: "WordPress Widgets",
+                widgets: [
+                    { name: "WP Pesquisar", tag: "w:wp-search" },
+                    { name: "WP Posts Recentes", tag: "w:wp-recent-posts" },
+                    { name: "WP Comentários Recentes", tag: "w:wp-recent-comments" },
+                    { name: "WP Arquivos", tag: "w:wp-archives" },
+                    { name: "WP Categorias", tag: "w:wp-categories" },
+                    { name: "WP Calendário", tag: "w:wp-calendar" },
+                    { name: "WP Tag Cloud", tag: "w:wp-tag-cloud" },
+                    { name: "WP Menu Personalizado", tag: "w:wp-custom-menu" }
                 ]
             }
         ];
@@ -620,44 +787,55 @@
             const drawItem = (item, parentEl) => {
                 const btn = document.createElement('div');
                 btn.className = 'widget-btn';
-                btn.innerHTML = `<span class="prefix">${item.prefix}</span>${item.label || item.name}`;
+
+                const [prefix] = item.tag.split(':');
+                btn.innerHTML = `<span class="prefix">${prefix}:</span>${item.name}`;
+
                 btn.onclick = () => {
-                    addLog(`Renomeando para: ${item.prefix}${item.name}`);
-                    parent.postMessage({ pluginMessage: { type: 'rename-layer', newName: `${item.prefix}${item.name}` } }, '*');
+                    addLog(`Renomeando para: ${item.tag}`);
+                    parent.postMessage({ pluginMessage: { type: 'rename-layer', newName: item.tag } }, '*');
                 };
                 const wrapper = document.createElement('div');
                 wrapper.className = 'tree-item';
                 wrapper.appendChild(btn);
                 parentEl.appendChild(wrapper);
-
-                if (item.children) {
-                    const childCont = document.createElement('div');
-                    childCont.className = 'tree-children';
-                    item.children.forEach(c => drawItem(c, childCont));
-                    parentEl.appendChild(childCont);
-                }
             };
 
-            widgetTreeData.forEach(cat => {
-                const block = document.createElement('div');
-                block.className = 'category-block';
-                const title = document.createElement('div');
-                title.className = 'category-title';
-                title.textContent = cat.category;
-                block.appendChild(title);
-                const root = document.createElement('div');
-                root.className = 'tree-root';
-
-                cat.items.forEach(item => {
-                    if (!filterText || item.name.includes(filterText) || item.label.includes(filterText)) {
-                        drawItem(item, root);
-                    }
+            widgetCategories.forEach(cat => {
+                const filteredWidgets = cat.widgets.filter(item => {
+                    return !filterText ||
+                        item.name.toLowerCase().includes(filterText) ||
+                        item.tag.toLowerCase().includes(filterText);
                 });
-                block.appendChild(root);
-                container.appendChild(block);
+
+                if (filteredWidgets.length > 0) {
+                    const block = document.createElement('div');
+                    block.className = 'category-block';
+                    const title = document.createElement('div');
+                    title.className = 'category-title';
+                    title.textContent = cat.title;
+                    block.appendChild(title);
+                    const root = document.createElement('div');
+                    root.className = 'tree-root';
+
+                    filteredWidgets.forEach(item => {
+                        drawItem(item, root);
+                    });
+
+                    block.appendChild(root);
+                    container.appendChild(block);
+                }
             });
         }
         document.getElementById('search-widgets').addEventListener('input', (e) => renderHelpTree(e.target.value));
+
+        // --- EXPORT TRIGGER ---
+        function triggerExport() {
+            const q = parseFloat(document.getElementById('quality').value);
+            parent.postMessage({ pluginMessage: { type: 'export-elementor', quality: q } }, '*');
+            // Muda para a aba de preview se já não estiver (se o clique veio do btn exportar)
+            // Se veio do recarregar, já estamos na aba preview.
+        }
 
         // --- PREVIEW ENGINE ---
         document.getElementById('zoom-select').addEventListener('change', (e) => {
@@ -696,7 +874,14 @@
             const st = dom.style;
             // Box Model
             if (s.padding) st.padding = `${s.padding.top || 0}px ${s.padding.right || 0}px ${s.padding.bottom || 0}px ${s.padding.left || 0}px`;
-            if (s.margin) st.margin = `${s.margin.top || 0}px ${s.margin.right || 0}px ${s.margin.bottom || 0}px ${s.margin.left || 0}px`;
+
+            // Margin Handling (Objeto ou chaves individuais para retrocompatibilidade)
+            if (s.margin) {
+                st.marginTop = `${s.margin.top || 0}px`;
+                st.marginRight = `${s.margin.right || 0}px`;
+                st.marginBottom = `${s.margin.bottom || 0}px`;
+                st.marginLeft = `${s.margin.left || 0}px`;
+            }
 
             // Backgrounds
             if (s.background_background === 'gradient') {
@@ -724,6 +909,16 @@
 
             // Border
             if (s.border_radius) st.borderRadius = `${s.border_radius.size || s.border_radius.top || 0}px`;
+
+            // Position (Absolute) - Visualização no Preview
+            if (s._position === 'absolute') {
+                st.position = 'absolute';
+                if (s._offset_orientation_h === 'right') st.right = getUnitValue(s._offset_x);
+                else st.left = getUnitValue(s._offset_x);
+
+                if (s._offset_orientation_v === 'end') st.bottom = getUnitValue(s._offset_y);
+                else st.top = getUnitValue(s._offset_y);
+            }
         }
 
         function applyTypography(dom, s, prefix = '') {
@@ -824,8 +1019,7 @@
 
         // --- EVENTS ---
         document.getElementById('btn-export').onclick = () => {
-            const q = parseFloat(document.getElementById('quality').value);
-            parent.postMessage({ pluginMessage: { type: 'export-elementor', quality: q } }, '*');
+            triggerExport();
         };
         document.getElementById('btn-copy').onclick = () => {
             document.getElementById('output-area').select();
@@ -838,7 +1032,6 @@
             const pass = document.getElementById('wp-pass').value;
             parent.postMessage({ pluginMessage: { type: 'save-wp-config', config: { url, user, password: pass } } }, '*');
         };
-
         window.onmessage = (event) => {
             const msg = event.data.pluginMessage;
             if (!msg) return;
@@ -847,7 +1040,23 @@
                 document.getElementById('output-area').value = msg.data;
                 document.getElementById('btn-copy').disabled = false;
                 addLog("JSON Gerado!", 'success');
+
+                // Auto-copy
+                document.getElementById('output-area').select();
+                navigator.clipboard.writeText(msg.data).then(() => {
+                    addLog("JSON copiado automaticamente para a área de transferência!", 'success');
+                }).catch(e => console.error(e));
+
                 if (document.getElementById('tab-preview').classList.contains('active')) updatePreview();
+            }
+            else if (msg.type === 'load-wp-config') {
+                const config = msg.config;
+                if (config) {
+                    if (config.url) document.getElementById('wp-url').value = config.url;
+                    if (config.user) document.getElementById('wp-user').value = config.user;
+                    if (config.password) document.getElementById('wp-pass').value = config.password;
+                    addLog("Config WP carregada.", 'success');
+                }
             }
             else if (msg.type === 'upload-image-request') {
                 document.getElementById('loader').style.display = 'flex';
@@ -896,6 +1105,10 @@
                 })();
             }
         };
+
+        // --- INICIALIZAÇÃO FIX ---
+        // Pede a configuração ao iniciar
+        parent.postMessage({ pluginMessage: { type: 'get-wp-config' } }, '*');
 
         renderHelpTree();
     </script>
