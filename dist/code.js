@@ -1210,7 +1210,7 @@ class ElementorCompiler {
     }
 }
 // -------------------- Main Execution --------------------
-figma.showUI(__html__, { width: 400, height: 600 });
+figma.showUI(__html__, { width: 600, height: 600 });
 let compiler;
 figma.clientStorage.getAsync('wp_config').then(config => {
     compiler = new ElementorCompiler(config || {});

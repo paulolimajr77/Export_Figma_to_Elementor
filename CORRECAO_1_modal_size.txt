@@ -1,0 +1,6 @@
+// LINHA 808 do code.ts
+// SUBSTITUIR:
+figma.showUI(__html__, { width: 400, height: 600 });
+
+// POR:
+figma.showUI(__html__, { width: 500, height: 700 });
