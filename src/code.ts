@@ -856,6 +856,9 @@ figma.ui.onmessage = async (msg) => {
             figma.notify('Erro ao exportar.');
         }
     }
+    else if (msg.type === 'resize-ui') {
+        figma.ui.resize(msg.width, msg.height);
+    }
     else if (msg.type === 'save-wp-config') {
         await figma.clientStorage.setAsync('wp_config', msg.config);
         compiler.wpConfig = msg.config;

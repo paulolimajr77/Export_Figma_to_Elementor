@@ -13,7 +13,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 /// <reference types="@figma/plugin-typings" />
 var Gemini;
 (function (Gemini) {
-    const API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent';
+    const API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
     // ==================== Gerenciamento de API Key ====================
     /**
      * Salva a API Key do Google Gemini
@@ -1256,6 +1256,9 @@ figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
             console.error(e);
             figma.notify('Erro ao exportar.');
         }
+    }
+    else if (msg.type === 'resize-ui') {
+        figma.ui.resize(msg.width, msg.height);
     }
     else if (msg.type === 'save-wp-config') {
         yield figma.clientStorage.setAsync('wp_config', msg.config);

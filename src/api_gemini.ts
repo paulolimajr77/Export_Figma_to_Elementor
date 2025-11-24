@@ -4,7 +4,7 @@
 /// <reference types="@figma/plugin-typings" />
 
 namespace Gemini {
-    const API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent';
+    const API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
     // ==================== Gerenciamento de API Key ====================
 

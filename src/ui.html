@@ -820,23 +820,32 @@
             qualityValue.textContent = Math.round(e.target.value * 100) + '%';
         });
 
-        // --- REDIMENSIONAMENTO ---
+        // ==================== REDIMENSIONAMENTO DO MODAL ====================
         const resizer = document.getElementById('resizer');
-        resizer.addEventListener('pointerdown', (e) => {
-            resizer.setPointerCapture(e.pointerId);
-            resizer.addEventListener('pointermove', onResize);
-            resizer.addEventListener('pointerup', stopResize);
+        let isResizing = false;
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            e.preventDefault();
         });
-        function onResize(e) {
-            const width = Math.max(350, e.clientX + 20);
-            const height = Math.max(500, e.clientY + 20);
-            parent.postMessage({ pluginMessage: { type: 'resize-ui', width, height } }, '*');
-        }
-        function stopResize(e) {
-            resizer.releasePointerCapture(e.pointerId);
-            resizer.removeEventListener('pointermove', onResize);
-            resizer.removeEventListener('pointerup', stopResize);
-        }
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            const newWidth = e.clientX;
+            const newHeight = e.clientY;
+
+            if (newWidth > 300 && newHeight > 400) {
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'resize-ui',
+                        width: newWidth,
+                        height: newHeight
+                    }
+                }, '*');
+            }
+        });
+        document.addEventListener('mouseup', () => {
+            isResizing = false;
+        });
 
         // --- HELP TREE RENDERER ---
         function renderHelpTree(filterText = '') {
@@ -1260,56 +1269,38 @@
 
 
         // ==================== HANDLERS GEMINI ====================
-
-        // Salvar API Key
-        document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
-            const key = document.getElementById('gemini-api-key').value.trim();
-            if (!key) {
-                alert('⚠️ Digite uma API Key válida');
-                return;
+        // Interceptar mensagens existentes e adicionar handlers Gemini
+        const originalOnMessage = window.onmessage;
+        window.onmessage = (event) => {
+            // Chamar handler original primeiro
+            if (originalOnMessage) {
+                originalOnMessage(event);
             }
-            parent.postMessage({ pluginMessage: { type: 'save-gemini-key', key } }, '*');
-        });
-
-        // Testar Conexão
-        document.getElementById('btn-test-gemini').addEventListener('click', () => {
-            parent.postMessage({ pluginMessage: { type: 'test-gemini-connection' } }, '*');
-        });
-
-        // Analisar com IA
-        document.getElementById('btn-analyze-gemini').addEventListener('click', () => {
-            document.getElementById('gemini-results').style.display = 'none';
-            parent.postMessage({ pluginMessage: { type: 'analyze-with-gemini' } }, '*');
-        });
-
-        // Receber resultados do Gemini (ADICIONAR ao window.addEventListener existente)
-        // Procure por: window.addEventListener('message', (event) => {
-        // E adicione DENTRO dele, após os outros handlers:
-
-        if (msg.type === 'gemini-connection-result') {
-            if (msg.success) {
-                alert('✅ Conexão OK! API Key válida.');
-            } else {
-                alert('❌ Falha na conexão. Verifique a API Key.');
+            const msg = event.data.pluginMessage;
+            if (!msg) return;
+            // Handlers Gemini
+            if (msg.type === 'gemini-connection-result') {
+                if (msg.success) {
+                    alert('✅ Conexão OK! API Key válida.');
+                } else {
+                    alert('❌ Falha na conexão. Verifique a API Key.');
+                }
             }
-        }
-
-        if (msg.type === 'gemini-creation-complete') {
-            const resultsDiv = document.getElementById('gemini-results');
-            const improvementsDiv = document.getElementById('gemini-improvements');
-
-            resultsDiv.style.display = 'block';
-            improvementsDiv.innerHTML = `
-                <strong>Frame Original:</strong> ${msg.data.originalName}<br>
-                <strong>Novo Frame:</strong> ${msg.data.newName}<br><br>
-                <strong>Melhorias:</strong><br>
-                ${msg.data.improvements.map(imp => `• ${imp}`).join('<br>')}
-            `;
-        }
-
-        if (msg.type === 'gemini-error') {
-            alert('❌ Erro: ' + msg.error);
-        }
+            if (msg.type === 'gemini-creation-complete') {
+                const resultsDiv = document.getElementById('gemini-results');
+                const improvementsDiv = document.getElementById('gemini-improvements');
+                resultsDiv.style.display = 'block';
+                improvementsDiv.innerHTML = `
+                    <strong>Frame Original:</strong> ${msg.data.originalName}<br>
+                    <strong>Novo Frame:</strong> ${msg.data.newName}<br><br>
+                    <strong>Melhorias:</strong><br>
+                    ${msg.data.improvements.map(imp => `• ${imp}`).join('<br>')}
+                `;
+            }
+            if (msg.type === 'gemini-error') {
+                alert('❌ Erro: ' + msg.error);
+            }
+        };
 
     </script>
 </body>
