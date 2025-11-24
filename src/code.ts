@@ -5,7 +5,7 @@
 // - FIX: Adiciona 'image_size' redundante em Image Box para forçar a largura.
 // - FIX: Garante tipos numéricos em padding/margin para compatibilidade.
 // - Mantém detecção robusta de Backgrounds e Bordas.
-
+/// <reference path="./api_gemini.ts" />
 // -------------------- Interfaces --------------------
 interface ElementorSettings {
     [key: string]: any;
@@ -885,6 +885,78 @@ figma.ui.onmessage = async (msg) => {
             layout: hasLayout(n) ? (n as FrameNode).layoutMode : 'none'
         }));
         figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(debug, null, 2) });
+    }
+    // Salvar API Key do Gemini
+    else if (msg.type === 'save-gemini-key') {
+        await Gemini.saveKey(msg.key);
+        figma.notify('🔑 API Key salva com sucesso!');
+    }
+
+    // Testar conexão com Gemini
+    else if (msg.type === 'test-gemini-connection') {
+        try {
+            const isConnected = await Gemini.testConnection();
+            figma.ui.postMessage({
+                type: 'gemini-connection-result',
+                success: isConnected
+            });
+
+            if (isConnected) {
+                figma.notify('✅ Conexão com Gemini OK!');
+            } else {
+                figma.notify('❌ Falha na conexão. Verifique a API Key.');
+            }
+        } catch (e: any) {
+            figma.notify('❌ Erro ao testar conexão');
+        }
+    }
+
+    // Analisar layout com IA e criar novo frame otimizado
+    else if (msg.type === 'analyze-with-gemini') {
+        const selection = figma.currentPage.selection;
+        if (selection.length !== 1) {
+            figma.notify('⚠️ Selecione apenas 1 frame para análise');
+            return;
+        }
+
+        const node = selection[0];
+        figma.notify('🤖 Analisando layout com IA...');
+
+        try {
+            // Exporta screenshot do frame
+            const imageData = await node.exportAsync({ format: 'PNG' });
+
+            // Envia para análise e recriação
+            const analysis = await Gemini.analyzeAndRecreate(imageData, node);
+
+            figma.notify('🎨 Criando novo frame otimizado...');
+
+            // Cria novo frame baseado na análise
+            const newFrame = await Gemini.createOptimizedFrame(analysis, node);
+
+            // Seleciona o novo frame
+            figma.currentPage.selection = [newFrame];
+            figma.viewport.scrollAndZoomIntoView([newFrame]);
+
+            // Retorna resultados para UI
+            figma.ui.postMessage({
+                type: 'gemini-creation-complete',
+                data: {
+                    originalName: node.name,
+                    newName: newFrame.name,
+                    improvements: analysis.improvements || []
+                }
+            });
+
+            figma.notify('✅ Novo frame criado com sucesso!');
+        } catch (e: any) {
+            console.error(e);
+            figma.notify('❌ Erro na análise: ' + e.message);
+            figma.ui.postMessage({
+                type: 'gemini-error',
+                error: e.message
+            });
+        }
     }
 };
 

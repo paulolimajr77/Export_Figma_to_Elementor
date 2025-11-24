@@ -447,8 +447,9 @@
 
     <!-- NAVEGAÇÃO -->
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('export')">1. Gerar JSON</button>
-        <button class="tab-btn" onclick="openTab('preview')">2. Preview</button>
+        <button class="tab-btn active" onclick="openTab('export')">Gerar JSON</button>
+        <button class="tab-btn" onclick="openTab('gemini')">IA Gemini</button>
+        <button class="tab-btn" onclick="openTab('preview')">Preview</button>
         <button class="tab-btn" onclick="openTab('wp')">Config WP</button>
         <button class="tab-btn" onclick="openTab('help')">Ajuda</button>
     </div>
@@ -490,7 +491,7 @@
                     style="width:auto;">Recarregar</button>
             </div>
         </div>
-
+        <div id="tab-wp" class="content"></div>
         <div id="preview-wrapper">
             <div id="preview-container">
                 <div

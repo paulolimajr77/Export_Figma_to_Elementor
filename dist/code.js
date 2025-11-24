@@ -8,13 +8,375 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-// Elementor JSON Compiler – Full Implementation (TypeScript)
-// Exporta frames do Figma para JSON compatível com Elementor (clipboard).
-// Versão Final Corrigida (v2):
-// - FIX: Textos não são mais confundidos com Ícones/Imagens na detecção automática.
-// - FIX: Adiciona 'image_size' redundante em Image Box para forçar a largura.
-// - FIX: Garante tipos numéricos em padding/margin para compatibilidade.
-// - Mantém detecção robusta de Backgrounds e Bordas.
+// Google Gemini API Integration
+// Análise inteligente de layouts e criação automática de frames otimizados
+/// <reference types="@figma/plugin-typings" />
+var Gemini;
+(function (Gemini) {
+    const API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent';
+    // ==================== Gerenciamento de API Key ====================
+    /**
+     * Salva a API Key do Google Gemini
+     */
+    function saveKey(key) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield figma.clientStorage.setAsync('gemini_api_key', key);
+        });
+    }
+    Gemini.saveKey = saveKey;
+    /**
+     * Recupera a API Key salva
+     */
+    function getKey() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield figma.clientStorage.getAsync('gemini_api_key');
+        });
+    }
+    Gemini.getKey = getKey;
+    /**
+     * Testa a conexão com a API do Gemini
+     */
+    function testConnection() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const key = yield getKey();
+            if (!key)
+                return false;
+            try {
+                const response = yield fetch(`${API_ENDPOINT}?key=${key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                                parts: [{ text: 'Test' }]
+                            }]
+                    })
+                });
+                return response.ok;
+            }
+            catch (_a) {
+                return false;
+            }
+        });
+    }
+    Gemini.testConnection = testConnection;
+    // ==================== Análise e Criação de Layout ====================
+    /**
+     * Analisa um frame e retorna instruções para recriar com melhorias
+     */
+    function analyzeAndRecreate(imageData, originalNode) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const key = yield getKey();
+            if (!key)
+                throw new Error('API Key não configurada');
+            const base64Image = arrayBufferToBase64(imageData);
+            const prompt = `
+Analise este layout de interface e forneça instruções DETALHADAS para RECRIAR um novo frame otimizado.
+
+Identifique com precisão:
+1. **Estrutura Hierárquica**: Containers principais, seções e widgets
+2. **Nomenclaturas**: Use prefixos adequados:
+   - c:section, c:inner, c:container para containers
+   - w:heading, w:text-editor, w:button, w:image, w:image-box para widgets
+3. **Auto-Layout**: Configurações de flexbox (direção, alinhamento, gap, padding)
+4. **Conteúdo**: Textos visíveis, cores, tamanhos de fonte
+5. **Hierarquia**: Ordem correta dos elementos
+
+Responda APENAS com JSON válido nesta estrutura:
+{
+  "frameName": "c:section Hero - IA Optimized",
+  "width": 1200,
+  "height": 600,
+  "autoLayout": {
+    "direction": "vertical",
+    "primaryAlign": "center",
+    "counterAlign": "center",
+    "gap": 20,
+    "padding": {"top": 40, "right": 60, "bottom": 40, "left": 60}
+  },
+  "background": "#FFFFFF",
+  "children": [
+    {
+      "type": "container",
+      "name": "c:inner Content",
+      "autoLayout": {"direction": "vertical", "primaryAlign": "center", "counterAlign": "center", "gap": 16, "padding": {"top": 0, "right": 0, "bottom": 0, "left": 0}},
+      "children": [
+        {
+          "type": "widget",
+          "widgetType": "heading",
+          "name": "w:heading Title",
+          "content": "Título identificado",
+          "fontSize": 48,
+          "color": "#000000"
+        },
+        {
+          "type": "widget",
+          "widgetType": "text",
+          "name": "w:text-editor Description",
+          "content": "Descrição identificada",
+          "fontSize": 16,
+          "color": "#666666"
+        }
+      ]
+    }
+  ],
+  "improvements": ["Aplicado auto-layout vertical", "Nomenclaturas padronizadas"]
+}
+        `;
+            const response = yield fetch(`${API_ENDPOINT}?key=${key}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inline_data: {
+                                        mime_type: 'image/png',
+                                        data: base64Image
+                                    }
+                                }
+                            ]
+                        }],
+                    generationConfig: {
+                        temperature: 0.4,
+                        maxOutputTokens: 2048
+                    }
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+            const data = yield response.json();
+            return parseGeminiResponse(data);
+        });
+    }
+    Gemini.analyzeAndRecreate = analyzeAndRecreate;
+    /**
+     * Cria um novo frame otimizado baseado na análise da IA
+     */
+    function createOptimizedFrame(analysis, originalNode) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Cria novo frame
+            const newFrame = figma.createFrame();
+            newFrame.name = analysis.frameName;
+            newFrame.resize(analysis.width, analysis.height);
+            // Posiciona ao lado do original (100px de distância)
+            if ('x' in originalNode && 'y' in originalNode) {
+                newFrame.x = originalNode.x + originalNode.width + 100;
+                newFrame.y = originalNode.y;
+            }
+            // Aplica background
+            if (analysis.background) {
+                newFrame.fills = [{
+                        type: 'SOLID',
+                        color: hexToRgb(analysis.background)
+                    }];
+            }
+            // Aplica auto-layout no frame principal
+            if (analysis.autoLayout) {
+                applyAutoLayoutToFrame(newFrame, analysis.autoLayout);
+            }
+            // Cria filhos recursivamente
+            for (const child of analysis.children) {
+                yield createChildNode(newFrame, child);
+            }
+            // Adiciona à página
+            figma.currentPage.appendChild(newFrame);
+            return newFrame;
+        });
+    }
+    Gemini.createOptimizedFrame = createOptimizedFrame;
+    // ==================== Funções Auxiliares ====================
+    /**
+     * Cria um nó filho baseado na especificação da IA
+     */
+    function createChildNode(parent, spec) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (spec.type === 'container') {
+                const container = figma.createFrame();
+                container.name = spec.name;
+                if (spec.autoLayout) {
+                    applyAutoLayoutToFrame(container, spec.autoLayout);
+                }
+                if (spec.background) {
+                    container.fills = [{
+                            type: 'SOLID',
+                            color: hexToRgb(spec.background)
+                        }];
+                }
+                // Cria filhos do container
+                if (spec.children) {
+                    for (const child of spec.children) {
+                        yield createChildNode(container, child);
+                    }
+                }
+                parent.appendChild(container);
+                return container;
+            }
+            else if (spec.type === 'widget') {
+                return yield createWidget(parent, spec);
+            }
+            // Fallback
+            const fallback = figma.createFrame();
+            fallback.name = spec.name || 'Unknown';
+            parent.appendChild(fallback);
+            return fallback;
+        });
+    }
+    /**
+     * Cria um widget baseado no tipo especificado
+     */
+    function createWidget(parent, spec) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const widgetType = spec.widgetType;
+            // Widgets de texto (heading, text-editor)
+            if (widgetType === 'heading' || widgetType === 'text') {
+                const text = figma.createText();
+                text.name = spec.name;
+                // Carrega fonte
+                yield figma.loadFontAsync({ family: "Inter", style: "Regular" });
+                text.characters = spec.content || 'Texto';
+                if (spec.fontSize) {
+                    text.fontSize = spec.fontSize;
+                }
+                if (spec.color) {
+                    text.fills = [{
+                            type: 'SOLID',
+                            color: hexToRgb(spec.color)
+                        }];
+                }
+                parent.appendChild(text);
+                return text;
+            }
+            // Widget de botão
+            else if (widgetType === 'button') {
+                const button = figma.createFrame();
+                button.name = spec.name;
+                button.layoutMode = 'HORIZONTAL';
+                button.primaryAxisAlignItems = 'CENTER';
+                button.counterAxisAlignItems = 'CENTER';
+                button.paddingLeft = button.paddingRight = 24;
+                button.paddingTop = button.paddingBottom = 12;
+                button.cornerRadius = 8;
+                if (spec.background) {
+                    button.fills = [{
+                            type: 'SOLID',
+                            color: hexToRgb(spec.background)
+                        }];
+                }
+                else {
+                    button.fills = [{
+                            type: 'SOLID',
+                            color: { r: 0.13, g: 0.6, b: 1 } // Azul padrão
+                        }];
+                }
+                // Adiciona texto do botão
+                yield figma.loadFontAsync({ family: "Inter", style: "Medium" });
+                const buttonText = figma.createText();
+                buttonText.characters = spec.content || 'Button';
+                buttonText.fontSize = 16;
+                buttonText.fills = [{
+                        type: 'SOLID',
+                        color: spec.color ? hexToRgb(spec.color) : { r: 1, g: 1, b: 1 }
+                    }];
+                button.appendChild(buttonText);
+                parent.appendChild(button);
+                return button;
+            }
+            // Widget de imagem (placeholder)
+            else if (widgetType === 'image') {
+                const rect = figma.createRectangle();
+                rect.name = spec.name;
+                rect.resize(spec.width || 200, spec.height || 150);
+                rect.fills = [{
+                        type: 'SOLID',
+                        color: { r: 0.9, g: 0.9, b: 0.9 }
+                    }];
+                parent.appendChild(rect);
+                return rect;
+            }
+            // Fallback
+            const fallback = figma.createFrame();
+            fallback.name = spec.name || 'Widget';
+            parent.appendChild(fallback);
+            return fallback;
+        });
+    }
+    /**
+     * Aplica configurações de auto-layout a um frame
+     */
+    function applyAutoLayoutToFrame(frame, config) {
+        frame.layoutMode = config.direction === 'horizontal' ? 'HORIZONTAL' : 'VERTICAL';
+        // Primary axis (justify-content)
+        if (config.primaryAlign === 'start')
+            frame.primaryAxisAlignItems = 'MIN';
+        else if (config.primaryAlign === 'center')
+            frame.primaryAxisAlignItems = 'CENTER';
+        else if (config.primaryAlign === 'end')
+            frame.primaryAxisAlignItems = 'MAX';
+        else if (config.primaryAlign === 'space-between')
+            frame.primaryAxisAlignItems = 'SPACE_BETWEEN';
+        // Counter axis (align-items)
+        if (config.counterAlign === 'start')
+            frame.counterAxisAlignItems = 'MIN';
+        else if (config.counterAlign === 'center')
+            frame.counterAxisAlignItems = 'CENTER';
+        else if (config.counterAlign === 'end')
+            frame.counterAxisAlignItems = 'MAX';
+        // Gap
+        if (config.gap)
+            frame.itemSpacing = config.gap;
+        // Padding
+        if (config.padding) {
+            frame.paddingTop = config.padding.top || 0;
+            frame.paddingRight = config.padding.right || 0;
+            frame.paddingBottom = config.padding.bottom || 0;
+            frame.paddingLeft = config.padding.left || 0;
+        }
+    }
+    /**
+     * Converte array de bytes para base64
+     */
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    }
+    /**
+     * Converte cor hexadecimal para RGB do Figma
+     */
+    function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16) / 255,
+            g: parseInt(result[2], 16) / 255,
+            b: parseInt(result[3], 16) / 255
+        } : { r: 1, g: 1, b: 1 };
+    }
+    /**
+     * Faz parse da resposta do Gemini
+     */
+    function parseGeminiResponse(data) {
+        try {
+            const text = data.candidates[0].content.parts[0].text;
+            // Remove markdown code blocks se existirem
+            const jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            }
+            throw new Error('JSON não encontrado na resposta');
+        }
+        catch (e) {
+            console.error('Erro ao fazer parse da resposta:', e);
+            throw new Error('Resposta inválida da IA: ' + (e.message || String(e)));
+        }
+    }
+})(Gemini || (Gemini = {}));
+/// <reference path="./api_gemini.ts" />
 // -------------------- Helper Utilities --------------------
 function generateGUID() {
     return 'xxxxxxxxxx'.replace(/[x]/g, () => ((Math.random() * 36) | 0).toString(36));
@@ -925,6 +1287,70 @@ figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
             layout: hasLayout(n) ? n.layoutMode : 'none'
         }));
         figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(debug, null, 2) });
+    }
+    // Salvar API Key do Gemini
+    else if (msg.type === 'save-gemini-key') {
+        yield Gemini.saveKey(msg.key);
+        figma.notify('🔑 API Key salva com sucesso!');
+    }
+    // Testar conexão com Gemini
+    else if (msg.type === 'test-gemini-connection') {
+        try {
+            const isConnected = yield Gemini.testConnection();
+            figma.ui.postMessage({
+                type: 'gemini-connection-result',
+                success: isConnected
+            });
+            if (isConnected) {
+                figma.notify('✅ Conexão com Gemini OK!');
+            }
+            else {
+                figma.notify('❌ Falha na conexão. Verifique a API Key.');
+            }
+        }
+        catch (e) {
+            figma.notify('❌ Erro ao testar conexão');
+        }
+    }
+    // Analisar layout com IA e criar novo frame otimizado
+    else if (msg.type === 'analyze-with-gemini') {
+        const selection = figma.currentPage.selection;
+        if (selection.length !== 1) {
+            figma.notify('⚠️ Selecione apenas 1 frame para análise');
+            return;
+        }
+        const node = selection[0];
+        figma.notify('🤖 Analisando layout com IA...');
+        try {
+            // Exporta screenshot do frame
+            const imageData = yield node.exportAsync({ format: 'PNG' });
+            // Envia para análise e recriação
+            const analysis = yield Gemini.analyzeAndRecreate(imageData, node);
+            figma.notify('🎨 Criando novo frame otimizado...');
+            // Cria novo frame baseado na análise
+            const newFrame = yield Gemini.createOptimizedFrame(analysis, node);
+            // Seleciona o novo frame
+            figma.currentPage.selection = [newFrame];
+            figma.viewport.scrollAndZoomIntoView([newFrame]);
+            // Retorna resultados para UI
+            figma.ui.postMessage({
+                type: 'gemini-creation-complete',
+                data: {
+                    originalName: node.name,
+                    newName: newFrame.name,
+                    improvements: analysis.improvements || []
+                }
+            });
+            figma.notify('✅ Novo frame criado com sucesso!');
+        }
+        catch (e) {
+            console.error(e);
+            figma.notify('❌ Erro na análise: ' + e.message);
+            figma.ui.postMessage({
+                type: 'gemini-error',
+                error: e.message
+            });
+        }
     }
 });
 function createTextWidget(node) {

@@ -1,0 +1,127 @@
+<!-- ADICIONAR ESTE BOTÃO NA LINHA 453, APÓS O BOTÃO "2. Preview" -->
+        <button class="tab-btn" onclick="openTab('gemini')">🤖 IA Gemini</button>
+
+<!-- ADICIONAR ESTE CONTEÚDO ANTES DA ABA "Config WP" (antes da linha 495) -->
+    <!-- ABA: IA GEMINI -->
+    <div id="tab-gemini" class="content">
+        <div class="info-box">
+            Configure a API do Google Gemini para análise inteligente de layouts com IA.
+        </div>
+        
+        <!-- Instruções -->
+        <div style="background: var(--hover); padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 11px; line-height: 1.6;">
+            <strong style="display: block; margin-bottom: 8px; font-size: 12px;">📝 Como obter sua API Key:</strong>
+            <ol style="margin: 0; padding-left: 20px;">
+                <li>Acesse <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: var(--primary);">Google AI Studio</a></li>
+                <li>Faça login com sua conta Google</li>
+                <li>Clique em "Create API Key"</li>
+                <li>Copie a chave gerada</li>
+                <li>Cole abaixo e salve</li>
+            </ol>
+        </div>
+        
+        <!-- Configuração API Key -->
+        <div class="form-group">
+            <label>API Key do Google Gemini</label>
+            <input type="password" id="gemini-api-key" placeholder="Cole sua API key aqui">
+        </div>
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <button id="btn-test-gemini" class="btn btn-secondary">Testar Conexão</button>
+            <button id="btn-save-gemini" class="btn btn-primary">Salvar API Key</button>
+        </div>
+        
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+        
+        <!-- Análise de Layout -->
+        <div class="form-group">
+            <label>🤖 Análise Inteligente de Layout</label>
+            <p style="font-size: 11px; opacity: 0.8; margin-top: 4px;">
+                Selecione um frame no Figma e clique abaixo. A IA irá analisar o layout e criar um novo frame otimizado com auto-layout e nomenclaturas corretas.
+            </p>
+            <button id="btn-analyze-layout" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+                🎨 Analisar e Criar Frame Otimizado
+            </button>
+        </div>
+        
+        <!-- Resultados (inicialmente oculto) -->
+        <div id="gemini-results" style="display: none; margin-top: 20px; padding: 12px; background: var(--hover); border-radius: 6px;">
+            <strong style="display: block; margin-bottom: 8px;">✨ Melhorias Aplicadas:</strong>
+            <ul id="gemini-improvements" style="margin: 0; padding-left: 20px; font-size: 11px;">
+            </ul>
+        </div>
+    </div>
+
+<!-- ADICIONAR ESTE JAVASCRIPT NO FINAL DO <script>, ANTES DO FECHAMENTO </script> (linha ~1200) -->
+
+        // ==================== GEMINI API HANDLERS ====================
+        
+        // Salvar API Key
+        document.getElementById('btn-save-gemini').onclick = () => {
+            const key = document.getElementById('gemini-api-key').value;
+            if (!key) {
+                addLog('Digite uma API key válida', 'error');
+                return;
+            }
+            
+            parent.postMessage({ 
+                pluginMessage: { type: 'save-gemini-key', key } 
+            }, '*');
+            addLog('API Key salva com sucesso!', 'success');
+        };
+        
+        // Testar conexão
+        document.getElementById('btn-test-gemini').onclick = () => {
+            parent.postMessage({ 
+                pluginMessage: { type: 'test-gemini-connection' } 
+            }, '*');
+            addLog('Testando conexão com Gemini...', 'info');
+        };
+        
+        // Analisar layout
+        document.getElementById('btn-analyze-layout').onclick = () => {
+            parent.postMessage({ 
+                pluginMessage: { type: 'analyze-with-gemini' } 
+            }, '*');
+            addLog('Enviando para análise com IA...', 'info');
+        };
+        
+        // Listener para mensagens do Gemini
+        const originalOnMessage = window.onmessage;
+        window.onmessage = (event) => {
+            // Chama o handler original primeiro
+            if (originalOnMessage) originalOnMessage(event);
+            
+            const msg = event.data.pluginMessage;
+            
+            if (msg.type === 'gemini-connection-result') {
+                if (msg.success) {
+                    addLog('✅ Conexão com Gemini OK!', 'success');
+                } else {
+                    addLog('❌ Falha na conexão. Verifique a API Key.', 'error');
+                }
+            }
+            
+            if (msg.type === 'gemini-creation-complete') {
+                const resultsDiv = document.getElementById('gemini-results');
+                const improvementsList = document.getElementById('gemini-improvements');
+                
+                let html = '';
+                if (msg.data.improvements && msg.data.improvements.length > 0) {
+                    msg.data.improvements.forEach(improvement => {
+                        html += `<li>${improvement}</li>`;
+                    });
+                } else {
+                    html = '<li>Frame otimizado criado com sucesso!</li>';
+                }
+                
+                improvementsList.innerHTML = html;
+                resultsDiv.style.display = 'block';
+                
+                addLog(`✅ Novo frame criado: ${msg.data.newName}`, 'success');
+            }
+            
+            if (msg.type === 'gemini-error') {
+                addLog(`❌ Erro: ${msg.error}`, 'error');
+            }
+        };
