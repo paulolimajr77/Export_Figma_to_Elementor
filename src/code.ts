@@ -538,7 +538,27 @@ class ElementorCompiler {
         const elements = await Promise.all(Array.from(nodes).map(async node => this.processNode(node, null, true)));
         return elements;
     }
+    // Encontra todos os elementos nav-menu recursivamente
+    findNavMenus(elements: ElementorElement[]): any[] {
+        const navMenus: any[] = [];
 
+        const searchRecursive = (els: ElementorElement[]) => {
+            for (const el of els) {
+                if (el.widgetType === 'nav-menu') {
+                    navMenus.push({
+                        id: el.id,
+                        name: el.settings._widget_title || 'Menu de Navegação'
+                    });
+                }
+                if (el.elements && el.elements.length > 0) {
+                    searchRecursive(el.elements);
+                }
+            }
+        };
+
+        searchRecursive(elements);
+        return navMenus;
+    }
     async processNode(node: SceneNode, parentNode: SceneNode | null = null, isTopLevel: boolean = false): Promise<ElementorElement> {
         const rawName = node.name || '';
         const prefixMatch = rawName.match(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i);
@@ -809,14 +829,28 @@ figma.ui.onmessage = async (msg) => {
 
         try {
             const elements = await compiler.compile(selection);
+
+            // Detectar elementos w:nav-menu
+            const navMenus = compiler.findNavMenus(elements);
+
             const template: ElementorTemplate = {
                 type: 'elementor',
                 siteurl: compiler.wpConfig?.url || '',
                 elements,
                 version: '0.4'
             };
-            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(template, null, 2) });
-            figma.notify('JSON gerado com sucesso!');
+
+            figma.ui.postMessage({
+                type: 'export-result',
+                data: JSON.stringify(template, null, 2),
+                navMenus: navMenus
+            });
+
+            if (navMenus.length > 0) {
+                figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navegação.`);
+            } else {
+                figma.notify('JSON gerado com sucesso!');
+            }
         } catch (e) {
             console.error(e);
             figma.notify('Erro ao exportar.');
