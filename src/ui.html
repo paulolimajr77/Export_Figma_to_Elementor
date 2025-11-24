@@ -1053,6 +1053,54 @@
             e.preventDefault();
             addLog('📦 Link para download: Você deve subir o arquivo .zip do plugin Figma to Elementor Remote Menus', 'info');
         };
+
+        async function createMenusAutomatically(navMenus, wpUrl, wpUser, wpPass) {
+            const wpUrlClean = wpUrl.replace(/\/$/, "");
+
+            for (const menu of navMenus) {
+                try {
+                    addLog(`📤 Criando menu: ${menu.name}...`, 'info');
+
+                    const payload = {
+                        menu_name: menu.name,
+                        menu_location: "primary",
+                        replace_existing: true,
+                        items: menu.items || []
+                    };
+
+                    const response = await fetch(`${wpUrlClean}/wp-json/figtoel-remote-menus/v1/sync`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Basic ' + btoa(wpUser + ":" + wpPass)
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    }
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        addLog(`✅ Menu "${menu.name}" criado com sucesso! (${menu.items.length} itens)`, 'success');
+                    } else {
+                        addLog(`⚠️ Falha ao criar menu "${menu.name}": ${result.message || 'Erro desconhecido'}`, 'error');
+                    }
+
+                } catch (error) {
+                    addLog(`❌ Erro ao criar menu "${menu.name}": ${error.message}`, 'error');
+
+                    // Verificar se é erro de plugin não instalado
+                    if (error.message.includes('404')) {
+                        addLog('💡 Verifique se o plugin "Figto El Remote Menus" está instalado e ativado no WordPress', 'error');
+                    }
+                }
+            }
+        }
+
         window.onmessage = (event) => {
             const msg = event.data.pluginMessage;
             if (!msg) return;
@@ -1070,20 +1118,31 @@
 
                 // Processar menus de navegação detectados
                 if (msg.navMenus && msg.navMenus.length > 0) {
-                    const autoMenuEnabled = document.getElementById('wp-auto-menu').checked;
-
-                    addLog(`⚠️ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação (w:nav-menu)`, 'info');
-
-                    if (!autoMenuEnabled) {
-                        addLog('💡 Para criar menus automaticamente:', 'info');
-                        addLog('   1. Baixe e instale o plugin XYZ Remote Menus no WordPress', 'info');
-                        addLog('   2. Vá na aba "Config WP" e marque "Plugin instalado"', 'info');
-                        addLog('   3. Exporte novamente para criar os menus dinamicamente', 'info');
-                    } else {
-                        addLog('✅ Plugin habilitado! Os menus serão criados via API do WordPress', 'info');
-                        addLog('📝 Endpoint: POST /wp-json/xyz-remote-menus/v1/sync', 'info');
-                    }
-                }
+    const autoMenuEnabled = document.getElementById('wp-auto-menu').checked;
+    const wpUrl = document.getElementById('wp-url').value;
+    const wpUser = document.getElementById('wp-user').value;
+    const wpPass = document.getElementById('wp-pass').value;
+    
+    addLog(`⚠️ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação (w:nav-menu)`, 'info');
+    
+    // Mostrar itens detectados
+    msg.navMenus.forEach(menu => {
+        addLog(`   📋 Menu: "${menu.name}" com ${menu.items.length} item(ns)`, 'info');
+    });
+    
+    if (!autoMenuEnabled) {
+        addLog('💡 Para criar menus automaticamente:', 'info');
+        addLog('   1. Baixe e instale o plugin Figto El Remote Menus no WordPress', 'info');
+        addLog('   2. Vá na aba "Config WP" e marque "Plugin instalado"', 'info');
+        addLog('   3. Exporte novamente para criar os menus dinamicamente', 'info');
+    } else if (!wpUrl || !wpUser || !wpPass) {
+        addLog('⚠️ Configure as credenciais do WordPress na aba "Config WP"', 'error');
+    } else {
+        // Criar menus automaticamente
+        addLog('🔄 Iniciando criação automática de menus...', 'info');
+        createMenusAutomatically(msg.navMenus, wpUrl, wpUser, wpPass);
+    }
+}
 
                 if (document.getElementById('tab-preview').classList.contains('active')) updatePreview();
             }

@@ -564,6 +564,83 @@ class ElementorCompiler {
             return elements;
         });
     }
+    // Encontra todos os elementos nav-menu recursivamente e extrai seus itens
+    findNavMenus(elements, figmaNodes) {
+        const navMenus = [];
+        const nodeMap = new Map();
+        // Criar mapa de IDs para nodes do Figma
+        if (figmaNodes) {
+            const mapNodes = (nodes) => {
+                for (const node of nodes) {
+                    nodeMap.set(node.id, node);
+                    if ('children' in node) {
+                        mapNodes(node.children);
+                    }
+                }
+            };
+            mapNodes(figmaNodes);
+        }
+        const extractMenuItems = (figmaNode) => {
+            const items = [];
+            if (!('children' in figmaNode))
+                return items;
+            const children = figmaNode.children;
+            for (const child of children) {
+                const childName = child.name.toLowerCase();
+                // Procurar por itens de menu (podem ser frames ou grupos com texto)
+                if (child.type === 'TEXT') {
+                    items.push({
+                        title: child.characters,
+                        url: '#', // URL padrão
+                        children: []
+                    });
+                }
+                else if ('children' in child) {
+                    // Procurar texto dentro do frame/grupo
+                    const textNodes = this.findAllChildren(child).filter(n => n.type === 'TEXT');
+                    if (textNodes.length > 0) {
+                        const title = textNodes[0].characters;
+                        // Verificar se tem subitens (children)
+                        const subItems = extractMenuItems(child);
+                        items.push({
+                            title: title,
+                            url: '#',
+                            children: subItems.length > 0 ? subItems : []
+                        });
+                    }
+                }
+            }
+            return items;
+        };
+        const searchRecursive = (els) => {
+            for (const el of els) {
+                if (el.widgetType === 'nav-menu') {
+                    const menuData = {
+                        id: el.id,
+                        name: el.settings._widget_title || 'Menu de Navegação',
+                        items: []
+                    };
+                    // Tentar encontrar o node do Figma correspondente
+                    if (figmaNodes) {
+                        for (const [nodeId, node] of nodeMap.entries()) {
+                            const nodeName = node.name.toLowerCase();
+                            if (nodeName.includes('nav-menu') || nodeName.includes(menuData.name.toLowerCase())) {
+                                menuData.items = extractMenuItems(node);
+                                menuData.figmaNodeId = nodeId;
+                                break;
+                            }
+                        }
+                    }
+                    navMenus.push(menuData);
+                }
+                if (el.elements && el.elements.length > 0) {
+                    searchRecursive(el.elements);
+                }
+            }
+        };
+        searchRecursive(elements);
+        return navMenus;
+    }
     processNode(node_1) {
         return __awaiter(this, arguments, void 0, function* (node, parentNode = null, isTopLevel = false) {
             const rawName = node.name || '';
@@ -708,6 +785,19 @@ class ElementorCompiler {
                 Object.assign(settings, extractBorderStyles(node));
                 Object.assign(settings, extractShadows(node));
             }
+            if (widgetSlug === 'nav-menu') {
+                // A 'nav-menu' widget in Elementor points to a menu created in WordPress's backend.
+                // It does not contain the menu items directly in its structure.
+                // By returning here, we ensure that text nodes inside the Figma frame are ignored,
+                // preventing the incorrect generation of extra widgets like an icon list.
+                return {
+                    id: generateGUID(),
+                    elType: 'widget',
+                    widgetType: 'nav-menu',
+                    settings,
+                    elements: []
+                };
+            }
             if (widgetSlug === 'image') {
                 const url = yield this.uploadImageToWordPress(node, 'WEBP');
                 settings.image = { url: url || '', id: 0 };
@@ -838,14 +928,25 @@ figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
         figma.notify('Processando... (Uploads de imagem podem demorar)');
         try {
             const elements = yield compiler.compile(selection);
+            // Detectar elementos w:nav-menu
+            const navMenus = compiler.findNavMenus(elements, selection);
             const template = {
                 type: 'elementor',
                 siteurl: ((_a = compiler.wpConfig) === null || _a === void 0 ? void 0 : _a.url) || '',
                 elements,
                 version: '0.4'
             };
-            figma.ui.postMessage({ type: 'export-result', data: JSON.stringify(template, null, 2) });
-            figma.notify('JSON gerado com sucesso!');
+            figma.ui.postMessage({
+                type: 'export-result',
+                data: JSON.stringify(template, null, 2),
+                navMenus: navMenus
+            });
+            if (navMenus.length > 0) {
+                figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navegação.`);
+            }
+            else {
+                figma.notify('JSON gerado com sucesso!');
+            }
         }
         catch (e) {
             console.error(e);
