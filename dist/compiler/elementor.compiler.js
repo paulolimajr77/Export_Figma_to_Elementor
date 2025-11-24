@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,18 +7,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ElementorCompiler = void 0;
-const guid_1 = require("../utils/guid");
-const geometry_1 = require("../utils/geometry");
-const uploader_1 = require("../media/uploader");
-const container_builder_1 = require("../containers/container.builder");
-const detector_1 = require("../widgets/detector");
-const text_builder_1 = require("../widgets/builders/text.builder");
-const styles_extractor_1 = require("../extractors/styles.extractor");
-const layout_extractor_1 = require("../extractors/layout.extractor");
-const background_extractor_1 = require("../extractors/background.extractor");
-const typography_extractor_1 = require("../extractors/typography.extractor");
+import { generateGUID, stripWidgetPrefix } from '../utils/guid';
+import { detectRelativePosition } from '../utils/geometry';
+import { ImageUploader } from '../media/uploader';
+import { ContainerBuilder } from '../containers/container.builder';
+import { detectWidgetType, detectWidgetFromPrefix, isIconNode, isImageNode } from '../widgets/detector';
+import { createTextWidget } from '../widgets/builders/text.builder';
+import { extractBorderStyles, extractShadows, extractOpacity, extractTransform } from '../extractors/styles.extractor';
+import { extractMargin, extractPositioning, extractPadding } from '../extractors/layout.extractor';
+import { extractBackgroundAdvanced } from '../extractors/background.extractor';
+import { extractTypography, extractTextColor } from '../extractors/typography.extractor';
 /**
  * Type guards
  */
@@ -33,11 +30,11 @@ function hasCornerRadius(node) {
  * Compilador principal refatorado
  * Orquestra todos os módulos para gerar JSON Elementor
  */
-class ElementorCompiler {
+export class ElementorCompiler {
     constructor(wpConfig = {}, quality = 0.85) {
         this.wpConfig = wpConfig;
-        this.uploader = new uploader_1.ImageUploader(wpConfig, quality);
-        this.containerBuilder = new container_builder_1.ContainerBuilder(this.uploader, this.processNode.bind(this));
+        this.uploader = new ImageUploader(wpConfig, quality);
+        this.containerBuilder = new ContainerBuilder(this.uploader, this.processNode.bind(this));
     }
     /**
      * Compila nós do Figma em elementos Elementor
@@ -66,7 +63,7 @@ class ElementorCompiler {
         return __awaiter(this, arguments, void 0, function* (node, parentNode = null, isTopLevel = false) {
             const rawName = node.name || '';
             // Verifica se tem prefixo explícito
-            const widgetSlug = (0, detector_1.detectWidgetFromPrefix)(rawName);
+            const widgetSlug = detectWidgetFromPrefix(rawName);
             if (widgetSlug) {
                 // Prefixos de container
                 if (['container', 'section', 'inner-container', 'column', 'row'].includes(widgetSlug)) {
@@ -76,7 +73,7 @@ class ElementorCompiler {
                 return this.createExplicitWidget(node, widgetSlug);
             }
             // Detecção automática
-            const detected = (0, detector_1.detectWidgetType)(node);
+            const detected = detectWidgetType(node);
             if (detected === 'container') {
                 return this.containerBuilder.build(node, parentNode, isTopLevel);
             }
@@ -85,10 +82,10 @@ class ElementorCompiler {
             }
             // Texto sem prefixo
             if (node.type === 'TEXT') {
-                return (0, text_builder_1.createTextWidget)(node);
+                return createTextWidget(node);
             }
             // Imagem sem prefixo
-            if ((0, detector_1.isImageNode)(node)) {
+            if (isImageNode(node)) {
                 return this.createExplicitWidget(node, 'image');
             }
             // Frame/Group como container
@@ -97,7 +94,7 @@ class ElementorCompiler {
             }
             // Fallback: widget de texto
             return {
-                id: (0, guid_1.generateGUID)(),
+                id: generateGUID(),
                 elType: 'widget',
                 widgetType: 'text-editor',
                 settings: { editor: 'Nó não suportado' },
@@ -111,7 +108,7 @@ class ElementorCompiler {
     createExplicitWidget(node, widgetSlug) {
         return __awaiter(this, void 0, void 0, function* () {
             const settings = {};
-            const cleanTitle = (0, guid_1.stripWidgetPrefix)(node.name);
+            const cleanTitle = stripWidgetPrefix(node.name);
             settings._widget_title = cleanTitle || widgetSlug;
             // Encontra todos os descendentes
             const allDescendants = this.findAllChildren(node);
@@ -121,10 +118,10 @@ class ElementorCompiler {
             // Para widgets compostos, identifica os componentes
             if (['image-box', 'icon-box', 'button', 'image'].includes(widgetSlug)) {
                 if (widgetSlug === 'image-box' || widgetSlug === 'image') {
-                    imageNode = allDescendants.find(c => (0, detector_1.isImageNode)(c)) || null;
+                    imageNode = allDescendants.find(c => isImageNode(c)) || null;
                 }
                 else if (widgetSlug === 'icon-box' || widgetSlug === 'icon') {
-                    imageNode = allDescendants.find(c => (0, detector_1.isIconNode)(c)) || null;
+                    imageNode = allDescendants.find(c => isIconNode(c)) || null;
                 }
                 // Encontra nós de texto (título e descrição)
                 const textNodes = allDescendants.filter(c => c.type === 'TEXT');
@@ -143,27 +140,27 @@ class ElementorCompiler {
             const contentNodes = [imageNode, titleNode, descNode].filter(n => n !== null);
             const styleNode = this.detectStyleNode(node, contentNodes);
             // Extrai estilos gerais
-            Object.assign(settings, (0, layout_extractor_1.extractMargin)(node));
-            Object.assign(settings, (0, layout_extractor_1.extractPositioning)(node));
-            Object.assign(settings, (0, styles_extractor_1.extractTransform)(node));
-            Object.assign(settings, (0, styles_extractor_1.extractOpacity)(node));
+            Object.assign(settings, extractMargin(node));
+            Object.assign(settings, extractPositioning(node));
+            Object.assign(settings, extractTransform(node));
+            Object.assign(settings, extractOpacity(node));
             // Extrai estilos do nó de estilo
             if (styleNode) {
-                Object.assign(settings, yield (0, background_extractor_1.extractBackgroundAdvanced)(styleNode, this.uploader));
-                Object.assign(settings, (0, styles_extractor_1.extractBorderStyles)(styleNode));
-                Object.assign(settings, (0, styles_extractor_1.extractShadows)(styleNode));
+                Object.assign(settings, yield extractBackgroundAdvanced(styleNode, this.uploader));
+                Object.assign(settings, extractBorderStyles(styleNode));
+                Object.assign(settings, extractShadows(styleNode));
                 if (hasLayout(styleNode) || hasCornerRadius(styleNode)) {
-                    Object.assign(settings, (0, layout_extractor_1.extractPadding)(styleNode));
+                    Object.assign(settings, extractPadding(styleNode));
                 }
             }
             else {
-                Object.assign(settings, (0, styles_extractor_1.extractBorderStyles)(node));
-                Object.assign(settings, (0, styles_extractor_1.extractShadows)(node));
+                Object.assign(settings, extractBorderStyles(node));
+                Object.assign(settings, extractShadows(node));
             }
             // Widgets específicos
             yield this.buildSpecificWidget(widgetSlug, node, settings, imageNode, titleNode, descNode);
             return {
-                id: (0, guid_1.generateGUID)(),
+                id: generateGUID(),
                 elType: 'widget',
                 widgetType: widgetSlug,
                 settings,
@@ -192,8 +189,8 @@ class ElementorCompiler {
             else if (widgetSlug === 'button') {
                 if (titleNode) {
                     settings.text = titleNode.characters;
-                    Object.assign(settings, (0, typography_extractor_1.extractTypography)(titleNode));
-                    const color = (0, typography_extractor_1.extractTextColor)(titleNode);
+                    Object.assign(settings, extractTypography(titleNode));
+                    const color = extractTextColor(titleNode);
                     if (color)
                         settings.button_text_color = color;
                 }
@@ -213,7 +210,7 @@ class ElementorCompiler {
             else if (widgetSlug === 'image-box' || widgetSlug === 'icon-box') {
                 // Posição relativa
                 if (imageNode && titleNode) {
-                    const pos = (0, geometry_1.detectRelativePosition)(imageNode, titleNode);
+                    const pos = detectRelativePosition(imageNode, titleNode);
                     settings.position = pos;
                     if (pos === 'left' || pos === 'right') {
                         settings.content_vertical_alignment = 'middle';
@@ -244,8 +241,8 @@ class ElementorCompiler {
                 // Título
                 if (titleNode) {
                     settings.title_text = titleNode.characters;
-                    const typo = (0, typography_extractor_1.extractTypography)(titleNode);
-                    const color = (0, typography_extractor_1.extractTextColor)(titleNode);
+                    const typo = extractTypography(titleNode);
+                    const color = extractTextColor(titleNode);
                     for (const key in typo) {
                         settings[key.replace('typography_', 'title_typography_')] = typo[key];
                     }
@@ -255,8 +252,8 @@ class ElementorCompiler {
                 // Descrição
                 if (descNode) {
                     settings.description_text = descNode.characters;
-                    const typo = (0, typography_extractor_1.extractTypography)(descNode);
-                    const color = (0, typography_extractor_1.extractTextColor)(descNode);
+                    const typo = extractTypography(descNode);
+                    const color = extractTextColor(descNode);
                     for (const key in typo) {
                         settings[key.replace('typography_', 'description_typography_')] = typo[key];
                     }
@@ -268,8 +265,8 @@ class ElementorCompiler {
             else if (widgetSlug === 'heading') {
                 if (node.type === 'TEXT') {
                     settings.title = node.characters;
-                    Object.assign(settings, (0, typography_extractor_1.extractTypography)(node));
-                    const color = (0, typography_extractor_1.extractTextColor)(node);
+                    Object.assign(settings, extractTypography(node));
+                    const color = extractTextColor(node);
                     if (color)
                         settings.title_color = color;
                 }
@@ -278,8 +275,8 @@ class ElementorCompiler {
             else if (widgetSlug === 'text-editor') {
                 if (node.type === 'TEXT') {
                     settings.editor = node.characters;
-                    Object.assign(settings, (0, typography_extractor_1.extractTypography)(node));
-                    const color = (0, typography_extractor_1.extractTextColor)(node);
+                    Object.assign(settings, extractTypography(node));
+                    const color = extractTextColor(node);
                     if (color)
                         settings.text_color = color;
                 }
@@ -374,4 +371,3 @@ class ElementorCompiler {
         this.uploader.handleUploadResponse(id, result);
     }
 }
-exports.ElementorCompiler = ElementorCompiler;

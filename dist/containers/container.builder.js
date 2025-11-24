@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,17 +7,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ContainerBuilder = void 0;
-const guid_1 = require("../utils/guid");
-const styles_extractor_1 = require("../extractors/styles.extractor");
-const layout_extractor_1 = require("../extractors/layout.extractor");
-const background_extractor_1 = require("../extractors/background.extractor");
-const container_detector_1 = require("./container.detector");
+import { generateGUID } from '../utils/guid';
+import { extractBorderStyles, extractShadows, extractOpacity, extractTransform } from '../extractors/styles.extractor';
+import { extractFlexLayout, extractPadding, extractMargin } from '../extractors/layout.extractor';
+import { extractBackgroundAdvanced } from '../extractors/background.extractor';
+import { detectContainerType, isInnerContainer } from './container.detector';
 /**
  * Classe responsável pela criação de containers Elementor
  */
-class ContainerBuilder {
+export class ContainerBuilder {
     constructor(uploader, processNodeFn) {
         this.uploader = uploader;
         this.processNodeFn = processNodeFn;
@@ -34,17 +31,17 @@ class ContainerBuilder {
         return __awaiter(this, arguments, void 0, function* (node, parentNode = null, isTopLevel = false) {
             const lname = node.name.toLowerCase();
             let settings = {};
-            const containerType = (0, container_detector_1.detectContainerType)(node, parentNode, isTopLevel);
+            const containerType = detectContainerType(node, parentNode, isTopLevel);
             let isInner = containerType === 'inner';
             // Extrai estilos do container
-            Object.assign(settings, (0, styles_extractor_1.extractBorderStyles)(node));
-            Object.assign(settings, (0, styles_extractor_1.extractShadows)(node));
-            Object.assign(settings, yield (0, background_extractor_1.extractBackgroundAdvanced)(node, this.uploader));
-            Object.assign(settings, (0, layout_extractor_1.extractPadding)(node));
-            Object.assign(settings, (0, styles_extractor_1.extractOpacity)(node));
-            Object.assign(settings, (0, styles_extractor_1.extractTransform)(node));
-            Object.assign(settings, (0, layout_extractor_1.extractFlexLayout)(node));
-            Object.assign(settings, (0, layout_extractor_1.extractMargin)(node));
+            Object.assign(settings, extractBorderStyles(node));
+            Object.assign(settings, extractShadows(node));
+            Object.assign(settings, yield extractBackgroundAdvanced(node, this.uploader));
+            Object.assign(settings, extractPadding(node));
+            Object.assign(settings, extractOpacity(node));
+            Object.assign(settings, extractTransform(node));
+            Object.assign(settings, extractFlexLayout(node));
+            Object.assign(settings, extractMargin(node));
             // Container externo (section)
             if (containerType === 'external') {
                 let childToMerge = null;
@@ -52,7 +49,7 @@ class ContainerBuilder {
                 if ('children' in node) {
                     const children = node.children;
                     const frameChildren = children.filter(c => c.type === 'FRAME' || c.type === 'INSTANCE');
-                    if (frameChildren.length === 1 && (0, container_detector_1.isInnerContainer)(frameChildren[0], node)) {
+                    if (frameChildren.length === 1 && isInnerContainer(frameChildren[0], node)) {
                         childToMerge = frameChildren[0];
                     }
                 }
@@ -61,11 +58,11 @@ class ContainerBuilder {
                     settings.content_width = 'boxed';
                     settings.width = { unit: '%', size: 100 };
                     settings.boxed_width = { unit: 'px', size: Math.round(childToMerge.width) };
-                    Object.assign(settings, (0, layout_extractor_1.extractPadding)(childToMerge));
-                    Object.assign(settings, (0, layout_extractor_1.extractFlexLayout)(childToMerge));
+                    Object.assign(settings, extractPadding(childToMerge));
+                    Object.assign(settings, extractFlexLayout(childToMerge));
                     const grandChildren = yield Promise.all(childToMerge.children.map(c => this.processNodeFn(c, node, false)));
                     return {
-                        id: (0, guid_1.generateGUID)(),
+                        id: generateGUID(),
                         elType: 'container',
                         isInner: false,
                         settings,
@@ -98,7 +95,7 @@ class ContainerBuilder {
                 childElements = yield Promise.all(node.children.map(child => this.processNodeFn(child, node, false)));
             }
             return {
-                id: (0, guid_1.generateGUID)(),
+                id: generateGUID(),
                 elType: 'container',
                 isInner,
                 settings,
@@ -107,4 +104,3 @@ class ContainerBuilder {
         });
     }
 }
-exports.ContainerBuilder = ContainerBuilder;

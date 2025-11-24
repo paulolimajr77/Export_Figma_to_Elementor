@@ -1,7 +1,7 @@
-import type { ElementorElement, ElementorSettings } from '../types/elementor.types';
-import { generateGUID } from '../utils/guid';
-import { extractTypography, extractTextColor } from '../extractors/typography.extractor';
-import { extractMargin } from '../extractors/layout.extractor';
+import type { ElementorElement, ElementorSettings } from '../../types/elementor.types';
+import { generateGUID } from '../../utils/guid';
+import { extractTypography, extractTextColor } from '../../extractors/typography.extractor';
+import { extractMargin } from '../../extractors/layout.extractor';
 
 /**
  * Cria um widget de texto (heading ou text-editor)

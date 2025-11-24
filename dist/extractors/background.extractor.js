@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,10 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.extractBackgroundAdvanced = extractBackgroundAdvanced;
-exports.extractBackgroundColor = extractBackgroundColor;
-const colors_1 = require("../utils/colors");
+import { convertColor } from '../utils/colors';
 /**
  * Type guards
  */
@@ -27,7 +23,7 @@ function isArray(value) {
  * @param uploader Instância do uploader de imagens
  * @returns Settings de background do Elementor
  */
-function extractBackgroundAdvanced(node, uploader) {
+export function extractBackgroundAdvanced(node, uploader) {
     return __awaiter(this, void 0, void 0, function* () {
         const settings = {};
         if (!hasFills(node) || !isArray(node.fills) || node.fills.length === 0) {
@@ -41,7 +37,7 @@ function extractBackgroundAdvanced(node, uploader) {
         // Background sólido
         if (bgFill.type === 'SOLID') {
             settings.background_background = 'classic';
-            settings.background_color = (0, colors_1.convertColor)(bgFill);
+            settings.background_color = convertColor(bgFill);
         }
         // Background com imagem
         else if (bgFill.type === 'IMAGE') {
@@ -61,7 +57,7 @@ function extractBackgroundAdvanced(node, uploader) {
             const stops = bgFill.gradientStops;
             // Primeira cor do gradiente
             if (stops.length > 0) {
-                settings.background_color = (0, colors_1.convertColor)({
+                settings.background_color = convertColor({
                     type: 'SOLID',
                     color: stops[0].color,
                     opacity: stops[0].color.a
@@ -73,7 +69,7 @@ function extractBackgroundAdvanced(node, uploader) {
             }
             // Segunda cor do gradiente
             if (stops.length > 1) {
-                settings.background_color_b = (0, colors_1.convertColor)({
+                settings.background_color_b = convertColor({
                     type: 'SOLID',
                     color: stops[stops.length - 1].color,
                     opacity: stops[stops.length - 1].color.a
@@ -96,7 +92,7 @@ function extractBackgroundAdvanced(node, uploader) {
  * @param node Nó do Figma
  * @returns Settings de background
  */
-function extractBackgroundColor(node) {
+export function extractBackgroundColor(node) {
     const settings = {};
     if (!hasFills(node) || !isArray(node.fills) || node.fills.length === 0) {
         return settings;
@@ -107,7 +103,7 @@ function extractBackgroundColor(node) {
     const bgFill = visibleFills[visibleFills.length - 1];
     if (bgFill.type === 'SOLID') {
         settings.background_background = 'classic';
-        settings.background_color = (0, colors_1.convertColor)(bgFill);
+        settings.background_color = convertColor(bgFill);
     }
     return settings;
 }

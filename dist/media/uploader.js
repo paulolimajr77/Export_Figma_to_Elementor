@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,15 +7,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ImageUploader = void 0;
-const hash_1 = require("../utils/hash");
-const guid_1 = require("../utils/guid");
-const image_exporter_1 = require("./image.exporter");
+import { computeHash } from '../utils/hash';
+import { generateGUID } from '../utils/guid';
+import { exportNodeAsImage } from './image.exporter';
 /**
  * Classe responsável pelo upload de imagens para o WordPress
  */
-class ImageUploader {
+export class ImageUploader {
     constructor(wpConfig, quality = 0.85) {
         this.pendingUploads = new Map();
         this.mediaHashCache = new Map();
@@ -39,17 +36,17 @@ class ImageUploader {
             }
             try {
                 const targetFormat = format === 'SVG' ? 'SVG' : 'WEBP';
-                const result = yield (0, image_exporter_1.exportNodeAsImage)(node, targetFormat, this.quality);
+                const result = yield exportNodeAsImage(node, targetFormat, this.quality);
                 if (!result)
                     return null;
                 const { bytes, mime, ext, needsConversion } = result;
                 // Calcula hash para evitar uploads duplicados
-                const hash = yield (0, hash_1.computeHash)(bytes);
+                const hash = yield computeHash(bytes);
                 if (this.mediaHashCache.has(hash)) {
                     return this.mediaHashCache.get(hash);
                 }
                 this.nodeHashCache.set(node.id, hash);
-                const id = (0, guid_1.generateGUID)();
+                const id = generateGUID();
                 const safeId = node.id.replace(/[^a-z0-9]/gi, '_');
                 const name = `w_${safeId}_${hash}.${ext}`;
                 // Cria uma promise que será resolvida quando a UI responder
@@ -122,4 +119,3 @@ class ImageUploader {
         this.nodeHashCache.clear();
     }
 }
-exports.ImageUploader = ImageUploader;

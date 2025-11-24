@@ -1,13 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.convertColor = convertColor;
-exports.rgbaToHex = rgbaToHex;
 /**
  * Converte uma cor sólida do Figma para formato RGBA CSS
  * @param paint Paint sólido do Figma
  * @returns String no formato rgba(r, g, b, a)
  */
-function convertColor(paint) {
+export function convertColor(paint) {
     if (!paint || paint.type !== 'SOLID')
         return '';
     const { r, g, b } = paint.color;
@@ -22,7 +18,7 @@ function convertColor(paint) {
  * @param a Alpha (0-1)
  * @returns String hexadecimal
  */
-function rgbaToHex(r, g, b, a = 1) {
+export function rgbaToHex(r, g, b, a = 1) {
     const toHex = (n) => {
         const hex = Math.round(n).toString(16);
         return hex.length === 1 ? '0' + hex : hex;

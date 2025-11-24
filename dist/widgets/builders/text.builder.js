@@ -1,17 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createTextWidget = createTextWidget;
-exports.createHeadingWidget = createHeadingWidget;
-exports.createTextEditorWidget = createTextEditorWidget;
-const guid_1 = require("../utils/guid");
-const typography_extractor_1 = require("../extractors/typography.extractor");
-const layout_extractor_1 = require("../extractors/layout.extractor");
+import { generateGUID } from '../../utils/guid';
+import { extractTypography, extractTextColor } from '../../extractors/typography.extractor';
+import { extractMargin } from '../../extractors/layout.extractor';
 /**
  * Cria um widget de texto (heading ou text-editor)
  * @param node Nó de texto do Figma
  * @returns Elemento Elementor
  */
-function createTextWidget(node) {
+export function createTextWidget(node) {
     // Determina se é heading baseado no tamanho ou peso da fonte
     const isHeading = node.fontSize > 24 ||
         node.fontName.style.toLowerCase().includes('bold');
@@ -25,9 +20,9 @@ function createTextWidget(node) {
         settings.editor = node.characters;
     }
     // Extrai tipografia
-    Object.assign(settings, (0, typography_extractor_1.extractTypography)(node));
+    Object.assign(settings, extractTypography(node));
     // Extrai cor
-    const color = (0, typography_extractor_1.extractTextColor)(node);
+    const color = extractTextColor(node);
     if (color) {
         if (isHeading) {
             settings.title_color = color;
@@ -37,9 +32,9 @@ function createTextWidget(node) {
         }
     }
     // Extrai margin
-    Object.assign(settings, (0, layout_extractor_1.extractMargin)(node));
+    Object.assign(settings, extractMargin(node));
     return {
-        id: (0, guid_1.generateGUID)(),
+        id: generateGUID(),
         elType: 'widget',
         widgetType,
         settings,
@@ -52,14 +47,14 @@ function createTextWidget(node) {
  * @param settings Settings adicionais
  * @returns Elemento Elementor
  */
-function createHeadingWidget(node, settings = {}) {
+export function createHeadingWidget(node, settings = {}) {
     settings.title = node.characters;
-    Object.assign(settings, (0, typography_extractor_1.extractTypography)(node));
-    const color = (0, typography_extractor_1.extractTextColor)(node);
+    Object.assign(settings, extractTypography(node));
+    const color = extractTextColor(node);
     if (color)
         settings.title_color = color;
     return {
-        id: (0, guid_1.generateGUID)(),
+        id: generateGUID(),
         elType: 'widget',
         widgetType: 'heading',
         settings,
@@ -72,14 +67,14 @@ function createHeadingWidget(node, settings = {}) {
  * @param settings Settings adicionais
  * @returns Elemento Elementor
  */
-function createTextEditorWidget(node, settings = {}) {
+export function createTextEditorWidget(node, settings = {}) {
     settings.editor = node.characters;
-    Object.assign(settings, (0, typography_extractor_1.extractTypography)(node));
-    const color = (0, typography_extractor_1.extractTextColor)(node);
+    Object.assign(settings, extractTypography(node));
+    const color = extractTextColor(node);
     if (color)
         settings.text_color = color;
     return {
-        id: (0, guid_1.generateGUID)(),
+        id: generateGUID(),
         elType: 'widget',
         widgetType: 'text-editor',
         settings,

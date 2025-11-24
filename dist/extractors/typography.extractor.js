@@ -1,8 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.extractTypography = extractTypography;
-exports.extractTextColor = extractTextColor;
-exports.extractTextAlignment = extractTextAlignment;
 /**
  * Verifica se um valor é um array (type guard para readonly arrays)
  */
@@ -14,7 +9,7 @@ function isArray(value) {
  * @param node Nó de texto do Figma
  * @returns Settings de tipografia do Elementor
  */
-function extractTypography(node) {
+export function extractTypography(node) {
     const settings = {};
     settings.typography_typography = 'custom';
     // Tamanho da fonte
@@ -80,7 +75,7 @@ function extractTypography(node) {
  * @param node Nó de texto do Figma
  * @returns Cor em formato RGBA CSS
  */
-function extractTextColor(node) {
+export function extractTextColor(node) {
     if (!('fills' in node) || !isArray(node.fills) || node.fills.length === 0)
         return '';
     const fill = node.fills[0];
@@ -96,7 +91,7 @@ function extractTextColor(node) {
  * @param node Nó de texto do Figma
  * @returns Alinhamento CSS
  */
-function extractTextAlignment(node) {
+export function extractTextAlignment(node) {
     if (!node.textAlignHorizontal)
         return 'left';
     const map = {

@@ -1,10 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.isIconNode = isIconNode;
-exports.hasImageFill = hasImageFill;
-exports.isImageNode = isImageNode;
-exports.detectWidgetType = detectWidgetType;
-exports.detectWidgetFromPrefix = detectWidgetFromPrefix;
 /**
  * Type guards
  */
@@ -19,7 +12,7 @@ function isArray(value) {
  * @param node Nó do Figma
  * @returns true se o nó parece ser um ícone
  */
-function isIconNode(node) {
+export function isIconNode(node) {
     const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'];
     const isVector = vectorTypes.includes(node.type);
     const isSmallFrame = (node.type === 'FRAME' || node.type === 'INSTANCE') &&
@@ -33,7 +26,7 @@ function isIconNode(node) {
  * @param node Nó do Figma
  * @returns true se tem fill de imagem
  */
-function hasImageFill(node) {
+export function hasImageFill(node) {
     return hasFills(node) && isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
 }
 /**
@@ -41,7 +34,7 @@ function hasImageFill(node) {
  * @param node Nó do Figma
  * @returns true se o nó é uma imagem
  */
-function isImageNode(node) {
+export function isImageNode(node) {
     // Retângulo com fill de imagem
     if (node.type === 'RECTANGLE') {
         return hasImageFill(node);
@@ -62,7 +55,7 @@ function isImageNode(node) {
  * @param node Nó do Figma
  * @returns Tipo do widget ou null se não detectado
  */
-function detectWidgetType(node) {
+export function detectWidgetType(node) {
     const lname = node.name.toLowerCase();
     // Detecção por nome explícito
     if (lname.includes('button') || lname.includes('btn'))
@@ -92,7 +85,7 @@ function detectWidgetType(node) {
  * @param name Nome do nó
  * @returns Slug do widget ou null
  */
-function detectWidgetFromPrefix(name) {
+export function detectWidgetFromPrefix(name) {
     const prefixMatch = name.match(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i);
     if (!prefixMatch)
         return null;

@@ -4,23 +4,24 @@
         "lib": [
             "es6",
             "dom",
-            "es2017"
+            "es2016",
+            "dom.iterable"
         ],
-        "strict": true,
+        "strict": false,
         "typeRoots": [
             "./node_modules/@types",
             "./node_modules/@figma"
         ],
-        "outFile": "./dist/code.js",
+        "module": "esnext",
+        "moduleResolution": "node",
+        "outDir": "./dist",
         "skipLibCheck": true,
         "noImplicitAny": false
     },
     "include": [
-        "src/code.ts"
+        "src/**/*"
     ],
     "exclude": [
-        "node_modules",
-        "backups",
-        "**/*.backup_*"
+        "node_modules"
     ]
 }

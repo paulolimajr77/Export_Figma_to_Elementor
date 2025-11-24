@@ -1,9 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.extractFlexLayout = extractFlexLayout;
-exports.extractPadding = extractPadding;
-exports.extractMargin = extractMargin;
-exports.extractPositioning = extractPositioning;
 /**
  * Type guard para verificar se o nó tem propriedades de layout
  */
@@ -15,7 +9,7 @@ function hasLayout(node) {
  * @param node Nó do Figma com auto-layout
  * @returns Settings de flex layout
  */
-function extractFlexLayout(node) {
+export function extractFlexLayout(node) {
     if (!hasLayout(node) || node.layoutMode === 'NONE')
         return {};
     const settings = {};
@@ -62,7 +56,7 @@ function extractFlexLayout(node) {
  * @param node Nó do Figma
  * @returns Settings de padding
  */
-function extractPadding(node) {
+export function extractPadding(node) {
     var _a, _b, _c, _d;
     const frame = node;
     const top = (_a = frame.paddingTop) !== null && _a !== void 0 ? _a : 0;
@@ -86,7 +80,7 @@ function extractPadding(node) {
  * @param node Nó do Figma
  * @returns Settings de margin
  */
-function extractMargin(node) {
+export function extractMargin(node) {
     const parent = node.parent;
     // Só calcula margin se o pai não tem auto-layout
     if (!parent || !('layoutMode' in parent) || parent.layoutMode !== 'NONE') {
@@ -123,7 +117,7 @@ function extractMargin(node) {
  * @param node Nó do Figma
  * @returns Settings de posicionamento
  */
-function extractPositioning(node) {
+export function extractPositioning(node) {
     const settings = {};
     const name = node.name.toLowerCase();
     // Posicionamento fixo

@@ -1,8 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.detectRelativePosition = detectRelativePosition;
-exports.calculateDistance = calculateDistance;
-exports.isNodeInside = isNodeInside;
 /**
  * Detecta a posição relativa entre dois nós (Top, Left, Right)
  * Útil para determinar o layout de widgets como Image Box
@@ -10,7 +5,7 @@ exports.isNodeInside = isNodeInside;
  * @param target Nó de destino (ex: texto)
  * @returns Posição relativa: 'top', 'left' ou 'right'
  */
-function detectRelativePosition(source, target) {
+export function detectRelativePosition(source, target) {
     if (!source.absoluteBoundingBox || !target.absoluteBoundingBox)
         return 'top';
     const b1 = source.absoluteBoundingBox;
@@ -35,7 +30,7 @@ function detectRelativePosition(source, target) {
  * @param node2 Segundo nó
  * @returns Distância em pixels
  */
-function calculateDistance(node1, node2) {
+export function calculateDistance(node1, node2) {
     if (!node1.absoluteBoundingBox || !node2.absoluteBoundingBox)
         return Infinity;
     const b1 = node1.absoluteBoundingBox;
@@ -52,7 +47,7 @@ function calculateDistance(node1, node2) {
  * @param parent Nó pai
  * @returns true se o filho está dentro do pai
  */
-function isNodeInside(child, parent) {
+export function isNodeInside(child, parent) {
     if (!child.absoluteBoundingBox || !parent.absoluteBoundingBox)
         return false;
     const c = child.absoluteBoundingBox;

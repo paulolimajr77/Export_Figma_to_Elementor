@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,9 +7,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.exportNodeAsImage = exportNodeAsImage;
-exports.exportNodesAsImages = exportNodesAsImages;
 /**
  * Exporta um nó do Figma como imagem
  * @param node Nó a ser exportado
@@ -18,7 +14,7 @@ exports.exportNodesAsImages = exportNodesAsImages;
  * @param quality Qualidade da exportação (0.1 a 1.0)
  * @returns Resultado da exportação ou null em caso de erro
  */
-function exportNodeAsImage(node_1, format_1) {
+export function exportNodeAsImage(node_1, format_1) {
     return __awaiter(this, arguments, void 0, function* (node, format, quality = 0.85) {
         try {
             // SVG - exportação vetorial
@@ -62,7 +58,7 @@ function exportNodeAsImage(node_1, format_1) {
  * @param quality Qualidade da exportação
  * @returns Array de resultados
  */
-function exportNodesAsImages(nodes_1, format_1) {
+export function exportNodesAsImages(nodes_1, format_1) {
     return __awaiter(this, arguments, void 0, function* (nodes, format, quality = 0.85) {
         return Promise.all(nodes.map(node => exportNodeAsImage(node, format, quality)));
     });

@@ -257,6 +257,7 @@ src/
 - ✅ **Código modular e organizado** (Fase 5)
 - ✅ **Fácil manutenção** (Fase 5)
 - ✅ **Escalável e testável** (Fase 5)
+- ✅ **Melhor diagnóstico de erros da API** (Fase 6)
 
 #### **Pronto para:**
 - ✅ Produção
@@ -273,3 +274,26 @@ src/
 
 **Desenvolvido com ❤️ por Antigravity AI**
 **Versão 3.8 - Todas as Fases Completas + Refatoração Modular**
+---
+
+### **FASE 6: Melhoria da Usabilidade e Diagnóstico de Erros da API Gemini** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Diagnóstico Claro de Erros**: O plugin agora exibe mensagens de erro detalhadas da API do Google Gemini.
+2. ✅ **Tratamento de Erro Robusto**: O fluxo de tratamento de erro foi refatorado para capturar e propagar informações específicas sobre a falha.
+3. ✅ **Melhor Experiência do Usuário**: Em vez de uma mensagem genérica de "falha na conexão", o usuário agora sabe exatamente qual é o problema (ex: API Key inválida, problema de rede, etc.).
+4. ✅ **Correção de Endpoint da API**: Corrigido o endpoint da API do Gemini de `v1beta` para `v1` para garantir a compatibilidade com os modelos mais recentes.
+
+**Impacto:** Melhora significativamente a usabilidade da integração com a IA, permitindo que os usuários resolvam problemas de conexão de forma rápida e autônoma.
+
+---
+
+### **FASE 7: Integração com SDK Oficial e Seleção de Modelo Gemini** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **SDK Oficial do Google**: A integração com a IA foi refatorada para usar a biblioteca `@google/generative-ai`, substituindo as chamadas manuais `fetch`.
+2. ✅ **Conexão Estável**: A mudança para a SDK oficial resolveu em definitivo os erros de "modelo não encontrado" (`model not found`), garantindo uma comunicação mais robusta e confiável com a API.
+3. ✅ **Seleção de Modelo de IA**: O usuário agora pode escolher entre os modelos **Gemini 1.5 Flash** (rápido e econômico) e **Gemini 1.5 Pro** (mais avançado e poderoso) diretamente na interface do plugin, na aba "IA Gemini".
+4. ✅ **Código Mais Limpo**: A lógica de comunicação com a API e a de construção de frames foram separadas em seus próprios módulos (`api_gemini.ts` e `gemini_frame_builder.ts`), melhorando a organização e a manutenibilidade do código.
+
+**Impacto:** A funcionalidade de IA está mais poderosa, estável e flexível, dando ao usuário controle sobre o modelo a ser utilizado e garantindo que a conexão funcione de forma consistente.

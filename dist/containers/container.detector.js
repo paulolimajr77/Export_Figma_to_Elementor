@@ -1,8 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.isExternalContainer = isExternalContainer;
-exports.isInnerContainer = isInnerContainer;
-exports.detectContainerType = detectContainerType;
 /**
  * Type guard para verificar se o nó tem propriedades de layout
  */
@@ -15,7 +10,7 @@ function hasLayout(node) {
  * @param isTopLevel Se é um nó de nível superior
  * @returns true se é container externo
  */
-function isExternalContainer(node, isTopLevel = false) {
+export function isExternalContainer(node, isTopLevel = false) {
     if (!hasLayout(node))
         return false;
     const frame = node;
@@ -41,7 +36,7 @@ function isExternalContainer(node, isTopLevel = false) {
  * @param parentNode Nó pai
  * @returns true se é container interno
  */
-function isInnerContainer(node, parentNode) {
+export function isInnerContainer(node, parentNode) {
     if (!hasLayout(node))
         return false;
     const frame = node;
@@ -71,7 +66,7 @@ function isInnerContainer(node, parentNode) {
  * @param isTopLevel Se é nó de nível superior
  * @returns Tipo do container
  */
-function detectContainerType(node, parentNode, isTopLevel) {
+export function detectContainerType(node, parentNode, isTopLevel) {
     const lname = node.name.toLowerCase();
     // Verifica prefixos explícitos primeiro
     if (lname.startsWith('c:section') || lname.startsWith('c:boxed')) {

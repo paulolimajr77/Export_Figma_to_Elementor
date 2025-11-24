@@ -1,11 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.extractBorderStyles = extractBorderStyles;
-exports.extractCornerRadius = extractCornerRadius;
-exports.extractShadows = extractShadows;
-exports.extractOpacity = extractOpacity;
-exports.extractTransform = extractTransform;
-const colors_1 = require("../utils/colors");
+import { convertColor } from '../utils/colors';
 /**
  * Type guards para verificar propriedades dos nós
  */
@@ -26,13 +19,13 @@ function isArray(value) {
  * @param node Nó do Figma
  * @returns Settings de borda do Elementor
  */
-function extractBorderStyles(node) {
+export function extractBorderStyles(node) {
     const settings = {};
     // Extrai stroke (borda)
     if (hasStrokes(node) && isArray(node.strokes) && node.strokes.length > 0) {
         const stroke = node.strokes[0];
         if (stroke.type === 'SOLID') {
-            settings.border_color = (0, colors_1.convertColor)(stroke);
+            settings.border_color = convertColor(stroke);
             settings.border_border = 'solid';
             if (node.strokeWeight !== figma.mixed) {
                 const w = node.strokeWeight;
@@ -57,7 +50,7 @@ function extractBorderStyles(node) {
  * @param node Nó do Figma
  * @returns Settings de border radius
  */
-function extractCornerRadius(node) {
+export function extractCornerRadius(node) {
     const settings = {};
     if (hasCornerRadius(node)) {
         const anyNode = node;
@@ -92,7 +85,7 @@ function extractCornerRadius(node) {
  * @param node Nó do Figma
  * @returns Settings de sombra do Elementor
  */
-function extractShadows(node) {
+export function extractShadows(node) {
     const settings = {};
     if (!hasEffects(node) || !Array.isArray(node.effects))
         return settings;
@@ -116,7 +109,7 @@ function extractShadows(node) {
  * @param node Nó do Figma
  * @returns Settings de opacidade
  */
-function extractOpacity(node) {
+export function extractOpacity(node) {
     if ('opacity' in node && node.opacity !== 1) {
         return { _opacity: { unit: 'px', size: node.opacity } };
     }
@@ -127,7 +120,7 @@ function extractOpacity(node) {
  * @param node Nó do Figma
  * @returns Settings de transformação
  */
-function extractTransform(node) {
+export function extractTransform(node) {
     const settings = {};
     if ('rotation' in node && node.rotation !== 0) {
         settings._transform_rotate_popover = 'custom';

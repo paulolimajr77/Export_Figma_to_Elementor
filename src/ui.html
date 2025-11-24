@@ -90,7 +90,6 @@
             padding: 16px;
             display: none;
             padding-bottom: 40px;
-            /* Espaço para o resizer */
         }
 
         .content.active {
@@ -220,11 +219,9 @@
             flex: 1;
             width: 100%;
             background-color: #e0e0e0;
-            /* Fundo neutro */
             border: 1px solid var(--border);
             overflow: auto;
             position: relative;
-            /* Padrão xadrez para ver transparência */
             background-image:
                 linear-gradient(45deg, #ccc 25%, transparent 25%),
                 linear-gradient(-45deg, #ccc 25%, transparent 25%),
@@ -235,16 +232,12 @@
         }
 
         #preview-container {
-            /* O container em si não deve ter cor de fundo forçada a menos que venha do JSON */
-            /* background-color: #fff;  <-- Removido para permitir ver o xadrez se for transparente */
             color: #333;
             min-height: 100%;
             width: 100%;
-            /* Responsivo */
             transform-origin: 0 0;
             overflow: visible;
             padding: 20px;
-            /* Margem de respiro */
         }
 
         .preview-toolbar {
@@ -269,7 +262,6 @@
             box-sizing: border-box;
             width: 100%;
             align-items: flex-start;
-            /* Permite quebrar linha se necessário */
             flex-wrap: nowrap;
         }
 
@@ -292,7 +284,6 @@
             width: 100%;
         }
 
-        /* Posições */
         .e-image-box.pos-left {
             flex-direction: row;
         }
@@ -305,7 +296,6 @@
             flex-direction: column;
         }
 
-        /* Espaçamento e Alinhamento */
         .e-image-box-img {
             margin-bottom: 15px;
             flex-shrink: 0;
@@ -374,7 +364,7 @@
             box-shadow: -1px -1px 2px rgba(0, 0, 0, 0.1);
         }
 
-        /* Widgets Help Tree (Styles from previous valid version) */
+        /* Widgets Help Tree */
         .category-block {
             margin-bottom: 20px;
         }
@@ -447,11 +437,11 @@
 
     <!-- NAVEGAÇÃO -->
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('export')">Gerar JSON</button>
-        <button class="tab-btn" onclick="openTab('gemini')">IA Gemini</button>
-        <button class="tab-btn" onclick="openTab('preview')">Preview</button>
-        <button class="tab-btn" onclick="openTab('wp')">Config WP</button>
-        <button class="tab-btn" onclick="openTab('help')">Ajuda</button>
+        <button class="tab-btn active" onclick="openTab('export', event)">Gerar JSON</button>
+        <button class="tab-btn" onclick="openTab('gemini', event)">IA Gemini</button>
+        <button class="tab-btn" onclick="openTab('preview', event)">Preview</button>
+        <button class="tab-btn" onclick="openTab('wp', event)">Config WP</button>
+        <button class="tab-btn" onclick="openTab('help', event)">Ajuda</button>
     </div>
 
     <!-- ABA 1: EXPORTAÇÃO -->
@@ -486,7 +476,6 @@
                     <option value="0.75">75%</option>
                     <option value="1" selected>100%</option>
                 </select>
-                <!-- FIX: Botão agora dispara a exportação novamente -->
                 <button onclick="triggerExport()" class="btn btn-secondary btn-small"
                     style="width:auto;">Recarregar</button>
             </div>
@@ -502,19 +491,20 @@
             </div>
         </div>
     </div>
+
     <!-- ABA 2: IA GEMINI -->
     <div id="tab-gemini" class="content">
         <div class="info-box">
             🤖 Use a IA do Google Gemini para analisar layouts e criar frames otimizados automaticamente.
         </div>
 
-        <!-- Configuração da API Key -->
         <div class="form-group">
             <label>🔑 API Key do Google Gemini</label>
             <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
                 Obtenha gratuitamente em:
-                <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: var(--primary);">Google
-                    AI Studio</a>
+                <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: var(--primary);">
+                    Google AI Studio
+                </a>
             </div>
             <input type="password" id="gemini-api-key" placeholder="Cole sua API Key aqui">
             <div style="display: flex; gap: 8px; margin-top: 8px;">
@@ -523,7 +513,14 @@
             </div>
         </div>
 
-        <!-- Análise de Layout -->
+        <div class="form-group">
+            <label for="gemini-model-select">🤖 Modelo Gemini</label>
+            <select id="gemini-model-select">
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Rápido e Econômico)</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado e Poderoso)</option>
+            </select>
+        </div>
+
         <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
             <label>🎨 Analisar e Otimizar Layout</label>
             <div style="font-size: 11px; color: #666; margin-bottom: 12px; line-height: 1.5;">
@@ -537,7 +534,6 @@
             <button id="btn-analyze-gemini" class="btn btn-primary">🚀 Analisar com IA</button>
         </div>
 
-        <!-- Resultados -->
         <div id="gemini-results" style="display: none; margin-top: 20px;">
             <label>✅ Melhorias Aplicadas:</label>
             <div id="gemini-improvements"
@@ -546,14 +542,21 @@
         </div>
     </div>
 
-
     <!-- ABA 3: WORDPRESS -->
     <div id="tab-wp" class="content">
         <div class="info-box">Configure upload automático de imagens para a biblioteca do WP.</div>
-        <div class="form-group"><label>URL do Site (com https://)</label><input type="text" id="wp-url"
-                placeholder="https://meusite.com"></div>
-        <div class="form-group"><label>Usuário</label><input type="text" id="wp-user" placeholder="admin"></div>
-        <div class="form-group"><label>Senha de Aplicativo</label><input type="password" id="wp-pass"></div>
+        <div class="form-group">
+            <label>URL do Site (com https://)</label>
+            <input type="text" id="wp-url" placeholder="https://meusite.com">
+        </div>
+        <div class="form-group">
+            <label>Usuário</label>
+            <input type="text" id="wp-user" placeholder="admin">
+        </div>
+        <div class="form-group">
+            <label>Senha de Aplicativo</label>
+            <input type="password" id="wp-pass">
+        </div>
 
         <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
             <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
@@ -564,8 +567,7 @@
                 Requer o plugin <strong>FigtoEl Remote Menus</strong> instalado no WordPress.
                 <br>
                 <a href="https://pljr.com.br/plugin/figtoel-remote-menus.zip" id="link-download-plugin" target="_blank"
-                    style="color: var(--primary); text-decoration: none;">📦 Baixar
-                    Plugin</a>
+                    style="color: var(--primary); text-decoration: none;">📦 Baixar Plugin</a>
             </div>
         </div>
 
@@ -794,26 +796,40 @@
             }
         ];
 
-        // --- LÓGICA DE UI ---
-        function openTab(name) {
-            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`tab-${name}`).classList.add('active');
-
-            const tabMap = { 'export': 0, 'preview': 1, 'wp': 2, 'help': 3 };
-            if (tabMap[name] !== undefined) {
-                document.querySelectorAll('.tab-btn')[tabMap[name]].classList.add('active');
-            }
-            if (name === 'preview') updatePreview();
-        }
-
+        // --- LOG DE INTERFACE ---
         function addLog(msg, type = 'info') {
             const area = document.getElementById('log-area');
             area.value += `[${type.toUpperCase()}] ${msg}\n`;
             area.scrollTop = area.scrollHeight;
         }
 
-        // Slider Porcentagem
+        // --- NAVEGAÇÃO ENTRE ABAS ---
+        function openTab(tabName, evt) {
+            const contents = document.querySelectorAll('.content');
+            contents.forEach(c => c.classList.remove('active'));
+
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(b => b.classList.remove('active'));
+
+            const selectedTab = document.getElementById('tab-' + tabName);
+            if (selectedTab) selectedTab.classList.add('active');
+
+            if (evt && evt.currentTarget) {
+                evt.currentTarget.classList.add('active');
+            } else {
+                const tabMap = { export: 0, gemini: 1, preview: 2, wp: 3, help: 4 };
+                const idx = tabMap[tabName];
+                if (idx !== undefined && buttons[idx]) {
+                    buttons[idx].classList.add('active');
+                }
+            }
+
+            if (tabName === 'preview') {
+                updatePreview();
+            }
+        }
+
+        // Slider de qualidade
         const qualityInput = document.getElementById('quality');
         const qualityValue = document.getElementById('quality-value');
         qualityInput.addEventListener('input', (e) => {
@@ -827,6 +843,7 @@
             isResizing = true;
             e.preventDefault();
         });
+
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
 
@@ -843,6 +860,7 @@
                 }, '*');
             }
         });
+
         document.addEventListener('mouseup', () => {
             isResizing = false;
         });
@@ -850,6 +868,8 @@
         // --- HELP TREE RENDERER ---
         function renderHelpTree(filterText = '') {
             const container = document.getElementById('widgets-container');
+            if (!container) return;
+
             container.innerHTML = '';
             filterText = filterText.toLowerCase();
 
@@ -864,6 +884,7 @@
                     addLog(`Renomeando para: ${item.tag}`);
                     parent.postMessage({ pluginMessage: { type: 'rename-layer', newName: item.tag } }, '*');
                 };
+
                 const wrapper = document.createElement('div');
                 wrapper.className = 'tree-item';
                 wrapper.appendChild(btn);
@@ -880,37 +901,58 @@
                 if (filteredWidgets.length > 0) {
                     const block = document.createElement('div');
                     block.className = 'category-block';
+
                     const title = document.createElement('div');
                     title.className = 'category-title';
                     title.textContent = cat.title;
                     block.appendChild(title);
+
                     const root = document.createElement('div');
                     root.className = 'tree-root';
 
-                    filteredWidgets.forEach(item => {
-                        drawItem(item, root);
-                    });
+                    filteredWidgets.forEach(item => drawItem(item, root));
 
                     block.appendChild(root);
                     container.appendChild(block);
                 }
             });
         }
-        document.getElementById('search-widgets').addEventListener('input', (e) => renderHelpTree(e.target.value));
+
+        // ==================== EVENTOS GEMINI E BUSCA DE WIDGETS ====================
+        document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
+            const key = document.getElementById('gemini-api-key').value.trim();
+            if (!key) {
+                alert('⚠️ Digite uma API Key válida');
+                return;
+            }
+            parent.postMessage({ pluginMessage: { type: 'save-gemini-key', key } }, '*');
+        });
+
+        document.getElementById('btn-test-gemini').addEventListener('click', () => {
+            parent.postMessage({ pluginMessage: { type: 'test-gemini-connection' } }, '*');
+        });
+
+        document.getElementById('btn-analyze-gemini').addEventListener('click', () => {
+            document.getElementById('gemini-results').style.display = 'none';
+            parent.postMessage({ pluginMessage: { type: 'analyze-with-gemini' } }, '*');
+        });
+
+        document.getElementById('search-widgets').addEventListener('input', (e) => {
+            renderHelpTree(e.target.value);
+        });
 
         // --- EXPORT TRIGGER ---
         function triggerExport() {
             const q = parseFloat(document.getElementById('quality').value);
             parent.postMessage({ pluginMessage: { type: 'export-elementor', quality: q } }, '*');
-            // Muda para a aba de preview se já não estiver (se o clique veio do btn exportar)
-            // Se veio do recarregar, já estamos na aba preview.
         }
 
         // --- PREVIEW ENGINE ---
         document.getElementById('zoom-select').addEventListener('change', (e) => {
-            document.getElementById('preview-container').style.transform = `scale(${e.target.value})`;
-            // Adjust width to prevent clipping
-            document.getElementById('preview-container').style.width = `${100 / e.target.value}%`;
+            const scale = parseFloat(e.target.value);
+            const pc = document.getElementById('preview-container');
+            pc.style.transform = `scale(${scale})`;
+            pc.style.width = `${100 / scale}%`;
         });
 
         function updatePreview() {
@@ -935,16 +977,24 @@
 
         function getUnitValue(val) {
             if (!val) return '';
-            if (typeof val === 'object' && val.size !== undefined) return `${val.size}${val.unit || 'px'}`;
+            if (typeof val === 'object' && val.size !== undefined) {
+                return `${val.size}${val.unit || 'px'}`;
+            }
             return val;
         }
 
+        // --- APPLY STYLES (com extras de logging / tratamento robusto) ---
         function applyStyles(dom, s) {
-            const st = dom.style;
-            // Box Model
-            if (s.padding) st.padding = `${s.padding.top || 0}px ${s.padding.right || 0}px ${s.padding.bottom || 0}px ${s.padding.left || 0}px`;
+            if (!s || !dom) return;
 
-            // Margin Handling (Objeto ou chaves individuais para retrocompatibilidade)
+            const st = dom.style;
+
+            // Box Model
+            if (s.padding) {
+                st.padding = `${s.padding.top || 0}px ${s.padding.right || 0}px ${s.padding.bottom || 0}px ${s.padding.left || 0}px`;
+            }
+
+            // Margin
             if (s.margin) {
                 st.marginTop = `${s.margin.top || 0}px`;
                 st.marginRight = `${s.margin.right || 0}px`;
@@ -954,11 +1004,11 @@
 
             // Backgrounds
             if (s.background_background === 'gradient') {
-                const angle = s.background_gradient_angle?.size || 180;
+                const angle = (s.background_gradient_angle && s.background_gradient_angle.size) || 180;
                 const c1 = s.background_color || 'transparent';
                 const c2 = s.background_color_b || 'transparent';
                 st.background = `linear-gradient(${angle}deg, ${c1}, ${c2})`;
-            } else if (s.background_image?.url) {
+            } else if (s.background_image && s.background_image.url) {
                 st.backgroundImage = `url('${s.background_image.url}')`;
                 st.backgroundSize = s.background_size || 'cover';
                 if (s.background_color) st.backgroundColor = s.background_color;
@@ -976,21 +1026,14 @@
             if (s.width) st.width = getUnitValue(s.width);
             if (s.min_height) st.minHeight = getUnitValue(s.min_height);
 
-            // Border
-            if (s.border_radius) st.borderRadius = `${s.border_radius.size || s.border_radius.top || 0}px`;
-
-            // Position (Absolute) - Visualização no Preview
-            if (s._position === 'absolute') {
-                st.position = 'absolute';
-                if (s._offset_orientation_h === 'right') st.right = getUnitValue(s._offset_x);
-                else st.left = getUnitValue(s._offset_x);
-
-                if (s._offset_orientation_v === 'end') st.bottom = getUnitValue(s._offset_y);
-                else st.top = getUnitValue(s._offset_y);
+            // Border radius
+            if (s.border_radius) {
+                st.borderRadius = `${s.border_radius.size || s.border_radius.top || 0}px`;
             }
         }
-
         function applyTypography(dom, s, prefix = '') {
+            if (!s || !dom) return;
+
             const st = dom.style;
             const color = s[`${prefix}color`] || s[`${prefix}text_color`] || s.title_color || s.text_color;
             const size = s[`${prefix}typography_font_size`];
@@ -1015,22 +1058,24 @@
             } else if (el.widgetType === 'image-box') {
                 dom = document.createElement('div');
                 dom.className = 'e-widget';
-                applyStyles(dom, s); // Wrapper styles (background etc)
+                applyStyles(dom, s);
 
                 const inner = document.createElement('div');
                 inner.className = `e-image-box pos-${s.position || 'top'}`;
-                if (s.content_vertical_alignment) inner.style.alignItems = s.content_vertical_alignment === 'middle' ? 'center' : 'flex-start';
+                if (s.content_vertical_alignment) {
+                    inner.style.alignItems = s.content_vertical_alignment === 'middle' ? 'center' : 'flex-start';
+                }
 
                 const imgDiv = document.createElement('div');
                 imgDiv.className = 'e-image-box-img';
                 const img = document.createElement('img');
-                img.src = s.image?.url || '';
+                img.src = (s.image && s.image.url) || '';
                 if (s.image_width) img.style.width = getUnitValue(s.image_width);
                 imgDiv.appendChild(img);
 
                 const txtDiv = document.createElement('div');
                 txtDiv.className = 'e-image-box-content';
-                if (s.text_align) txtDiv.style.textAlign = s.text_align; // Apply text align to content wrapper
+                if (s.text_align) txtDiv.style.textAlign = s.text_align;
 
                 const t = document.createElement('h3');
                 t.innerText = s.title_text || 'Title';
@@ -1049,7 +1094,6 @@
                 inner.appendChild(txtDiv);
                 dom.appendChild(inner);
             } else {
-                // Standard Widgets
                 dom = document.createElement('div');
                 dom.className = 'e-widget';
                 applyStyles(dom, s);
@@ -1063,7 +1107,7 @@
                     dom.appendChild(h);
                 } else if (el.widgetType === 'image') {
                     const img = document.createElement('img');
-                    img.src = s.image?.url || '';
+                    img.src = (s.image && s.image.url) || '';
                     if (s.width) img.style.width = getUnitValue(s.width);
                     if (s.align) dom.style.textAlign = s.align;
                     dom.appendChild(img);
@@ -1083,32 +1127,43 @@
                     dom.appendChild(p);
                 }
             }
+
             return dom;
         }
 
-        // --- EVENTS ---
+        // --- EVENTOS DE BOTÕES PRINCIPAIS ---
         document.getElementById('btn-export').onclick = () => {
             triggerExport();
         };
+
         document.getElementById('btn-copy').onclick = () => {
-            document.getElementById('output-area').select();
+            const outputArea = document.getElementById('output-area');
+            outputArea.select();
             document.execCommand('copy');
             addLog("Copiado!", 'success');
         };
+
         document.getElementById('btn-save-wp').onclick = () => {
             const url = document.getElementById('wp-url').value;
             const user = document.getElementById('wp-user').value;
             const pass = document.getElementById('wp-pass').value;
             const autoMenu = document.getElementById('wp-auto-menu').checked;
-            parent.postMessage({ pluginMessage: { type: 'save-wp-config', config: { url, user, password: pass, autoMenu } } }, '*');
+
+            parent.postMessage({
+                pluginMessage: {
+                    type: 'save-wp-config',
+                    config: { url, user, password: pass, autoMenu }
+                }
+            }, '*');
         };
 
-        // Link para download do plugin
         document.getElementById('link-download-plugin').onclick = (e) => {
             e.preventDefault();
             addLog('📦 Link para download: Você deve subir o arquivo .zip do plugin Figma to Elementor Remote Menus', 'info');
+            window.open(e.currentTarget.href, '_blank');
         };
 
+        // --- CRIAÇÃO AUTOMÁTICA DE MENUS NO WP ---
         async function createMenusAutomatically(navMenus, wpUrl, wpUser, wpPass) {
             const wpUrlClean = wpUrl.replace(/\/$/, "");
 
@@ -1144,12 +1199,8 @@
                     } else {
                         addLog(`⚠️ Falha ao criar menu "${menu.name}": ${result.message || 'Erro desconhecido'}`, 'error');
                     }
-
-
                 } catch (error) {
                     addLog(`❌ Erro ao criar menu "${menu.name}": ${error.message}`, 'error');
-
-                    // Verificar se é erro de plugin não instalado
                     if (error.message.includes('404')) {
                         addLog('💡 Verifique se o plugin "Figto El Remote Menus" está instalado e ativado no WordPress', 'error');
                     }
@@ -1157,6 +1208,7 @@
             }
         }
 
+        // --- HANDLER DE MENSAGENS DO FIGMA ---
         window.onmessage = (event) => {
             const msg = event.data.pluginMessage;
             if (!msg) return;
@@ -1166,13 +1218,11 @@
                 document.getElementById('btn-copy').disabled = false;
                 addLog("JSON Gerado!", 'success');
 
-                // Auto-copy
                 document.getElementById('output-area').select();
                 navigator.clipboard.writeText(msg.data).then(() => {
                     addLog("JSON copiado automaticamente para a área de transferência!", 'success');
                 }).catch(e => console.error(e));
 
-                // Processar menus de navegação detectados
                 if (msg.navMenus && msg.navMenus.length > 0) {
                     const autoMenuEnabled = document.getElementById('wp-auto-menu').checked;
                     const wpUrl = document.getElementById('wp-url').value;
@@ -1180,8 +1230,6 @@
                     const wpPass = document.getElementById('wp-pass').value;
 
                     addLog(`⚠️ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação (w:nav-menu)`, 'info');
-
-                    // Mostrar itens detectados
                     msg.navMenus.forEach(menu => {
                         addLog(`   📋 Menu: "${menu.name}" com ${menu.items.length} item(ns)`, 'info');
                     });
@@ -1194,13 +1242,14 @@
                     } else if (!wpUrl || !wpUser || !wpPass) {
                         addLog('⚠️ Configure as credenciais do WordPress na aba "Config WP"', 'error');
                     } else {
-                        // Criar menus automaticamente
                         addLog('🔄 Iniciando criação automática de menus...', 'info');
                         createMenusAutomatically(msg.navMenus, wpUrl, wpUser, wpPass);
                     }
                 }
 
-                if (document.getElementById('tab-preview').classList.contains('active')) updatePreview();
+                if (document.getElementById('tab-preview').classList.contains('active')) {
+                    updatePreview();
+                }
             }
             else if (msg.type === 'load-wp-config') {
                 const config = msg.config;
@@ -1228,11 +1277,12 @@
                 (async () => {
                     try {
                         let blob = new Blob([msg.data], { type: msg.mimeType });
-                        // WebP Conversion
                         if (msg.needsConversion && msg.targetMimeType === 'image/webp') {
                             addLog(`Convertendo: ${msg.name}`);
                             const b = await createImageBitmap(blob);
-                            const c = document.createElement('canvas'); c.width = b.width; c.height = b.height;
+                            const c = document.createElement('canvas');
+                            c.width = b.width;
+                            c.height = b.height;
                             c.getContext('2d').drawImage(b, 0, 0);
                             blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.85));
                         }
@@ -1243,50 +1293,45 @@
                         fd.append('title', name);
 
                         const res = await fetch(`${wpUrl}/wp-json/wp/v2/media`, {
-                            method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(wpUser + ":" + wpPass) }, body: fd
+                            method: 'POST',
+                            headers: { 'Authorization': 'Basic ' + btoa(wpUser + ":" + wpPass) },
+                            body: fd
                         });
 
                         if (!res.ok) throw new Error("Falha Upload");
                         const json = await res.json();
                         addLog(`Upload OK: ${json.source_url}`, 'success');
-                        parent.postMessage({ pluginMessage: { type: 'upload-image-response', id: msg.id, success: true, url: json.source_url } }, '*');
+                        parent.postMessage({
+                            pluginMessage: {
+                                type: 'upload-image-response',
+                                id: msg.id,
+                                success: true,
+                                url: json.source_url
+                            }
+                        }, '*');
                     } catch (e) {
                         addLog(`Erro: ${e.message}`, 'error');
-                        parent.postMessage({ pluginMessage: { type: 'upload-image-response', id: msg.id, success: false } }, '*');
+                        parent.postMessage({
+                            pluginMessage: {
+                                type: 'upload-image-response',
+                                id: msg.id,
+                                success: false
+                            }
+                        }, '*');
                     } finally {
                         document.getElementById('loader').style.display = 'none';
                     }
                 })();
             }
-        };
-
-        // --- INICIALIZAÇÃO FIX ---
-        // Pede a configuração ao iniciar
-        parent.postMessage({ pluginMessage: { type: 'get-wp-config' } }, '*');
-
-        renderHelpTree();
-
-
-
-        // ==================== HANDLERS GEMINI ====================
-        // Interceptar mensagens existentes e adicionar handlers Gemini
-        const originalOnMessage = window.onmessage;
-        window.onmessage = (event) => {
-            // Chamar handler original primeiro
-            if (originalOnMessage) {
-                originalOnMessage(event);
-            }
-            const msg = event.data.pluginMessage;
-            if (!msg) return;
-            // Handlers Gemini
-            if (msg.type === 'gemini-connection-result') {
+            else if (msg.type === 'gemini-connection-result') {
                 if (msg.success) {
                     alert('✅ Conexão OK! API Key válida.');
                 } else {
-                    alert('❌ Falha na conexão. Verifique a API Key.');
+                    // Exibe a mensagem de erro detalhada recebida do backend
+                    alert(`❌ Falha na conexão:\n\n${msg.message || 'Verifique a API Key e sua conexão com a internet.'}`);
                 }
             }
-            if (msg.type === 'gemini-creation-complete') {
+            else if (msg.type === 'gemini-creation-complete') {
                 const resultsDiv = document.getElementById('gemini-results');
                 const improvementsDiv = document.getElementById('gemini-improvements');
                 resultsDiv.style.display = 'block';
@@ -1297,11 +1342,37 @@
                     ${msg.data.improvements.map(imp => `• ${imp}`).join('<br>')}
                 `;
             }
-            if (msg.type === 'gemini-error') {
+            else if (msg.type === 'gemini-error') {
                 alert('❌ Erro: ' + msg.error);
+            }
+            else if (msg.type === 'load-gemini-config') {
+                if (msg.apiKey) {
+                    document.getElementById('gemini-api-key').value = msg.apiKey;
+                }
+                if (msg.model) {
+                    document.getElementById('gemini-model-select').value = msg.model;
+                }
+                 addLog("Configurações do Gemini carregadas.", 'success');
             }
         };
 
+        // --- INICIALIZAÇÃO ---
+        // Solicita as configurações salvas quando a UI é carregada
+        parent.postMessage({ pluginMessage: { type: 'get-wp-config' } }, '*');
+        parent.postMessage({ pluginMessage: { type: 'get-gemini-config' } }, '*');
+        renderHelpTree();
+
+        // --- LÓGICA DO GEMINI MODEL SELECT ---
+        const geminiModelSelect = document.getElementById('gemini-model-select');
+        geminiModelSelect.addEventListener('change', () => {
+            parent.postMessage({ 
+                pluginMessage: { 
+                    type: 'save-gemini-model', 
+                    model: geminiModelSelect.value 
+                } 
+            }, '*');
+             addLog(`Modelo Gemini alterado para: ${geminiModelSelect.options[geminiModelSelect.selectedIndex].text}`, 'info');
+        });
     </script>
 </body>
 
