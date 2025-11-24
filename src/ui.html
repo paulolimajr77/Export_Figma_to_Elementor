@@ -509,6 +509,20 @@
                 placeholder="https://meusite.com"></div>
         <div class="form-group"><label>Usuário</label><input type="text" id="wp-user" placeholder="admin"></div>
         <div class="form-group"><label>Senha de Aplicativo</label><input type="password" id="wp-pass"></div>
+
+        <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+            <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                <input type="checkbox" id="wp-auto-menu" style="margin-right: 8px;">
+                <span>Plugin instalado - Criar menus automaticamente</span>
+            </label>
+            <div style="font-size: 11px; color: #666; margin-top: 8px; line-height: 1.5;">
+                Requer o plugin <strong>XYZ Remote Menus</strong> instalado no WordPress.
+                <br>
+                <a href="#" id="link-download-plugin" style="color: var(--primary); text-decoration: none;">📦 Baixar
+                    Plugin</a>
+            </div>
+        </div>
+
         <button id="btn-save-wp" class="btn btn-primary">Salvar Configuração</button>
     </div>
 
@@ -1030,7 +1044,14 @@
             const url = document.getElementById('wp-url').value;
             const user = document.getElementById('wp-user').value;
             const pass = document.getElementById('wp-pass').value;
-            parent.postMessage({ pluginMessage: { type: 'save-wp-config', config: { url, user, password: pass } } }, '*');
+            const autoMenu = document.getElementById('wp-auto-menu').checked;
+            parent.postMessage({ pluginMessage: { type: 'save-wp-config', config: { url, user, password: pass, autoMenu } } }, '*');
+        };
+
+        // Link para download do plugin
+        document.getElementById('link-download-plugin').onclick = (e) => {
+            e.preventDefault();
+            addLog('📦 Link para download: Você deve subir o arquivo .zip do plugin Figma to Elementor Remote Menus', 'info');
         };
         window.onmessage = (event) => {
             const msg = event.data.pluginMessage;
@@ -1047,6 +1068,23 @@
                     addLog("JSON copiado automaticamente para a área de transferência!", 'success');
                 }).catch(e => console.error(e));
 
+                // Processar menus de navegação detectados
+                if (msg.navMenus && msg.navMenus.length > 0) {
+                    const autoMenuEnabled = document.getElementById('wp-auto-menu').checked;
+
+                    addLog(`⚠️ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação (w:nav-menu)`, 'info');
+
+                    if (!autoMenuEnabled) {
+                        addLog('💡 Para criar menus automaticamente:', 'info');
+                        addLog('   1. Baixe e instale o plugin XYZ Remote Menus no WordPress', 'info');
+                        addLog('   2. Vá na aba "Config WP" e marque "Plugin instalado"', 'info');
+                        addLog('   3. Exporte novamente para criar os menus dinamicamente', 'info');
+                    } else {
+                        addLog('✅ Plugin habilitado! Os menus serão criados via API do WordPress', 'info');
+                        addLog('📝 Endpoint: POST /wp-json/xyz-remote-menus/v1/sync', 'info');
+                    }
+                }
+
                 if (document.getElementById('tab-preview').classList.contains('active')) updatePreview();
             }
             else if (msg.type === 'load-wp-config') {
@@ -1055,6 +1093,7 @@
                     if (config.url) document.getElementById('wp-url').value = config.url;
                     if (config.user) document.getElementById('wp-user').value = config.user;
                     if (config.password) document.getElementById('wp-pass').value = config.password;
+                    if (config.autoMenu !== undefined) document.getElementById('wp-auto-menu').checked = config.autoMenu;
                     addLog("Config WP carregada.", 'success');
                 }
             }
