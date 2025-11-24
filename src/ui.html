@@ -516,9 +516,10 @@
                 <span>Plugin instalado - Criar menus automaticamente</span>
             </label>
             <div style="font-size: 11px; color: #666; margin-top: 8px; line-height: 1.5;">
-                Requer o plugin <strong>XYZ Remote Menus</strong> instalado no WordPress.
+                Requer o plugin <strong>FigtoEl Remote Menus</strong> instalado no WordPress.
                 <br>
-                <a href="#" id="link-download-plugin" style="color: var(--primary); text-decoration: none;">📦 Baixar
+                <a href="https://pljr.com.br/plugin/figtoel-remote-menus.zip" id="link-download-plugin" target="_blank"
+                    style="color: var(--primary); text-decoration: none;">📦 Baixar
                     Plugin</a>
             </div>
         </div>
@@ -1089,6 +1090,7 @@
                     } else {
                         addLog(`⚠️ Falha ao criar menu "${menu.name}": ${result.message || 'Erro desconhecido'}`, 'error');
                     }
+                    
 
                 } catch (error) {
                     addLog(`❌ Erro ao criar menu "${menu.name}": ${error.message}`, 'error');
@@ -1118,31 +1120,31 @@
 
                 // Processar menus de navegação detectados
                 if (msg.navMenus && msg.navMenus.length > 0) {
-    const autoMenuEnabled = document.getElementById('wp-auto-menu').checked;
-    const wpUrl = document.getElementById('wp-url').value;
-    const wpUser = document.getElementById('wp-user').value;
-    const wpPass = document.getElementById('wp-pass').value;
-    
-    addLog(`⚠️ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação (w:nav-menu)`, 'info');
-    
-    // Mostrar itens detectados
-    msg.navMenus.forEach(menu => {
-        addLog(`   📋 Menu: "${menu.name}" com ${menu.items.length} item(ns)`, 'info');
-    });
-    
-    if (!autoMenuEnabled) {
-        addLog('💡 Para criar menus automaticamente:', 'info');
-        addLog('   1. Baixe e instale o plugin Figto El Remote Menus no WordPress', 'info');
-        addLog('   2. Vá na aba "Config WP" e marque "Plugin instalado"', 'info');
-        addLog('   3. Exporte novamente para criar os menus dinamicamente', 'info');
-    } else if (!wpUrl || !wpUser || !wpPass) {
-        addLog('⚠️ Configure as credenciais do WordPress na aba "Config WP"', 'error');
-    } else {
-        // Criar menus automaticamente
-        addLog('🔄 Iniciando criação automática de menus...', 'info');
-        createMenusAutomatically(msg.navMenus, wpUrl, wpUser, wpPass);
-    }
-}
+                    const autoMenuEnabled = document.getElementById('wp-auto-menu').checked;
+                    const wpUrl = document.getElementById('wp-url').value;
+                    const wpUser = document.getElementById('wp-user').value;
+                    const wpPass = document.getElementById('wp-pass').value;
+
+                    addLog(`⚠️ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação (w:nav-menu)`, 'info');
+
+                    // Mostrar itens detectados
+                    msg.navMenus.forEach(menu => {
+                        addLog(`   📋 Menu: "${menu.name}" com ${menu.items.length} item(ns)`, 'info');
+                    });
+
+                    if (!autoMenuEnabled) {
+                        addLog('💡 Para criar menus automaticamente:', 'info');
+                        addLog('   1. Baixe e instale o plugin Figto El Remote Menus no WordPress', 'info');
+                        addLog('   2. Vá na aba "Config WP" e marque "Plugin instalado"', 'info');
+                        addLog('   3. Exporte novamente para criar os menus dinamicamente', 'info');
+                    } else if (!wpUrl || !wpUser || !wpPass) {
+                        addLog('⚠️ Configure as credenciais do WordPress na aba "Config WP"', 'error');
+                    } else {
+                        // Criar menus automaticamente
+                        addLog('🔄 Iniciando criação automática de menus...', 'info');
+                        createMenusAutomatically(msg.navMenus, wpUrl, wpUser, wpPass);
+                    }
+                }
 
                 if (document.getElementById('tab-preview').classList.contains('active')) updatePreview();
             }
