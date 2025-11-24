@@ -272,7 +272,7 @@ src/
 
 ---
 
-**Desenvolvido com ❤️ por Antigravity AI**
+**Desenvolvido com ❤️ por Paulo Lima Jr + AI**
 **Versão 3.8 - Todas as Fases Completas + Refatoração Modular**
 ---
 
