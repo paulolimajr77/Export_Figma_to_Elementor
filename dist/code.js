@@ -1338,39 +1338,40 @@ STRUCTURAL CONTEXT (FIGMA DATA):
   }
   function getModel() {
     return __async(this, null, function* () {
-      return GEMINI_MODEL;
+      const savedModel = yield figma.clientStorage.getAsync("gemini_model");
+      return savedModel || GEMINI_MODEL;
     });
   }
   function testConnection() {
     return __async(this, null, function* () {
       var _a;
-      const key = yield getKey();
-      if (!key) {
-        return { success: false, message: "API Key n\xE3o fornecida." };
+      const apiKey = yield getKey();
+      if (!apiKey) {
+        return { success: false, message: "API Key n\xE3o configurada" };
       }
-      const modelName = yield getModel();
-      const fullApiUrl = `${API_BASE_URL}${modelName}:generateContent?key=${key}`;
+      const model = yield getModel();
+      console.log(`\u{1F9EA} Testando conex\xE3o com modelo: ${model}`);
+      const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
       try {
-        const response = yield fetch(fullApiUrl, {
+        const response = yield fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: "Test" }] }]
+            contents: [{
+              parts: [{ text: "Ol\xE1" }]
+            }]
           })
         });
-        if (response.ok) {
-          return { success: true, message: `Conectado com sucesso ao modelo ${modelName}!` };
-        } else {
+        if (!response.ok) {
           const errorData = yield response.json();
-          const errorMessage = ((_a = errorData == null ? void 0 : errorData.error) == null ? void 0 : _a.message) || `Erro ${response.status}: ${response.statusText}`;
-          throw new GeminiError(`Falha na conex\xE3o: ${errorMessage}`, response.status, errorData);
+          const errorMessage = ((_a = errorData.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
+          console.error("\u274C Erro na resposta:", errorData);
+          throw new GeminiError(`Falha na conex\xE3o: ${errorMessage}`);
         }
-      } catch (error) {
-        console.error("Erro de rede ao testar conex\xE3o:", error);
-        if (error instanceof GeminiError) {
-          return { success: false, message: error.message };
-        }
-        return { success: false, message: `Erro de rede: ${error.message || "Verifique sua conex\xE3o."}` };
+        return { success: true, message: `Conex\xE3o OK com ${model}!` };
+      } catch (e) {
+        console.error("Erro de rede ao testar conex\xE3o:", e);
+        return { success: false, message: e.message || "Erro desconhecido" };
       }
     });
   }
@@ -1563,7 +1564,7 @@ ${error.message}` });
   var init_api_gemini = __esm({
     "src/api_gemini.ts"() {
       init_prompts();
-      GEMINI_MODEL = "gemini-2.5-flash-lite";
+      GEMINI_MODEL = "gemini-2.5-flash";
       API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
       GeminiError = class extends Error {
         constructor(message, statusCode, details) {
@@ -1970,6 +1971,8 @@ ${error.message}` });
       });
       figma.ui.onmessage = (msg) => __async(null, null, function* () {
         var _a;
+        console.log("\u{1F4E8} Mensagem recebida:", msg.type);
+        console.log("Dados completos:", msg);
         if (!compiler) compiler = new ElementorCompiler({});
         if (msg.type === "export-elementor") {
           const selection = figma.currentPage.selection;
@@ -2007,10 +2010,16 @@ ${error.message}` });
           compiler.setWPConfig(msg.config);
           figma.notify("Configura\xE7\xF5es salvas.");
         } else if (msg.type === "get-wp-config") {
+          console.log("\u{1F4E5} Recebido get-wp-config");
           const config = yield figma.clientStorage.getAsync("wp_config");
-          if (config) {
-            figma.ui.postMessage({ type: "load-wp-config", config });
-          }
+          console.log("Config WP recuperada:", config);
+          figma.ui.postMessage({ type: "load-wp-config", config });
+        } else if (msg.type === "get-gemini-config") {
+          console.log("\u{1F4E5} Recebido get-gemini-config");
+          const apiKey = yield getKey();
+          const model = yield getModel();
+          console.log("Gemini config recuperada - API Key:", apiKey ? "presente" : "ausente", "Modelo:", model);
+          figma.ui.postMessage({ type: "load-gemini-config", apiKey, model });
         } else if (msg.type === "upload-image-response") {
           compiler.handleUploadResponse(msg.id, msg);
         } else if (msg.type === "rename-layer") {
@@ -2031,20 +2040,27 @@ ${error.message}` });
           figma.ui.postMessage({ type: "debug-result", data: JSON.stringify(debug, null, 2) });
         } else if (msg.type === "resize-ui") {
           figma.ui.resize(msg.width, msg.height);
-        } else if (msg.type === "get-gemini-config") {
-          const apiKey = yield getKey();
-          const model = yield getModel();
-          figma.ui.postMessage({ type: "load-gemini-config", apiKey, model });
         } else if (msg.type === "save-gemini-key") {
-          yield saveKey(msg.key);
-          figma.notify("\u{1F511} API Key do Gemini salva com sucesso!");
+          console.log("\u{1F4E5} Recebido save-gemini-key");
+          console.log("Key recebida:", msg.key);
+          try {
+            yield saveKey(msg.key);
+            console.log("\u2705 Key salva com sucesso");
+            figma.notify("\u{1F511} API Key do Gemini salva com sucesso!");
+          } catch (error) {
+            console.error("\u274C Erro ao salvar key:", error);
+            figma.notify("\u274C Erro ao salvar API Key");
+          }
         } else if (msg.type === "save-gemini-model") {
+          console.log("\u{1F4E5} Recebido save-gemini-model");
           yield saveModel(msg.model);
           figma.notify(`\u{1F916} Modelo Gemini definido para: ${msg.model}`);
         } else if (msg.type === "test-gemini-connection") {
+          console.log("\u{1F4E5} Recebido test-gemini-connection");
           figma.notify("Testando conex\xE3o com a API Gemini...");
           try {
             const result = yield testConnection();
+            console.log("Resultado do teste:", result);
             figma.ui.postMessage({
               type: "gemini-connection-result",
               success: result.success,

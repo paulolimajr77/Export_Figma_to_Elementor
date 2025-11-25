@@ -5,9 +5,17 @@
 
 import { ANALYZE_RECREATE_PROMPT } from './config/prompts';
 
-// Define os modelos disponíveis
-export type GeminiModel = "gemini-2.5-flash-lite";
-export const GEMINI_MODEL: GeminiModel = "gemini-2.5-flash-lite";
+// Define os modelos disponíveis (baseado em https://ai.google.dev/gemini-api/docs/models?hl=pt-br)
+export type GeminiModel =
+    // Gemini 2.5
+    | 'gemini-2.5-pro'
+    | 'gemini-2.5-flash'
+    | 'gemini-2.5-flash-lite'
+    // Gemini 2.0
+    | 'gemini-2.0-flash'
+    | 'gemini-2.0-flash-lite';
+
+export const GEMINI_MODEL: GeminiModel = "gemini-2.5-flash";
 export const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
 // ==================== Custom Error Class ====================
@@ -34,42 +42,46 @@ export async function saveModel(model: GeminiModel): Promise<void> {
 }
 
 export async function getModel(): Promise<GeminiModel> {
-    return GEMINI_MODEL;
+    const savedModel = await figma.clientStorage.getAsync('gemini_model');
+    return savedModel || GEMINI_MODEL;
 }
 
 // ==================== Funções da API ====================
 
-export async function testConnection(): Promise<{ success: boolean; message?: string }> {
-    const key = await getKey();
-    if (!key) {
-        return { success: false, message: 'API Key não fornecida.' };
+export async function testConnection(): Promise<{ success: boolean; message: string }> {
+    const apiKey = await getKey();
+    if (!apiKey) {
+        return { success: false, message: 'API Key não configurada' };
     }
 
-    const modelName = await getModel();
-    const fullApiUrl = `${API_BASE_URL}${modelName}:generateContent?key=${key}`;
+    // Busca o modelo salvo ou usa o padrão
+    const model = await getModel();
+    console.log(`🧪 Testando conexão com modelo: ${model}`);
+
+    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
 
     try {
-        const response = await fetch(fullApiUrl, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: 'Test' }] }]
+                contents: [{
+                    parts: [{ text: 'Olá' }]
+                }]
             })
         });
 
-        if (response.ok) {
-            return { success: true, message: `Conectado com sucesso ao modelo ${modelName}!` };
-        } else {
+        if (!response.ok) {
             const errorData = await response.json();
-            const errorMessage = errorData?.error?.message || `Erro ${response.status}: ${response.statusText}`;
-            throw new GeminiError(`Falha na conexão: ${errorMessage}`, response.status, errorData);
+            const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+            console.error('❌ Erro na resposta:', errorData);
+            throw new GeminiError(`Falha na conexão: ${errorMessage}`);
         }
-    } catch (error: any) {
-        console.error('Erro de rede ao testar conexão:', error);
-        if (error instanceof GeminiError) {
-            return { success: false, message: error.message };
-        }
-        return { success: false, message: `Erro de rede: ${error.message || 'Verifique sua conexão.'}` };
+
+        return { success: true, message: `Conexão OK com ${model}!` };
+    } catch (e: any) {
+        console.error('Erro de rede ao testar conexão:', e);
+        return { success: false, message: e.message || 'Erro desconhecido' };
     }
 }
 

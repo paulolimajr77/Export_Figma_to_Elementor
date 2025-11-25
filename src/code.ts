@@ -50,6 +50,9 @@ figma.clientStorage.getAsync('gemini_api_key').then(apiKey => {
 
 
 figma.ui.onmessage = async (msg) => {
+    console.log('📨 Mensagem recebida:', msg.type);
+    console.log('Dados completos:', msg);
+
     if (!compiler) compiler = new ElementorCompiler({});
 
     // Exportar para Elementor
@@ -102,10 +105,18 @@ figma.ui.onmessage = async (msg) => {
     }
 
     else if (msg.type === 'get-wp-config') {
+        console.log('📥 Recebido get-wp-config');
         const config = await figma.clientStorage.getAsync('wp_config');
-        if (config) {
-            figma.ui.postMessage({ type: 'load-wp-config', config });
-        }
+        console.log('Config WP recuperada:', config);
+        figma.ui.postMessage({ type: 'load-wp-config', config });
+    }
+
+    else if (msg.type === 'get-gemini-config') {
+        console.log('📥 Recebido get-gemini-config');
+        const apiKey = await Gemini.getKey();
+        const model = await Gemini.getModel();
+        console.log('Gemini config recuperada - API Key:', apiKey ? 'presente' : 'ausente', 'Modelo:', model);
+        figma.ui.postMessage({ type: 'load-gemini-config', apiKey, model });
     }
 
     // Resposta de upload de imagem
@@ -144,30 +155,35 @@ figma.ui.onmessage = async (msg) => {
     // ----- NOVA LÓGICA DO GEMINI USANDO A SDK -----------------------
     // =================================================================
 
-    // Carrega a configuração do Gemini (API Key e Modelo)
-    else if (msg.type === 'get-gemini-config') {
-        const apiKey = await Gemini.getKey();
-        const model = await Gemini.getModel();
-        figma.ui.postMessage({ type: 'load-gemini-config', apiKey, model });
-    }
-
     // Salva a API Key do Gemini
     else if (msg.type === 'save-gemini-key') {
-        await Gemini.saveKey(msg.key);
-        figma.notify('🔑 API Key do Gemini salva com sucesso!');
+        console.log('📥 Recebido save-gemini-key');
+        console.log('Key recebida:', msg.key);
+
+        try {
+            await Gemini.saveKey(msg.key);
+            console.log('✅ Key salva com sucesso');
+            figma.notify('🔑 API Key do Gemini salva com sucesso!');
+        } catch (error) {
+            console.error('❌ Erro ao salvar key:', error);
+            figma.notify('❌ Erro ao salvar API Key');
+        }
     }
 
     // Salva o modelo Gemini selecionado
     else if (msg.type === 'save-gemini-model') {
+        console.log('📥 Recebido save-gemini-model');
         await Gemini.saveModel(msg.model);
         figma.notify(`🤖 Modelo Gemini definido para: ${msg.model}`);
     }
 
     // Testa a conexão com a API Gemini usando a SDK
     else if (msg.type === 'test-gemini-connection') {
+        console.log('📥 Recebido test-gemini-connection');
         figma.notify('Testando conexão com a API Gemini...');
         try {
             const result = await Gemini.testConnection();
+            console.log('Resultado do teste:', result);
 
             figma.ui.postMessage({
                 type: 'gemini-connection-result',
