@@ -529,7 +529,15 @@
                 &nbsp;&nbsp;&nbsp;• Nomenclaturas padronizadas (c:, w:)<br>
                 &nbsp;&nbsp;&nbsp;• Hierarquia organizada
             </div>
-            <button id="btn-analyze-gemini" class="btn btn-primary">🚀 Analisar com IA</button>
+            <div class="actions">
+                <button id="analyze-btn" class="btn btn-primary">✨ Analisar com IA (Elementor)</button>
+                <button id="analyze-layout-btn" class="btn btn-secondary"
+                    style="background-color: #9c27b0; margin-top: 10px;">📐 Analisar Layout (Figma)</button>
+            </div>
+            <div id="loader-gemini" class="loader" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analisando layout com Gemini AI...</p>
+            </div>
         </div>
 
         <div id="gemini-results" style="display: none; margin-top: 20px;">
@@ -539,8 +547,25 @@
             </div>
         </div>
 
+        <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+            <label>🛠️ JSON to Figma (Beta)</label>
+            <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
+                Cole um JSON de layout para criar automaticamente.
+                <a href="#" id="load-json-example" style="color: var(--primary); margin-left: 8px;">Carregar Exemplo</a>
+            </div>
+            <textarea id="json-input" placeholder='{ "frameName": "Exemplo", "width": 800, ... }'
+                style="height: 100px; font-family: monospace; font-size: 10px; background-color: var(--code-bg); resize: vertical; margin-bottom: 8px;"></textarea>
+            <button id="btn-create-json" class="btn btn-secondary" style="width: 100%;">🏗️ Criar Layout do
+                JSON</button>
+        </div>
+
         <div class="form-group" style="margin-top: 20px;">
-            <label>📜 Log de Requisição/Resposta da IA</label>
+            <label>📜 Log Visual</label>
+            <div id="gemini-logs"
+                style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 10px; background: var(--code-bg); margin-bottom: 10px;">
+            </div>
+
+            <label>📜 Log de Texto</label>
             <textarea id="gemini-log-area" readonly
                 style="height: 150px; font-family: monospace; font-size: 10px; background-color: var(--code-bg); resize: vertical; white-space: pre-wrap;"></textarea>
         </div>
@@ -607,16 +632,20 @@
             if (loader) loader.style.display = 'flex';
             if (loaderText) loaderText.textContent = text;
             // Desabilita botões para evitar cliques duplos
-            document.getElementById('btn-analyze-gemini').disabled = true;
-            document.getElementById('btn-export').disabled = true;
+            const analyzeBtn = document.getElementById('analyze-btn');
+            if (analyzeBtn) analyzeBtn.disabled = true;
+            const exportBtn = document.getElementById('btn-export');
+            if (exportBtn) exportBtn.disabled = true;
         }
 
         function hideLoader() {
             const loader = document.getElementById('loader');
             if (loader) loader.style.display = 'none';
             // Reabilita botões
-            document.getElementById('btn-analyze-gemini').disabled = false;
-            document.getElementById('btn-export').disabled = false;
+            const analyzeBtn = document.getElementById('analyze-btn');
+            if (analyzeBtn) analyzeBtn.disabled = false;
+            const exportBtn = document.getElementById('btn-export');
+            if (exportBtn) exportBtn.disabled = false;
         }
 
         // --- DADOS HIERÁRQUICOS DA ABA AJUDA ---
@@ -943,13 +972,18 @@
         }
 
         // ==================== EVENTOS GEMINI E BUSCA DE WIDGETS ====================
-        document.getElementById('btn-analyze-gemini').addEventListener('click', () => {
+        document.getElementById('analyze-btn').addEventListener('click', () => {
             document.getElementById('gemini-log-area').value = ''; // Limpa o log
             // Mostra o loader imediatamente na UI para feedback instantâneo
             showLoader('Preparando para análise...');
             document.getElementById('gemini-results').style.display = 'none';
             parent.postMessage({ pluginMessage: { type: 'analyze-with-gemini' } }, '*');
         });
+
+        document.getElementById('analyze-layout-btn').onclick = () => {
+            document.getElementById('loader').style.display = 'flex';
+            parent.postMessage({ pluginMessage: { type: 'analyze-layout-figma' } }, '*');
+        };
 
         document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
             const key = document.getElementById('gemini-api-key').value;
@@ -962,6 +996,54 @@
 
         document.getElementById('search-widgets').addEventListener('input', (e) => {
             renderHelpTree(e.target.value);
+        });
+
+        // --- JSON BUILDER ---
+        document.getElementById('btn-create-json').addEventListener('click', () => {
+            const jsonStr = document.getElementById('json-input').value;
+            if (!jsonStr.trim()) {
+                alert('Cole um JSON válido primeiro.');
+                return;
+            }
+            parent.postMessage({ pluginMessage: { type: 'create-from-json', data: jsonStr } }, '*');
+        });
+
+        document.getElementById('load-json-example').addEventListener('click', (e) => {
+            e.preventDefault();
+            const example = {
+                "frameName": "Exemplo JSON",
+                "width": 800,
+                "height": 600,
+                "background": "#F5F5F5",
+                "autoLayout": { "direction": "vertical", "gap": 20, "padding": { "top": 40, "right": 40, "bottom": 40, "left": 40 } },
+                "children": [
+                    {
+                        "type": "TEXT",
+                        "name": "Título",
+                        "textContent": "Olá, Figma!",
+                        "fontSize": 32,
+                        "fontWeight": "Bold",
+                        "fills": [{ "type": "SOLID", "color": { "r": 0, "g": 0, "b": 0 } }]
+                    },
+                    {
+                        "type": "FRAME",
+                        "name": "Card",
+                        "autoLayout": { "direction": "vertical", "gap": 10, "padding": { "top": 20, "right": 20, "bottom": 20, "left": 20 } },
+                        "fills": [{ "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1 } }],
+                        "cornerRadius": 8,
+                        "children": [
+                            {
+                                "type": "TEXT",
+                                "name": "Descrição",
+                                "textContent": "Este card foi criado via JSON.",
+                                "fontSize": 16,
+                                "fills": [{ "type": "SOLID", "color": { "r": 0.4, "g": 0.4, "b": 0.4 } }]
+                            }
+                        ]
+                    }
+                ]
+            };
+            document.getElementById('json-input').value = JSON.stringify(example, null, 2);
         });
 
         // --- EXPORT TRIGGER --- 
@@ -1384,6 +1466,76 @@
             else if (msg.type === 'add-gemini-log') {
                 addGeminiLog(msg.data);
             }
+            else if (msg.type === 'show-preview-image') {
+                const logsContainer = document.getElementById('gemini-logs');
+                const imageDiv = document.createElement('div');
+                imageDiv.style.marginBottom = '10px';
+                imageDiv.style.border = '1px solid var(--border)';
+                imageDiv.style.borderRadius = '4px';
+                imageDiv.style.overflow = 'hidden';
+                imageDiv.innerHTML = `
+                    <div style="background: var(--hover); padding: 5px 10px; font-size: 10px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border);">
+                        📸 Analisando: ${msg.name}
+                    </div>
+                    <img src="data:image/png;base64,${msg.image}" style="width: 100%; display: block;">
+                `;
+                logsContainer.appendChild(imageDiv);
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+            else if (msg.type === 'show-analysis-results') {
+                console.log('Received show-analysis-results', msg);
+                const resultsDiv = document.getElementById('gemini-results');
+                const improvementsDiv = document.getElementById('gemini-improvements');
+                resultsDiv.style.display = 'block';
+
+                // Formatação melhorada para Markdown
+                let formattedText = msg.data || ''; // Garante que não seja undefined
+
+                if (formattedText) {
+                    formattedText = formattedText
+                        // Headers
+                        .replace(/^### (.*?)$/gm, '<h3 style="margin: 16px 0 8px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 4px;">$1</h3>')
+                        .replace(/^## (.*?)$/gm, '<h2 style="margin: 20px 0 10px; color: var(--text); border-bottom: 2px solid var(--border); padding-bottom: 6px;">$1</h2>')
+                        .replace(/^# (.*?)$/gm, '<h1 style="margin: 24px 0 12px; color: var(--primary); font-size: 16px;">$1</h1>')
+                        // Bold
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        // Code Blocks (simples)
+                        .replace(/```json([\s\S]*?)```/g, '<pre style="background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 10px;"><code>$1</code></pre>')
+                        .replace(/```([\s\S]*?)```/g, '<pre style="background: var(--code-bg); padding: 10px; border-radius: 4px; overflow-x: auto;"><code>$1</code></pre>')
+                        // Inline Code
+                        .replace(/`([^`]+)`/g, '<code style="background: var(--code-bg); padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
+                        // Lists
+                        .replace(/^- (.*?)$/gm, '<li style="margin-left: 20px;">$1</li>')
+                        // Line breaks
+                        .replace(/\n/g, '<br>');
+
+                    // Limpa <br> excessivos após headers ou code blocks
+                    formattedText = formattedText.replace(/<\/h3><br>/g, '</h3>');
+                    formattedText = formattedText.replace(/<\/pre><br>/g, '</pre>');
+                }
+
+                let imageHtml = '';
+                if (msg.image) {
+                    console.log('Image data present, length:', msg.image.length);
+                    imageHtml = `
+                        <div style="margin-bottom: 15px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden;">
+                            <div style="background: var(--hover); padding: 5px 10px; font-size: 10px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border);">
+                                📸 Frame Analisado
+                            </div>
+                            <img src="data:image/png;base64,${msg.image}" style="width: 100%; display: block;">
+                        </div>
+                    `;
+                } else {
+                    console.warn('No image data in show-analysis-results');
+                }
+
+                improvementsDiv.innerHTML = `
+                    ${imageHtml}
+                    <div style="font-size: 12px; line-height: 1.6;">
+                        ${formattedText}
+                    </div>
+                `;
+            }
         };
 
         // --- INICIALIZAÇÃO --- 
@@ -1393,12 +1545,43 @@
         renderHelpTree();
 
         // Setup tab navigation
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        tabButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const tabName = btn.getAttribute('data-tab');
+                console.log('Tab clicked:', tabName);
                 openTab(tabName, e);
             });
         });
+
+        // Ensure openTab is globally available and robust
+        window.openTab = function (tabName, evt) {
+            console.log('Opening tab:', tabName);
+            const contents = document.querySelectorAll('.content');
+            contents.forEach(c => c.classList.remove('active'));
+
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(b => b.classList.remove('active'));
+
+            const selectedTab = document.getElementById('tab-' + tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            } else {
+                console.error('Tab content not found:', 'tab-' + tabName);
+            }
+
+            if (evt && evt.currentTarget) {
+                evt.currentTarget.classList.add('active');
+            } else {
+                // Fallback if no event (e.g. manual call)
+                const btn = document.querySelector(`.tab - btn[data - tab="${tabName}"]`);
+                if (btn) btn.classList.add('active');
+            }
+
+            if (tabName === 'preview') {
+                updatePreview();
+            }
+        };
     </script>
 </body>
 

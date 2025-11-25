@@ -1,24 +1,5 @@
 (() => {
-  var __defProp = Object.defineProperty;
-  var __defProps = Object.defineProperties;
-  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
   var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-  var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __propIsEnum = Object.prototype.propertyIsEnumerable;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-  var __spreadValues = (a, b) => {
-    for (var prop in b || (b = {}))
-      if (__hasOwnProp.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    if (__getOwnPropSymbols)
-      for (var prop of __getOwnPropSymbols(b)) {
-        if (__propIsEnum.call(b, prop))
-          __defNormalProp(a, prop, b[prop]);
-      }
-    return a;
-  };
-  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __esm = (fn, res) => function __init() {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
   };
@@ -1225,7 +1206,7 @@
   }
   function getModel() {
     return __async(this, null, function* () {
-      return "gemini-2.5-flash";
+      return GEMINI_MODEL;
     });
   }
   function testConnection() {
@@ -1258,119 +1239,44 @@
       }
     });
   }
-  function analyzeAndRecreate(_0) {
-    return __async(this, arguments, function* (imageData, availableImageIds = []) {
-      var _a, _b;
-      const key = yield getKey();
-      if (!key) throw new Error("API Key n\xE3o configurada");
-      const modelName = yield getModel();
-      const fullApiUrl = `${API_BASE_URL}${modelName}:generateContent?key=${key}`;
-      const base64Image = arrayBufferToBase64(imageData);
-      const prompt = `
-Analise este layout de interface e forne\xE7a instru\xE7\xF5es DETALHADAS para RECRIAR um novo frame otimizado.
-O objetivo \xE9 clonar a estrutura e o conte\xFAdo visual o mais fielmente poss\xEDvel usando Auto-Layout.
-
-IMAGENS DISPON\xCDVEIS (IDs):
-${availableImageIds.join(", ")}
-
-Responda APENAS com JSON v\xE1lido seguindo ESTRITAMENTE esta estrutura:
-
-{
-  "frameName": "Nome do Frame",
-  "width": 1440,
-  "height": 900,
-  "background": "#FFFFFF",
-  "autoLayout": { "direction": "vertical", "gap": 0, "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 } },
-  "children": [
-    {
-      "type": "container",
-      "name": "w:container", // Use prefixo w: para widgets Elementor
-      "background": "transparent",
-      "width": 1440,
-      "height": 500,
-      "autoLayout": { "direction": "vertical", "gap": 20, "padding": { "top": 40, "right": 40, "bottom": 40, "left": 40 } },
-      "children": [
-        {
-          "type": "widget",
-          "widgetType": "heading",
-          "name": "w:heading",
-          "content": "TEXTO EXATO DA IMAGEM",
-          "fontSize": 48,
-          "color": "#333333",
-          "width": 800,
-          "height": 60
-        },
-        {
-          "type": "widget",
-          "widgetType": "image",
-          "name": "w:image",
-          "content": "${availableImageIds[0] || "ID_DA_IMAGEM_AQUI"}", // Use o ID da imagem se corresponder visualmente
-          "width": 400,
-          "height": 300
-        }
-      ]
+  function repairJson(jsonString) {
+    let repaired = jsonString.trim();
+    if (repaired.endsWith(",")) {
+      repaired = repaired.slice(0, -1);
     }
-  ],
-  "improvements": ["Lista de melhorias aplicadas"]
-}
-
-Regras CRITICAS:
-1. Extraia TODO o texto da imagem exatamente como ele aparece.
-2. Estime as dimens\xF5es (width/height) de TODOS os elementos.
-3. Para IMAGENS: Se a imagem visual corresponder a um dos IDs listados acima, use o ID no campo "content". Caso contr\xE1rio, descreva a imagem.
-4. NOMENCLATURA: Use SEMPRE o prefixo "w:" no campo "name" para mapear para widgets Elementor (ex: "w:heading", "w:text", "w:button", "w:image", "w:container", "w:icon-box").
-5. Identifique cores hexadecimais aproximadas.
-6. Use Auto-Layout para tudo.
-`;
-      const requestBody = {
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: "image/png", data: base64Image } }
-          ]
-        }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 8192,
-          response_mime_type: "application/json"
-        }
-      };
-      const requestLog = __spreadProps(__spreadValues({}, requestBody), { contents: [{ parts: [{ text: prompt }, { text: "[imagem omitida]" }] }] });
-      figma.ui.postMessage({ type: "add-gemini-log", data: `--- REQUISI\xC7\xC3O ---
-${JSON.stringify(requestLog, null, 2)}` });
-      try {
-        const response = yield fetch(fullApiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody)
-        });
-        if (!response.ok) {
-          const errorData = yield response.json();
-          const errorMessage = ((_a = errorData == null ? void 0 : errorData.error) == null ? void 0 : _a.message) || `Erro na API: ${response.status}`;
-          throw new Error(errorMessage);
-        }
-        const data = yield response.json();
-        figma.ui.postMessage({ type: "add-gemini-log", data: `--- RESPOSTA ---
-${JSON.stringify(data, null, 2)}` });
-        if (!data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
-          const errorMessage = ((_b = data.error) == null ? void 0 : _b.message) || "A API retornou uma resposta vazia ou malformada.";
-          throw new Error(errorMessage);
-        }
-        const responseText = data.candidates[0].content.parts[0].text;
-        const startIndex = responseText.indexOf("{");
-        const endIndex = responseText.lastIndexOf("}");
-        if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
-          throw new Error("Nenhum objeto JSON v\xE1lido encontrado na resposta da API.");
-        }
-        const jsonText = responseText.substring(startIndex, endIndex + 1);
-        return JSON.parse(jsonText);
-      } catch (error) {
-        figma.ui.postMessage({ type: "add-gemini-log", data: `--- ERRO ---
-${error.message}` });
-        console.error("Erro na chamada fetch para o Gemini:", error);
-        throw new Error(`Erro na API Gemini: ${error.message}`);
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < repaired.length; i++) {
+      const char = repaired[i];
+      if (char === "\\" && !escaped) {
+        escaped = true;
+        continue;
       }
-    });
+      if (char === '"' && !escaped) {
+        inString = !inString;
+      }
+      if (!inString) {
+        if (char === "{") openBraces++;
+        if (char === "}") openBraces--;
+        if (char === "[") openBrackets++;
+        if (char === "]") openBrackets--;
+      }
+      escaped = false;
+    }
+    if (inString) {
+      repaired += '"';
+    }
+    while (openBrackets > 0) {
+      repaired += "]";
+      openBrackets--;
+    }
+    while (openBraces > 0) {
+      repaired += "}";
+      openBraces--;
+    }
+    return repaired;
   }
   function arrayBufferToBase64(buffer) {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1399,9 +1305,165 @@ ${error.message}` });
     }
     return result;
   }
-  var API_BASE_URL;
+  function analyzeLayoutFigma(_0) {
+    return __async(this, arguments, function* (imageData, availableImageIds = [], nodeData = null) {
+      var _a;
+      const key = yield getKey();
+      if (!key) throw new Error("API Key n\xE3o configurada");
+      const model = yield getModel();
+      const fullApiUrl = `${API_BASE_URL}${model}:generateContent?key=${key}`;
+      const base64Image = arrayBufferToBase64(imageData);
+      const prompt = `
+Act as a FIGMA INSTRUCTOR and AUTO LAYOUT EXPERT.
+Your goal is to provide a clear, step-by-step "Figma Construction Manual" on how to build the provided layout in Figma.
+
+\u26D4\uFE0F STRICTLY FORBIDDEN:
+- DO NOT generate code (React, HTML, CSS, JSX).
+- DO NOT use file paths like "src/components/...".
+- DO NOT mention "Developer Handoff".
+
+\u2705 YOUR FOCUS:
+- Figma Layers (Frames, Groups, Text, Vectors).
+- Auto Layout Properties (Direction, Gap, Padding, Hug/Fill/Fixed).
+- Figma Styles (Text Styles, Color Styles).
+- Component Properties (Variants, Boolean Properties).
+
+INSTRUCTIONS:
+Analyze the screenshot and data to produce a guide:
+1.  **Layer Hierarchy**: List the exact Frame structure needed (e.g., "Main Frame > Header > Logo Wrapper").
+2.  **Auto Layout Specs**: For each container, specify:
+    - **Direction**: Horizontal (Row) or Vertical (Column).
+        - *CRITICAL: If text and image are side-by-side, use HORIZONTAL direction. Do NOT use "None" or absolute positioning unless strictly necessary.*
+    - **Gap**: px value
+    - **Padding**: px values
+    - **Resizing**: Hug Content / Fill Container / Fixed Width
+    - **Alignment**: Top Left / Center / etc.
+3.  **Styles**:
+    - **Colors**: Suggest names for Color Styles (e.g., "Primary/Blue", "Neutral/Gray-100").
+    - **Typography**: Suggest names for Text Styles (e.g., "Heading/H1", "Body/Medium").
+4.  **Components**: Identify repeating elements that should be Components.
+
+OUTPUT FORMAT:
+Provide the response in clear MARKDOWN format.
+- Use **Bold** for key settings.
+- Use \`Code Blocks\` ONLY for JSON tokens (Colors/Typography).
+- Structure with clear Headings (###).
+
+REQUIRED JSON OUTPUTS (Include these as code blocks):
+- **Color Tokens JSON**: { "colors": { ... } }
+- **Typography Tokens JSON**: { "typography": { ... } }
+
+STRUCTURAL CONTEXT (FIGMA DATA):
+${nodeData ? JSON.stringify(nodeData, null, 2) : "No structural data available."}
+`;
+      const response = yield fetch(fullApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: base64Image } }] }],
+          generationConfig: { response_mime_type: "text/plain", temperature: 0.4, maxOutputTokens: 8192 }
+        })
+      });
+      const data = yield response.json();
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${((_a = data.error) == null ? void 0 : _a.message) || response.statusText}`);
+      }
+      const candidate = data.candidates[0];
+      if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+        throw new Error("API returned empty content.");
+      }
+      return candidate.content.parts[0].text;
+    });
+  }
+  function generateFigmaLayoutJSON(_0) {
+    return __async(this, arguments, function* (imageData, availableImageIds = [], nodeData = null) {
+      var _a;
+      const key = yield getKey();
+      if (!key) throw new Error("API Key n\xE3o configurada");
+      const model = yield getModel();
+      const fullApiUrl = `${API_BASE_URL}${model}:generateContent?key=${key}`;
+      const base64Image = arrayBufferToBase64(imageData);
+      const prompt = `
+Act as a FIGMA AUTO LAYOUT EXPERT.
+Your goal is to reconstruct the layout of the provided screenshot using Figma's Auto Layout best practices.
+
+\u26D4\uFE0F CRITICAL RULES:
+1. **HORIZONTAL vs VERTICAL**: If elements (like Text and Image) are side-by-side, you MUST use "direction": "horizontal". Do NOT use "none" or absolute positioning unless strictly necessary.
+2. **DIMENSIONS**: Copy EXACTLY the "width" and "height" from the structural JSON.
+3. **BACKGROUNDS**: Use the "fills" from the JSON.
+4. **TEXT**: Copy text EXACTLY.
+5. **NAMING**: Use descriptive names like "Container", "Image Wrapper", "Text Block", "Button".
+
+INSTRUCTIONS:
+1. ANALYZE the screenshot and the STRUCTURAL DATA.
+2. RECREATE the layout using Frames with Auto Layout.
+3. DETERMINE the best 'direction' (horizontal/vertical), 'gap', 'padding', and 'alignment' for each container.
+4. IDENTIFY text and images.
+
+STRUCTURAL CONTEXT (FIGMA DATA):
+${nodeData ? JSON.stringify(nodeData, null, 2) : "No structural data available."}
+
+Respond ONLY with valid JSON following this structure:
+{
+  "frameName": "Figma Auto Layout Analysis",
+  "width": 100,
+  "height": 100,
+  "background": "#FFFFFF",
+  "autoLayout": { "direction": "vertical", "gap": 0, "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 } },
+  "children": [
+    {
+      "type": "container",
+      "name": "Container",
+      "autoLayout": { "direction": "horizontal", ... },
+      "children": [...]
+    },
+    {
+      "type": "text",
+      "name": "Headline",
+      "textContent": "...",
+      "style": { "fontSize": 16, "fontWeight": "bold", "fontFamily": "Inter", "color": "#000000" }
+    },
+    {
+      "type": "image",
+      "name": "Hero Image"
+    }
+  ]
+}
+`;
+      const response = yield fetch(fullApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: base64Image } }] }],
+          generationConfig: { response_mime_type: "application/json", temperature: 0.4, maxOutputTokens: 8192 }
+        })
+      });
+      const data = yield response.json();
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${((_a = data.error) == null ? void 0 : _a.message) || response.statusText}`);
+      }
+      const candidate = data.candidates[0];
+      if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+        throw new Error("API returned empty content.");
+      }
+      let responseText = candidate.content.parts[0].text;
+      const startIndex = responseText.indexOf("{");
+      if (startIndex === -1) throw new Error("No JSON found in response.");
+      let endIndex = responseText.lastIndexOf("}");
+      if (endIndex === -1 || endIndex < startIndex) endIndex = responseText.length;
+      let jsonString = responseText.substring(startIndex, endIndex + 1);
+      try {
+        return JSON.parse(jsonString);
+      } catch (e) {
+        console.warn("Invalid JSON, attempting repair...", e);
+        return JSON.parse(repairJson(jsonString));
+      }
+    });
+  }
+  var GEMINI_MODEL, API_BASE_URL;
   var init_api_gemini = __esm({
     "src/api_gemini.ts"() {
+      GEMINI_MODEL = "gemini-2.5-flash-lite";
       API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     }
   });
@@ -1409,22 +1471,49 @@ ${error.message}` });
   // src/gemini_frame_builder.ts
   function createOptimizedFrame(_0, _1) {
     return __async(this, arguments, function* (analysis, originalNode, availableImages = {}) {
+      figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F528} Criando Frame Principal: "${analysis.frameName || "Gemini Frame"}"` });
       const newFrame = figma.createFrame();
       newFrame.name = analysis.frameName || "Gemini IA Frame";
-      const width = analysis.width || originalNode.width;
-      const height = analysis.height || originalNode.height;
+      const width = analysis.width || (originalNode ? originalNode.width : 1200);
+      const height = analysis.height || (originalNode ? originalNode.height : 800);
       newFrame.resize(width, height);
-      if ("x" in originalNode && "y" in originalNode) {
+      figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F4CF} Dimens\xF5es: ${width}x${height}` });
+      if (originalNode && "x" in originalNode && "y" in originalNode) {
         newFrame.x = originalNode.x + originalNode.width + 100;
         newFrame.y = originalNode.y;
+      } else {
+        newFrame.x = figma.viewport.center.x - width / 2;
+        newFrame.y = figma.viewport.center.y - height / 2;
       }
-      if (analysis.background) {
-        newFrame.fills = [{ type: "SOLID", color: hexToRgb(analysis.background) }];
+      if (originalNode && "fills" in originalNode && originalNode.fills !== figma.mixed) {
+        console.log("Original Node Fills:", JSON.stringify(originalNode.fills, null, 2));
+        try {
+          newFrame.fills = JSON.parse(JSON.stringify(originalNode.fills));
+          console.log("New Frame Fills applied:", JSON.stringify(newFrame.fills, null, 2));
+          figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F3A8} Copiando preenchimentos do original...` });
+        } catch (e) {
+          console.error("Error applying fills:", e);
+        }
+      } else {
+        console.log("Original Node has no fills or mixed fills, or is null.");
+        if (analysis.fills) {
+          try {
+            newFrame.fills = analysis.fills;
+            figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F3A8} Aplicando fills do JSON...` });
+          } catch (e) {
+            console.error("Error applying JSON fills:", e);
+          }
+        } else if (analysis.background) {
+          newFrame.fills = [{ type: "SOLID", color: hexToRgb(analysis.background) }];
+          figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F3A8} Aplicando background: ${analysis.background}` });
+        }
       }
       if (analysis.autoLayout) {
         applyAutoLayoutToFrame(newFrame, analysis.autoLayout);
+        figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F4D0} Aplicando Auto Layout: ${analysis.autoLayout.direction}` });
       }
       if (analysis.children && Array.isArray(analysis.children)) {
+        figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F476} Processando ${analysis.children.length} filhos...` });
         for (const child of analysis.children) {
           yield createChildNode(newFrame, child, availableImages);
         }
@@ -1438,11 +1527,23 @@ ${error.message}` });
       if (spec.type === "container") {
         const container = figma.createFrame();
         container.name = spec.name;
+        if (spec.width && spec.height) {
+          container.resize(spec.width, spec.height);
+        }
         if (spec.autoLayout) {
           applyAutoLayoutToFrame(container, spec.autoLayout);
         }
-        if (spec.background) {
+        if (spec.fills) {
+          try {
+            container.fills = spec.fills;
+          } catch (e) {
+            console.error("Error applying container fills:", e);
+          }
+        } else if (spec.background) {
           container.fills = [{ type: "SOLID", color: hexToRgb(spec.background) }];
+        }
+        if (spec.cornerRadius) {
+          container.cornerRadius = spec.cornerRadius;
         }
         if (spec.children) {
           for (const child of spec.children) {
@@ -1464,6 +1565,15 @@ ${error.message}` });
     return __async(this, null, function* () {
       yield figma.loadFontAsync({ family: "Inter", style: "Regular" });
       yield figma.loadFontAsync({ family: "Inter", style: "Medium" });
+      yield figma.loadFontAsync({ family: "Inter", style: "Bold" });
+      if (spec.fontFamily) {
+        try {
+          const weight = spec.fontWeight || "Regular";
+          yield figma.loadFontAsync({ family: spec.fontFamily, style: weight });
+        } catch (e) {
+          console.warn(`Fonte ${spec.fontFamily} n\xE3o encontrada, usando Inter.`);
+        }
+      }
       let node;
       switch (spec.widgetType) {
         case "heading":
@@ -1472,9 +1582,23 @@ ${error.message}` });
           const text = figma.createText();
           node = text;
           text.name = spec.name || "Texto";
-          text.characters = spec.content || "Texto";
+          text.characters = spec.content || spec.characters || "Texto";
           if (spec.fontSize) text.fontSize = spec.fontSize;
           if (spec.color) text.fills = [{ type: "SOLID", color: hexToRgb(spec.color) }];
+          if (spec.fills) {
+            try {
+              text.fills = spec.fills;
+            } catch (e) {
+            }
+          }
+          if (spec.fontFamily) {
+            const weight = spec.fontWeight || "Regular";
+            try {
+              text.fontName = { family: spec.fontFamily, style: weight };
+            } catch (e) {
+              text.fontName = { family: "Inter", style: "Regular" };
+            }
+          }
           if (spec.width) {
             text.resize(spec.width, text.height);
             text.textAutoResize = "HEIGHT";
@@ -1529,6 +1653,13 @@ ${error.message}` });
           fallbackWidget.name = spec.name || "Widget";
           if (spec.width && spec.height) fallbackWidget.resize(spec.width, spec.height);
           break;
+      }
+      if (spec.width && spec.height && node.type !== "TEXT") {
+        try {
+          node.resize(spec.width, spec.height);
+        } catch (e) {
+          console.warn("Falha ao redimensionar node:", e);
+        }
       }
       parent.appendChild(node);
       return node;
@@ -1586,6 +1717,119 @@ ${error.message}` });
           return images;
         });
       }
+      function serializeNode(node) {
+        const data = {
+          id: node.id,
+          name: node.name,
+          type: node.type,
+          width: node.width,
+          height: node.height,
+          x: node.x,
+          y: node.y,
+          visible: node.visible,
+          locked: node.locked
+        };
+        if ("opacity" in node) data.opacity = node.opacity;
+        if ("blendMode" in node) data.blendMode = node.blendMode;
+        if ("fills" in node && node.fills !== figma.mixed) {
+          data.fills = node.fills.map((fill) => {
+            if (fill.type === "SOLID") {
+              return { type: "SOLID", color: fill.color, opacity: fill.opacity, visible: fill.visible };
+            }
+            return { type: fill.type, visible: fill.visible };
+          });
+        }
+        if ("strokes" in node && node.strokes !== figma.mixed) {
+          data.strokes = node.strokes.map((stroke) => {
+            if (stroke.type === "SOLID") {
+              return { type: "SOLID", color: stroke.color, opacity: stroke.opacity, visible: stroke.visible };
+            }
+            return { type: stroke.type, visible: stroke.visible };
+          });
+          data.strokeWeight = node.strokeWeight;
+          data.strokeAlign = node.strokeAlign;
+          data.strokeCap = node.strokeCap;
+          data.strokeJoin = node.strokeJoin;
+          data.dashPattern = node.dashPattern;
+        }
+        if ("effects" in node && node.effects !== figma.mixed) {
+          data.effects = node.effects.map((effect) => ({
+            type: effect.type,
+            visible: effect.visible,
+            radius: effect.radius,
+            offset: effect.offset,
+            spread: effect.spread,
+            color: effect.color,
+            blendMode: effect.blendMode
+          }));
+        }
+        if ("cornerRadius" in node) {
+          if (node.cornerRadius !== figma.mixed) {
+            data.cornerRadius = node.cornerRadius;
+          } else {
+            data.topLeftRadius = node.topLeftRadius;
+            data.topRightRadius = node.topRightRadius;
+            data.bottomLeftRadius = node.bottomLeftRadius;
+            data.bottomRightRadius = node.bottomRightRadius;
+          }
+        }
+        if ("constraints" in node) {
+          data.constraints = node.constraints;
+        }
+        if (node.type === "TEXT") {
+          data.characters = node.characters;
+          data.fontSize = node.fontSize;
+          data.fontName = node.fontName;
+          data.fontWeight = node.fontWeight;
+          data.textAlignHorizontal = node.textAlignHorizontal;
+          data.textAlignVertical = node.textAlignVertical;
+          data.textAutoResize = node.textAutoResize;
+          data.letterSpacing = node.letterSpacing;
+          data.lineHeight = node.lineHeight;
+          data.textCase = node.textCase;
+          data.textDecoration = node.textDecoration;
+          if (node.fills !== figma.mixed && node.fills.length > 0 && node.fills[0].type === "SOLID") {
+            data.color = node.fills[0].color;
+          }
+        }
+        if ("layoutMode" in node) {
+          data.layoutMode = node.layoutMode;
+          data.primaryAxisSizingMode = node.primaryAxisSizingMode;
+          data.counterAxisSizingMode = node.counterAxisSizingMode;
+          data.primaryAxisAlignItems = node.primaryAxisAlignItems;
+          data.counterAxisAlignItems = node.counterAxisAlignItems;
+          data.paddingTop = node.paddingTop;
+          data.paddingRight = node.paddingRight;
+          data.paddingBottom = node.paddingBottom;
+          data.paddingLeft = node.paddingLeft;
+          data.itemSpacing = node.itemSpacing;
+        }
+        if ("children" in node) {
+          data.children = node.children.map((child) => serializeNode(child));
+        }
+        return data;
+      }
+      function rgbToHex(rgb) {
+        const toHex = (c) => {
+          const hex = Math.round(c * 255).toString(16);
+          return hex.length === 1 ? "0" + hex : hex;
+        };
+        return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+      }
+      function getBackgroundFromNode(node) {
+        if ("fills" in node && Array.isArray(node.fills)) {
+          for (const fill of node.fills) {
+            if (fill.type === "SOLID") {
+              const { r, g, b } = fill.color;
+              return rgbToHex({ r, g, b });
+            }
+          }
+        }
+        return "#FFFFFF";
+      }
+      function getSectionsToAnalyze(node) {
+        return [node];
+      }
       figma.showUI(__html__, { width: 600, height: 600 });
       var compiler;
       figma.clientStorage.getAsync("wp_config").then((config) => {
@@ -1601,6 +1845,93 @@ ${error.message}` });
           }
         });
       });
+      function normalizeFigmaJSON(json) {
+        let root = json;
+        if (json.document) {
+          root = json.document;
+        }
+        if (root.type === "DOCUMENT" || root.type === "PAGE") {
+          if (root.children && root.children.length > 0) {
+            const firstFrame = root.children.find((c) => c.type === "FRAME" || c.type === "SECTION");
+            if (firstFrame) {
+              root = firstFrame;
+            } else {
+              root = root.children[0];
+            }
+          }
+        }
+        const analysis = {
+          frameName: root.name || "Layout Importado",
+          width: root.width || 1200,
+          height: root.height || 800,
+          children: [],
+          type: root.type,
+          fills: root.backgrounds || root.fills || []
+        };
+        if (root.layoutMode && root.layoutMode !== "NONE") {
+          analysis.autoLayout = {
+            direction: root.layoutMode === "HORIZONTAL" ? "horizontal" : "vertical",
+            gap: root.itemSpacing || 0,
+            padding: {
+              top: root.paddingTop || root.padding || 0,
+              right: root.paddingRight || root.padding || 0,
+              bottom: root.paddingBottom || root.padding || 0,
+              left: root.paddingLeft || root.padding || 0
+            },
+            primaryAlign: root.primaryAxisAlignItems,
+            counterAlign: root.counterAxisAlignItems
+          };
+        }
+        if (root.children && Array.isArray(root.children)) {
+          analysis.children = root.children.map((child) => normalizeChildNode(child));
+        }
+        return analysis;
+      }
+      function normalizeChildNode(node) {
+        var _a, _b, _c, _d;
+        const isContainer = node.type === "FRAME" || node.type === "GROUP" || node.type === "SECTION";
+        let widgetType = "container";
+        if (!isContainer) {
+          if (node.type === "TEXT") widgetType = "text";
+          else if (node.type === "RECTANGLE") widgetType = "image";
+          else if (node.type === "VECTOR" || node.type === "STAR" || node.type === "ELLIPSE") widgetType = "icon";
+          else widgetType = "unknown";
+        }
+        const child = {
+          type: isContainer ? "container" : "widget",
+          name: node.name,
+          widgetType: isContainer ? void 0 : widgetType,
+          width: node.width,
+          height: node.height,
+          fills: node.fills || node.backgrounds,
+          cornerRadius: node.cornerRadius,
+          // Text specific
+          content: node.characters,
+          characters: node.characters,
+          fontSize: (_a = node.style) == null ? void 0 : _a.fontSize,
+          fontFamily: (_b = node.style) == null ? void 0 : _b.fontFamily,
+          fontWeight: (_c = node.style) == null ? void 0 : _c.fontWeight,
+          color: ((_d = node.style) == null ? void 0 : _d.fill) ? rgbToHex(node.style.fill) : void 0,
+          // Simplificação
+          style: node.style
+        };
+        if (node.layoutMode && node.layoutMode !== "NONE") {
+          child.autoLayout = {
+            direction: node.layoutMode === "HORIZONTAL" ? "horizontal" : "vertical",
+            gap: node.itemSpacing || 0,
+            padding: {
+              top: node.paddingTop || node.padding || 0,
+              right: node.paddingRight || node.padding || 0,
+              bottom: node.paddingBottom || node.padding || 0,
+              left: node.paddingLeft || node.padding || 0
+            }
+          };
+        }
+        if (node.children && Array.isArray(node.children)) {
+          child.children = node.children.map((c) => normalizeChildNode(c));
+        }
+        return child;
+      }
       figma.ui.onmessage = (msg) => __async(null, null, function* () {
         var _a;
         if (!compiler) compiler = new ElementorCompiler({});
@@ -1703,15 +2034,76 @@ ${error.message}` });
             return;
           }
           const node = selection[0];
-          figma.notify("\u{1F916} Analisando layout com IA...");
+          if (node.type !== "FRAME" && node.type !== "SECTION" && node.type !== "COMPONENT") {
+            figma.notify("\u26A0\uFE0F Selecione um Frame, Section ou Componente v\xE1lido.");
+            return;
+          }
+          if (!("children" in node)) {
+            figma.notify("\u26A0\uFE0F O elemento selecionado n\xE3o possui filhos para an\xE1lise.");
+            return;
+          }
+          figma.notify("\u{1F916} Iniciando an\xE1lise estruturada...");
           try {
-            const imageData = yield node.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: 1.5 } });
             const availableImages = yield extractImagesFromNode(node);
             const availableImageIds = Object.keys(availableImages);
-            console.log(`Imagens extra\xEDdas: ${availableImageIds.length}`);
-            const analysis = yield analyzeAndRecreate(imageData, availableImageIds);
-            figma.notify("\u{1F3A8} Criando novo frame otimizado...");
-            const newFrame = yield createOptimizedFrame(analysis, node, availableImages);
+            const childrenToAnalyze = getSectionsToAnalyze(node);
+            const totalSections = childrenToAnalyze.length;
+            if (totalSections === 0) {
+              throw new Error("O frame selecionado est\xE1 vazio ou n\xE3o possui se\xE7\xF5es vis\xEDveis.");
+            }
+            const aggregatedChildren = [];
+            const aggregatedImprovements = [];
+            for (let i = 0; i < totalSections; i++) {
+              let child = childrenToAnalyze[i];
+              const sectionIndex = i + 1;
+              const originalName = child.name;
+              figma.notify(`\u{1F916} Analisando se\xE7\xE3o ${sectionIndex} de ${totalSections}: ${child.name}...`);
+              figma.ui.postMessage({ type: "add-gemini-log", data: `--- INICIANDO AN\xC1LISE DA SE\xC7\xC3O ${sectionIndex}/${totalSections}: ${child.name} ---` });
+              const sectionImageData = yield child.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: 1.5 } });
+              const base64SectionImage = figma.base64Encode(sectionImageData);
+              figma.ui.postMessage({
+                type: "show-analysis-results",
+                data: "",
+                // Texto vazio, apenas imagem
+                image: base64SectionImage
+              });
+              figma.ui.postMessage({
+                type: "show-preview-image",
+                image: base64SectionImage,
+                name: child.name
+              });
+              const sectionSerializedData = serializeNode(child);
+              figma.ui.postMessage({
+                type: "add-gemini-log",
+                data: `\u{1F50D} DADOS COLETADOS (Se\xE7\xE3o ${sectionIndex} - ${child.name}):
+${JSON.stringify(sectionSerializedData, null, 2)}`
+              });
+              const sectionAnalysis = yield generateFigmaLayoutJSON(sectionImageData, availableImageIds, sectionSerializedData);
+              figma.ui.postMessage({
+                type: "add-gemini-log",
+                data: `\u{1F916} RESPOSTA DA IA (Se\xE7\xE3o ${sectionIndex} - ${child.name}):
+${JSON.stringify(sectionAnalysis, null, 2)}`
+              });
+              if (sectionAnalysis.children) {
+                aggregatedChildren.push(...sectionAnalysis.children);
+              }
+              if (sectionAnalysis.improvements) {
+                aggregatedImprovements.push(...sectionAnalysis.improvements);
+              }
+            }
+            figma.notify("\u{1F3A8} Montando frame final otimizado...");
+            const finalAnalysis = {
+              frameName: node.name + " (Otimizado)",
+              width: node.width,
+              height: node.height,
+              background: getBackgroundFromNode(node),
+              // Extrai o background do node original
+              autoLayout: { direction: "vertical", gap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 } },
+              children: aggregatedChildren,
+              improvements: [...new Set(aggregatedImprovements)]
+              // Remove duplicatas
+            };
+            const newFrame = yield createOptimizedFrame(finalAnalysis, node, availableImages);
             figma.currentPage.selection = [newFrame];
             figma.viewport.scrollAndZoomIntoView([newFrame]);
             figma.ui.postMessage({
@@ -1719,10 +2111,10 @@ ${error.message}` });
               data: {
                 originalName: node.name,
                 newName: newFrame.name,
-                improvements: analysis.improvements || ["Estrutura otimizada com Auto-Layout"]
+                improvements: finalAnalysis.improvements
               }
             });
-            figma.notify("\u2705 Novo frame criado com sucesso!");
+            figma.notify("\u2705 Frame recriado com sucesso (An\xE1lise por se\xE7\xF5es)!");
           } catch (e) {
             console.error("Erro detalhado na an\xE1lise Gemini:", e);
             figma.notify("\u274C Erro na an\xE1lise: " + e.message);
@@ -1733,6 +2125,57 @@ ${error.message}` });
           } finally {
             figma.ui.postMessage({ type: "hide-loader" });
           }
+        } else if (msg.type === "analyze-layout-figma") {
+          const selection = figma.currentPage.selection;
+          if (selection.length !== 1) {
+            figma.notify("\u26A0\uFE0F Selecione apenas 1 frame para an\xE1lise");
+            return;
+          }
+          const node = selection[0];
+          if (node.type !== "FRAME" && node.type !== "SECTION" && node.type !== "COMPONENT") {
+            figma.notify("\u26A0\uFE0F Selecione um Frame, Section ou Componente v\xE1lido.");
+            return;
+          }
+          figma.notify("\u{1F4D0} Gerando guia de Auto Layout...");
+          figma.ui.postMessage({ type: "show-loader", text: "Gerando guia passo-a-passo..." });
+          try {
+            const availableImages = yield extractImagesFromNode(node);
+            const availableImageIds = Object.keys(availableImages);
+            const imageData = yield node.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: 1.5 } });
+            const serializedData = serializeNode(node);
+            const analysisText = yield analyzeLayoutFigma(imageData, availableImageIds, serializedData);
+            const base64Image = figma.base64Encode(imageData);
+            figma.ui.postMessage({
+              type: "show-analysis-results",
+              data: analysisText,
+              image: base64Image
+            });
+            figma.notify("\u2705 Guia gerado com sucesso!");
+          } catch (e) {
+            console.error(e);
+            figma.notify("\u274C Erro: " + e.message);
+          } finally {
+            figma.ui.postMessage({ type: "hide-loader" });
+          }
+        } else if (msg.type === "create-from-json") {
+          try {
+            const rawJson = JSON.parse(msg.data);
+            figma.notify("\u{1F3D7}\uFE0F Criando layout a partir do JSON...");
+            figma.ui.postMessage({ type: "add-gemini-log", data: "\u{1F3D7}\uFE0F Iniciando cria\xE7\xE3o do layout via JSON..." });
+            const normalizedAnalysis = normalizeFigmaJSON(rawJson);
+            figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F504} JSON Normalizado: Frame "${normalizedAnalysis.frameName}"` });
+            const newFrame = yield createOptimizedFrame(normalizedAnalysis, null);
+            figma.currentPage.selection = [newFrame];
+            figma.viewport.scrollAndZoomIntoView([newFrame]);
+            figma.notify("\u2705 Layout criado com sucesso!");
+            figma.ui.postMessage({ type: "add-gemini-log", data: "\u2705 Layout criado com sucesso!" });
+          } catch (e) {
+            figma.notify("\u274C Erro ao criar layout: " + e.message);
+            figma.ui.postMessage({ type: "add-gemini-log", data: "\u274C Erro ao criar layout: " + e.message });
+            console.error(e);
+          }
+        } else if (msg.type === "resize-ui") {
+          figma.ui.resize(msg.width, msg.height);
         }
       });
     }
