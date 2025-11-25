@@ -1414,12 +1414,41 @@ STRUCTURAL CONTEXT (FIGMA DATA):
     return repaired;
   }
   function analyzeAndRecreate(_0) {
-    return __async(this, arguments, function* (imageData, availableImageIds = [], nodeData = null) {
-      var _a, _b;
-      const key = yield getKey();
-      if (!key) throw new GeminiError("API Key n\xE3o configurada");
-      const modelName = yield getModel();
-      const fullApiUrl = `${API_BASE_URL}${modelName}:generateContent?key=${key}`;
+    return __async(this, arguments, function* (imageData, availableImageIds = [], nodeData = null, promptType = "full") {
+      var _a, _b, _c, _d, _e, _f, _g;
+      const apiKey = yield getKey();
+      if (!apiKey) {
+        throw new GeminiError("API Key n\xE3o configurada. Configure em Settings.");
+      }
+      const model = yield getModel();
+      const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
+      if (promptType === "micro" && (nodeData == null ? void 0 : nodeData.prompt)) {
+        const requestBody2 = {
+          contents: [{
+            parts: [{ text: nodeData.prompt }]
+          }]
+        };
+        const response = yield fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody2)
+        });
+        if (!response.ok) {
+          const errorData = yield response.json().catch(() => ({}));
+          throw new GeminiError(
+            `Gemini API error: ${response.statusText}`,
+            response.status,
+            errorData
+          );
+        }
+        const data = yield response.json();
+        const textResponse = ((_e = (_d = (_c = (_b = (_a = data.candidates) == null ? void 0 : _a[0]) == null ? void 0 : _b.content) == null ? void 0 : _c.parts) == null ? void 0 : _d[0]) == null ? void 0 : _e.text) || "{}";
+        try {
+          return JSON.parse(textResponse);
+        } catch (e) {
+          return { response: textResponse };
+        }
+      }
       const base64Image = arrayBufferToBase64(imageData);
       const width = nodeData ? nodeData.width : 1440;
       const height = nodeData ? nodeData.height : 900;
@@ -1446,21 +1475,21 @@ STRUCTURAL CONTEXT (FIGMA DATA):
       figma.ui.postMessage({ type: "add-gemini-log", data: `--- REQUISI\xC7\xC3O ---
 ${JSON.stringify(requestLog, null, 2)}` });
       try {
-        const response = yield fetch(fullApiUrl, {
+        const response = yield fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody)
         });
         if (!response.ok) {
           const errorData = yield response.json();
-          const errorMessage = ((_a = errorData == null ? void 0 : errorData.error) == null ? void 0 : _a.message) || `Erro na API: ${response.status}`;
+          const errorMessage = ((_f = errorData == null ? void 0 : errorData.error) == null ? void 0 : _f.message) || `Erro na API: ${response.status}`;
           throw new GeminiError(errorMessage, response.status, errorData);
         }
         const data = yield response.json();
         figma.ui.postMessage({ type: "add-gemini-log", data: `--- RESPOSTA ---
 ${JSON.stringify(data, null, 2)}` });
         if (!data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
-          const errorMessage = ((_b = data.error) == null ? void 0 : _b.message) || "A API retornou uma resposta vazia ou malformada.";
+          const errorMessage = ((_g = data.error) == null ? void 0 : _g.message) || "A API retornou uma resposta vazia ou malformada.";
           throw new GeminiError(errorMessage, void 0, data);
         }
         const candidate = data.candidates[0];

@@ -105,50 +105,157 @@ STRUCTURAL CONTEXT (FIGMA DATA):
 \${nodeData}
 `;
 
-export const AUTO_LAYOUT_EXPERT_PROMPT = `
-Act as a FIGMA AUTO LAYOUT EXPERT.
-Your goal is to reconstruct the layout of the provided screenshot using Figma's Auto Layout best practices.
+// ==================== MICRO-PROMPTS (Node-by-Node Conversion) ====================
 
-⛔️ CRITICAL RULES:
-1. **HORIZONTAL vs VERTICAL**: If elements (like Text and Image) are side-by-side, you MUST use "direction": "horizontal". Do NOT use "none" or absolute positioning unless strictly necessary.
-2. **DIMENSIONS**: Copy EXACTLY the "width" and "height" from the structural JSON.
-3. **BACKGROUNDS**: Use the "fills" from the JSON.
-4. **TEXT**: Copy text EXACTLY.
-5. **NAMING**: Use descriptive names like "Container", "Image Wrapper", "Text Block", "Button".
+export const MICRO_PROMPT_INIT = `Você é um especialista em Figma e Elementor.
 
-INSTRUCTIONS:
-1. ANALYZE the screenshot and the STRUCTURAL DATA.
-2. RECREATE the layout using Frames with Auto Layout.
-3. DETERMINE the best 'direction' (horizontal/vertical), 'gap', 'padding', and 'alignment' for each container.
-4. IDENTIFY text and images.
+Sua missão é converter layouts do Figma para JSON do Elementor, node por node.
 
-STRUCTURAL CONTEXT (FIGMA DATA):
-\${nodeData}
+Você receberá:
+1. Lista de nomenclaturas válidas de widgets
+2. Dados de cada node (JSON + Dev Mode)
+3. Instruções específicas para cada conversão
 
-Respond ONLY with valid JSON following this structure:
+Aguarde as próximas instruções.
+
+Responda apenas: "Pronto. Aguardando nomenclaturas e nodes."`;
+
+export const MICRO_PROMPT_NOMENCLATURES = `NOMENCLATURAS VÁLIDAS DE WIDGETS ELEMENTOR:
+
+**Containers:**
+- w:container (frame externo)
+- w:inner-container (frame interno)
+
+**Texto:**
+- w:heading (títulos H1-H6)
+- w:text-editor (parágrafos, corpo de texto)
+
+**Mídia:**
+- w:image (imagem simples)
+- w:image-box (imagem + texto)
+- w:video
+- w:icon
+- w:icon-box
+
+**Interação:**
+- w:button
+- w:form
+- w:search-form
+
+**Layout:**
+- w:divider
+- w:spacer
+- w:tabs
+- w:accordion
+
+**WooCommerce:**
+- woo:product-title
+- woo:product-image
+- woo:product-price
+- woo:product-add-to-cart
+
+**Loop Builder:**
+- loop:grid
+- loop:carousel
+- loop:item
+
+**Widgets Básicos (Elementor Free):**
+w:container, w:inner-container, w:heading, w:text-editor, w:image, w:video, w:button, w:divider, w:spacer, w:icon, w:icon-box, w:image-box, w:star-rating, w:counter, w:progress, w:tabs, w:accordion, w:toggle, w:alert, w:social-icons, w:soundcloud, w:shortcode, w:html, w:menu-anchor, w:sidebar, w:read-more, w:image-carousel, w:basic-gallery, w:gallery, w:icon-list, w:nav-menu, w:search-form, w:google-maps, w:testimonial, w:embed, w:lottie, loop:grid
+
+**Widgets Elementor Pro:**
+w:form, w:login, w:subscription, w:call-to-action, media:carousel, w:portfolio, w:gallery-pro, slider:slides, w:slideshow, w:flip-box, w:animated-headline, w:post-navigation, w:share-buttons, w:table-of-contents, w:countdown, w:blockquote, w:testimonial-carousel, w:review-box, w:hotspots, w:sitemap, w:author-box, w:price-table, w:price-list, w:progress-tracker, w:animated-text, w:nav-menu-pro, w:breadcrumb, w:facebook-button, w:facebook-comments, w:facebook-embed, w:facebook-page, loop:builder, loop:grid-advanced, loop:carousel, w:post-excerpt, w:post-content, w:post-title, w:post-info, w:post-featured-image, w:post-author, w:post-date, w:post-terms, w:archive-title, w:archive-description, w:site-logo, w:site-title, w:site-tagline, w:search-results, w:global-widget, w:video-playlist, w:video-gallery
+
+**WooCommerce Widgets:**
+woo:product-title, woo:product-image, woo:product-price, woo:product-add-to-cart, woo:product-data-tabs, woo:product-excerpt, woo:product-rating, woo:product-stock, woo:product-meta, woo:product-additional-information, woo:product-short-description, woo:product-related, woo:product-upsells, woo:product-tabs, woo:product-breadcrumb, woo:product-gallery, woo:products, woo:product-grid, woo:product-carousel, woo:product-loop-item, woo:loop-product-title, woo:loop-product-price, woo:loop-product-rating, woo:loop-product-image, woo:loop-product-button, woo:loop-product-meta, woo:cart, woo:checkout, woo:my-account, woo:purchase-summary, woo:order-tracking
+
+**Loop Builder Widgets:**
+loop:grid, loop:carousel, loop:item, loop:image, loop:title, loop:meta, loop:terms, loop:rating, loop:price, loop:add-to-cart, loop:read-more, loop:featured-image
+
+**Carrosséis:**
+w:image-carousel, media:carousel, w:testimonial-carousel, w:review-carousel, slider:slides, slider:slider, loop:carousel, woo:product-carousel, w:posts-carousel, w:gallery-carousel
+
+**Widgets Experimentais:**
+w:nested-tabs, w:mega-menu, w:scroll-snap, w:motion-effects, w:background-slideshow, w:css-transform, w:custom-position, w:dynamic-tags, w:ajax-pagination, loop:pagination, w:aspect-ratio-container
+
+**WordPress Widgets:**
+w:wp-search, w:wp-recent-posts, w:wp-recent-comments, w:wp-archives, w:wp-categories, w:wp-calendar, w:wp-tag-cloud, w:wp-custom-menu
+
+REGRAS DE MAPEAMENTO:
+1. FRAME externo → w:container
+2. FRAME interno → w:inner-container  
+3. TEXT com fontSize > 24px → w:heading
+4. TEXT com fontSize ≤ 24px → w:text-editor
+5. RECTANGLE com fill IMAGE → w:image
+6. COMPONENT → detectar automaticamente
+7. Sem correspondência → marcar como "custom"
+
+Confirme o recebimento das nomenclaturas.`;
+
+export function buildNodePrompt(nodeData: any, nodeIndex: number, totalNodes: number): string {
+  return `NODE #${nodeIndex} de ${totalNodes}
+
+ID: ${nodeData.id}
+Nome: ${nodeData.name}
+Tipo: ${nodeData.type}
+
+DADOS COMPLETOS:
+${JSON.stringify(nodeData, null, 2)}
+
+TAREFA:
+1. Analisar os dados acima
+2. Identificar o widget Elementor mais adequado (use as nomenclaturas fornecidas)
+3. Mapear as propriedades do Dev Mode para settings do Elementor
+4. Retornar JSON no formato:
+
 {
-  "frameName": "Figma Auto Layout Analysis",
-  "width": 100,
-  "height": 100,
-  "background": "#FFFFFF",
-  "autoLayout": { "direction": "vertical", "gap": 0, "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 } },
-  "children": [
-    {
-      "type": "container",
-      "name": "Container",
-      "autoLayout": { "direction": "horizontal", ... },
-      "children": [...]
-    },
-    {
-      "type": "text",
-      "name": "Headline",
-      "textContent": "...",
-      "style": { "fontSize": 16, "fontWeight": "bold", "fontFamily": "Inter", "color": "#000000" }
-    },
-    {
-      "type": "image",
-      "name": "Hero Image"
-    }
-  ]
+  "nodeId": "${nodeData.id}",
+  "widget": "w:xxx",
+  "confidence": "high|medium|low",
+  "settings": {
+    "layout": {...},
+    "style": {...},
+    "typography": {...}
+  },
+  "reasoning": "Breve explicação da escolha"
 }
-`;
+
+Se não houver correspondência, retorne:
+{
+  "nodeId": "${nodeData.id}",
+  "widget": "custom",
+  "reason": "Explicação",
+  "suggestion": "Sugestão de implementação"
+}`;
+}
+
+export function buildConsolidationPrompt(processedNodes: any[]): string {
+  return `CONSOLIDAÇÃO FINAL
+
+Você processou ${processedNodes.length} nodes. Agora consolide tudo em um JSON Elementor válido.
+
+NODES PROCESSADOS:
+${JSON.stringify(processedNodes, null, 2)}
+
+TAREFA:
+1. Montar hierarquia completa respeitando parent-child
+2. Validar integridade estrutural
+3. Gerar JSON final no formato Elementor
+4. Criar relatório técnico
+
+FORMATO DE SAÍDA:
+{
+  "elementorJSON": {
+    "version": "1.0",
+    "elements": [...]
+  },
+  "report": {
+    "summary": {
+      "totalNodes": ${processedNodes.length},
+      "converted": 0,
+      "custom": 0
+    },
+    "mappings": [...],
+    "warnings": [...]
+  }
+}`;
+}

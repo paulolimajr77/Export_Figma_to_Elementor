@@ -123,15 +123,57 @@ function repairJson(jsonString: string): string {
     return repaired;
 }
 
-export async function analyzeAndRecreate(imageData: Uint8Array, availableImageIds: string[] = [], nodeData: any = null): Promise<LayoutAnalysis> {
-    const key = await getKey();
-    if (!key) throw new GeminiError('API Key não configurada');
+export async function analyzeAndRecreate(
+    imageData: Uint8Array,
+    availableImageIds: string[] = [],
+    nodeData: any = null,
+    promptType: 'full' | 'micro' = 'full'
+): Promise<LayoutAnalysis> {
+    const apiKey = await getKey();
+    if (!apiKey) {
+        throw new GeminiError('API Key não configurada. Configure em Settings.');
+    }
 
-    const modelName = await getModel();
-    const fullApiUrl = `${API_BASE_URL}${modelName}:generateContent?key=${key}`;
+    const model = await getModel();
+    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
 
+    // Para micro-prompts, usar apenas texto
+    if (promptType === 'micro' && nodeData?.prompt) {
+        const requestBody = {
+            contents: [{
+                parts: [{ text: nodeData.prompt }]
+            }]
+        };
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new GeminiError(
+                `Gemini API error: ${response.statusText}`,
+                response.status,
+                errorData
+            );
+        }
+
+        const data = await response.json();
+        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+
+        try {
+            return JSON.parse(textResponse);
+        } catch {
+            return { response: textResponse } as any;
+        }
+    }
+
+    // Converte imagem para base64
     const base64Image = arrayBufferToBase64(imageData);
 
+    // Monta o prompt com os dados do node
     const width = nodeData ? nodeData.width : 1440;
     const height = nodeData ? nodeData.height : 900;
     const halfHeight = nodeData ? Math.round(nodeData.height / 2) : 500;
@@ -171,7 +213,7 @@ export async function analyzeAndRecreate(imageData: Uint8Array, availableImageId
     figma.ui.postMessage({ type: 'add-gemini-log', data: `--- REQUISIÇÃO ---\n${JSON.stringify(requestLog, null, 2)}` });
 
     try {
-        const response = await fetch(fullApiUrl, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
