@@ -77,28 +77,11 @@ async function createChildNode(parent: FrameNode, spec: ChildNode, availableImag
         const container = figma.createFrame();
         container.name = spec.name;
 
-        // Aplica dimensões se disponíveis
-        if (spec.width && spec.height) {
-            container.resize(spec.width, spec.height);
-        }
+        // Apply common properties first (dimensions, fills, etc.)
+        applyCommonProperties(container, spec);
 
         if (spec.autoLayout) {
             applyAutoLayoutToFrame(container, spec.autoLayout);
-        }
-
-        // Prioridade para fills
-        if (spec.fills) {
-            try {
-                container.fills = spec.fills;
-            } catch (e) {
-                console.error('Error applying container fills:', e);
-            }
-        } else if (spec.background) {
-            container.fills = [{ type: 'SOLID', color: hexToRgb(spec.background) }];
-        }
-
-        if (spec.cornerRadius) {
-            container.cornerRadius = spec.cornerRadius;
         }
 
         if (spec.children) {
@@ -115,6 +98,7 @@ async function createChildNode(parent: FrameNode, spec: ChildNode, availableImag
 
     const fallback = figma.createFrame();
     fallback.name = spec.name || 'Unknown Node';
+    applyCommonProperties(fallback, spec);
     parent.appendChild(fallback);
     return fallback;
 }
@@ -136,10 +120,6 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
 
     let node: SceneNode;
 
-    // Aplica dimensões se fornecidas (exceto para texto que tem lógica própria)
-    // Nota: Para aplicar resize, o node precisa ser criado primeiro.
-    // A lógica abaixo foi ajustada para criar o node dentro do switch e depois aplicar resize se necessário.
-
     switch (spec.widgetType) {
         case 'heading':
         case 'text':
@@ -149,15 +129,10 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             text.name = spec.name || 'Texto';
             text.characters = spec.content || spec.characters || 'Texto';
 
+            // Text specific styles
             if (spec.fontSize) text.fontSize = spec.fontSize;
-            if (spec.color) text.fills = [{ type: 'SOLID', color: hexToRgb(spec.color) }];
 
-            // Prioridade para fills do JSON (ex: cor de texto)
-            if (spec.fills) {
-                try { text.fills = spec.fills; } catch (e) { }
-            }
-
-            // Aplica fonte personalizada
+            // Font family application
             if (spec.fontFamily) {
                 const weight = spec.fontWeight || "Regular";
                 try {
@@ -167,13 +142,16 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
                 }
             }
 
-            // Configuração de auto-resize para texto
+            // Text auto-resize logic
             if (spec.width) {
                 text.resize(spec.width, text.height);
                 text.textAutoResize = 'HEIGHT';
             } else {
                 text.textAutoResize = 'WIDTH_AND_HEIGHT';
             }
+
+            // Apply common properties (fills, etc.) - Text supports fills
+            applyCommonProperties(text, spec, { skipResize: true });
             break;
 
         case 'button':
@@ -181,9 +159,7 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             node = button;
             button.name = spec.name || 'Botão';
 
-            // Estilo do botão
-            if (spec.background) button.fills = [{ type: 'SOLID', color: hexToRgb(spec.background) }];
-            button.cornerRadius = 8;
+            // Button specific layout defaults
             button.primaryAxisSizingMode = 'AUTO';
             button.counterAxisSizingMode = 'AUTO';
             button.layoutMode = 'HORIZONTAL';
@@ -191,17 +167,19 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             button.paddingRight = 24;
             button.paddingTop = 12;
             button.paddingBottom = 12;
+            button.cornerRadius = 8;
 
-            // Texto do botão
+            // Button text
             const btnText = figma.createText();
             btnText.characters = spec.content || 'Botão';
             btnText.fontSize = 16;
             if (spec.color) btnText.fills = [{ type: 'SOLID', color: hexToRgb(spec.color) }];
             button.appendChild(btnText);
 
-            // Se houver largura fixa para o botão
+            applyCommonProperties(button, spec);
+
+            // Override sizing mode if fixed size was applied
             if (spec.width && spec.height) {
-                button.resize(spec.width, spec.height);
                 button.primaryAxisSizingMode = 'FIXED';
                 button.counterAxisSizingMode = 'FIXED';
             }
@@ -212,18 +190,20 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             const rect = figma.createRectangle();
             node = rect;
             rect.name = spec.name || 'Imagem';
-            if (spec.width && spec.height) {
-                rect.resize(spec.width, spec.height);
-            } else {
-                rect.resize(100, 100); // Tamanho padrão se não houver dimensões
+
+            // Default size if missing
+            if (!spec.width || !spec.height) {
+                rect.resize(100, 100);
             }
 
-            // Tenta reutilizar a imagem se o ID corresponder
+            applyCommonProperties(rect, spec);
+
+            // Image specific fill logic (overrides solid fill from common props if image exists)
             if (spec.content && availableImages[spec.content]) {
                 const image = figma.createImage(availableImages[spec.content]);
                 rect.fills = [{ type: 'IMAGE', scaleMode: 'FILL', imageHash: image.hash }];
-            } else {
-                // Placeholder cinza se não encontrar imagem
+            } else if (!spec.fills && !spec.background) {
+                // Placeholder only if no other fill applied
                 rect.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
             }
             break;
@@ -232,21 +212,46 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             const fallbackWidget = figma.createFrame();
             node = fallbackWidget;
             fallbackWidget.name = spec.name || 'Widget';
-            if (spec.width && spec.height) fallbackWidget.resize(spec.width, spec.height);
+            applyCommonProperties(fallbackWidget, spec);
             break;
     }
 
-    // Força o redimensionamento se as dimensões foram fornecidas e não é texto (que tem lógica própria)
-    if (spec.width && spec.height && node.type !== 'TEXT') {
+    parent.appendChild(node);
+    return node;
+}
+
+function applyCommonProperties(node: SceneNode, spec: ChildNode, options: { skipResize?: boolean } = {}) {
+    // Dimensions
+    if (!options.skipResize && spec.width && spec.height) {
         try {
-            node.resize(spec.width, spec.height);
+            if ('resize' in node) {
+                node.resize(spec.width, spec.height);
+            }
         } catch (e) {
             console.warn('Falha ao redimensionar node:', e);
         }
     }
 
-    parent.appendChild(node);
-    return node;
+    // Fills
+    if ('fills' in node) {
+        if (spec.fills) {
+            try {
+                node.fills = spec.fills;
+            } catch (e) { }
+        } else if (spec.background) {
+            node.fills = [{ type: 'SOLID', color: hexToRgb(spec.background) }];
+        } else if (spec.color && node.type === 'TEXT') {
+            // Text color fallback
+            node.fills = [{ type: 'SOLID', color: hexToRgb(spec.color) }];
+        }
+    }
+
+    // Corner Radius
+    if ('cornerRadius' in node && spec.cornerRadius) {
+        if (node.type !== 'ELLIPSE') {
+            (node as any).cornerRadius = spec.cornerRadius;
+        }
+    }
 }
 
 function applyAutoLayoutToFrame(frame: FrameNode, config: AutoLayoutConfig) {
