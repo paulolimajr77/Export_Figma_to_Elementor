@@ -297,3 +297,15 @@ src/
 4. ✅ **Código Mais Limpo**: A lógica de comunicação com a API e a de construção de frames foram separadas em seus próprios módulos (`api_gemini.ts` e `gemini_frame_builder.ts`), melhorando a organização e a manutenibilidade do código.
 
 **Impacto:** A funcionalidade de IA está mais poderosa, estável e flexível, dando ao usuário controle sobre o modelo a ser utilizado e garantindo que a conexão funcione de forma consistente.
+
+---
+
+### **FASE 8: Otimização da Geração de Layouts com IA e Reutilização de Assets** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Reutilização Inteligente de Imagens**: O plugin agora extrai as imagens do frame original antes de enviar para análise e as reutiliza na criação do novo layout, garantindo fidelidade visual total e eliminando placeholders cinzas.
+2. ✅ **Nomenclatura Elementor (`w:tag`)**: A IA foi instruída a nomear as camadas seguindo o padrão de widgets do Elementor (ex: `w:heading`, `w:image`, `w:container`), facilitando a exportação posterior para o WordPress.
+3. ✅ **Prompt Otimizado**: O prompt enviado ao Gemini foi refinado para exigir extração exata de textos, estimativa precisa de dimensões e estrutura JSON rigorosa, resultando em layouts muito mais fiéis.
+4. ✅ **Correções de UI**: Corrigidos problemas de navegação entre abas e botões de ação ("Salvar API Key", "Testar Conexão") que não respondiam, garantindo uma experiência de uso fluida.
+
+**Impacto:** A geração de layouts com IA agora produz resultados visualmente ricos e estruturalmente prontos para exportação, com imagens reais e nomes de camadas compatíveis com o fluxo de trabalho do Elementor.

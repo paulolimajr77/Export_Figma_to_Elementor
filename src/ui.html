@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -437,11 +437,11 @@
 
     <!-- NAVEGAÇÃO -->
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('export', event)">Gerar JSON</button>
-        <button class="tab-btn" onclick="openTab('gemini', event)">IA Gemini</button>
-        <button class="tab-btn" onclick="openTab('preview', event)">Preview</button>
-        <button class="tab-btn" onclick="openTab('wp', event)">Config WP</button>
-        <button class="tab-btn" onclick="openTab('help', event)">Ajuda</button>
+        <button class="tab-btn active" data-tab="export">Gerar JSON</button>
+        <button class="tab-btn" data-tab="gemini">IA Gemini</button>
+        <button class="tab-btn" data-tab="preview">Preview</button>
+        <button class="tab-btn" data-tab="wp">Config WP</button>
+        <button class="tab-btn" data-tab="help">Ajuda</button>
     </div>
 
     <!-- ABA 1: EXPORTAÇÃO -->
@@ -480,7 +480,6 @@
                     style="width:auto;">Recarregar</button>
             </div>
         </div>
-        <div id="tab-wp" class="content"></div>
         <div id="preview-wrapper">
             <div id="preview-container">
                 <div
@@ -514,11 +513,10 @@
         </div>
 
         <div class="form-group">
-            <label for="gemini-model-select">🤖 Modelo Gemini</label>
-            <select id="gemini-model-select">
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Rápido e Econômico)</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado e Poderoso)</option>
-            </select>
+            <label>🤖 Modelo Gemini</label>
+            <p style="font-size: 11px; color: #666; margin: 4px 0;">
+                Usando o modelo: <strong>gemini-2.5-flash</strong>
+            </p>
         </div>
 
         <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
@@ -539,6 +537,12 @@
             <div id="gemini-improvements"
                 style="background: var(--code-bg); padding: 12px; border-radius: 4px; font-size: 11px; line-height: 1.6;">
             </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 20px;">
+            <label>📜 Log de Requisição/Resposta da IA</label>
+            <textarea id="gemini-log-area" readonly
+                style="height: 150px; font-family: monospace; font-size: 10px; background-color: var(--code-bg); resize: vertical; white-space: pre-wrap;"></textarea>
         </div>
     </div>
 
@@ -597,6 +601,24 @@
     </div>
 
     <script>
+        function showLoader(text = 'Processando...') {
+            const loader = document.getElementById('loader');
+            const loaderText = document.getElementById('loader-text');
+            if (loader) loader.style.display = 'flex';
+            if (loaderText) loaderText.textContent = text;
+            // Desabilita botões para evitar cliques duplos
+            document.getElementById('btn-analyze-gemini').disabled = true;
+            document.getElementById('btn-export').disabled = true;
+        }
+
+        function hideLoader() {
+            const loader = document.getElementById('loader');
+            if (loader) loader.style.display = 'none';
+            // Reabilita botões
+            document.getElementById('btn-analyze-gemini').disabled = false;
+            document.getElementById('btn-export').disabled = false;
+        }
+
         // --- DADOS HIERÁRQUICOS DA ABA AJUDA ---
         const widgetCategories = [
             {
@@ -796,14 +818,22 @@
             }
         ];
 
-        // --- LOG DE INTERFACE ---
+        // --- LOG DE INTERFACE --- 
         function addLog(msg, type = 'info') {
             const area = document.getElementById('log-area');
             area.value += `[${type.toUpperCase()}] ${msg}\n`;
             area.scrollTop = area.scrollHeight;
         }
 
-        // --- NAVEGAÇÃO ENTRE ABAS ---
+        function addGeminiLog(msg) {
+            const area = document.getElementById('gemini-log-area');
+            if (area) {
+                area.value += `${msg}\n`;
+                area.scrollTop = area.scrollHeight;
+            }
+        }
+
+        // --- NAVEGAÇÃO ENTRE ABAS --- 
         function openTab(tabName, evt) {
             const contents = document.querySelectorAll('.content');
             contents.forEach(c => c.classList.remove('active'));
@@ -851,13 +881,7 @@
             const newHeight = e.clientY;
 
             if (newWidth > 300 && newHeight > 400) {
-                parent.postMessage({
-                    pluginMessage: {
-                        type: 'resize-ui',
-                        width: newWidth,
-                        height: newHeight
-                    }
-                }, '*');
+                parent.postMessage({ pluginMessage: { type: 'resize-ui', width: newWidth, height: newHeight } }, '*');
             }
         });
 
@@ -865,7 +889,7 @@
             isResizing = false;
         });
 
-        // --- HELP TREE RENDERER ---
+        // --- HELP TREE RENDERER --- 
         function renderHelpTree(filterText = '') {
             const container = document.getElementById('widgets-container');
             if (!container) return;
@@ -919,12 +943,16 @@
         }
 
         // ==================== EVENTOS GEMINI E BUSCA DE WIDGETS ====================
+        document.getElementById('btn-analyze-gemini').addEventListener('click', () => {
+            document.getElementById('gemini-log-area').value = ''; // Limpa o log
+            // Mostra o loader imediatamente na UI para feedback instantâneo
+            showLoader('Preparando para análise...');
+            document.getElementById('gemini-results').style.display = 'none';
+            parent.postMessage({ pluginMessage: { type: 'analyze-with-gemini' } }, '*');
+        });
+
         document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
-            const key = document.getElementById('gemini-api-key').value.trim();
-            if (!key) {
-                alert('⚠️ Digite uma API Key válida');
-                return;
-            }
+            const key = document.getElementById('gemini-api-key').value;
             parent.postMessage({ pluginMessage: { type: 'save-gemini-key', key } }, '*');
         });
 
@@ -932,22 +960,17 @@
             parent.postMessage({ pluginMessage: { type: 'test-gemini-connection' } }, '*');
         });
 
-        document.getElementById('btn-analyze-gemini').addEventListener('click', () => {
-            document.getElementById('gemini-results').style.display = 'none';
-            parent.postMessage({ pluginMessage: { type: 'analyze-with-gemini' } }, '*');
-        });
-
         document.getElementById('search-widgets').addEventListener('input', (e) => {
             renderHelpTree(e.target.value);
         });
 
-        // --- EXPORT TRIGGER ---
+        // --- EXPORT TRIGGER --- 
         function triggerExport() {
             const q = parseFloat(document.getElementById('quality').value);
             parent.postMessage({ pluginMessage: { type: 'export-elementor', quality: q } }, '*');
         }
 
-        // --- PREVIEW ENGINE ---
+        // --- PREVIEW ENGINE --- 
         document.getElementById('zoom-select').addEventListener('change', (e) => {
             const scale = parseFloat(e.target.value);
             const pc = document.getElementById('preview-container');
@@ -983,7 +1006,7 @@
             return val;
         }
 
-        // --- APPLY STYLES (com extras de logging / tratamento robusto) ---
+        // --- APPLY STYLES (com extras de logging / tratamento robusto) --- 
         function applyStyles(dom, s) {
             if (!s || !dom) return;
 
@@ -1131,7 +1154,7 @@
             return dom;
         }
 
-        // --- EVENTOS DE BOTÕES PRINCIPAIS ---
+        // --- EVENTOS DE BOTÕES PRINCIPAIS --- 
         document.getElementById('btn-export').onclick = () => {
             triggerExport();
         };
@@ -1163,7 +1186,7 @@
             window.open(e.currentTarget.href, '_blank');
         };
 
-        // --- CRIAÇÃO AUTOMÁTICA DE MENUS NO WP ---
+        // --- CRIAÇÃO AUTOMÁTICA DE MENUS NO WP --- 
         async function createMenusAutomatically(navMenus, wpUrl, wpUser, wpPass) {
             const wpUrlClean = wpUrl.replace(/\/$/, "");
 
@@ -1208,7 +1231,7 @@
             }
         }
 
-        // --- HANDLER DE MENSAGENS DO FIGMA ---
+        // --- HANDLER DE MENSAGENS DO FIGMA --- 
         window.onmessage = (event) => {
             const msg = event.data.pluginMessage;
             if (!msg) return;
@@ -1349,29 +1372,32 @@
                 if (msg.apiKey) {
                     document.getElementById('gemini-api-key').value = msg.apiKey;
                 }
-                if (msg.model) {
-                    document.getElementById('gemini-model-select').value = msg.model;
-                }
-                 addLog("Configurações do Gemini carregadas.", 'success');
+                // Não há mais seleção de modelo, então esta parte é removida
+                addLog("Configurações do Gemini carregadas.", 'success');
+            }
+            else if (msg.type === 'show-loader') {
+                showLoader(msg.text);
+            }
+            else if (msg.type === 'hide-loader') {
+                hideLoader();
+            }
+            else if (msg.type === 'add-gemini-log') {
+                addGeminiLog(msg.data);
             }
         };
 
-        // --- INICIALIZAÇÃO ---
+        // --- INICIALIZAÇÃO --- 
         // Solicita as configurações salvas quando a UI é carregada
         parent.postMessage({ pluginMessage: { type: 'get-wp-config' } }, '*');
         parent.postMessage({ pluginMessage: { type: 'get-gemini-config' } }, '*');
         renderHelpTree();
 
-        // --- LÓGICA DO GEMINI MODEL SELECT ---
-        const geminiModelSelect = document.getElementById('gemini-model-select');
-        geminiModelSelect.addEventListener('change', () => {
-            parent.postMessage({ 
-                pluginMessage: { 
-                    type: 'save-gemini-model', 
-                    model: geminiModelSelect.value 
-                } 
-            }, '*');
-             addLog(`Modelo Gemini alterado para: ${geminiModelSelect.options[geminiModelSelect.selectedIndex].text}`, 'info');
+        // Setup tab navigation
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tabName = btn.getAttribute('data-tab');
+                openTab(tabName, e);
+            });
         });
     </script>
 </body>

@@ -13,6 +13,34 @@ function hasLayout(node: SceneNode): node is FrameNode | ComponentNode | Instanc
     return 'layoutMode' in node;
 }
 
+// -------------------- Helper Functions --------------------
+async function extractImagesFromNode(node: SceneNode): Promise<Record<string, Uint8Array>> {
+    const images: Record<string, Uint8Array> = {};
+
+    async function traverse(n: SceneNode) {
+        if ('fills' in n && Array.isArray(n.fills)) {
+            for (const fill of n.fills) {
+                if (fill.type === 'IMAGE' && fill.imageHash) {
+                    const image = figma.getImageByHash(fill.imageHash);
+                    if (image) {
+                        const bytes = await image.getBytesAsync();
+                        // Usa o hash da imagem como ID para reutilização
+                        images[fill.imageHash] = bytes;
+                    }
+                }
+            }
+        }
+        if ('children' in n) {
+            for (const child of n.children) {
+                await traverse(child);
+            }
+        }
+    }
+
+    await traverse(node);
+    return images;
+}
+
 // -------------------- Main Execution --------------------
 figma.showUI(__html__, { width: 600, height: 600 });
 
@@ -88,7 +116,7 @@ figma.ui.onmessage = async (msg) => {
         compiler.setWPConfig(msg.config);
         figma.notify('Configurações salvas.');
     }
-    
+
     else if (msg.type === 'get-wp-config') {
         const config = await figma.clientStorage.getAsync('wp_config');
         if (config) {
@@ -122,7 +150,12 @@ figma.ui.onmessage = async (msg) => {
         }));
         figma.ui.postMessage({ type: 'debug-result', data: JSON.stringify(debug, null, 2) });
     }
-    
+
+    // Redimensionar a UI
+    else if (msg.type === 'resize-ui') {
+        figma.ui.resize(msg.width, msg.height);
+    }
+
     // =================================================================
     // ----- NOVA LÓGICA DO GEMINI USANDO A SDK -----------------------
     // =================================================================
@@ -150,12 +183,12 @@ figma.ui.onmessage = async (msg) => {
     else if (msg.type === 'test-gemini-connection') {
         figma.notify('Testando conexão com a API Gemini...');
         try {
-            const result = await Gemini.testConnection(); 
-            
+            const result = await Gemini.testConnection();
+
             figma.ui.postMessage({
                 type: 'gemini-connection-result',
                 success: result.success,
-                message: result.message 
+                message: result.message
             });
 
             if (result.success) {
@@ -182,16 +215,23 @@ figma.ui.onmessage = async (msg) => {
         }
 
         const node = selection[0];
-        figma.notify('🤖 Analisando layout com a IA...');
+
+        // Mostra o loader e informa o usuário
+        figma.notify('🤖 Analisando layout com IA...');
 
         try {
             const imageData = await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 1.5 } });
-            
-            const analysis = await Gemini.analyzeAndRecreate(imageData);
+
+            // Extrai imagens existentes para reutilização
+            const availableImages = await extractImagesFromNode(node);
+            const availableImageIds = Object.keys(availableImages);
+            console.log(`Imagens extraídas: ${availableImageIds.length}`);
+
+            const analysis = await Gemini.analyzeAndRecreate(imageData, availableImageIds);
 
             figma.notify('🎨 Criando novo frame otimizado...');
 
-            const newFrame = await createOptimizedFrame(analysis, node);
+            const newFrame = await createOptimizedFrame(analysis, node, availableImages);
 
             figma.currentPage.selection = [newFrame];
             figma.viewport.scrollAndZoomIntoView([newFrame]);
@@ -213,6 +253,9 @@ figma.ui.onmessage = async (msg) => {
                 type: 'gemini-error',
                 error: e.message
             });
+        } finally {
+            // Garante que o loader seja escondido no final, mesmo se houver erro
+            figma.ui.postMessage({ type: 'hide-loader' });
         }
     }
 };
