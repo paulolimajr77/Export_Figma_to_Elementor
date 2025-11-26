@@ -324,6 +324,122 @@ function arrayBufferToBase64(buffer: Uint8Array): string {
 }
 
 
+// ==================== Fase 4: Consolidação ====================
+
+export async function consolidateNodes(processedNodes: ProcessedNode[]): Promise<ConsolidationResult> {
+    const apiKey = await getKey();
+    if (!apiKey) throw new GeminiError('API Key não configurada.');
+
+    const model = await getModel();
+    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
+
+    const prompt = buildConsolidationPrompt(processedNodes);
+
+    const requestBody = {
+        contents: [{
+            parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+            temperature: 0.2, // Baixa temperatura para maior precisão estrutural
+            maxOutputTokens: 8192,
+            response_mime_type: "application/json",
+        }
+    };
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new GeminiError(`Erro na consolidação: ${response.status}`, response.status, errorData);
+        }
+
+        const data = await response.json();
+        const candidate = data.candidates?.[0];
+
+        if (!candidate?.content?.parts?.[0]?.text) {
+            throw new GeminiError("Resposta vazia da consolidação.");
+        }
+
+        const responseText = candidate.content.parts[0].text;
+
+        // Extrair JSON da resposta (pode vir envolto em markdown)
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new GeminiError("JSON não encontrado na resposta de consolidação.");
+
+        return JSON.parse(jsonMatch[0]);
+
+    } catch (error: any) {
+        console.error('Erro na consolidação:', error);
+        throw new GeminiError(`Falha na consolidação: ${error.message}`);
+    }
+}
+
+function buildConsolidationPrompt(nodes: ProcessedNode[]): string {
+    return `
+CONSOLIDAÇÃO FINAL - ELEMENTOR JSON
+
+Você recebeu ${nodes.length} nodes processados individualmente.
+Sua tarefa é montar a hierarquia final e gerar um JSON válido para importação no Elementor.
+
+NODES PROCESSADOS:
+${JSON.stringify(nodes, null, 2)}
+
+TAREFA:
+1. Reconstrur a árvore hierárquica baseada nos parentIds e childrenIds.
+2. Validar se todos os widgets são válidos (w:container, w:heading, etc).
+3. Converter propriedades de estilo para o formato final do Elementor.
+4. Gerar relatório técnico.
+
+FORMATO DE SAÍDA (JSON):
+{
+  "elementorJSON": {
+    "version": "0.4",
+    "title": "Figma Import",
+    "type": "page",
+    "content": [
+      // Array de elementos raiz (Containers principais)
+      // Cada elemento deve ter "id", "elType" ("section", "column", "widget"), "settings", "elements"
+    ]
+  },
+  "report": {
+    "summary": {
+      "totalNodes": ${nodes.length},
+      "converted": 0, // Preencher
+      "custom": 0,    // Preencher
+      "warnings": 0   // Preencher
+    },
+    "mappings": [
+      { "nodeId": "...", "widget": "...", "status": "success|warning" }
+    ],
+    "warnings": [
+      "Aviso 1...",
+      "Aviso 2..."
+    ]
+  }
+}
+
+REGRAS CRÍTICAS:
+- O JSON deve seguir estritamente a estrutura do Elementor (sections > columns > widgets) OU Containers (preferencial).
+- Se um node for "w:container", ele deve virar um Container do Elementor.
+- MAPPING DE AUTO LAYOUT:
+  - direction: "row" -> settings: { "flex_direction": "row", "container_type": "flex" }
+  - direction: "vertical" -> settings: { "flex_direction": "column", "container_type": "flex" }
+  - primaryAlign: "MIN" -> justify_content: "flex-start" (ou start)
+  - primaryAlign: "CENTER" -> justify_content: "center"
+  - primaryAlign: "MAX" -> justify_content: "flex-end" (ou end)
+  - primaryAlign: "SPACE_BETWEEN" -> justify_content: "space-between"
+  - counterAlign: "MIN" -> align_items: "flex-start" (ou start)
+  - counterAlign: "CENTER" -> align_items: "center"
+  - counterAlign: "MAX" -> align_items: "flex-end" (ou end)
+- IDs devem ser únicos.
+`;
+}
+
 
 
 
@@ -360,6 +476,7 @@ export interface ChildNode {
     fontStyle?: string;
     style?: any; // Suporte a objeto de estilo do Figma
     cornerRadius?: number;
+    border?: string | { color: string; width: number };
 }
 
 export interface AutoLayoutConfig {
@@ -372,5 +489,35 @@ export interface AutoLayoutConfig {
         right: number;
         bottom: number;
         left: number;
+    };
+}
+
+export interface ProcessedNode {
+    nodeId: string;
+    widget: string;
+    confidence: 'high' | 'medium' | 'low';
+    settings: any;
+    reasoning?: string;
+    parentId?: string;
+    children?: string[];
+}
+
+export interface ConsolidationResult {
+    elementorJSON: {
+        version: string;
+        title?: string;
+        type?: string;
+        content: any[];
+    };
+    report: {
+        summary: {
+            totalNodes: number;
+            converted: number;
+            custom: number;
+            warnings: number;
+        };
+        mappings: { nodeId: string; widget: string; status: string }[];
+        customNodes?: any[];
+        warnings: string[];
     };
 }

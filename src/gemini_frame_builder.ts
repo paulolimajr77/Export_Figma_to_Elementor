@@ -26,7 +26,7 @@ export async function createOptimizedFrame(analysis: LayoutAnalysis, originalNod
     }
 
     // Copia fielmente os preenchimentos (fills) do node original (Suporte a Imagens, Gradientes, etc.)
-    if (originalNode && 'fills' in originalNode && originalNode.fills !== figma.mixed) {
+    if (originalNode && 'fills' in originalNode && originalNode.fills !== figma.mixed && originalNode.fills.length > 0) {
         console.log('Original Node Fills:', JSON.stringify(originalNode.fills, null, 2));
         try {
             newFrame.fills = JSON.parse(JSON.stringify(originalNode.fills));
@@ -50,8 +50,13 @@ export async function createOptimizedFrame(analysis: LayoutAnalysis, originalNod
                 console.error('Error applying JSON fills:', e);
             }
         } else if (analysis.background) {
-            newFrame.fills = [{ type: 'SOLID', color: hexToRgb(analysis.background) }];
-            figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Aplicando background: ${analysis.background}` });
+            if (analysis.background.toLowerCase() === 'transparent') {
+                newFrame.fills = [];
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Aplicando background: Transparente` });
+            } else {
+                newFrame.fills = [{ type: 'SOLID', color: hexToRgb(analysis.background) }];
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Aplicando background: ${analysis.background}` });
+            }
         }
     }
 
@@ -111,7 +116,7 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
 
     if (spec.fontFamily) {
         try {
-            const weight = spec.fontWeight || "Regular";
+            const weight = mapFontWeight(spec.fontWeight);
             await figma.loadFontAsync({ family: spec.fontFamily, style: weight });
         } catch (e) {
             console.warn(`Fonte ${spec.fontFamily} não encontrada, usando Inter.`);
@@ -127,20 +132,22 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             const text = figma.createText();
             node = text;
             text.name = spec.name || 'Texto';
-            text.characters = spec.content || spec.characters || 'Texto';
-
-            // Text specific styles
-            if (spec.fontSize) text.fontSize = spec.fontSize;
 
             // Font family application
             if (spec.fontFamily) {
-                const weight = spec.fontWeight || "Regular";
+                const weight = mapFontWeight(spec.fontWeight);
                 try {
                     text.fontName = { family: spec.fontFamily, style: weight };
                 } catch (e) {
                     text.fontName = { family: "Inter", style: "Regular" };
                 }
             }
+
+            // Set characters AFTER setting font (to avoid default font issues)
+            text.characters = spec.content || spec.characters || 'Texto';
+
+            // Text specific styles
+            if (spec.fontSize) text.fontSize = spec.fontSize;
 
             // Text auto-resize logic
             if (spec.width) {
@@ -163,6 +170,8 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             button.primaryAxisSizingMode = 'AUTO';
             button.counterAxisSizingMode = 'AUTO';
             button.layoutMode = 'HORIZONTAL';
+            button.primaryAxisAlignItems = 'CENTER'; // Default to Center
+            button.counterAxisAlignItems = 'CENTER'; // Default to Center
             button.paddingLeft = 24;
             button.paddingRight = 24;
             button.paddingTop = 12;
@@ -198,10 +207,19 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
 
             applyCommonProperties(rect, spec);
 
-            // Image specific fill logic (overrides solid fill from common props if image exists)
-            if (spec.content && availableImages[spec.content]) {
-                const image = figma.createImage(availableImages[spec.content]);
-                rect.fills = [{ type: 'IMAGE', scaleMode: 'FILL', imageHash: image.hash }];
+            // Image specific fill logic
+            if (spec.content) {
+                const cleanHash = spec.content.trim();
+                if (availableImages[cleanHash]) {
+                    console.log(`✅ Imagem encontrada para hash: ${cleanHash}`);
+                    const image = figma.createImage(availableImages[cleanHash]);
+                    rect.fills = [{ type: 'IMAGE', scaleMode: 'FILL', imageHash: image.hash }];
+                } else {
+                    console.warn(`❌ Imagem NÃO encontrada para hash: ${cleanHash}`);
+                    console.log('Hashes disponíveis:', Object.keys(availableImages));
+                    // Placeholder visual para indicar erro
+                    rect.fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }]; // Vermelho para erro
+                }
             } else if (!spec.fills && !spec.background) {
                 // Placeholder only if no other fill applied
                 rect.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
@@ -239,7 +257,11 @@ function applyCommonProperties(node: SceneNode, spec: ChildNode, options: { skip
                 node.fills = spec.fills;
             } catch (e) { }
         } else if (spec.background) {
-            node.fills = [{ type: 'SOLID', color: hexToRgb(spec.background) }];
+            if (spec.background.toLowerCase() === 'transparent') {
+                node.fills = [];
+            } else {
+                node.fills = [{ type: 'SOLID', color: hexToRgb(spec.background) }];
+            }
         } else if (spec.color && node.type === 'TEXT') {
             // Text color fallback
             node.fills = [{ type: 'SOLID', color: hexToRgb(spec.color) }];
@@ -252,11 +274,65 @@ function applyCommonProperties(node: SceneNode, spec: ChildNode, options: { skip
             (node as any).cornerRadius = spec.cornerRadius;
         }
     }
+
+    // Borders (Strokes)
+    if ('strokes' in node && spec.border) {
+        // Expecting spec.border to be like "1px solid #000000" or a structured object
+        // For now, let's assume the prompt returns a structured object or we parse it.
+        // Actually, let's look at how we want the JSON to be.
+        // The prompt example doesn't explicitly show border structure, so we should add it.
+        // Let's support a simple object { color: string, width: number }
+        if (typeof spec.border === 'object' && spec.border !== null) {
+            const border = spec.border as any;
+            if (border.color && border.width) {
+                node.strokes = [{ type: 'SOLID', color: hexToRgb(border.color) }];
+                node.strokeWeight = border.width;
+            }
+        } else if (typeof spec.border === 'string') {
+            // Try to parse "1px solid #color"
+            const match = spec.border.match(/(\d+)px\s+solid\s+(#[\da-fA-F]+)/);
+            if (match) {
+                node.strokes = [{ type: 'SOLID', color: hexToRgb(match[2]) }];
+                node.strokeWeight = parseInt(match[1], 10);
+            }
+        }
+    }
 }
 
 function applyAutoLayoutToFrame(frame: FrameNode, config: AutoLayoutConfig) {
     frame.layoutMode = config.direction === 'horizontal' ? 'HORIZONTAL' : 'VERTICAL';
-    // ... (restante da lógica do auto-layout)
+
+    if (config.gap !== undefined) frame.itemSpacing = config.gap;
+
+    if (config.padding) {
+        frame.paddingTop = config.padding.top || 0;
+        frame.paddingRight = config.padding.right || 0;
+        frame.paddingBottom = config.padding.bottom || 0;
+        frame.paddingLeft = config.padding.left || 0;
+    }
+
+    // Default to HUG contents for main axis if not specified otherwise
+    frame.primaryAxisSizingMode = 'AUTO';
+    frame.counterAxisSizingMode = 'AUTO'; // Or FIXED based on width?
+
+    // Alignment
+    if (config.primaryAlign) {
+        switch (config.primaryAlign.toUpperCase()) {
+            case 'MIN': frame.primaryAxisAlignItems = 'MIN'; break;
+            case 'CENTER': frame.primaryAxisAlignItems = 'CENTER'; break;
+            case 'MAX': frame.primaryAxisAlignItems = 'MAX'; break;
+            case 'SPACE_BETWEEN': frame.primaryAxisAlignItems = 'SPACE_BETWEEN'; break;
+        }
+    }
+
+    if (config.counterAlign) {
+        switch (config.counterAlign.toUpperCase()) {
+            case 'MIN': frame.counterAxisAlignItems = 'MIN'; break;
+            case 'CENTER': frame.counterAxisAlignItems = 'CENTER'; break;
+            case 'MAX': frame.counterAxisAlignItems = 'MAX'; break;
+            // Counter axis doesn't support SPACE_BETWEEN
+        }
+    }
 }
 
 function hexToRgb(hex: string): RGB {
@@ -266,4 +342,21 @@ function hexToRgb(hex: string): RGB {
         g: parseInt(result[2], 16) / 255,
         b: parseInt(result[3], 16) / 255
     } : { r: 0, g: 0, b: 0 };
+}
+
+function mapFontWeight(weight: string | number | undefined): string {
+    if (!weight) return 'Regular';
+    const w = String(weight).toLowerCase().trim();
+    switch (w) {
+        case '100': case 'thin': return 'Thin';
+        case '200': case 'extralight': case 'extra light': return 'Extra Light';
+        case '300': case 'light': return 'Light';
+        case '400': case 'regular': case 'normal': return 'Regular';
+        case '500': case 'medium': return 'Medium';
+        case '600': case 'semibold': case 'semi bold': return 'Semi Bold';
+        case '700': case 'bold': return 'Bold';
+        case '800': case 'extrabold': case 'extra bold': return 'Extra Bold';
+        case '900': case 'black': return 'Black';
+        default: return 'Regular';
+    }
 }

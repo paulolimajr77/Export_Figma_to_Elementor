@@ -18,6 +18,16 @@ CRITICAL VISUAL FIDELITY RULES:
 2. BACKGROUNDS: Extract "fills" from the JSON. If "SOLID", use the hex color. If "GRADIENT", try to reproduce or use the main color.
 3. IMAGES: If the JSON has "fills" of type "IMAGE", map to the correct image widget.
 4. TEXT: Copy the text EXACTLY as it is in the "characters" field of the JSON.
+5. BORDERS: Look for "strokes" in the JSON. If present, extract color and width.
+6. SPACING: Pay close attention to "itemSpacing" (gap) and "padding" in the JSON. Use these for Auto Layout.
+7. BUTTONS: Identify buttons by looking for small containers with centered text and background color. Map them to "w:button".
+8. STRUCTURAL SIMPLIFICATION (CRITICAL):
+   - IGNORE any "Group" or "Frame" that is just a wrapper (no background, no border, no specific padding).
+   - If a container has \`background: "transparent"\` and \`border: null\`, DO NOT create a widget for it. Return its children directly to the parent.
+   - Your goal is the FLATTEST possible structure: Section -> Container (Row/Col) -> Widgets.
+   - Example: Group 6 > Group 5 > Frame 5 > Group 1 > Section > Link > Background... -> SHOULD BE JUST: Section > Column > Link.
+9. FLATTEN GROUPS: Treat Figma "Groups" as transparent pass-through layers. Do not create a widget for a Group unless it has visual properties (fill/stroke). Merge its children into the parent container.
+10. ALIGNMENT: Analyze the distribution of children. If they are centered, use "primaryAlign": "CENTER". If spread apart, use "SPACE_BETWEEN". Default to "MIN". For vertical alignment in a Row, check "counterAlign".
 
 VALID WIDGET LIST (Use EXACTLY these tags in the "name" field):
 
@@ -49,7 +59,7 @@ Responda APENAS com JSON válido seguindo ESTRITAMENTE esta estrutura:
   "width": \${width},
   "height": \${height},
   "background": "#FFFFFF",
-  "autoLayout": { "direction": "vertical", "gap": 0, "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 } },
+  "autoLayout": { "direction": "vertical", "gap": 0, "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 }, "primaryAlign": "MIN", "counterAlign": "MIN" },
   "children": [
     {
       "type": "container",
@@ -57,6 +67,7 @@ Responda APENAS com JSON válido seguindo ESTRITAMENTE esta estrutura:
       "background": "transparent",
       "width": \${width},
       "height": \${halfHeight},
+      "border": { "color": "#000000", "width": 1 },
       "autoLayout": { "direction": "vertical", "gap": 20, "padding": { "top": 40, "right": 40, "bottom": 40, "left": 40 } },
       "children": [
         {
@@ -73,14 +84,25 @@ Responda APENAS com JSON válido seguindo ESTRITAMENTE esta estrutura:
         },
         {
           "type": "widget",
+          "widgetType": "button",
+          "name": "w:button",
+          "content": "Clique Aqui",
+          "background": "#0073AA",
+          "color": "#FFFFFF",
+          "width": 150,
+          "height": 50,
+          "borderRadius": 5
+        },
+        {
+          "type": "widget",
           "widgetType": "image",
           "name": "w:image",
           "content": "\${firstImageId}",
           "width": \${thirdWidth},
-          "height": \${thirdHeight}
+          "height": \${thirdHeight},
+          "border": "1px solid #CCCCCC"
         }
       ]
-    }
     }
   ]
 }
@@ -89,7 +111,7 @@ Regras CRITICAS:
 1. Use os DADOS DO FIGMA fornecidos para extrair o texto exato, fontes (fontFamily/fontWeight), cores e dimensões.
 2. Estime as dimensões (width/height) de TODOS os elementos com precisão baseada nos dados.
 3. Para IMAGENS: Se a imagem visual corresponder a um dos IDs listados acima, use o ID no campo "content".
-4.  **Components**: Identify repeating elements that should be Components.
+4. **Components**: Identify repeating elements that should be Components.
 
 OUTPUT FORMAT:
 Provide the response in clear MARKDOWN format.

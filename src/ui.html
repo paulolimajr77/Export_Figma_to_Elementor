@@ -584,9 +584,111 @@
                 <label>Logs de Processamento:</label>
                 <textarea id="gemini-log-area" readonly
                     style="height: 150px; font-family: monospace; font-size: 10px; background-color: var(--code-bg); resize: vertical; white-space: pre-wrap;"></textarea>
+
+                <!-- Consolidation Report Area -->
+                <div id="consolidation-report"
+                    style="display: none; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <label>📊 Relatório de Consolidação</label>
+                    <div
+                        style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-size: 11px;">
+                        <div id="report-summary"
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                            <!-- Summary items will be injected here -->
+                        </div>
+                        <div id="report-warnings" style="color: #e67e22; display: none;">
+                            <strong>⚠️ Avisos:</strong>
+                            <ul style="margin: 5px 0; padding-left: 20px;"></ul>
+                        </div>
+                        <div style="margin-top: 10px; display: flex; gap: 8px;">
+                            <button id="btn-copy-final-json" class="btn btn-primary" style="font-size: 10px;">Copiar
+                                JSON Final</button>
+                            <button id="btn-download-report" class="btn btn-secondary" style="font-size: 10px;">Ver
+                                Detalhes</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- ... (rest of the file) ... -->
+
+    <script>
+        // ... (existing scripts) ...
+
+        let finalConsolidationResult = null;
+
+        window.onmessage = (event) => {
+            const msg = event.data.pluginMessage;
+            if (!msg) return;
+
+            // ... (existing handlers) ...
+
+            if (msg.type === 'consolidation-result') {
+                finalConsolidationResult = msg.result;
+
+                // Show report UI
+                const reportDiv = document.getElementById('consolidation-report');
+                reportDiv.style.display = 'block';
+
+                // Update Summary
+                const summary = msg.result.report.summary;
+                const summaryDiv = document.getElementById('report-summary');
+                summaryDiv.innerHTML = `
+                    <div>Total Nodes: <strong>${summary.totalNodes}</strong></div>
+                    <div>Convertidos: <strong style="color: var(--success);">${summary.converted}</strong></div>
+                    <div>Customizados: <strong style="color: var(--warning);">${summary.custom}</strong></div>
+                    <div>Avisos: <strong style="color: ${summary.warnings > 0 ? '#e67e22' : 'inherit'};">${summary.warnings}</strong></div>
+                `;
+
+                // Update Warnings
+                const warningsDiv = document.getElementById('report-warnings');
+                const warningsList = warningsDiv.querySelector('ul');
+                if (msg.result.report.warnings && msg.result.report.warnings.length > 0) {
+                    warningsDiv.style.display = 'block';
+                    warningsList.innerHTML = msg.result.report.warnings.map(w => `<li>${w}</li>`).join('');
+                } else {
+                    warningsDiv.style.display = 'none';
+                }
+
+                // Update Phase Indicator
+                const phases = document.querySelectorAll('#phase-indicator div');
+                if (phases.length >= 4) {
+                    phases[3].innerHTML = '✅ Fase 4: Consolidação (Concluída)';
+                    phases[3].style.fontWeight = 'bold';
+                    phases[3].style.color = 'var(--success)';
+                }
+
+                // Auto-copy JSON to clipboard (optional, or just update output area)
+                const outputArea = document.getElementById('output-area');
+                if (outputArea) {
+                    outputArea.value = JSON.stringify(msg.result.elementorJSON, null, 2);
+                    // Switch to Export tab to show result? Maybe not, stay in Gemini tab.
+                }
+            }
+        };
+
+        document.getElementById('btn-copy-final-json').addEventListener('click', () => {
+            if (finalConsolidationResult) {
+                const jsonStr = JSON.stringify(finalConsolidationResult.elementorJSON, null, 2);
+                const textarea = document.createElement('textarea');
+                textarea.value = jsonStr;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                parent.postMessage({ pluginMessage: { type: 'notify', message: 'JSON copiado para a área de transferência!' } }, '*');
+            }
+        });
+
+        document.getElementById('btn-download-report').addEventListener('click', () => {
+            if (finalConsolidationResult) {
+                console.log('Relatório Completo:', finalConsolidationResult.report);
+                parent.postMessage({ pluginMessage: { type: 'notify', message: 'Relatório completo enviado para o console (F12)' } }, '*');
+            }
+        });
+
+    </script>
 
     <!-- ABA 3: WORDPRESS -->
     <div id="tab-wp" class="tab-content">
@@ -630,8 +732,37 @@
             Clique em um item para renomear a layer selecionada no Figma automaticamente.
         </div>
 
+        <!-- Área de Testes -->
+        <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+            <label>🛠️ Ferramentas de Teste</label>
+            <div style="font-size: 11px; color: #666; margin-bottom: 10px;">
+                Gere um frame padronizado para testar a conversão.
+            </div>
+            <button id="btn-generate-test-frame" class="btn btn-secondary" style="width: 100%;">
+                🧪 Gerar Frame de Teste (Auto Layout)
+            </button>
+        </div>
+
         <div id="widgets-container"></div>
     </div>
+
+    <!-- ... (rest of the file) ... -->
+
+    <script>
+        // ... (existing scripts) ...
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // ... (existing listeners) ...
+
+            // Test Frame Generator
+            const btnTestFrame = document.getElementById('btn-generate-test-frame');
+            if (btnTestFrame) {
+                btnTestFrame.addEventListener('click', () => {
+                    parent.postMessage({ pluginMessage: { type: 'create-test-frame' } }, '*');
+                });
+            }
+        });
+    </script>
 
     <!-- MANIPULADOR DE REDIMENSIONAMENTO -->
     <div id="resizer" title="Arraste para redimensionar"></div>

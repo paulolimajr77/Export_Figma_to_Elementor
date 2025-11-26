@@ -38,6 +38,9 @@ export function serializeNode(node: SceneNode): SerializedNode {
             if (fill.type === 'SOLID') {
                 return { type: 'SOLID', color: fill.color, opacity: fill.opacity, visible: fill.visible };
             }
+            if (fill.type === 'IMAGE') {
+                return { type: 'IMAGE', visible: fill.visible, imageHash: fill.imageHash, scaleMode: fill.scaleMode };
+            }
             return { type: fill.type, visible: fill.visible };
         });
     }
