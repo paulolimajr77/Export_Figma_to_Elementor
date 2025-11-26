@@ -262,3 +262,56 @@ export function unwrapNode(node: SceneNode): SceneNode {
 
     return currentNode;
 }
+
+export function repairJson(jsonString: string): string {
+    let repaired = jsonString.trim();
+
+    // Remove potential trailing commas
+    if (repaired.endsWith(',')) {
+        repaired = repaired.slice(0, -1);
+    }
+
+    // Count brackets/braces to close them
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < repaired.length; i++) {
+        const char = repaired[i];
+
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+
+        if (!inString) {
+            if (char === '{') openBraces++;
+            else if (char === '}') openBraces--;
+            else if (char === '[') openBrackets++;
+            else if (char === ']') openBrackets--;
+        }
+    }
+
+    // Close unclosed structures
+    while (openBraces > 0) {
+        repaired += '}';
+        openBraces--;
+    }
+    while (openBrackets > 0) {
+        repaired += ']';
+        openBrackets--;
+    }
+
+    return repaired;
+}

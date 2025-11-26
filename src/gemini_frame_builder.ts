@@ -25,37 +25,74 @@ export async function createOptimizedFrame(analysis: LayoutAnalysis, originalNod
         newFrame.y = figma.viewport.center.y - (height / 2);
     }
 
-    // Copia fielmente os preenchimentos (fills) do node original (Suporte a Imagens, Gradientes, etc.)
+    // ESTRATÉGIA DE FILLS: Prioridade para o original, fallback para análise
+    // Começa transparente para evitar fundo branco padrão
+    newFrame.fills = [];
+
+    // 1. TENTAR COPIAR DO ORIGINAL (Mais confiável)
     if (originalNode && 'fills' in originalNode && originalNode.fills !== figma.mixed && originalNode.fills.length > 0) {
-        console.log('Original Node Fills:', JSON.stringify(originalNode.fills, null, 2));
+        console.log('✅ Original Node Fills:', JSON.stringify(originalNode.fills, null, 2));
         try {
-            newFrame.fills = JSON.parse(JSON.stringify(originalNode.fills));
-            console.log('New Frame Fills applied:', JSON.stringify(newFrame.fills, null, 2));
-            figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Copiando preenchimentos do original...` });
-        } catch (e) {
-            console.error('Error applying fills:', e);
-        }
-    } else {
-        console.log('Original Node has no fills or mixed fills, or is null.');
-        // Prioridade para 'fills' do JSON normalizado
-        if (analysis.fills) {
-            try {
-                // Filtra fills inválidos ou converte se necessário (Figma JSON às vezes tem formatos diferentes)
-                // Mas se vier da API do Figma, geralmente é compatível.
-                // Ajuste para cores normalizadas (0-1) vs (0-255) se necessário?
-                // A API do Figma usa 0-1. O JSON do usuário tem 0-1.
-                newFrame.fills = analysis.fills;
-                figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Aplicando fills do JSON...` });
-            } catch (e) {
-                console.error('Error applying JSON fills:', e);
+            // Validar se os fills são completos antes de aplicar
+            const validFills = (originalNode.fills as Paint[]).filter(fill => {
+                if (fill.type === 'SOLID') return true;
+                if (fill.type === 'IMAGE') return 'imageHash' in fill;
+                if (fill.type === 'GRADIENT_LINEAR' || fill.type === 'GRADIENT_RADIAL' || fill.type === 'GRADIENT_ANGULAR' || fill.type === 'GRADIENT_DIAMOND') {
+                    return 'gradientStops' in fill && 'gradientTransform' in fill;
+                }
+                return false;
+            });
+
+            if (validFills.length > 0) {
+                newFrame.fills = JSON.parse(JSON.stringify(validFills));
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 ✅ Copiando ${validFills.length} preenchimento(s) do original` });
+            } else {
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `⚠️ Fills do original inválidos, usando fallback` });
             }
-        } else if (analysis.background) {
+        } catch (e) {
+            console.error('❌ Error applying original fills:', e);
+            figma.ui.postMessage({ type: 'add-gemini-log', data: `⚠️ Erro ao copiar fills: ${e}` });
+        }
+    }
+
+    // 2. FALLBACK: Usar dados da análise (se fills do original falharam ou não existem)
+    if (Array.isArray(newFrame.fills) && newFrame.fills.length === 0) {
+        console.log('⚠️ Usando fallback para fills (original vazio ou inválido)');
+
+        // Tentar usar fills do JSON da IA (mas validar primeiro)
+        if (analysis.fills && Array.isArray(analysis.fills) && analysis.fills.length > 0) {
+            try {
+                // IMPORTANTE: A IA pode retornar fills incompletos (só type e visible)
+                // Vamos filtrar apenas os que são realmente aplicáveis
+                const validAIFills = analysis.fills.filter((fill: any) => {
+                    if (fill.type === 'SOLID' && fill.color) return true;
+                    if (fill.type === 'IMAGE' && fill.imageHash) return true;
+                    // Gradientes da IA geralmente vêm incompletos, ignorar
+                    return false;
+                });
+
+                if (validAIFills.length > 0) {
+                    newFrame.fills = validAIFills;
+                    figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Aplicando ${validAIFills.length} fill(s) do JSON da IA` });
+                } else {
+                    figma.ui.postMessage({ type: 'add-gemini-log', data: `⚠️ Fills da IA incompletos, ignorando` });
+                }
+            } catch (e) {
+                console.error('❌ Error applying AI fills:', e);
+            }
+        }
+
+        // Se ainda estiver vazio, tentar usar background como string
+        if (Array.isArray(newFrame.fills) && newFrame.fills.length === 0 && analysis.background) {
             if (analysis.background.toLowerCase() === 'transparent') {
                 newFrame.fills = [];
-                figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Aplicando background: Transparente` });
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Background: Transparente` });
             } else {
-                newFrame.fills = [{ type: 'SOLID', color: hexToRgb(analysis.background) }];
-                figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Aplicando background: ${analysis.background}` });
+                const bgColor = parseColor(analysis.background);
+                if (bgColor) {
+                    newFrame.fills = [{ type: 'SOLID', color: bgColor }];
+                    figma.ui.postMessage({ type: 'add-gemini-log', data: `🎨 Background: ${analysis.background}` });
+                }
             }
         }
     }
@@ -78,9 +115,21 @@ export async function createOptimizedFrame(analysis: LayoutAnalysis, originalNod
 }
 
 async function createChildNode(parent: FrameNode, spec: ChildNode, availableImages: Record<string, Uint8Array>): Promise<SceneNode> {
-    if (spec.type === 'container') {
+    // Normaliza o tipo para comparação (case insensitive)
+    const type = spec.type ? spec.type.toUpperCase() : 'FRAME';
+
+    // 1. Lógica de Container (Recursiva)
+    // Aceita tipos explícitos de container ou se tiver filhos
+    if (type === 'CONTAINER' || type === 'FRAME' || type === 'GROUP' || type === 'SECTION' || (spec.children && spec.children.length > 0)) {
+        // Exceção: Se for um botão (w:button) e quisermos usar a lógica específica de widget,
+        // poderíamos desviar aqui. Mas se o JSON da IA já traz a estrutura (Frame + Texto),
+        // é melhor tratar como Container genérico para fidelidade visual.
+
         const container = figma.createFrame();
-        container.name = spec.name;
+        container.name = spec.name || 'Container';
+
+        // IMPORTANTE: Começa transparente para evitar sobreposição branca se o fill falhar ou não existir
+        container.fills = [];
 
         // Apply common properties first (dimensions, fills, etc.)
         applyCommonProperties(container, spec);
@@ -97,12 +146,22 @@ async function createChildNode(parent: FrameNode, spec: ChildNode, availableImag
         parent.appendChild(container);
         return container;
     }
-    else if (spec.type === 'widget') {
+
+    // 2. Lógica de Widget / Elementos Folha
+    else if (type === 'WIDGET' || type === 'TEXT' || type === 'RECTANGLE' || type === 'VECTOR' || type === 'STAR' || type === 'ELLIPSE') {
+        // Mapeia tipos do Figma para tipos de widget internos se necessário
+        if (!spec.widgetType) {
+            if (type === 'TEXT') spec.widgetType = 'text';
+            else if (type === 'RECTANGLE') spec.widgetType = 'image'; // Assume imagem ou retângulo genérico
+            else if (spec.name && spec.name.startsWith('w:')) spec.widgetType = spec.name.replace('w:', '');
+        }
         return await createWidget(parent, spec, availableImages);
     }
 
+    // 3. Fallback para tipos desconhecidos
     const fallback = figma.createFrame();
     fallback.name = spec.name || 'Unknown Node';
+    fallback.fills = []; // Transparente por padrão
     applyCommonProperties(fallback, spec);
     parent.appendChild(fallback);
     return fallback;
@@ -182,7 +241,10 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             const btnText = figma.createText();
             btnText.characters = spec.content || 'Botão';
             btnText.fontSize = 16;
-            if (spec.color) btnText.fills = [{ type: 'SOLID', color: hexToRgb(spec.color) }];
+
+            const btnTextColor = parseColor(spec.color);
+            if (btnTextColor) btnText.fills = [{ type: 'SOLID', color: btnTextColor }];
+
             button.appendChild(btnText);
 
             applyCommonProperties(button, spec);
@@ -230,6 +292,7 @@ async function createWidget(parent: FrameNode, spec: ChildNode, availableImages:
             const fallbackWidget = figma.createFrame();
             node = fallbackWidget;
             fallbackWidget.name = spec.name || 'Widget';
+            fallbackWidget.fills = []; // Transparente
             applyCommonProperties(fallbackWidget, spec);
             break;
     }
@@ -246,25 +309,114 @@ function applyCommonProperties(node: SceneNode, spec: ChildNode, options: { skip
                 node.resize(spec.width, spec.height);
             }
         } catch (e) {
-            console.warn('Falha ao redimensionar node:', e);
+            console.warn('⚠️ Falha ao redimensionar node:', e);
         }
     }
 
-    // Fills
+    // ==================== FILLS (REFATORADO) ====================
     if ('fills' in node) {
-        if (spec.fills) {
+        let fillsApplied = false;
+
+        // 1. Tentar usar fills estruturados do JSON
+        if (spec.fills && Array.isArray(spec.fills) && spec.fills.length > 0) {
             try {
-                node.fills = spec.fills;
-            } catch (e) { }
-        } else if (spec.background) {
-            if (spec.background.toLowerCase() === 'transparent') {
-                node.fills = [];
-            } else {
-                node.fills = [{ type: 'SOLID', color: hexToRgb(spec.background) }];
+                // Validar fills antes de aplicar
+                const validFills = spec.fills.filter((fill: any) => {
+                    if (fill.type === 'SOLID' && fill.color) return true;
+                    if (fill.type === 'IMAGE' && fill.imageHash) return true;
+                    // Ignorar gradientes incompletos da IA
+                    if (fill.type && fill.type.includes('GRADIENT')) {
+                        if (fill.gradientStops && fill.gradientTransform) return true;
+                        console.warn(`⚠️ Gradiente incompleto ignorado:`, fill);
+                        return false;
+                    }
+                    return false;
+                });
+
+                if (validFills.length > 0) {
+                    node.fills = validFills;
+                    fillsApplied = true;
+                    console.log(`✅ Aplicados ${validFills.length} fill(s) do JSON`);
+                } else {
+                    console.warn('⚠️ Todos os fills do JSON eram inválidos');
+                }
+            } catch (e) {
+                console.warn('⚠️ Erro ao aplicar fills do JSON:', e);
             }
-        } else if (spec.color && node.type === 'TEXT') {
-            // Text color fallback
-            node.fills = [{ type: 'SOLID', color: hexToRgb(spec.color) }];
+        }
+
+        // 2. Fallback: usar background como string
+        if (!fillsApplied && spec.background) {
+            // Garantir que é string antes de chamar toLowerCase
+            const bgString = String(spec.background);
+
+            if (bgString.toLowerCase() === 'transparent') {
+                node.fills = [];
+                fillsApplied = true;
+            } else {
+                const bgColor = parseColor(bgString);
+                if (bgColor) {
+                    node.fills = [{ type: 'SOLID', color: bgColor }];
+                    fillsApplied = true;
+                }
+            }
+        }
+
+        // 3. Fallback para textos: usar color
+        if (!fillsApplied && spec.color && node.type === 'TEXT') {
+            const txtColor = parseColor(spec.color);
+            if (txtColor) {
+                node.fills = [{ type: 'SOLID', color: txtColor }];
+                fillsApplied = true;
+            }
+        }
+
+        // 4. Se nada funcionou, deixar transparente (evita branco padrão)
+        if (!fillsApplied && node.type !== 'TEXT') {
+            node.fills = [];
+        }
+    }
+
+    // ==================== FONTES (PARA TEXTOS) ====================
+    if (node.type === 'TEXT') {
+        const textNode = node as TextNode;
+
+        // Aplicar fontFamily e fontWeight ANTES de definir characters
+        if (spec.fontFamily || spec.fontWeight) {
+            const family = spec.fontFamily || 'Inter';
+            const weight = mapFontWeight(spec.fontWeight);
+
+            try {
+                // Tentar carregar e aplicar a fonte
+                figma.loadFontAsync({ family, style: weight }).then(() => {
+                    textNode.fontName = { family, style: weight };
+                }).catch(() => {
+                    // Fallback para Inter Regular
+                    figma.loadFontAsync({ family: 'Inter', style: 'Regular' }).then(() => {
+                        textNode.fontName = { family: 'Inter', style: 'Regular' };
+                    });
+                });
+            } catch (e) {
+                console.warn(`⚠️ Erro ao aplicar fonte ${family}:`, e);
+            }
+        }
+
+        // Aplicar fontSize
+        if (spec.fontSize) {
+            textNode.fontSize = spec.fontSize;
+        }
+
+        // Aplicar alinhamento de texto
+        if (spec.textAlignHorizontal) {
+            textNode.textAlignHorizontal = spec.textAlignHorizontal;
+        }
+        if (spec.textAlignVertical) {
+            textNode.textAlignVertical = spec.textAlignVertical;
+        }
+
+        // Aplicar textCase
+        if (spec.textCase) {
+            textNode.textCase = spec.textCase;
         }
     }
 
@@ -277,23 +429,23 @@ function applyCommonProperties(node: SceneNode, spec: ChildNode, options: { skip
 
     // Borders (Strokes)
     if ('strokes' in node && spec.border) {
-        // Expecting spec.border to be like "1px solid #000000" or a structured object
-        // For now, let's assume the prompt returns a structured object or we parse it.
-        // Actually, let's look at how we want the JSON to be.
-        // The prompt example doesn't explicitly show border structure, so we should add it.
-        // Let's support a simple object { color: string, width: number }
         if (typeof spec.border === 'object' && spec.border !== null) {
             const border = spec.border as any;
             if (border.color && border.width) {
-                node.strokes = [{ type: 'SOLID', color: hexToRgb(border.color) }];
-                node.strokeWeight = border.width;
+                const borderColor = parseColor(border.color);
+                if (borderColor) {
+                    node.strokes = [{ type: 'SOLID', color: borderColor }];
+                    node.strokeWeight = border.width;
+                }
             }
         } else if (typeof spec.border === 'string') {
-            // Try to parse "1px solid #color"
             const match = spec.border.match(/(\d+)px\s+solid\s+(#[\da-fA-F]+)/);
             if (match) {
-                node.strokes = [{ type: 'SOLID', color: hexToRgb(match[2]) }];
-                node.strokeWeight = parseInt(match[1], 10);
+                const borderColor = parseColor(match[2]);
+                if (borderColor) {
+                    node.strokes = [{ type: 'SOLID', color: borderColor }];
+                    node.strokeWeight = parseInt(match[1], 10);
+                }
             }
         }
     }
@@ -333,6 +485,16 @@ function applyAutoLayoutToFrame(frame: FrameNode, config: AutoLayoutConfig) {
             // Counter axis doesn't support SPACE_BETWEEN
         }
     }
+}
+
+function parseColor(input: any): RGB | null {
+    if (!input) return null;
+    if (typeof input === 'string') return hexToRgb(input);
+    if (typeof input === 'object' && 'r' in input && 'g' in input && 'b' in input) {
+        // Assume que já está no formato 0-1 se vier do Gemini/Figma
+        return { r: input.r, g: input.g, b: input.b };
+    }
+    return null;
 }
 
 function hexToRgb(hex: string): RGB {

@@ -494,40 +494,83 @@
         </div>
 
         <div class="form-group">
-            <label>🔑 API Key do Google Gemini</label>
-            <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
-                Obtenha gratuitamente em:
-                <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: var(--primary);">
-                    Google AI Studio
-                </a>
+            <label>🧠 Provedor de IA</label>
+            <select id="ai-provider-select"
+                style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 15px;">
+                <option value="gemini">Google Gemini (Padrão)</option>
+                <option value="deepseek">DeepSeek (Novo 🚀)</option>
+            </select>
+        </div>
+
+        <!-- GEMINI SETTINGS -->
+        <div id="gemini-settings">
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="margin-bottom: 0;">🔑 API Key (Gemini)</label>
+                    <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: var(--primary);">
+                        Google AI Studio
+                    </a>
+                </div>
+                <input type="password" id="gemini-api-key" placeholder="Cole sua API Key do Gemini aqui">
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button id="btn-save-gemini-key" class="btn btn-primary" style="flex: 1;">Salvar Key</button>
+                    <button id="btn-test-gemini" class="btn btn-secondary" style="flex: 1;">Testar</button>
+                </div>
             </div>
-            <input type="password" id="gemini-api-key" placeholder="Cole sua API Key aqui">
-            <div style="display: flex; gap: 8px; margin-top: 8px;">
-                <button id="btn-save-gemini-key" class="btn btn-primary" style="flex: 1;">Salvar API Key</button>
-                <button id="btn-test-gemini" class="btn btn-secondary" style="flex: 1;">Testar Conexão</button>
+
+            <div class="form-group">
+                <label>🤖 Modelo Gemini</label>
+                <select id="gemini-model-select"
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px;">
+                    <optgroup label="Gemini 2.5 (Recomendado)">
+                        <option value="gemini-2.5-pro">gemini-2.5-pro - Pensamento avançado</option>
+                        <option value="gemini-2.5-flash" selected>gemini-2.5-flash - Rápido e inteligente ⭐</option>
+                        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite - Ultra rápido</option>
+                    </optgroup>
+                    <optgroup label="Gemini 2.0 (Modelos Anteriores)">
+                        <option value="gemini-2.0-flash">gemini-2.0-flash - 1M tokens</option>
+                        <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite - Pequeno e rápido</option>
+                    </optgroup>
+                </select>
+                <p style="font-size: 10px; color: #666; margin-top: 8px;">
+                    💡 <strong>Recomendado:</strong> gemini-2.5-flash (melhor custo-benefício)<br>
+                    ⚡ <strong>Mais rápido:</strong> gemini-2.5-flash-lite<br>
+                    📊 <a href="https://ai.google.dev/gemini-api/docs/models?hl=pt-br" target="_blank"
+                        style="color: var(--primary);">Ver documentação oficial</a>
+                </p>
             </div>
         </div>
 
-        <div class="form-group">
-            <label>🤖 Modelo Gemini</label>
-            <select id="gemini-model-select"
-                style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px;">
-                <optgroup label="Gemini 2.5 (Recomendado)">
-                    <option value="gemini-2.5-pro">gemini-2.5-pro - Pensamento avançado</option>
-                    <option value="gemini-2.5-flash" selected>gemini-2.5-flash - Rápido e inteligente ⭐</option>
-                    <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite - Ultra rápido</option>
-                </optgroup>
-                <optgroup label="Gemini 2.0 (Modelos Anteriores)">
-                    <option value="gemini-2.0-flash">gemini-2.0-flash - 1M tokens</option>
-                    <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite - Pequeno e rápido</option>
-                </optgroup>
-            </select>
-            <p style="font-size: 10px; color: #666; margin-top: 8px;">
-                💡 <strong>Recomendado:</strong> gemini-2.5-flash (melhor custo-benefício)<br>
-                ⚡ <strong>Mais rápido:</strong> gemini-2.5-flash-lite<br>
-                📊 <a href="https://ai.google.dev/gemini-api/docs/models?hl=pt-br" target="_blank"
-                    style="color: var(--primary);">Ver documentação oficial</a>
-            </p>
+        <!-- DEEPSEEK SETTINGS -->
+        <div id="deepseek-settings" style="display: none;">
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="margin-bottom: 0;">🔑 API Key (DeepSeek)</label>
+                    <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color: var(--primary);">
+                        DeepSeek Platform
+                    </a>
+                </div>
+                <input type="password" id="deepseek-api-key" placeholder="Cole sua API Key do DeepSeek aqui">
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button id="btn-save-deepseek-key" class="btn btn-primary" style="flex: 1;">Salvar Key</button>
+                    <button id="btn-test-deepseek" class="btn btn-secondary" style="flex: 1;">Testar</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>🤖 Modelo DeepSeek</label>
+                <select id="deepseek-model-select"
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px;">
+                    <option value="deepseek-chat" selected>deepseek-chat (V3) - Recomendado ⭐</option>
+                    <option value="deepseek-coder">deepseek-coder - Especialista em Código</option>
+                </select>
+                <p style="font-size: 10px; color: #666; margin-top: 8px;">
+                    💡 <strong>DeepSeek V3</strong> é comparável ao GPT-4 e Claude 3.5 Sonnet.<br>
+                    💰 <strong>Custo:</strong> Extremamente baixo.<br>
+                    📊 <a href="https://api-docs.deepseek.com/" target="_blank" style="color: var(--primary);">Ver
+                        documentação oficial</a>
+                </p>
+            </div>
         </div>
 
         <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
@@ -1134,35 +1177,45 @@
             }
         };
 
+        const DeepSeek = {
+            loadDeepSeek: (apiKey, model) => {
+                console.log('📥 loadDeepSeek chamado');
+                const input = document.getElementById('deepseek-api-key');
+                const modelSelect = document.getElementById('deepseek-model-select');
+
+                if (input && apiKey) input.value = apiKey;
+                if (modelSelect && model) modelSelect.value = model;
+            },
+
+            saveKey: () => {
+                const input = document.getElementById('deepseek-api-key');
+                const key = input ? input.value : '';
+                if (!key || key.trim() === '') {
+                    console.error('❌ API Key DeepSeek vazia');
+                    return;
+                }
+                parent.postMessage({ pluginMessage: { type: 'save-deepseek-key', key } }, '*');
+            },
+
+            testConnection: () => {
+                const input = document.getElementById('deepseek-api-key');
+                const key = input ? input.value : '';
+                if (!key || key.trim() === '') {
+                    console.error('❌ Nenhuma API Key DeepSeek para testar');
+                    return;
+                }
+                parent.postMessage({ pluginMessage: { type: 'test-deepseek-connection' } }, '*');
+            }
+        };
+
         const Gemini = {
             loadGemini: (apiKey, model) => {
                 console.log('📥 loadGemini chamado');
-                console.log('API Key recebida:', apiKey ? `${apiKey.substring(0, 10)}...` : 'null');
-                console.log('Modelo recebido:', model);
-
                 const input = document.getElementById('gemini-api-key');
                 const modelSelect = document.getElementById('gemini-model-select');
 
-                console.log('Input element:', input);
-                console.log('Model select element:', modelSelect);
-
-                if (input && apiKey) {
-                    input.value = apiKey;
-                    console.log('✅ API Key carregada no input');
-                } else if (!input) {
-                    console.error('❌ Input gemini-api-key não encontrado!');
-                } else if (!apiKey) {
-                    console.warn('⚠️ Nenhuma API Key salva');
-                }
-
-                if (modelSelect && model) {
-                    modelSelect.value = model;
-                    console.log(`✅ Modelo carregado: ${model}`);
-                } else if (!modelSelect) {
-                    console.error('❌ Select gemini-model-select não encontrado!');
-                } else if (!model) {
-                    console.warn('⚠️ Nenhum modelo salvo, usando padrão');
-                }
+                if (input && apiKey) input.value = apiKey;
+                if (modelSelect && model) modelSelect.value = model;
             },
 
             addLog: (msg) => {
@@ -1177,44 +1230,45 @@
                 document.getElementById('gemini-log-area').value = '';
                 UI.showLoader('Preparando para análise...');
                 document.getElementById('gemini-results').style.display = 'none';
-                parent.postMessage({ pluginMessage: { type: 'analyze-with-gemini' } }, '*');
+
+                // Check provider
+                const provider = document.getElementById('ai-provider-select').value;
+                if (provider === 'deepseek') {
+                    parent.postMessage({ pluginMessage: { type: 'analyze-with-deepseek' } }, '*');
+                } else {
+                    parent.postMessage({ pluginMessage: { type: 'analyze-with-gemini' } }, '*');
+                }
             },
 
             analyzeLayout: () => {
                 UI.showLoader('Analisando layout...');
-                parent.postMessage({ pluginMessage: { type: 'analyze-layout-figma' } }, '*');
+                const provider = document.getElementById('ai-provider-select').value;
+                if (provider === 'deepseek') {
+                    parent.postMessage({ pluginMessage: { type: 'analyze-layout-deepseek' } }, '*');
+                } else {
+                    parent.postMessage({ pluginMessage: { type: 'analyze-layout-figma' } }, '*');
+                }
             },
 
             saveKey: () => {
                 const input = document.getElementById('gemini-api-key');
                 const key = input ? input.value : '';
 
-                console.log('🔑 saveKey chamado');
-                console.log('Input element:', input);
-                console.log('Key value:', key);
-
                 if (!key || key.trim() === '') {
                     console.error('❌ API Key vazia');
                     return;
                 }
-
-                console.log('Enviando mensagem save-gemini-key...');
                 parent.postMessage({ pluginMessage: { type: 'save-gemini-key', key } }, '*');
             },
 
             testConnection: () => {
-                console.log('🧪 testConnection chamado');
                 const input = document.getElementById('gemini-api-key');
                 const key = input ? input.value : '';
-
-                console.log('Key para teste:', key);
 
                 if (!key || key.trim() === '') {
                     console.error('❌ Nenhuma API Key para testar');
                     return;
                 }
-
-                console.log('Enviando mensagem test-gemini-connection...');
                 parent.postMessage({ pluginMessage: { type: 'test-gemini-connection' } }, '*');
             },
 
@@ -1555,6 +1609,7 @@
             // Request initial config
             parent.postMessage({ pluginMessage: { type: 'get-wp-config' } }, '*');
             parent.postMessage({ pluginMessage: { type: 'get-gemini-config' } }, '*');
+            parent.postMessage({ pluginMessage: { type: 'get-deepseek-config' } }, '*');
 
             // Quality Slider
             const qualityInput = document.getElementById('quality');
@@ -1565,7 +1620,28 @@
                 });
             }
 
-            // Event listeners para Gemini (movidos para dentro do DOMContentLoaded)
+            // Provider Switcher
+            const providerSelect = document.getElementById('ai-provider-select');
+            if (providerSelect) {
+                providerSelect.addEventListener('change', (e) => {
+                    const provider = e.target.value;
+                    const geminiSettings = document.getElementById('gemini-settings');
+                    const deepseekSettings = document.getElementById('deepseek-settings');
+                    const analyzeBtn = document.getElementById('analyze-btn');
+
+                    if (provider === 'deepseek') {
+                        geminiSettings.style.display = 'none';
+                        deepseekSettings.style.display = 'block';
+                        if (analyzeBtn) analyzeBtn.innerText = '✨ Analisar com DeepSeek (Elementor)';
+                    } else {
+                        geminiSettings.style.display = 'block';
+                        deepseekSettings.style.display = 'none';
+                        if (analyzeBtn) analyzeBtn.innerText = '✨ Analisar com Gemini (Elementor)';
+                    }
+                });
+            }
+
+            // Event listeners para Gemini
             const analyzeBtnEl = document.getElementById('analyze-btn');
             const analyzeLayoutBtnEl = document.getElementById('analyze-layout-btn');
             const btnSaveGeminiEl = document.getElementById('btn-save-gemini-key');
@@ -1573,30 +1649,32 @@
 
             if (analyzeBtnEl) analyzeBtnEl.addEventListener('click', Gemini.analyze);
             if (analyzeLayoutBtnEl) analyzeLayoutBtnEl.addEventListener('click', Gemini.analyzeLayout);
-            if (btnSaveGeminiEl) {
-                console.log('✅ Event listener registrado para btn-save-gemini-key');
-                btnSaveGeminiEl.addEventListener('click', Gemini.saveKey);
-            } else {
-                console.error('❌ Elemento btn-save-gemini-key não encontrado!');
-            }
-            if (btnTestGeminiEl) {
-                console.log('✅ Event listener registrado para btn-test-gemini');
-                btnTestGeminiEl.addEventListener('click', Gemini.testConnection);
-            } else {
-                console.error('❌ Elemento btn-test-gemini não encontrado!');
-            }
+            if (btnSaveGeminiEl) btnSaveGeminiEl.addEventListener('click', Gemini.saveKey);
+            if (btnTestGeminiEl) btnTestGeminiEl.addEventListener('click', Gemini.testConnection);
 
-            // Event listener para auto-salvar modelo ao trocar no select
+            // Event listeners para DeepSeek
+            const btnSaveDeepSeekEl = document.getElementById('btn-save-deepseek-key');
+            const btnTestDeepSeekEl = document.getElementById('btn-test-deepseek');
+
+            if (btnSaveDeepSeekEl) btnSaveDeepSeekEl.addEventListener('click', DeepSeek.saveKey);
+            if (btnTestDeepSeekEl) btnTestDeepSeekEl.addEventListener('click', DeepSeek.testConnection);
+
+            // Event listener para auto-salvar modelo Gemini
             const modelSelectEl = document.getElementById('gemini-model-select');
             if (modelSelectEl) {
-                console.log('✅ Event listener registrado para gemini-model-select (auto-save)');
                 modelSelectEl.addEventListener('change', (e) => {
                     const model = e.target.value;
-                    console.log('💾 Auto-salvando modelo:', model);
                     parent.postMessage({ pluginMessage: { type: 'save-gemini-model', model } }, '*');
                 });
-            } else {
-                console.error('❌ Elemento gemini-model-select não encontrado!');
+            }
+
+            // Event listener para auto-salvar modelo DeepSeek
+            const deepseekModelSelectEl = document.getElementById('deepseek-model-select');
+            if (deepseekModelSelectEl) {
+                deepseekModelSelectEl.addEventListener('change', (e) => {
+                    const model = e.target.value;
+                    parent.postMessage({ pluginMessage: { type: 'save-deepseek-model', model } }, '*');
+                });
             }
 
             // Event listeners para outros botões (movidos para dentro do DOMContentLoaded)
@@ -1726,12 +1804,27 @@
                     Gemini.loadGemini(msg.apiKey, msg.model);
                     break;
 
+                case 'load-deepseek-config':
+                    console.log('📥 Carregando configuração DeepSeek');
+                    DeepSeek.loadDeepSeek(msg.apiKey, msg.model);
+                    break;
+
                 case 'gemini-connection-result':
                     if (msg.success) {
                         Gemini.addLog(`✅ ${msg.message}`);
                     } else {
                         Gemini.addLog(`❌ ${msg.message}`);
                     }
+                    alert(msg.message);
+                    break;
+
+                case 'deepseek-connection-result':
+                    if (msg.success) {
+                        Gemini.addLog(`✅ ${msg.message}`);
+                    } else {
+                        Gemini.addLog(`❌ ${msg.message}`);
+                    }
+                    alert(msg.message);
                     break;
 
                 case 'show-analysis-results':

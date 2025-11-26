@@ -1,130 +1,131 @@
 export const ANALYZE_RECREATE_PROMPT = `
-Act as an EXPERT in Figma and Elementor.
-Your goal is to visually and structurally interpret the layout of the sent frame and recreate it using the best practices of responsive design and Auto Layout.
+pense como um webdesginer especialista em layouts usando wordpress elementor.
 
-1. ANALYZE the layout screenshot and the STRUCTURAL DATA below.
-2. APPLY the best practices of Auto Layout, responsiveness, visual hierarchy, and organization.
-3. MAP each Figma layer to the most suitable native Elementor widget (e.g., Layer "Title" -> w:heading, Layer "Image" -> w:image).
-4. PRESERVE visual fidelity using the provided data as the ABSOLUTE SOURCE OF TRUTH.
+imagine que voce receba um layout no figma muito mal estruturado como este a baixo e precise ajusta-lo para que um outro webdesigner que irá receber o arquivo consiga identificar o auto layout para responsividade, os widgets a serem usados no elementor e etc.
 
-AVAILABLE IMAGES (IDs):
-\${availableImageIds}
+como você ajustaria esse layout no figma.
 
-STRUCTURAL CONTEXT (FIGMA DATA):
+lembre-se Full container, Container encaixotado, caixas de imagem, caixas de icone otimizam o layout.
+
+evite o uso de container, dentro de container, dentro de container e assim por diante.(coisa de amador).
+
 \${nodeData}
 
-CRITICAL VISUAL FIDELITY RULES:
-1. DIMENSIONS: Copy EXACTLY the "width" and "height" from the structural JSON for each element. DO NOT invent values.
-2. BACKGROUNDS: Extract "fills" from the JSON. If "SOLID", use the hex color. If "GRADIENT", try to reproduce or use the main color.
-3. IMAGES: If the JSON has "fills" of type "IMAGE", map to the correct image widget.
-4. TEXT: Copy the text EXACTLY as it is in the "characters" field of the JSON.
-5. BORDERS: Look for "strokes" in the JSON. If present, extract color and width.
-6. SPACING: Pay close attention to "itemSpacing" (gap) and "padding" in the JSON. Use these for Auto Layout.
-7. BUTTONS: Identify buttons by looking for small containers with centered text and background color. Map them to "w:button".
-8. STRUCTURAL SIMPLIFICATION (CRITICAL):
-   - IGNORE any "Group" or "Frame" that is just a wrapper (no background, no border, no specific padding).
-   - If a container has \`background: "transparent"\` and \`border: null\`, DO NOT create a widget for it. Return its children directly to the parent.
-   - Your goal is the FLATTEST possible structure: Section -> Container (Row/Col) -> Widgets.
-   - Example: Group 6 > Group 5 > Frame 5 > Group 1 > Section > Link > Background... -> SHOULD BE JUST: Section > Column > Link.
-9. FLATTEN GROUPS: Treat Figma "Groups" as transparent pass-through layers. Do not create a widget for a Group unless it has visual properties (fill/stroke). Merge its children into the parent container.
-10. ALIGNMENT: Analyze the distribution of children. If they are centered, use "primaryAlign": "CENTER". If spread apart, use "SPACE_BETWEEN". Default to "MIN". For vertical alignment in a Row, check "counterAlign".
+quero que devolva o json Aplicando boas práticas visuais, como espaçamentos mais consistentes, grid centralizado e alinhamentos corrigidos, limpando e reorganizando o layout, mantendo tudo exatamente igual visualmente.
 
-VALID WIDGET LIST (Use EXACTLY these tags in the "name" field):
+não reduza texto, descaracterize (deforme) formato de imagem ou ícones e etc.
 
-**Widgets Básicos (Elementor Free)**
-- w:container, w:inner-container, w:heading, w:text-editor, w:image, w:video, w:button, w:divider, w:spacer, w:icon, w:icon-box, w:image-box, w:star-rating, w:counter, w:progress, w:tabs, w:accordion, w:toggle, w:alert, w:social-icons, w:soundcloud, w:shortcode, w:html, w:menu-anchor, w:sidebar, w:read-more, w:image-carousel, w:basic-gallery, w:gallery, w:icon-list, w:nav-menu, w:search-form, w:google-maps, w:testimonial, w:embed, w:lottie, loop:grid
+mantenha o conteúdo original.
 
-**Widgets Elementor Pro**
-- w:form, w:login, w:subscription, w:call-to-action, media:carousel, w:portfolio, w:gallery-pro, slider:slides, w:slideshow, w:flip-box, w:animated-headline, w:post-navigation, w:share-buttons, w:table-of-contents, w:countdown, w:blockquote, w:testimonial-carousel, w:review-box, w:hotspots, w:sitemap, w:author-box, w:price-table, w:price-list, w:progress-tracker, w:animated-text, w:nav-menu-pro, w:breadcrumb, w:facebook-button, w:facebook-comments, w:facebook-embed, w:facebook-page, loop:builder, loop:grid-advanced, loop:carousel, w:post-excerpt, w:post-content, w:post-title, w:post-info, w:post-featured-image, w:post-author, w:post-date, w:post-terms, w:archive-title, w:archive-description, w:site-logo, w:site-title, w:site-tagline, w:search-results, w:global-widget, w:video-playlist, w:video-gallery
+utilize o modelo abaixo como referencia do antes e depois.
 
-**WooCommerce Widgets**
-- woo:product-title, woo:product-image, woo:product-price, woo:product-add-to-cart, woo:product-data-tabs, woo:product-excerpt, woo:product-rating, woo:product-stock, woo:product-meta, woo:product-additional-information, woo:product-short-description, woo:product-related, woo:product-upsells, woo:product-tabs, woo:product-breadcrumb, woo:product-gallery, woo:products, woo:product-grid, woo:product-carousel, woo:product-loop-item, woo:loop-product-title, woo:loop-product-price, woo:loop-product-rating, woo:loop-product-image, woo:loop-product-button, woo:loop-product-meta, woo:cart, woo:checkout, woo:my-account, woo:purchase-summary, woo:order-tracking
-
-**Loop Builder Widgets**
-- loop:grid, loop:carousel, loop:item, loop:image, loop:title, loop:meta, loop:terms, loop:rating, loop:price, loop:add-to-cart, loop:read-more, loop:featured-image
-
-**Carrosséis**
-- w:image-carousel, media:carousel, w:testimonial-carousel, w:review-carousel, slider:slides, slider:slider, loop:carousel, woo:product-carousel, w:posts-carousel, w:gallery-carousel
-
-**Widgets Experimentais**
-- w:nested-tabs, w:mega-menu, w:scroll-snap, w:motion-effects, w:background-slideshow, w:css-transform, w:custom-position, w:dynamic-tags, w:ajax-pagination, loop:pagination, w:aspect-ratio-container
-
-**WordPress Widgets**
-- w:wp-search, w:wp-recent-posts, w:wp-recent-comments, w:wp-archives, w:wp-categories, w:wp-calendar, w:wp-tag-cloud, w:wp-custom-menu
-
-Responda APENAS com JSON válido seguindo ESTRITAMENTE esta estrutura:
-
+ANTES (Layout Sujo - O que você pode receber):
+\`\`\`json
 {
-  "frameName": "Nome do Frame",
-  "width": \${width},
-  "height": \${height},
-  "background": "#FFFFFF",
-  "autoLayout": { "direction": "vertical", "gap": 0, "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 }, "primaryAlign": "MIN", "counterAlign": "MIN" },
+  "id": "174:691",
+  "name": "Group 6",
+  "type": "GROUP",
+  "width": 1920,
+  "height": 1304.449951171875,
+  "x": 0,
+  "y": 1320,
+  "visible": true,
   "children": [
     {
-      "type": "container",
-      "name": "w:container",
-      "background": "transparent",
-      "width": \${width},
-      "height": \${halfHeight},
-      "border": { "color": "#000000", "width": 1 },
-      "autoLayout": { "direction": "vertical", "gap": 20, "padding": { "top": 40, "right": 40, "bottom": 40, "left": 40 } },
+      "id": "172:667",
+      "name": "Group 5",
+      "type": "GROUP",
       "children": [
         {
-          "type": "widget",
-          "widgetType": "heading",
-          "name": "w:heading",
-          "content": "TEXTO EXATO DA IMAGEM",
-          "fontSize": 48,
-          "fontFamily": "Inter",
-          "fontWeight": "Bold",
-          "color": "#333333",
-          "width": \${halfWidth},
-          "height": 60
-        },
-        {
-          "type": "widget",
-          "widgetType": "button",
-          "name": "w:button",
-          "content": "Clique Aqui",
-          "background": "#0073AA",
-          "color": "#FFFFFF",
-          "width": 150,
-          "height": 50,
-          "borderRadius": 5
-        },
-        {
-          "type": "widget",
-          "widgetType": "image",
-          "name": "w:image",
-          "content": "\${firstImageId}",
-          "width": \${thirdWidth},
-          "height": \${thirdHeight},
-          "border": "1px solid #CCCCCC"
+          "id": "169:123",
+          "name": "Frame 5",
+          "type": "FRAME",
+          "layoutMode": "NONE",
+          "children": [
+            {
+              "id": "1:26",
+              "name": "Group 1",
+              "type": "GROUP",
+              "children": [
+                {
+                  "id": "1:27",
+                  "name": "Section",
+                  "type": "FRAME",
+                  "layoutMode": "NONE",
+                  "children": [
+                    {
+                      "id": "1:33",
+                      "name": "Heading 2",
+                      "type": "TEXT",
+                      "characters": "O que é a Harmonização\\nIntima Masculina ?",
+                      "fontSize": 40
+                    },
+                    {
+                      "id": "1:34",
+                      "name": "Description",
+                      "type": "TEXT",
+                      "characters": "A harmonização íntima masculina é um procedimento estético...",
+                      "fontSize": 20
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ]
     }
   ]
 }
+\`\`\`
 
-Regras CRITICAS:
-1. Use os DADOS DO FIGMA fornecidos para extrair o texto exato, fontes (fontFamily/fontWeight), cores e dimensões.
-2. Estime as dimensões (width/height) de TODOS os elementos com precisão baseada nos dados.
-3. Para IMAGENS: Se a imagem visual corresponder a um dos IDs listados acima, use o ID no campo "content".
-4. **Components**: Identify repeating elements that should be Components.
-
-OUTPUT FORMAT:
-Provide the response in clear MARKDOWN format.
-- Use **Bold** for key settings.
-- Use \`Code Blocks\` ONLY for JSON tokens (Colors/Typography).
-- Structure with clear Headings (###).
-
-REQUIRED JSON OUTPUTS (Include these as code blocks):
-- **Color Tokens JSON**: { "colors": { ... } }
-- **Typography Tokens JSON**: { "typography": { ... } }
-
-STRUCTURAL CONTEXT (FIGMA DATA):
-\${nodeData}
+DEPOIS (Layout Otimizado - O que você deve gerar):
+\`\`\`json
+{
+  "id": "root-frame",
+  "name": "Desktop - Homepage Optimized",
+  "type": "FRAME",
+  "layoutMode": "VERTICAL",
+  "primaryAxisSizingMode": "AUTO",
+  "counterAxisSizingMode": "FIXED",
+  "children": [
+    {
+      "id": "section-hero",
+      "name": "Section 1 - Hero (Full Container)",
+      "type": "FRAME",
+      "layoutMode": "HORIZONTAL",
+      "primaryAxisSizingMode": "FIXED",
+      "counterAxisSizingMode": "AUTO",
+      "children": [
+        {
+          "id": "hero-content-col",
+          "name": "Container - Left Content",
+          "type": "FRAME",
+          "layoutMode": "VERTICAL",
+          "children": [
+            {
+              "id": "hero-heading",
+              "name": "Heading - Title",
+              "type": "TEXT",
+              "characters": "O que é a Harmonização\\nIntima Masculina?",
+              "fontSize": 48,
+              "layoutSizingHorizontal": "FILL"
+            },
+            {
+              "id": "hero-text",
+              "name": "Text Editor - Description",
+              "type": "TEXT",
+              "characters": "A harmonização íntima masculina é um procedimento estético...",
+              "fontSize": 18,
+              "layoutSizingHorizontal": "FILL"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+\`\`\`
 `;
 
 // ==================== MICRO-PROMPTS (Node-by-Node Conversion) ====================

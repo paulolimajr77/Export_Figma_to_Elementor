@@ -3,7 +3,7 @@
 
 import { extractNodeData, NodeData } from './node_extractor';
 import type { ConversationState, ProcessedNode, FinalOutput } from './conversation_types';
-import * as Gemini from '../api_gemini';
+import { analyzeAndRecreate } from '../api_gemini';
 import { MICRO_PROMPT_INIT, MICRO_PROMPT_NOMENCLATURES, buildNodePrompt, buildConsolidationPrompt } from '../config/prompts';
 
 /**
@@ -110,10 +110,11 @@ async function callGeminiWithRetry(
             // Monta os dados para enviar ao Gemini
             const nodeData = { prompt }; // Simplificado para esta versão
 
-            const result = await Gemini.analyzeAndRecreate(
-                imageData || new Uint8Array(),
+            const result = await analyzeAndRecreate(
+                imageData || new Uint8Array(0),
                 availableImageIds,
-                nodeData
+                nodeData,
+                'micro'
             );
 
             return result;

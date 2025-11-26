@@ -6,6 +6,7 @@
 import type { ElementorTemplate, WPConfig } from './types/elementor.types';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import * as Gemini from './api_gemini';
+import * as DeepSeek from './api_deepseek';
 import type { LayoutAnalysis, ChildNode } from './api_gemini';
 import { createOptimizedFrame } from './gemini_frame_builder';
 import { extractImagesFromNode, getBackgroundFromNode } from './utils/image_utils';
@@ -19,6 +20,91 @@ function hasLayout(node: SceneNode): node is FrameNode | ComponentNode | Instanc
 // -------------------- Helper Functions --------------------
 // (Funções de imagem e serialização movidas para src/utils)
 
+
+// Helper simples para construção de nodes (Engine "Burra" para teste)
+const buildNode = (data: any, parent?: FrameNode) => {
+    let node: SceneNode;
+    if (data.type === 'FRAME') {
+        const frame = figma.createFrame();
+        node = frame;
+        frame.name = data.name;
+
+        // Add to parent FIRST so we can set layout sizing properties that depend on parent
+        if (parent) parent.appendChild(node);
+
+        if (data.width) frame.resize(data.width, typeof data.height === 'number' ? data.height : 100);
+        if (data.layoutMode) frame.layoutMode = data.layoutMode;
+        if (data.primaryAxisAlignItems) {
+            if (data.primaryAxisAlignItems === 'START') frame.primaryAxisAlignItems = 'MIN';
+            else if (data.primaryAxisAlignItems === 'END') frame.primaryAxisAlignItems = 'MAX';
+            else frame.primaryAxisAlignItems = data.primaryAxisAlignItems;
+        }
+        if (data.counterAxisAlignItems) {
+            if (data.counterAxisAlignItems === 'START') frame.counterAxisAlignItems = 'MIN';
+            else if (data.counterAxisAlignItems === 'END') frame.counterAxisAlignItems = 'MAX';
+            else frame.counterAxisAlignItems = data.counterAxisAlignItems;
+        }
+        if (data.itemSpacing) frame.itemSpacing = data.itemSpacing;
+        if (data.paddingTop) frame.paddingTop = data.paddingTop;
+        if (data.paddingBottom) frame.paddingBottom = data.paddingBottom;
+        if (data.paddingLeft) frame.paddingLeft = data.paddingLeft;
+        if (data.paddingRight) frame.paddingRight = data.paddingRight;
+        if (data.cornerRadius) frame.cornerRadius = data.cornerRadius;
+        if (data.topLeftRadius) frame.topLeftRadius = data.topLeftRadius;
+        if (data.topRightRadius) frame.topRightRadius = data.topRightRadius;
+        if (data.bottomLeftRadius) frame.bottomLeftRadius = data.bottomLeftRadius;
+        if (data.bottomRightRadius) frame.bottomRightRadius = data.bottomRightRadius;
+        if (data.strokes) frame.strokes = data.strokes;
+        if (data.strokeWeight) frame.strokeWeight = data.strokeWeight;
+        if (data.fills) frame.fills = data.fills;
+
+        // Set sizing AFTER appending to parent and parent has layoutMode (if applicable)
+        // Note: The parent must have layoutMode != "NONE" for these to work.
+        // Since we build top-down, parent should be ready.
+        if (data.layoutSizingHorizontal === 'FILL') frame.layoutSizingHorizontal = 'FILL';
+        if (data.layoutSizingVertical === 'FILL') frame.layoutSizingVertical = 'FILL';
+        if (data.layoutSizingVertical === 'HUG') frame.layoutSizingVertical = 'HUG';
+
+        if (data.primaryAxisSizingMode) {
+            if (data.primaryAxisSizingMode === 'HUG') frame.primaryAxisSizingMode = 'AUTO';
+            else if (data.primaryAxisSizingMode === 'FILL') frame.primaryAxisSizingMode = 'FIXED';
+            else frame.primaryAxisSizingMode = data.primaryAxisSizingMode;
+        }
+        if (data.counterAxisSizingMode) {
+            if (data.counterAxisSizingMode === 'HUG') frame.counterAxisSizingMode = 'AUTO';
+            else if (data.counterAxisSizingMode === 'FILL') frame.counterAxisSizingMode = 'FIXED';
+            else frame.counterAxisSizingMode = data.counterAxisSizingMode;
+        }
+
+        if (data.children) {
+            data.children.forEach((childData: any) => buildNode(childData, frame));
+        }
+    } else if (data.type === 'TEXT') {
+        const text = figma.createText();
+        node = text;
+        text.name = data.name;
+
+        // Add to parent FIRST
+        if (parent) parent.appendChild(node);
+
+        text.characters = data.characters;
+        if (data.fontSize) text.fontSize = data.fontSize;
+        if (data.fontName) text.fontName = data.fontName;
+        if (data.fills) text.fills = data.fills;
+        else if (data.color) {
+            text.fills = [{ type: 'SOLID', color: data.color }];
+        }
+        if (data.textAlignHorizontal) text.textAlignHorizontal = data.textAlignHorizontal;
+        if (data.lineHeight) text.lineHeight = data.lineHeight;
+
+        // Set sizing AFTER appending
+        if (data.layoutSizingHorizontal === 'FILL') text.layoutSizingHorizontal = 'FILL';
+    } else {
+        return;
+    }
+
+    return node;
+};
 
 // -------------------- Main Execution --------------------
 figma.showUI(__html__, { width: 600, height: 600 });
@@ -310,18 +396,27 @@ figma.ui.onmessage = async (msg) => {
             // ... (existing code)
 
             // Cria um objeto de análise consolidado
-            const finalAnalysis: Gemini.LayoutAnalysis = {
+            // Cria um objeto de análise consolidado
+            const finalAnalysis: any = {
+                type: "FRAME",
+                name: node.name + " (Otimizado)",
                 frameName: node.name + " (Otimizado)",
                 width: node.width,
                 height: node.height,
+                layoutMode: "VERTICAL",
                 background: getBackgroundFromNode(node),
                 autoLayout: { direction: "vertical", gap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 } },
                 children: aggregatedChildren,
                 improvements: [...new Set(aggregatedImprovements)]
             };
 
-            // 1. Cria o frame visual no Figma (Feedback imediato)
-            const newFrame = await createOptimizedFrame(finalAnalysis, node, availableImages);
+            // 1. Cria o frame visual no Figma (USANDO MOTOR SIMPLES PARA TESTE)
+            // const newFrame = await createOptimizedFrame(finalAnalysis, node, availableImages);
+            const newFrame = buildNode(finalAnalysis) as FrameNode;
+            if (node) {
+                newFrame.x = node.x + node.width + 100;
+                newFrame.y = node.y;
+            }
 
             figma.currentPage.selection = [newFrame];
             figma.viewport.scrollAndZoomIntoView([newFrame]);
@@ -375,6 +470,182 @@ figma.ui.onmessage = async (msg) => {
         }
     }
 
+    // =================================================================
+    // ----- LÓGICA DO DEEPSEEK ---------------------------------------
+    // =================================================================
+
+    else if (msg.type === 'save-deepseek-key') {
+        await DeepSeek.saveDeepSeekKey(msg.key);
+        figma.notify('🔑 API Key do DeepSeek salva com sucesso!');
+    }
+
+    else if (msg.type === 'save-deepseek-model') {
+        await DeepSeek.saveDeepSeekModel(msg.model);
+        figma.notify(`🤖 Modelo DeepSeek definido para: ${msg.model}`);
+    }
+
+    else if (msg.type === 'get-deepseek-config') {
+        const apiKey = await DeepSeek.getDeepSeekKey();
+        const model = await DeepSeek.getDeepSeekModel();
+        figma.ui.postMessage({ type: 'load-deepseek-config', apiKey, model });
+    }
+
+    else if (msg.type === 'test-deepseek-connection') {
+        figma.notify('Testando conexão com DeepSeek...');
+        const result = await DeepSeek.testDeepSeekConnection();
+        figma.ui.postMessage({ type: 'deepseek-connection-result', ...result });
+        if (result.success) figma.notify(result.message);
+        else figma.notify('❌ Falha na conexão DeepSeek');
+    }
+
+    else if (msg.type === 'analyze-with-deepseek') {
+        const selection = figma.currentPage.selection;
+        if (selection.length !== 1) {
+            figma.notify('⚠️ Selecione apenas 1 frame para análise');
+            return;
+        }
+
+        const node = selection[0];
+
+        // Validação mais estrita do tipo de node
+        if (node.type !== 'FRAME' && node.type !== 'SECTION' && node.type !== 'COMPONENT' && node.type !== 'GROUP') {
+            figma.notify('⚠️ Selecione um Frame, Section, Componente ou Grupo válido.');
+            return;
+        }
+
+        if (!('children' in node)) {
+            figma.notify('⚠️ O elemento selecionado não possui filhos para análise.');
+            return;
+        }
+
+        figma.notify('🤖 Iniciando análise com DeepSeek...');
+
+        try {
+            // Extrai imagens globais para reutilização
+            const availableImages = await extractImagesFromNode(node);
+            const availableImageIds = Object.keys(availableImages);
+            console.log('🖼️ Imagens extraídas do original:', availableImageIds);
+            figma.ui.postMessage({ type: 'add-gemini-log', data: `🖼️ Imagens encontradas no original: ${availableImageIds.length}` });
+
+            // Prepara lista de filhos para análise
+            const childrenToAnalyze = getSectionsToAnalyze(node);
+            const totalSections = childrenToAnalyze.length;
+
+            if (totalSections === 0) {
+                throw new Error("O frame selecionado está vazio ou não possui seções visíveis.");
+            }
+
+            const aggregatedChildren: any[] = [];
+            const aggregatedImprovements: string[] = [];
+
+            // Itera sobre cada filho (seção)
+            for (let i = 0; i < totalSections; i++) {
+                let child = childrenToAnalyze[i];
+                const sectionIndex = i + 1;
+
+                figma.notify(`🤖 Analisando seção ${sectionIndex} de ${totalSections}: ${child.name}...`);
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `--- INICIANDO ANÁLISE DA SEÇÃO ${sectionIndex}/${totalSections}: ${child.name} ---` });
+
+                // Serializa dados da seção
+                const sectionSerializedData = serializeNode(child);
+
+                // LOG DETALHADO DOS DADOS COLETADOS
+                figma.ui.postMessage({
+                    type: 'add-gemini-log',
+                    data: `🔍 DADOS COLETADOS (Seção ${sectionIndex} - ${child.name}):\n${JSON.stringify(sectionSerializedData, null, 2)}`
+                });
+
+                // Exporta imagem da seção para análise visual (se suportado)
+                const sectionImageData = await child.exportAsync({ format: 'JPG', constraint: { type: 'SCALE', value: 1 } });
+
+                // Analisa a seção individualmente usando DeepSeek
+                const sectionAnalysis = await DeepSeek.analyzeLayoutDeepSeek(sectionSerializedData, child.id, sectionImageData);
+
+                // LOG DA RESPOSTA DA IA
+                figma.ui.postMessage({
+                    type: 'add-gemini-log',
+                    data: `🤖 RESPOSTA DEEPSEEK (Seção ${sectionIndex} - ${child.name}):\n${JSON.stringify(sectionAnalysis, null, 2)}`
+                });
+
+                if (sectionAnalysis.children) {
+                    aggregatedChildren.push(...sectionAnalysis.children);
+                }
+                if (sectionAnalysis.improvements) {
+                    aggregatedImprovements.push(...sectionAnalysis.improvements);
+                }
+            }
+
+            figma.notify('🎨 Montando frame final otimizado...');
+
+            // Cria um objeto de análise consolidado
+            // Cria um objeto de análise consolidado
+            const finalAnalysis: any = {
+                type: "FRAME",
+                name: node.name + " (DeepSeek Otimizado)",
+                frameName: node.name + " (DeepSeek Otimizado)",
+                width: node.width,
+                height: node.height,
+                layoutMode: "VERTICAL",
+                background: getBackgroundFromNode(node),
+                autoLayout: { direction: "vertical", gap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 } },
+                children: aggregatedChildren,
+                improvements: [...new Set(aggregatedImprovements)]
+            };
+
+            // 1. Cria o frame visual no Figma (USANDO MOTOR SIMPLES PARA TESTE)
+            // const newFrame = await createOptimizedFrame(finalAnalysis, node, availableImages);
+            const newFrame = buildNode(finalAnalysis) as FrameNode;
+            if (node) {
+                newFrame.x = node.x + node.width + 100;
+                newFrame.y = node.y;
+            }
+
+            figma.currentPage.selection = [newFrame];
+            figma.viewport.scrollAndZoomIntoView([newFrame]);
+
+            figma.ui.postMessage({
+                type: 'gemini-creation-complete',
+                data: {
+                    originalName: node.name,
+                    newName: newFrame.name,
+                    improvements: finalAnalysis.improvements
+                }
+            });
+
+            // 2. FASE 4: CONSOLIDAÇÃO PARA JSON ELEMENTOR
+            figma.notify('🔗 Iniciando Fase 4: Consolidação Final...');
+            figma.ui.postMessage({ type: 'add-gemini-log', data: `--- FASE 4: CONSOLIDAÇÃO ---` });
+
+            // Converter LayoutAnalysis para ProcessedNode[]
+            const processedNodes: Gemini.ProcessedNode[] = flattenAnalysisToNodes(finalAnalysis);
+
+            // Chamar API de consolidação do DeepSeek
+            const consolidationResult = await DeepSeek.consolidateNodes(processedNodes);
+
+            figma.ui.postMessage({
+                type: 'add-gemini-log',
+                data: `✅ CONSOLIDAÇÃO CONCLUÍDA:\n${JSON.stringify(consolidationResult, null, 2)}`
+            });
+
+            figma.ui.postMessage({
+                type: 'consolidation-result',
+                result: consolidationResult
+            });
+
+            figma.notify('✅ Conversão Completa! JSON gerado.');
+
+        } catch (e: any) {
+            console.error("Erro detalhado na análise DeepSeek:", e);
+            figma.notify('❌ Erro na análise: ' + e.message);
+            figma.ui.postMessage({
+                type: 'gemini-error',
+                error: e.message
+            });
+        } finally {
+            figma.ui.postMessage({ type: 'hide-loader' });
+        }
+    }
+
     else if (msg.type === 'resize-ui') {
         figma.ui.resize(msg.width, msg.height);
     }
@@ -387,286 +658,479 @@ figma.ui.onmessage = async (msg) => {
                 "name": "Desktop - Homepage Optimized",
                 "type": "FRAME",
                 "width": 1920,
-                "height": 2000,
-                "x": 0,
-                "y": 0,
-                "visible": true,
+                "height": 1304,
                 "layoutMode": "VERTICAL",
                 "primaryAxisSizingMode": "AUTO",
                 "counterAxisSizingMode": "FIXED",
-                "primaryAxisAlignItems": "MIN",
-                "counterAxisAlignItems": "CENTER",
-                "itemSpacing": 0,
-                "paddingTop": 0,
-                "paddingRight": 0,
-                "paddingBottom": 0,
-                "paddingLeft": 0,
-                "fills": [
-                    {
-                        "type": "SOLID",
-                        "color": { "r": 1, "g": 1, "b": 1 },
-                        "visible": true
-                    }
-                ],
+                "fills": [],
                 "children": [
                     {
                         "id": "section-hero",
                         "name": "Section 1 - Hero (Full Container)",
                         "type": "FRAME",
+                        "width": 1920,
+                        "height": 571,
                         "layoutMode": "HORIZONTAL",
                         "primaryAxisSizingMode": "FIXED",
                         "counterAxisSizingMode": "AUTO",
-                        "width": 1920,
-                        "paddingTop": 100,
-                        "paddingBottom": 100,
-                        "paddingLeft": 320,
+                        "fills": [],
+                        "paddingTop": 0,
                         "paddingRight": 320,
-                        "itemSpacing": 64,
-                        "primaryAxisAlignItems": "CENTER",
-                        "counterAxisAlignItems": "CENTER",
-                        "fills": [
-                            {
-                                "type": "SOLID",
-                                "color": { "r": 1, "g": 1, "b": 1 }
-                            }
-                        ],
+                        "paddingBottom": 0,
+                        "paddingLeft": 320,
+                        "itemSpacing": 0,
                         "children": [
                             {
                                 "id": "hero-content-col",
                                 "name": "Container - Left Content",
                                 "type": "FRAME",
+                                "width": 610,
+                                "height": 550,
                                 "layoutMode": "VERTICAL",
                                 "primaryAxisSizingMode": "AUTO",
                                 "counterAxisSizingMode": "FIXED",
-                                "layoutSizingHorizontal": "FILL",
-                                "width": 600,
-                                "itemSpacing": 32,
+                                "fills": [],
+                                "itemSpacing": 24,
+                                "primaryAxisAlignItems": "START",
+                                "counterAxisAlignItems": "START",
                                 "children": [
                                     {
                                         "id": "hero-heading",
                                         "name": "Heading - Title",
                                         "type": "TEXT",
-                                        "characters": "O que é a Harmonização\nIntima Masculina?",
-                                        "fontSize": 48,
-                                        "fontName": { "family": "Inter", "style": "Bold" },
+                                        "width": 526,
+                                        "height": 96,
+                                        "characters": "O que é a Harmonização\nIntima Masculina ?",
+                                        "fontSize": 40,
+                                        "fontName": {
+                                            "family": "Inter",
+                                            "style": "Bold"
+                                        },
                                         "fontWeight": 700,
-                                        "fills": [{ "type": "SOLID", "color": { "r": 0.007, "g": 0.431, "b": 0.478 } }],
-                                        "layoutSizingHorizontal": "FILL"
+                                        "textAlignHorizontal": "LEFT",
+                                        "textAlignVertical": "CENTER",
+                                        "letterSpacing": {
+                                            "unit": "PIXELS",
+                                            "value": -1
+                                        },
+                                        "lineHeight": {
+                                            "unit": "PIXELS",
+                                            "value": 48
+                                        },
+                                        "textCase": "UPPER",
+                                        "color": {
+                                            "r": 0.007843137718737125,
+                                            "g": 0.4313725531101227,
+                                            "b": 0.47843137383461
+                                        }
                                     },
                                     {
                                         "id": "hero-text",
                                         "name": "Text Editor - Description",
                                         "type": "TEXT",
-                                        "characters": "A harmonização íntima masculina é um procedimento estético que visa aumentar tanto o tamanho quanto a circunferência do Pênis, além de corrigir assimetrias e melhorar a aparência.\n\nO Protocolo NEXX utiliza Ácido Hialurônico, Toxina Botulínica e FIOS de PDO, produtos seguros, eficazes e compatíveis com o nosso organismo.",
-                                        "fontSize": 18,
-                                        "fontName": { "family": "Inter", "style": "Regular" },
-                                        "lineHeight": { "value": 28, "unit": "PIXELS" },
-                                        "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }],
-                                        "layoutSizingHorizontal": "FILL"
+                                        "width": 554,
+                                        "height": 264,
+                                        "characters": "A harmonização íntima masculina é um procedimento estético que visa aumentar tanto o tamanho quanto a circunferência do Pênis, além de corrigir assimetrias e melhorar a aparência.\n\nO Protocolo NEXX utiliza Ácido Hialurônico, Toxina Botulínica e FIOS de PDO, produtos seguros, eficazes e compatíveis com o nosso organismo. Trata-se de um procedimento minimamente invasivo, realizado sob anestesia local, com recuperação rápida e resultados imediatos.",
+                                        "fontSize": 20,
+                                        "fontName": {
+                                            "family": "Inter",
+                                            "style": "Regular"
+                                        },
+                                        "fontWeight": 400,
+                                        "textAlignHorizontal": "JUSTIFIED",
+                                        "textAlignVertical": "CENTER",
+                                        "lineHeight": {
+                                            "unit": "PIXELS",
+                                            "value": 24
+                                        },
+                                        "color": {
+                                            "r": 0.20000000298023224,
+                                            "g": 0.20000000298023224,
+                                            "b": 0.20000000298023224
+                                        }
                                     },
                                     {
                                         "id": "hero-button",
-                                        "name": "Button - CTA",
+                                        "name": "Button - Agendar Avaliação",
                                         "type": "FRAME",
+                                        "width": 350,
+                                        "height": 61,
                                         "layoutMode": "HORIZONTAL",
-                                        "primaryAxisSizingMode": "AUTO",
-                                        "counterAxisSizingMode": "AUTO",
+                                        "primaryAxisSizingMode": "FIXED",
+                                        "counterAxisSizingMode": "FIXED",
+                                        "fills": [
+                                            {
+                                                "type": "SOLID",
+                                                "color": {
+                                                    "r": 0.007843137718737125,
+                                                    "g": 0.4313725531101227,
+                                                    "b": 0.47843137383461
+                                                }
+                                            }
+                                        ],
+                                        "cornerRadius": 30,
                                         "primaryAxisAlignItems": "CENTER",
                                         "counterAxisAlignItems": "CENTER",
-                                        "paddingTop": 20,
-                                        "paddingBottom": 20,
-                                        "paddingLeft": 40,
-                                        "paddingRight": 40,
-                                        "cornerRadius": 50,
-                                        "fills": [{ "type": "SOLID", "color": { "r": 0.007, "g": 0.431, "b": 0.478 } }],
                                         "children": [
                                             {
-                                                "id": "btn-text",
-                                                "name": "Label",
+                                                "id": "button-text",
+                                                "name": "Text - Agendar Avaliação",
                                                 "type": "TEXT",
+                                                "width": 193.4801025390625,
+                                                "height": 20,
                                                 "characters": "Agendar Avaliação",
-                                                "fontSize": 18,
-                                                "fontName": { "family": "Sora", "style": "SemiBold" },
-                                                "fills": [{ "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1 } }]
+                                                "fontSize": 20,
+                                                "fontName": {
+                                                    "family": "Sora",
+                                                    "style": "SemiBold"
+                                                },
+                                                "fontWeight": 600,
+                                                "textAlignHorizontal": "LEFT",
+                                                "textAlignVertical": "CENTER",
+                                                "letterSpacing": {
+                                                    "unit": "PERCENT",
+                                                    "value": 0
+                                                },
+                                                "lineHeight": {
+                                                    "unit": "PIXELS",
+                                                    "value": 20
+                                                },
+                                                "color": {
+                                                    "r": 1,
+                                                    "g": 1,
+                                                    "b": 1
+                                                }
                                             }
                                         ]
                                     }
                                 ]
                             },
                             {
-                                "id": "hero-image-col",
-                                "name": "Container - Right Image",
+                                "id": "hero-image",
+                                "name": "Image - Banner Homem",
                                 "type": "FRAME",
-                                "layoutMode": "VERTICAL",
-                                "primaryAxisSizingMode": "AUTO",
-                                "counterAxisSizingMode": "FIXED",
                                 "width": 547,
                                 "height": 550,
-                                "cornerRadius": 24,
-                                "topLeftRadius": 24,
-                                "topRightRadius": 24,
-                                "bottomLeftRadius": 270,
-                                "bottomRightRadius": 24,
                                 "fills": [
                                     {
                                         "type": "IMAGE",
-                                        "scaleMode": "FILL",
-                                        "imageHash": "8940bc040ef8faaed695b736e6eff3a7c543b3b8"
+                                        "imageHash": "8940bc040ef8faaed695b736e6eff3a7c543b3b8",
+                                        "scaleMode": "CROP"
                                     }
-                                ]
+                                ],
+                                "topLeftRadius": 27.43000030517578,
+                                "topRightRadius": 27.43000030517578,
+                                "bottomLeftRadius": 274.25,
+                                "bottomRightRadius": 27.43000030517578
                             }
                         ]
                     },
                     {
-                        "id": "section-features",
-                        "name": "Section 2 - Features (Full Container)",
+                        "id": "section-steps",
+                        "name": "Section 2 - Steps (Full Container)",
                         "type": "FRAME",
+                        "width": 1920,
+                        "height": 677,
                         "layoutMode": "VERTICAL",
                         "primaryAxisSizingMode": "AUTO",
                         "counterAxisSizingMode": "FIXED",
-                        "width": 1920,
-                        "paddingTop": 100,
-                        "paddingBottom": 100,
-                        "paddingLeft": 320,
-                        "paddingRight": 320,
-                        "itemSpacing": 64,
-                        "primaryAxisAlignItems": "CENTER",
                         "fills": [
                             {
                                 "type": "SOLID",
-                                "color": { "r": 0.96, "g": 0.97, "b": 0.97 }
+                                "color": {
+                                    "r": 0.9647058844566345,
+                                    "g": 0.9686274528503418,
+                                    "b": 0.9686274528503418
+                                }
                             }
                         ],
+                        "paddingTop": 0,
+                        "paddingRight": 320,
+                        "paddingBottom": 0,
+                        "paddingLeft": 320,
+                        "itemSpacing": 0,
+                        "primaryAxisAlignItems": "CENTER",
+                        "counterAxisAlignItems": "CENTER",
                         "children": [
                             {
-                                "id": "feature-heading",
-                                "name": "Heading - Section Title",
+                                "id": "steps-heading",
+                                "name": "Heading - Steps Title",
                                 "type": "TEXT",
+                                "width": 719,
+                                "height": 112,
                                 "characters": "ENGROSSE E AUMENTE SEU PÊNIS COM RESULTADOS IMEDIATOS",
+                                "fontSize": 40,
+                                "fontName": {
+                                    "family": "Inter",
+                                    "style": "Bold"
+                                },
+                                "fontWeight": 700,
                                 "textAlignHorizontal": "CENTER",
-                                "fontSize": 36,
-                                "fontName": { "family": "Inter", "style": "Bold" },
-                                "fills": [{ "type": "SOLID", "color": { "r": 0.007, "g": 0.431, "b": 0.478 } }]
+                                "textAlignVertical": "CENTER",
+                                "letterSpacing": {
+                                    "unit": "PIXELS",
+                                    "value": -1
+                                },
+                                "lineHeight": {
+                                    "unit": "PIXELS",
+                                    "value": 56
+                                },
+                                "textCase": "UPPER",
+                                "color": {
+                                    "r": 0.007843137718737125,
+                                    "g": 0.4313725531101227,
+                                    "b": 0.47843137383461
+                                }
                             },
                             {
-                                "id": "features-grid",
-                                "name": "Container - Grid (Flex Row)",
+                                "id": "steps-container",
+                                "name": "Container - Steps",
                                 "type": "FRAME",
+                                "width": 1280,
+                                "height": 265,
                                 "layoutMode": "HORIZONTAL",
                                 "primaryAxisSizingMode": "AUTO",
                                 "counterAxisSizingMode": "FIXED",
+                                "fills": [],
+                                "itemSpacing": 36,
                                 "primaryAxisAlignItems": "CENTER",
-                                "itemSpacing": 32,
-                                "layoutSizingHorizontal": "FILL",
+                                "counterAxisAlignItems": "CENTER",
                                 "children": [
                                     {
-                                        "id": "card-1",
-                                        "name": "Container - Card 1",
+                                        "id": "step-1",
+                                        "name": "Step 1 - Anestesia",
                                         "type": "FRAME",
+                                        "width": 408,
+                                        "height": 265,
                                         "layoutMode": "VERTICAL",
                                         "primaryAxisSizingMode": "AUTO",
                                         "counterAxisSizingMode": "FIXED",
-                                        "itemSpacing": 16,
-                                        "width": 400,
+                                        "fills": [
+                                            {
+                                                "type": "SOLID",
+                                                "color": {
+                                                    "r": 1,
+                                                    "g": 1,
+                                                    "b": 1
+                                                }
+                                            }
+                                        ],
+                                        "strokes": [
+                                            {
+                                                "type": "SOLID",
+                                                "color": {
+                                                    "r": 0.15295857191085815,
+                                                    "g": 0.6660650372505188,
+                                                    "b": 0.7230768799781799
+                                                }
+                                            }
+                                        ],
+                                        "strokeWeight": 1,
+                                        "cornerRadius": 12,
+                                        "primaryAxisAlignItems": "CENTER",
+                                        "counterAxisAlignItems": "CENTER",
+                                        "itemSpacing": 8,
                                         "children": [
                                             {
-                                                "id": "img-box-1",
-                                                "name": "Image Box",
+                                                "id": "step-1-image",
+                                                "name": "Image - Anestesia",
                                                 "type": "FRAME",
-                                                "layoutMode": "VERTICAL",
-                                                "primaryAxisSizingMode": "FIXED",
-                                                "counterAxisSizingMode": "FIXED",
-                                                "width": 400,
-                                                "height": 260,
-                                                "cornerRadius": 12,
-                                                "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
-                                                "strokeWeight": 1,
-                                                "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "42e2afde322e10744ddbea5a95e2ef2849570b61" }]
+                                                "width": 408,
+                                                "height": 231,
+                                                "fills": [
+                                                    {
+                                                        "type": "IMAGE",
+                                                        "imageHash": "42e2afde322e10744ddbea5a95e2ef2849570b61",
+                                                        "scaleMode": "CROP"
+                                                    }
+                                                ]
                                             },
                                             {
-                                                "id": "text-1",
-                                                "name": "Heading",
+                                                "id": "step-1-text",
+                                                "name": "Text - Anestesia",
                                                 "type": "TEXT",
+                                                "width": 329,
+                                                "height": 24,
                                                 "characters": "Anestesia Local é Aplicada",
-                                                "fontSize": 20,
-                                                "textAlignHorizontal": "CENTER",
-                                                "layoutSizingHorizontal": "FILL",
-                                                "fontName": { "family": "Inter", "style": "Medium" },
-                                                "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                                                "fontSize": 26,
+                                                "fontName": {
+                                                    "family": "Inter",
+                                                    "style": "Regular"
+                                                },
+                                                "fontWeight": 400,
+                                                "textAlignHorizontal": "JUSTIFIED",
+                                                "textAlignVertical": "CENTER",
+                                                "letterSpacing": {
+                                                    "unit": "PERCENT",
+                                                    "value": 0
+                                                },
+                                                "lineHeight": {
+                                                    "unit": "PIXELS",
+                                                    "value": 24
+                                                },
+                                                "color": {
+                                                    "r": 0.20000000298023224,
+                                                    "g": 0.20000000298023224,
+                                                    "b": 0.20000000298023224
+                                                }
                                             }
                                         ]
                                     },
                                     {
-                                        "id": "card-2",
-                                        "name": "Container - Card 2",
+                                        "id": "step-2",
+                                        "name": "Step 2 - Aumento",
                                         "type": "FRAME",
+                                        "width": 403,
+                                        "height": 262,
                                         "layoutMode": "VERTICAL",
                                         "primaryAxisSizingMode": "AUTO",
                                         "counterAxisSizingMode": "FIXED",
-                                        "itemSpacing": 16,
-                                        "width": 400,
+                                        "fills": [
+                                            {
+                                                "type": "SOLID",
+                                                "color": {
+                                                    "r": 1,
+                                                    "g": 1,
+                                                    "b": 1
+                                                }
+                                            }
+                                        ],
+                                        "strokes": [
+                                            {
+                                                "type": "SOLID",
+                                                "color": {
+                                                    "r": 0.01568627543747425,
+                                                    "g": 0.7607843279838562,
+                                                    "b": 0.7960784435272217
+                                                }
+                                            }
+                                        ],
+                                        "strokeWeight": 1,
+                                        "cornerRadius": 12,
+                                        "primaryAxisAlignItems": "CENTER",
+                                        "counterAxisAlignItems": "CENTER",
+                                        "itemSpacing": 8,
                                         "children": [
                                             {
-                                                "id": "img-box-2",
-                                                "name": "Image Box",
+                                                "id": "step-2-image",
+                                                "name": "Image - Aumento",
                                                 "type": "FRAME",
-                                                "layoutMode": "VERTICAL",
-                                                "primaryAxisSizingMode": "FIXED",
-                                                "counterAxisSizingMode": "FIXED",
-                                                "width": 400,
-                                                "height": 260,
-                                                "cornerRadius": 12,
-                                                "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
-                                                "strokeWeight": 1,
-                                                "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "67d1eeaa0af163b171593ec0086e9b06964feee7" }]
+                                                "width": 403,
+                                                "height": 233,
+                                                "fills": [
+                                                    {
+                                                        "type": "IMAGE",
+                                                        "imageHash": "67d1eeaa0af163b171593ec0086e9b06964feee7",
+                                                        "scaleMode": "FILL"
+                                                    }
+                                                ]
                                             },
                                             {
-                                                "id": "text-2",
-                                                "name": "Heading",
+                                                "id": "step-2-text",
+                                                "name": "Text - Aumento",
                                                 "type": "TEXT",
+                                                "width": 225,
+                                                "height": 24,
                                                 "characters": "Aumento Imediato",
-                                                "fontSize": 20,
-                                                "textAlignHorizontal": "CENTER",
-                                                "layoutSizingHorizontal": "FILL",
-                                                "fontName": { "family": "Inter", "style": "Medium" },
-                                                "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                                                "fontSize": 26,
+                                                "fontName": {
+                                                    "family": "Inter",
+                                                    "style": "Regular"
+                                                },
+                                                "fontWeight": 400,
+                                                "textAlignHorizontal": "JUSTIFIED",
+                                                "textAlignVertical": "CENTER",
+                                                "letterSpacing": {
+                                                    "unit": "PERCENT",
+                                                    "value": 0
+                                                },
+                                                "lineHeight": {
+                                                    "unit": "PIXELS",
+                                                    "value": 24
+                                                },
+                                                "color": {
+                                                    "r": 0.20000000298023224,
+                                                    "g": 0.20000000298023224,
+                                                    "b": 0.20000000298023224
+                                                }
                                             }
                                         ]
                                     },
                                     {
-                                        "id": "card-3",
-                                        "name": "Container - Card 3",
+                                        "id": "step-3",
+                                        "name": "Step 3 - Resultado",
                                         "type": "FRAME",
+                                        "width": 407,
+                                        "height": 264,
                                         "layoutMode": "VERTICAL",
                                         "primaryAxisSizingMode": "AUTO",
                                         "counterAxisSizingMode": "FIXED",
-                                        "itemSpacing": 16,
-                                        "width": 400,
+                                        "fills": [
+                                            {
+                                                "type": "SOLID",
+                                                "color": {
+                                                    "r": 1,
+                                                    "g": 1,
+                                                    "b": 1
+                                                }
+                                            }
+                                        ],
+                                        "strokes": [
+                                            {
+                                                "type": "SOLID",
+                                                "color": {
+                                                    "r": 0.01568627543747425,
+                                                    "g": 0.7607843279838562,
+                                                    "b": 0.7960784435272217
+                                                }
+                                            }
+                                        ],
+                                        "strokeWeight": 1,
+                                        "cornerRadius": 12,
+                                        "primaryAxisAlignItems": "CENTER",
+                                        "counterAxisAlignItems": "CENTER",
+                                        "itemSpacing": 8,
                                         "children": [
                                             {
-                                                "id": "img-box-3",
-                                                "name": "Image Box",
+                                                "id": "step-3-image",
+                                                "name": "Image - Resultado",
                                                 "type": "FRAME",
-                                                "layoutMode": "VERTICAL",
-                                                "primaryAxisSizingMode": "FIXED",
-                                                "counterAxisSizingMode": "FIXED",
-                                                "width": 400,
-                                                "height": 260,
-                                                "cornerRadius": 12,
-                                                "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
-                                                "strokeWeight": 1,
-                                                "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "ea1036b71582be34af958b067e936c4599722911" }]
+                                                "width": 407,
+                                                "height": 264,
+                                                "fills": [
+                                                    {
+                                                        "type": "IMAGE",
+                                                        "imageHash": "ea1036b71582be34af958b067e936c4599722911",
+                                                        "scaleMode": "CROP"
+                                                    }
+                                                ],
+                                                "topRightRadius": 12,
+                                                "bottomRightRadius": 12
                                             },
                                             {
-                                                "id": "text-3",
-                                                "name": "Heading",
+                                                "id": "step-3-text",
+                                                "name": "Text - Resultado",
                                                 "type": "TEXT",
-                                                "characters": "Resultado Final",
-                                                "fontSize": 20,
+                                                "width": 256,
+                                                "height": 48,
+                                                "characters": "Resultado Final Com Aumento Imediato",
+                                                "fontSize": 26,
+                                                "fontName": {
+                                                    "family": "Inter",
+                                                    "style": "Regular"
+                                                },
+                                                "fontWeight": 400,
                                                 "textAlignHorizontal": "CENTER",
-                                                "layoutSizingHorizontal": "FILL",
-                                                "fontName": { "family": "Inter", "style": "Medium" },
-                                                "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                                                "textAlignVertical": "CENTER",
+                                                "lineHeight": {
+                                                    "unit": "PIXELS",
+                                                    "value": 24
+                                                },
+                                                "color": {
+                                                    "r": 0.20000000298023224,
+                                                    "g": 0.20000000298023224,
+                                                    "b": 0.20000000298023224
+                                                }
                                             }
                                         ]
                                     }
@@ -682,69 +1146,6 @@ figma.ui.onmessage = async (msg) => {
             await figma.loadFontAsync({ family: "Inter", style: "Bold" });
             await figma.loadFontAsync({ family: "Sora", style: "SemiBold" });
 
-            const buildNode = (data: any, parent?: FrameNode) => {
-                let node: SceneNode;
-                if (data.type === 'FRAME') {
-                    const frame = figma.createFrame();
-                    node = frame;
-                    frame.name = data.name;
-
-                    // Add to parent FIRST so we can set layout sizing properties that depend on parent
-                    if (parent) parent.appendChild(node);
-
-                    if (data.width) frame.resize(data.width, typeof data.height === 'number' ? data.height : 100);
-                    if (data.layoutMode) frame.layoutMode = data.layoutMode;
-                    if (data.primaryAxisAlignItems) frame.primaryAxisAlignItems = data.primaryAxisAlignItems;
-                    if (data.counterAxisAlignItems) frame.counterAxisAlignItems = data.counterAxisAlignItems;
-                    if (data.itemSpacing) frame.itemSpacing = data.itemSpacing;
-                    if (data.paddingTop) frame.paddingTop = data.paddingTop;
-                    if (data.paddingBottom) frame.paddingBottom = data.paddingBottom;
-                    if (data.paddingLeft) frame.paddingLeft = data.paddingLeft;
-                    if (data.paddingRight) frame.paddingRight = data.paddingRight;
-                    if (data.cornerRadius) frame.cornerRadius = data.cornerRadius;
-                    if (data.topLeftRadius) frame.topLeftRadius = data.topLeftRadius;
-                    if (data.topRightRadius) frame.topRightRadius = data.topRightRadius;
-                    if (data.bottomLeftRadius) frame.bottomLeftRadius = data.bottomLeftRadius;
-                    if (data.bottomRightRadius) frame.bottomRightRadius = data.bottomRightRadius;
-                    if (data.strokes) frame.strokes = data.strokes;
-                    if (data.strokeWeight) frame.strokeWeight = data.strokeWeight;
-                    if (data.fills) frame.fills = data.fills;
-
-                    // Set sizing AFTER appending to parent and parent has layoutMode (if applicable)
-                    // Note: The parent must have layoutMode != "NONE" for these to work.
-                    // Since we build top-down, parent should be ready.
-                    if (data.layoutSizingHorizontal === 'FILL') frame.layoutSizingHorizontal = 'FILL';
-                    if (data.layoutSizingVertical === 'FILL') frame.layoutSizingVertical = 'FILL';
-                    if (data.primaryAxisSizingMode) frame.primaryAxisSizingMode = data.primaryAxisSizingMode;
-                    if (data.counterAxisSizingMode) frame.counterAxisSizingMode = data.counterAxisSizingMode;
-
-                    if (data.children) {
-                        data.children.forEach((childData: any) => buildNode(childData, frame));
-                    }
-                } else if (data.type === 'TEXT') {
-                    const text = figma.createText();
-                    node = text;
-                    text.name = data.name;
-
-                    // Add to parent FIRST
-                    if (parent) parent.appendChild(node);
-
-                    text.characters = data.characters;
-                    if (data.fontSize) text.fontSize = data.fontSize;
-                    if (data.fontName) text.fontName = data.fontName;
-                    if (data.fills) text.fills = data.fills;
-                    if (data.textAlignHorizontal) text.textAlignHorizontal = data.textAlignHorizontal;
-                    if (data.lineHeight) text.lineHeight = data.lineHeight;
-
-                    // Set sizing AFTER appending
-                    if (data.layoutSizingHorizontal === 'FILL') text.layoutSizingHorizontal = 'FILL';
-                } else {
-                    return;
-                }
-
-                return node;
-            };
-
             const rootFrame = buildNode(testFrameData) as FrameNode;
             if (rootFrame) {
                 figma.currentPage.selection = [rootFrame];
@@ -758,6 +1159,8 @@ figma.ui.onmessage = async (msg) => {
         }
     }
 };
+
+
 
 // Helper para converter LayoutAnalysis em ProcessedNode[]
 function flattenAnalysisToNodes(analysis: Gemini.LayoutAnalysis): Gemini.ProcessedNode[] {

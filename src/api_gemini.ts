@@ -4,6 +4,7 @@
 /// <reference types="@figma/plugin-typings" />
 
 import { ANALYZE_RECREATE_PROMPT } from './config/prompts';
+import { repairJson } from './utils/serialization_utils';
 
 // Define os modelos disponíveis (baseado em https://ai.google.dev/gemini-api/docs/models?hl=pt-br)
 export type GeminiModel =
@@ -85,55 +86,7 @@ export async function testConnection(): Promise<{ success: boolean; message: str
     }
 }
 
-function repairJson(jsonString: string): string {
-    let repaired = jsonString.trim();
 
-    // Remove potential trailing commas
-    if (repaired.endsWith(',')) {
-        repaired = repaired.slice(0, -1);
-    }
-
-    // Count brackets/braces to close them
-    let openBraces = 0;
-    let openBrackets = 0;
-    let inString = false;
-    let escaped = false;
-
-    for (let i = 0; i < repaired.length; i++) {
-        const char = repaired[i];
-        if (char === '\\' && !escaped) {
-            escaped = true;
-            continue;
-        }
-        if (char === '"' && !escaped) {
-            inString = !inString;
-        }
-        if (!inString) {
-            if (char === '{') openBraces++;
-            if (char === '}') openBraces--;
-            if (char === '[') openBrackets++;
-            if (char === ']') openBrackets--;
-        }
-        escaped = false;
-    }
-
-    // Close unclosed strings (rough heuristic)
-    if (inString) {
-        repaired += '"';
-    }
-
-    // Close arrays and objects
-    while (openBrackets > 0) {
-        repaired += ']';
-        openBrackets--;
-    }
-    while (openBraces > 0) {
-        repaired += '}';
-        openBraces--;
-    }
-
-    return repaired;
-}
 
 export async function analyzeAndRecreate(
     imageData: Uint8Array,
@@ -371,7 +324,26 @@ export async function consolidateNodes(processedNodes: ProcessedNode[]): Promise
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new GeminiError("JSON não encontrado na resposta de consolidação.");
 
-        return JSON.parse(jsonMatch[0]);
+        let jsonString = jsonMatch[0];
+
+        // Tentar parsear o JSON
+        try {
+            return JSON.parse(jsonString);
+        } catch (parseError) {
+            console.warn('⚠️ JSON inválido detectado na consolidação. Tentando reparar...', parseError);
+            figma.ui.postMessage({ type: 'add-gemini-log', data: `⚠️ JSON malformado, tentando reparar...` });
+
+            try {
+                const repairedJson = repairJson(jsonString);
+                const result = JSON.parse(repairedJson);
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `✅ JSON reparado com sucesso` });
+                return result;
+            } catch (repairError) {
+                console.error('❌ Falha ao reparar JSON:', repairError);
+                figma.ui.postMessage({ type: 'add-gemini-log', data: `❌ Falha ao reparar JSON: ${repairError}` });
+                throw new GeminiError(`JSON malformado e não reparável: ${repairError}`);
+            }
+        }
 
     } catch (error: any) {
         console.error('Erro na consolidação:', error);
@@ -474,6 +446,9 @@ export interface ChildNode {
     fontFamily?: string;
     fontWeight?: string;
     fontStyle?: string;
+    textAlignHorizontal?: 'LEFT' | 'CENTER' | 'RIGHT' | 'JUSTIFIED';
+    textAlignVertical?: 'TOP' | 'CENTER' | 'BOTTOM';
+    textCase?: 'ORIGINAL' | 'UPPER' | 'LOWER' | 'TITLE';
     style?: any; // Suporte a objeto de estilo do Figma
     cornerRadius?: number;
     border?: string | { color: string; width: number };

@@ -309,3 +309,14 @@ src/
 4. ✅ **Correções de UI**: Corrigidos problemas de navegação entre abas e botões de ação ("Salvar API Key", "Testar Conexão") que não respondiam, garantindo uma experiência de uso fluida.
 
 **Impacto:** A geração de layouts com IA agora produz resultados visualmente ricos e estruturalmente prontos para exportação, com imagens reais e nomes de camadas compatíveis com o fluxo de trabalho do Elementor.
+
+---
+
+### **FASE 9: Testes de Renderização de JSON da IA (Internal)** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Engine de Renderização Simples (`buildNode`)**: Habilitada a engine `buildNode` (anteriormente usada apenas para frames de teste) para processar as respostas da IA (Gemini e DeepSeek).
+2. ✅ **Teste de Output Bruto**: O objetivo é verificar a estrutura "crua" do JSON gerado pela IA, sem as otimizações e correções automáticas da `createOptimizedFrame`.
+3. ✅ **Refatoração de Código**: A função `buildNode` foi movida para o escopo global em `src/code.ts` para ser acessível por todos os handlers.
+
+**Impacto:** Permite validar se a IA está gerando estruturas corretas nativamente ou se dependemos excessivamente do pós-processamento.

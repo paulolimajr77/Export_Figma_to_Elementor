@@ -1208,137 +1208,365 @@
   });
 
   // src/config/prompts.ts
+  function buildConsolidationPrompt(processedNodes) {
+    return `CONSOLIDA\xC7\xC3O FINAL
+
+Voc\xEA processou ${processedNodes.length} nodes. Agora consolide tudo em um JSON Elementor v\xE1lido.
+
+NODES PROCESSADOS:
+${JSON.stringify(processedNodes, null, 2)}
+
+TAREFA:
+1. Montar hierarquia completa respeitando parent-child
+2. Validar integridade estrutural
+3. Gerar JSON final no formato Elementor
+4. Criar relat\xF3rio t\xE9cnico
+
+FORMATO DE SA\xCDDA:
+{
+  "elementorJSON": {
+    "version": "1.0",
+    "elements": [...]
+  },
+  "report": {
+    "summary": {
+      "totalNodes": ${processedNodes.length},
+      "converted": 0,
+      "custom": 0
+    },
+    "mappings": [...],
+    "warnings": [...]
+  }
+}`;
+  }
   var ANALYZE_RECREATE_PROMPT;
   var init_prompts = __esm({
     "src/config/prompts.ts"() {
       ANALYZE_RECREATE_PROMPT = `
-Act as an EXPERT in Figma and Elementor.
-Your goal is to visually and structurally interpret the layout of the sent frame and recreate it using the best practices of responsive design and Auto Layout.
+pense como um webdesginer especialista em layouts usando wordpress elementor.
 
-1. ANALYZE the layout screenshot and the STRUCTURAL DATA below.
-2. APPLY the best practices of Auto Layout, responsiveness, visual hierarchy, and organization.
-3. MAP each Figma layer to the most suitable native Elementor widget (e.g., Layer "Title" -> w:heading, Layer "Image" -> w:image).
-4. PRESERVE visual fidelity using the provided data as the ABSOLUTE SOURCE OF TRUTH.
+imagine que voce receba um layout no figma muito mal estruturado como este a baixo e precise ajusta-lo para que um outro webdesigner que ir\xE1 receber o arquivo consiga identificar o auto layout para responsividade, os widgets a serem usados no elementor e etc.
 
-AVAILABLE IMAGES (IDs):
-\${availableImageIds}
+como voc\xEA ajustaria esse layout no figma.
 
-STRUCTURAL CONTEXT (FIGMA DATA):
+lembre-se Full container, Container encaixotado, caixas de imagem, caixas de icone otimizam o layout.
+
+evite o uso de container, dentro de container, dentro de container e assim por diante.(coisa de amador).
+
 \${nodeData}
 
-CRITICAL VISUAL FIDELITY RULES:
-1. DIMENSIONS: Copy EXACTLY the "width" and "height" from the structural JSON for each element. DO NOT invent values.
-2. BACKGROUNDS: Extract "fills" from the JSON. If "SOLID", use the hex color. If "GRADIENT", try to reproduce or use the main color.
-3. IMAGES: If the JSON has "fills" of type "IMAGE", map to the correct image widget.
-4. TEXT: Copy the text EXACTLY as it is in the "characters" field of the JSON.
-5. BORDERS: Look for "strokes" in the JSON. If present, extract color and width.
-6. SPACING: Pay close attention to "itemSpacing" (gap) and "padding" in the JSON. Use these for Auto Layout.
-7. BUTTONS: Identify buttons by looking for small containers with centered text and background color. Map them to "w:button".
-8. STRUCTURAL SIMPLIFICATION (CRITICAL):
-   - IGNORE any "Group" or "Frame" that is just a wrapper (no background, no border, no specific padding).
-   - If a container has \`background: "transparent"\` and \`border: null\`, DO NOT create a widget for it. Return its children directly to the parent.
-   - Your goal is the FLATTEST possible structure: Section -> Container (Row/Col) -> Widgets.
-   - Example: Group 6 > Group 5 > Frame 5 > Group 1 > Section > Link > Background... -> SHOULD BE JUST: Section > Column > Link.
-9. FLATTEN GROUPS: Treat Figma "Groups" as transparent pass-through layers. Do not create a widget for a Group unless it has visual properties (fill/stroke). Merge its children into the parent container.
-10. ALIGNMENT: Analyze the distribution of children. If they are centered, use "primaryAlign": "CENTER". If spread apart, use "SPACE_BETWEEN". Default to "MIN". For vertical alignment in a Row, check "counterAlign".
+quero que devolva o json Aplicando boas pr\xE1ticas visuais, como espa\xE7amentos mais consistentes, grid centralizado e alinhamentos corrigidos, limpando e reorganizando o layout, mantendo tudo exatamente igual visualmente.
 
-VALID WIDGET LIST (Use EXACTLY these tags in the "name" field):
+n\xE3o reduza texto, descaracterize (deforme) formato de imagem ou \xEDcones e etc.
 
-**Widgets B\xE1sicos (Elementor Free)**
-- w:container, w:inner-container, w:heading, w:text-editor, w:image, w:video, w:button, w:divider, w:spacer, w:icon, w:icon-box, w:image-box, w:star-rating, w:counter, w:progress, w:tabs, w:accordion, w:toggle, w:alert, w:social-icons, w:soundcloud, w:shortcode, w:html, w:menu-anchor, w:sidebar, w:read-more, w:image-carousel, w:basic-gallery, w:gallery, w:icon-list, w:nav-menu, w:search-form, w:google-maps, w:testimonial, w:embed, w:lottie, loop:grid
+mantenha o conte\xFAdo original.
 
-**Widgets Elementor Pro**
-- w:form, w:login, w:subscription, w:call-to-action, media:carousel, w:portfolio, w:gallery-pro, slider:slides, w:slideshow, w:flip-box, w:animated-headline, w:post-navigation, w:share-buttons, w:table-of-contents, w:countdown, w:blockquote, w:testimonial-carousel, w:review-box, w:hotspots, w:sitemap, w:author-box, w:price-table, w:price-list, w:progress-tracker, w:animated-text, w:nav-menu-pro, w:breadcrumb, w:facebook-button, w:facebook-comments, w:facebook-embed, w:facebook-page, loop:builder, loop:grid-advanced, loop:carousel, w:post-excerpt, w:post-content, w:post-title, w:post-info, w:post-featured-image, w:post-author, w:post-date, w:post-terms, w:archive-title, w:archive-description, w:site-logo, w:site-title, w:site-tagline, w:search-results, w:global-widget, w:video-playlist, w:video-gallery
+utilize o modelo abaixo como referencia do antes e depois.
 
-**WooCommerce Widgets**
-- woo:product-title, woo:product-image, woo:product-price, woo:product-add-to-cart, woo:product-data-tabs, woo:product-excerpt, woo:product-rating, woo:product-stock, woo:product-meta, woo:product-additional-information, woo:product-short-description, woo:product-related, woo:product-upsells, woo:product-tabs, woo:product-breadcrumb, woo:product-gallery, woo:products, woo:product-grid, woo:product-carousel, woo:product-loop-item, woo:loop-product-title, woo:loop-product-price, woo:loop-product-rating, woo:loop-product-image, woo:loop-product-button, woo:loop-product-meta, woo:cart, woo:checkout, woo:my-account, woo:purchase-summary, woo:order-tracking
-
-**Loop Builder Widgets**
-- loop:grid, loop:carousel, loop:item, loop:image, loop:title, loop:meta, loop:terms, loop:rating, loop:price, loop:add-to-cart, loop:read-more, loop:featured-image
-
-**Carross\xE9is**
-- w:image-carousel, media:carousel, w:testimonial-carousel, w:review-carousel, slider:slides, slider:slider, loop:carousel, woo:product-carousel, w:posts-carousel, w:gallery-carousel
-
-**Widgets Experimentais**
-- w:nested-tabs, w:mega-menu, w:scroll-snap, w:motion-effects, w:background-slideshow, w:css-transform, w:custom-position, w:dynamic-tags, w:ajax-pagination, loop:pagination, w:aspect-ratio-container
-
-**WordPress Widgets**
-- w:wp-search, w:wp-recent-posts, w:wp-recent-comments, w:wp-archives, w:wp-categories, w:wp-calendar, w:wp-tag-cloud, w:wp-custom-menu
-
-Responda APENAS com JSON v\xE1lido seguindo ESTRITAMENTE esta estrutura:
-
+ANTES (Layout Sujo - O que voc\xEA pode receber):
+\`\`\`json
 {
-  "frameName": "Nome do Frame",
-  "width": \${width},
-  "height": \${height},
-  "background": "#FFFFFF",
-  "autoLayout": { "direction": "vertical", "gap": 0, "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 }, "primaryAlign": "MIN", "counterAlign": "MIN" },
+  "id": "174:691",
+  "name": "Group 6",
+  "type": "GROUP",
+  "width": 1920,
+  "height": 1304.449951171875,
+  "x": 0,
+  "y": 1320,
+  "visible": true,
   "children": [
     {
-      "type": "container",
-      "name": "w:container",
-      "background": "transparent",
-      "width": \${width},
-      "height": \${halfHeight},
-      "border": { "color": "#000000", "width": 1 },
-      "autoLayout": { "direction": "vertical", "gap": 20, "padding": { "top": 40, "right": 40, "bottom": 40, "left": 40 } },
+      "id": "172:667",
+      "name": "Group 5",
+      "type": "GROUP",
       "children": [
         {
-          "type": "widget",
-          "widgetType": "heading",
-          "name": "w:heading",
-          "content": "TEXTO EXATO DA IMAGEM",
-          "fontSize": 48,
-          "fontFamily": "Inter",
-          "fontWeight": "Bold",
-          "color": "#333333",
-          "width": \${halfWidth},
-          "height": 60
-        },
-        {
-          "type": "widget",
-          "widgetType": "button",
-          "name": "w:button",
-          "content": "Clique Aqui",
-          "background": "#0073AA",
-          "color": "#FFFFFF",
-          "width": 150,
-          "height": 50,
-          "borderRadius": 5
-        },
-        {
-          "type": "widget",
-          "widgetType": "image",
-          "name": "w:image",
-          "content": "\${firstImageId}",
-          "width": \${thirdWidth},
-          "height": \${thirdHeight},
-          "border": "1px solid #CCCCCC"
+          "id": "169:123",
+          "name": "Frame 5",
+          "type": "FRAME",
+          "layoutMode": "NONE",
+          "children": [
+            {
+              "id": "1:26",
+              "name": "Group 1",
+              "type": "GROUP",
+              "children": [
+                {
+                  "id": "1:27",
+                  "name": "Section",
+                  "type": "FRAME",
+                  "layoutMode": "NONE",
+                  "children": [
+                    {
+                      "id": "1:33",
+                      "name": "Heading 2",
+                      "type": "TEXT",
+                      "characters": "O que \xE9 a Harmoniza\xE7\xE3o\\nIntima Masculina ?",
+                      "fontSize": 40
+                    },
+                    {
+                      "id": "1:34",
+                      "name": "Description",
+                      "type": "TEXT",
+                      "characters": "A harmoniza\xE7\xE3o \xEDntima masculina \xE9 um procedimento est\xE9tico...",
+                      "fontSize": 20
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ]
     }
   ]
 }
+\`\`\`
 
-Regras CRITICAS:
-1. Use os DADOS DO FIGMA fornecidos para extrair o texto exato, fontes (fontFamily/fontWeight), cores e dimens\xF5es.
-2. Estime as dimens\xF5es (width/height) de TODOS os elementos com precis\xE3o baseada nos dados.
-3. Para IMAGENS: Se a imagem visual corresponder a um dos IDs listados acima, use o ID no campo "content".
-4. **Components**: Identify repeating elements that should be Components.
-
-OUTPUT FORMAT:
-Provide the response in clear MARKDOWN format.
-- Use **Bold** for key settings.
-- Use \`Code Blocks\` ONLY for JSON tokens (Colors/Typography).
-- Structure with clear Headings (###).
-
-REQUIRED JSON OUTPUTS (Include these as code blocks):
-- **Color Tokens JSON**: { "colors": { ... } }
-- **Typography Tokens JSON**: { "typography": { ... } }
-
-STRUCTURAL CONTEXT (FIGMA DATA):
-\${nodeData}
+DEPOIS (Layout Otimizado - O que voc\xEA deve gerar):
+\`\`\`json
+{
+  "id": "root-frame",
+  "name": "Desktop - Homepage Optimized",
+  "type": "FRAME",
+  "layoutMode": "VERTICAL",
+  "primaryAxisSizingMode": "AUTO",
+  "counterAxisSizingMode": "FIXED",
+  "children": [
+    {
+      "id": "section-hero",
+      "name": "Section 1 - Hero (Full Container)",
+      "type": "FRAME",
+      "layoutMode": "HORIZONTAL",
+      "primaryAxisSizingMode": "FIXED",
+      "counterAxisSizingMode": "AUTO",
+      "children": [
+        {
+          "id": "hero-content-col",
+          "name": "Container - Left Content",
+          "type": "FRAME",
+          "layoutMode": "VERTICAL",
+          "children": [
+            {
+              "id": "hero-heading",
+              "name": "Heading - Title",
+              "type": "TEXT",
+              "characters": "O que \xE9 a Harmoniza\xE7\xE3o\\nIntima Masculina?",
+              "fontSize": 48,
+              "layoutSizingHorizontal": "FILL"
+            },
+            {
+              "id": "hero-text",
+              "name": "Text Editor - Description",
+              "type": "TEXT",
+              "characters": "A harmoniza\xE7\xE3o \xEDntima masculina \xE9 um procedimento est\xE9tico...",
+              "fontSize": 18,
+              "layoutSizingHorizontal": "FILL"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+\`\`\`
 `;
+    }
+  });
+
+  // src/utils/image_utils.ts
+  function rgbToHex(rgb) {
+    const toHex = (c) => {
+      const hex = Math.round(c * 255).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    };
+    return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+  }
+  function getBackgroundFromNode(node) {
+    if ("fills" in node && Array.isArray(node.fills)) {
+      for (const fill of node.fills) {
+        if (fill.type === "SOLID") {
+          const { r, g, b } = fill.color;
+          return rgbToHex({ r, g, b });
+        }
+      }
+    }
+    return "#FFFFFF";
+  }
+  function extractImagesFromNode(node) {
+    return __async(this, null, function* () {
+      const images = {};
+      function traverse(n) {
+        return __async(this, null, function* () {
+          if ("fills" in n && Array.isArray(n.fills)) {
+            for (const fill of n.fills) {
+              if (fill.type === "IMAGE" && fill.imageHash) {
+                const image = figma.getImageByHash(fill.imageHash);
+                if (image) {
+                  const bytes = yield image.getBytesAsync();
+                  images[fill.imageHash] = bytes;
+                }
+              }
+            }
+          }
+          if ("children" in n) {
+            for (const child of n.children) {
+              yield traverse(child);
+            }
+          }
+        });
+      }
+      yield traverse(node);
+      return images;
+    });
+  }
+  var init_image_utils = __esm({
+    "src/utils/image_utils.ts"() {
+    }
+  });
+
+  // src/utils/serialization_utils.ts
+  function serializeNode(node) {
+    const data = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      width: node.width,
+      height: node.height,
+      x: node.x,
+      y: node.y,
+      visible: node.visible,
+      locked: node.locked
+    };
+    if ("opacity" in node) data.opacity = node.opacity;
+    if ("blendMode" in node) data.blendMode = node.blendMode;
+    if ("fills" in node && node.fills !== figma.mixed) {
+      data.fills = node.fills.map((fill) => {
+        if (fill.type === "SOLID") {
+          return { type: "SOLID", color: fill.color, opacity: fill.opacity, visible: fill.visible };
+        }
+        if (fill.type === "IMAGE") {
+          return { type: "IMAGE", visible: fill.visible, imageHash: fill.imageHash, scaleMode: fill.scaleMode };
+        }
+        return { type: fill.type, visible: fill.visible };
+      });
+    }
+    if ("strokes" in node && node.strokes !== figma.mixed) {
+      data.strokes = node.strokes.map((stroke) => {
+        if (stroke.type === "SOLID") {
+          return { type: "SOLID", color: stroke.color, opacity: stroke.opacity, visible: stroke.visible };
+        }
+        return { type: stroke.type, visible: stroke.visible };
+      });
+      data.strokeWeight = node.strokeWeight;
+      data.strokeAlign = node.strokeAlign;
+      data.strokeCap = node.strokeCap;
+      data.strokeJoin = node.strokeJoin;
+      data.dashPattern = node.dashPattern;
+    }
+    if ("effects" in node && node.effects !== figma.mixed) {
+      data.effects = node.effects.map((effect) => ({
+        type: effect.type,
+        visible: effect.visible,
+        radius: effect.radius,
+        offset: effect.offset,
+        spread: effect.spread,
+        color: effect.color,
+        blendMode: effect.blendMode
+      }));
+    }
+    if ("cornerRadius" in node) {
+      if (node.cornerRadius !== figma.mixed) {
+        data.cornerRadius = node.cornerRadius;
+      } else {
+        data.topLeftRadius = node.topLeftRadius;
+        data.topRightRadius = node.topRightRadius;
+        data.bottomLeftRadius = node.bottomLeftRadius;
+        data.bottomRightRadius = node.bottomRightRadius;
+      }
+    }
+    if ("constraints" in node) {
+      data.constraints = node.constraints;
+    }
+    if (node.type === "TEXT") {
+      data.characters = node.characters;
+      data.fontSize = node.fontSize;
+      data.fontName = node.fontName;
+      data.fontWeight = node.fontWeight;
+      data.textAlignHorizontal = node.textAlignHorizontal;
+      data.textAlignVertical = node.textAlignVertical;
+      data.textAutoResize = node.textAutoResize;
+      data.letterSpacing = node.letterSpacing;
+      data.lineHeight = node.lineHeight;
+      data.textCase = node.textCase;
+      data.textDecoration = node.textDecoration;
+      if (node.fills !== figma.mixed && node.fills.length > 0 && node.fills[0].type === "SOLID") {
+        data.color = node.fills[0].color;
+      }
+    }
+    if ("layoutMode" in node) {
+      data.layoutMode = node.layoutMode;
+      data.primaryAxisSizingMode = node.primaryAxisSizingMode;
+      data.counterAxisSizingMode = node.counterAxisSizingMode;
+      data.primaryAxisAlignItems = node.primaryAxisAlignItems;
+      data.counterAxisAlignItems = node.counterAxisAlignItems;
+      data.paddingTop = node.paddingTop;
+      data.paddingRight = node.paddingRight;
+      data.paddingBottom = node.paddingBottom;
+      data.paddingLeft = node.paddingLeft;
+      data.itemSpacing = node.itemSpacing;
+    }
+    if ("children" in node) {
+      data.children = node.children.map((child) => serializeNode(child));
+    }
+    return data;
+  }
+  function getSectionsToAnalyze(node) {
+    return [node];
+  }
+  function repairJson(jsonString) {
+    let repaired = jsonString.trim();
+    if (repaired.endsWith(",")) {
+      repaired = repaired.slice(0, -1);
+    }
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < repaired.length; i++) {
+      const char = repaired[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === "{") openBraces++;
+        else if (char === "}") openBraces--;
+        else if (char === "[") openBrackets++;
+        else if (char === "]") openBrackets--;
+      }
+    }
+    while (openBraces > 0) {
+      repaired += "}";
+      openBraces--;
+    }
+    while (openBrackets > 0) {
+      repaired += "]";
+      openBrackets--;
+    }
+    return repaired;
+  }
+  var init_serialization_utils = __esm({
+    "src/utils/serialization_utils.ts"() {
+      init_image_utils();
     }
   });
 
@@ -1396,45 +1624,6 @@ STRUCTURAL CONTEXT (FIGMA DATA):
         return { success: false, message: e.message || "Erro desconhecido" };
       }
     });
-  }
-  function repairJson(jsonString) {
-    let repaired = jsonString.trim();
-    if (repaired.endsWith(",")) {
-      repaired = repaired.slice(0, -1);
-    }
-    let openBraces = 0;
-    let openBrackets = 0;
-    let inString = false;
-    let escaped = false;
-    for (let i = 0; i < repaired.length; i++) {
-      const char = repaired[i];
-      if (char === "\\" && !escaped) {
-        escaped = true;
-        continue;
-      }
-      if (char === '"' && !escaped) {
-        inString = !inString;
-      }
-      if (!inString) {
-        if (char === "{") openBraces++;
-        if (char === "}") openBraces--;
-        if (char === "[") openBrackets++;
-        if (char === "]") openBrackets--;
-      }
-      escaped = false;
-    }
-    if (inString) {
-      repaired += '"';
-    }
-    while (openBrackets > 0) {
-      repaired += "]";
-      openBrackets--;
-    }
-    while (openBraces > 0) {
-      repaired += "}";
-      openBraces--;
-    }
-    return repaired;
   }
   function analyzeAndRecreate(_0) {
     return __async(this, arguments, function* (imageData, availableImageIds = [], nodeData = null, promptType = "full") {
@@ -1589,7 +1778,7 @@ ${error.message}` });
       if (!apiKey) throw new GeminiError("API Key n\xE3o configurada.");
       const model = yield getModel();
       const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
-      const prompt = buildConsolidationPrompt(processedNodes);
+      const prompt = buildConsolidationPrompt2(processedNodes);
       const requestBody = {
         contents: [{
           parts: [{ text: prompt }]
@@ -1619,14 +1808,30 @@ ${error.message}` });
         const responseText = candidate.content.parts[0].text;
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new GeminiError("JSON n\xE3o encontrado na resposta de consolida\xE7\xE3o.");
-        return JSON.parse(jsonMatch[0]);
+        let jsonString = jsonMatch[0];
+        try {
+          return JSON.parse(jsonString);
+        } catch (parseError) {
+          console.warn("\u26A0\uFE0F JSON inv\xE1lido detectado na consolida\xE7\xE3o. Tentando reparar...", parseError);
+          figma.ui.postMessage({ type: "add-gemini-log", data: `\u26A0\uFE0F JSON malformado, tentando reparar...` });
+          try {
+            const repairedJson = repairJson(jsonString);
+            const result = JSON.parse(repairedJson);
+            figma.ui.postMessage({ type: "add-gemini-log", data: `\u2705 JSON reparado com sucesso` });
+            return result;
+          } catch (repairError) {
+            console.error("\u274C Falha ao reparar JSON:", repairError);
+            figma.ui.postMessage({ type: "add-gemini-log", data: `\u274C Falha ao reparar JSON: ${repairError}` });
+            throw new GeminiError(`JSON malformado e n\xE3o repar\xE1vel: ${repairError}`);
+          }
+        }
       } catch (error) {
         console.error("Erro na consolida\xE7\xE3o:", error);
         throw new GeminiError(`Falha na consolida\xE7\xE3o: ${error.message}`);
       }
     });
   }
-  function buildConsolidationPrompt(nodes) {
+  function buildConsolidationPrompt2(nodes) {
     return `
 CONSOLIDA\xC7\xC3O FINAL - ELEMENTOR JSON
 
@@ -1690,6 +1895,7 @@ REGRAS CR\xCDTICAS:
   var init_api_gemini = __esm({
     "src/api_gemini.ts"() {
       init_prompts();
+      init_serialization_utils();
       GEMINI_MODEL = "gemini-2.5-flash";
       API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
       GeminiError = class extends Error {
@@ -1703,483 +1909,206 @@ REGRAS CR\xCDTICAS:
     }
   });
 
-  // src/gemini_frame_builder.ts
-  function createOptimizedFrame(_0, _1) {
-    return __async(this, arguments, function* (analysis, originalNode, availableImages = {}) {
-      figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F528} Criando Frame Principal: "${analysis.frameName || "Gemini Frame"}"` });
-      const newFrame = figma.createFrame();
-      newFrame.name = analysis.frameName || "Gemini IA Frame";
-      const width = analysis.width || (originalNode ? originalNode.width : 1200);
-      const height = analysis.height || (originalNode ? originalNode.height : 800);
-      newFrame.resize(width, height);
-      figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F4CF} Dimens\xF5es: ${width}x${height}` });
-      if (originalNode && "x" in originalNode && "y" in originalNode) {
-        newFrame.x = originalNode.x + originalNode.width + 100;
-        newFrame.y = originalNode.y;
-      } else {
-        newFrame.x = figma.viewport.center.x - width / 2;
-        newFrame.y = figma.viewport.center.y - height / 2;
-      }
-      if (originalNode && "fills" in originalNode && originalNode.fills !== figma.mixed && originalNode.fills.length > 0) {
-        console.log("Original Node Fills:", JSON.stringify(originalNode.fills, null, 2));
-        try {
-          newFrame.fills = JSON.parse(JSON.stringify(originalNode.fills));
-          console.log("New Frame Fills applied:", JSON.stringify(newFrame.fills, null, 2));
-          figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F3A8} Copiando preenchimentos do original...` });
-        } catch (e) {
-          console.error("Error applying fills:", e);
-        }
-      } else {
-        console.log("Original Node has no fills or mixed fills, or is null.");
-        if (analysis.fills) {
-          try {
-            newFrame.fills = analysis.fills;
-            figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F3A8} Aplicando fills do JSON...` });
-          } catch (e) {
-            console.error("Error applying JSON fills:", e);
-          }
-        } else if (analysis.background) {
-          if (analysis.background.toLowerCase() === "transparent") {
-            newFrame.fills = [];
-            figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F3A8} Aplicando background: Transparente` });
-          } else {
-            newFrame.fills = [{ type: "SOLID", color: hexToRgb(analysis.background) }];
-            figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F3A8} Aplicando background: ${analysis.background}` });
-          }
-        }
-      }
-      if (analysis.autoLayout) {
-        applyAutoLayoutToFrame(newFrame, analysis.autoLayout);
-        figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F4D0} Aplicando Auto Layout: ${analysis.autoLayout.direction}` });
-      }
-      if (analysis.children && Array.isArray(analysis.children)) {
-        figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F476} Processando ${analysis.children.length} filhos...` });
-        for (const child of analysis.children) {
-          yield createChildNode(newFrame, child, availableImages);
-        }
-      }
-      figma.currentPage.appendChild(newFrame);
-      return newFrame;
-    });
-  }
-  function createChildNode(parent, spec, availableImages) {
+  // src/api_deepseek.ts
+  function consolidateNodes2(processedNodes) {
     return __async(this, null, function* () {
-      if (spec.type === "container") {
-        const container = figma.createFrame();
-        container.name = spec.name;
-        applyCommonProperties(container, spec);
-        if (spec.autoLayout) {
-          applyAutoLayoutToFrame(container, spec.autoLayout);
-        }
-        if (spec.children) {
-          for (const child of spec.children) {
-            yield createChildNode(container, child, availableImages);
-          }
-        }
-        parent.appendChild(container);
-        return container;
-      } else if (spec.type === "widget") {
-        return yield createWidget(parent, spec, availableImages);
-      }
-      const fallback = figma.createFrame();
-      fallback.name = spec.name || "Unknown Node";
-      applyCommonProperties(fallback, spec);
-      parent.appendChild(fallback);
-      return fallback;
-    });
-  }
-  function createWidget(parent, spec, availableImages) {
-    return __async(this, null, function* () {
-      yield figma.loadFontAsync({ family: "Inter", style: "Regular" });
-      yield figma.loadFontAsync({ family: "Inter", style: "Medium" });
-      yield figma.loadFontAsync({ family: "Inter", style: "Bold" });
-      if (spec.fontFamily) {
-        try {
-          const weight = mapFontWeight(spec.fontWeight);
-          yield figma.loadFontAsync({ family: spec.fontFamily, style: weight });
-        } catch (e) {
-          console.warn(`Fonte ${spec.fontFamily} n\xE3o encontrada, usando Inter.`);
-        }
-      }
-      let node;
-      switch (spec.widgetType) {
-        case "heading":
-        case "text":
-        case "text-editor":
-          const text = figma.createText();
-          node = text;
-          text.name = spec.name || "Texto";
-          if (spec.fontFamily) {
-            const weight = mapFontWeight(spec.fontWeight);
-            try {
-              text.fontName = { family: spec.fontFamily, style: weight };
-            } catch (e) {
-              text.fontName = { family: "Inter", style: "Regular" };
-            }
-          }
-          text.characters = spec.content || spec.characters || "Texto";
-          if (spec.fontSize) text.fontSize = spec.fontSize;
-          if (spec.width) {
-            text.resize(spec.width, text.height);
-            text.textAutoResize = "HEIGHT";
-          } else {
-            text.textAutoResize = "WIDTH_AND_HEIGHT";
-          }
-          applyCommonProperties(text, spec, { skipResize: true });
-          break;
-        case "button":
-          const button = figma.createFrame();
-          node = button;
-          button.name = spec.name || "Bot\xE3o";
-          button.primaryAxisSizingMode = "AUTO";
-          button.counterAxisSizingMode = "AUTO";
-          button.layoutMode = "HORIZONTAL";
-          button.primaryAxisAlignItems = "CENTER";
-          button.counterAxisAlignItems = "CENTER";
-          button.paddingLeft = 24;
-          button.paddingRight = 24;
-          button.paddingTop = 12;
-          button.paddingBottom = 12;
-          button.cornerRadius = 8;
-          const btnText = figma.createText();
-          btnText.characters = spec.content || "Bot\xE3o";
-          btnText.fontSize = 16;
-          if (spec.color) btnText.fills = [{ type: "SOLID", color: hexToRgb(spec.color) }];
-          button.appendChild(btnText);
-          applyCommonProperties(button, spec);
-          if (spec.width && spec.height) {
-            button.primaryAxisSizingMode = "FIXED";
-            button.counterAxisSizingMode = "FIXED";
-          }
-          break;
-        case "image":
-        case "image-box":
-          const rect = figma.createRectangle();
-          node = rect;
-          rect.name = spec.name || "Imagem";
-          if (!spec.width || !spec.height) {
-            rect.resize(100, 100);
-          }
-          applyCommonProperties(rect, spec);
-          if (spec.content) {
-            const cleanHash = spec.content.trim();
-            if (availableImages[cleanHash]) {
-              console.log(`\u2705 Imagem encontrada para hash: ${cleanHash}`);
-              const image = figma.createImage(availableImages[cleanHash]);
-              rect.fills = [{ type: "IMAGE", scaleMode: "FILL", imageHash: image.hash }];
-            } else {
-              console.warn(`\u274C Imagem N\xC3O encontrada para hash: ${cleanHash}`);
-              console.log("Hashes dispon\xEDveis:", Object.keys(availableImages));
-              rect.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
-            }
-          } else if (!spec.fills && !spec.background) {
-            rect.fills = [{ type: "SOLID", color: { r: 0.8, g: 0.8, b: 0.8 } }];
-          }
-          break;
-        default:
-          const fallbackWidget = figma.createFrame();
-          node = fallbackWidget;
-          fallbackWidget.name = spec.name || "Widget";
-          applyCommonProperties(fallbackWidget, spec);
-          break;
-      }
-      parent.appendChild(node);
-      return node;
-    });
-  }
-  function applyCommonProperties(node, spec, options = {}) {
-    if (!options.skipResize && spec.width && spec.height) {
+      var _a, _b, _c;
+      const apiKey = yield getDeepSeekKey();
+      if (!apiKey) throw new DeepSeekError("API Key n\xE3o configurada.");
+      const model = yield getDeepSeekModel();
+      const prompt = buildConsolidationPrompt(processedNodes);
+      const requestBody = {
+        model,
+        messages: [
+          { role: "system", content: "You are an expert Elementor developer. Consolidate the provided nodes into a valid Elementor JSON structure." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 8192,
+        response_format: { type: "json_object" }
+      };
       try {
-        if ("resize" in node) {
-          node.resize(spec.width, spec.height);
-        }
-      } catch (e) {
-        console.warn("Falha ao redimensionar node:", e);
-      }
-    }
-    if ("fills" in node) {
-      if (spec.fills) {
-        try {
-          node.fills = spec.fills;
-        } catch (e) {
-        }
-      } else if (spec.background) {
-        if (spec.background.toLowerCase() === "transparent") {
-          node.fills = [];
-        } else {
-          node.fills = [{ type: "SOLID", color: hexToRgb(spec.background) }];
-        }
-      } else if (spec.color && node.type === "TEXT") {
-        node.fills = [{ type: "SOLID", color: hexToRgb(spec.color) }];
-      }
-    }
-    if ("cornerRadius" in node && spec.cornerRadius) {
-      if (node.type !== "ELLIPSE") {
-        node.cornerRadius = spec.cornerRadius;
-      }
-    }
-    if ("strokes" in node && spec.border) {
-      if (typeof spec.border === "object" && spec.border !== null) {
-        const border = spec.border;
-        if (border.color && border.width) {
-          node.strokes = [{ type: "SOLID", color: hexToRgb(border.color) }];
-          node.strokeWeight = border.width;
-        }
-      } else if (typeof spec.border === "string") {
-        const match = spec.border.match(/(\d+)px\s+solid\s+(#[\da-fA-F]+)/);
-        if (match) {
-          node.strokes = [{ type: "SOLID", color: hexToRgb(match[2]) }];
-          node.strokeWeight = parseInt(match[1], 10);
-        }
-      }
-    }
-  }
-  function applyAutoLayoutToFrame(frame, config) {
-    frame.layoutMode = config.direction === "horizontal" ? "HORIZONTAL" : "VERTICAL";
-    if (config.gap !== void 0) frame.itemSpacing = config.gap;
-    if (config.padding) {
-      frame.paddingTop = config.padding.top || 0;
-      frame.paddingRight = config.padding.right || 0;
-      frame.paddingBottom = config.padding.bottom || 0;
-      frame.paddingLeft = config.padding.left || 0;
-    }
-    frame.primaryAxisSizingMode = "AUTO";
-    frame.counterAxisSizingMode = "AUTO";
-    if (config.primaryAlign) {
-      switch (config.primaryAlign.toUpperCase()) {
-        case "MIN":
-          frame.primaryAxisAlignItems = "MIN";
-          break;
-        case "CENTER":
-          frame.primaryAxisAlignItems = "CENTER";
-          break;
-        case "MAX":
-          frame.primaryAxisAlignItems = "MAX";
-          break;
-        case "SPACE_BETWEEN":
-          frame.primaryAxisAlignItems = "SPACE_BETWEEN";
-          break;
-      }
-    }
-    if (config.counterAlign) {
-      switch (config.counterAlign.toUpperCase()) {
-        case "MIN":
-          frame.counterAxisAlignItems = "MIN";
-          break;
-        case "CENTER":
-          frame.counterAxisAlignItems = "CENTER";
-          break;
-        case "MAX":
-          frame.counterAxisAlignItems = "MAX";
-          break;
-      }
-    }
-  }
-  function hexToRgb(hex) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16) / 255,
-      g: parseInt(result[2], 16) / 255,
-      b: parseInt(result[3], 16) / 255
-    } : { r: 0, g: 0, b: 0 };
-  }
-  function mapFontWeight(weight) {
-    if (!weight) return "Regular";
-    const w = String(weight).toLowerCase().trim();
-    switch (w) {
-      case "100":
-      case "thin":
-        return "Thin";
-      case "200":
-      case "extralight":
-      case "extra light":
-        return "Extra Light";
-      case "300":
-      case "light":
-        return "Light";
-      case "400":
-      case "regular":
-      case "normal":
-        return "Regular";
-      case "500":
-      case "medium":
-        return "Medium";
-      case "600":
-      case "semibold":
-      case "semi bold":
-        return "Semi Bold";
-      case "700":
-      case "bold":
-        return "Bold";
-      case "800":
-      case "extrabold":
-      case "extra bold":
-        return "Extra Bold";
-      case "900":
-      case "black":
-        return "Black";
-      default:
-        return "Regular";
-    }
-  }
-  var init_gemini_frame_builder = __esm({
-    "src/gemini_frame_builder.ts"() {
-    }
-  });
-
-  // src/utils/image_utils.ts
-  function rgbToHex(rgb) {
-    const toHex = (c) => {
-      const hex = Math.round(c * 255).toString(16);
-      return hex.length === 1 ? "0" + hex : hex;
-    };
-    return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
-  }
-  function getBackgroundFromNode(node) {
-    if ("fills" in node && Array.isArray(node.fills)) {
-      for (const fill of node.fills) {
-        if (fill.type === "SOLID") {
-          const { r, g, b } = fill.color;
-          return rgbToHex({ r, g, b });
-        }
-      }
-    }
-    return "#FFFFFF";
-  }
-  function extractImagesFromNode(node) {
-    return __async(this, null, function* () {
-      const images = {};
-      function traverse(n) {
-        return __async(this, null, function* () {
-          if ("fills" in n && Array.isArray(n.fills)) {
-            for (const fill of n.fills) {
-              if (fill.type === "IMAGE" && fill.imageHash) {
-                const image = figma.getImageByHash(fill.imageHash);
-                if (image) {
-                  const bytes = yield image.getBytesAsync();
-                  images[fill.imageHash] = bytes;
-                }
-              }
-            }
-          }
-          if ("children" in n) {
-            for (const child of n.children) {
-              yield traverse(child);
-            }
-          }
+        console.log(`\u{1F680} Enviando consolida\xE7\xE3o para DeepSeek (${model})...`);
+        const response = yield fetch(API_BASE_URL2, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody)
         });
+        if (!response.ok) {
+          const errorData = yield response.json();
+          throw new DeepSeekError(`Erro na consolida\xE7\xE3o DeepSeek: ${response.status}`, response.status, errorData);
+        }
+        const data = yield response.json();
+        const content = (_c = (_b = (_a = data.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content;
+        if (!content) {
+          throw new DeepSeekError("Resposta vazia da consolida\xE7\xE3o DeepSeek.");
+        }
+        let jsonString = content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonString = jsonMatch[0];
+        }
+        try {
+          return JSON.parse(jsonString);
+        } catch (e) {
+          console.warn("JSON inv\xE1lido na consolida\xE7\xE3o. Tentando reparar...", e);
+          try {
+            const repairedJson = repairJson(jsonString);
+            return JSON.parse(repairedJson);
+          } catch (repairError) {
+            console.error("Falha ao reparar JSON de consolida\xE7\xE3o:", repairError);
+            throw new DeepSeekError(`JSON de consolida\xE7\xE3o inv\xE1lido e irrepar\xE1vel: ${e}`);
+          }
+        }
+      } catch (error) {
+        console.error("Erro na consolida\xE7\xE3o DeepSeek:", error);
+        throw new DeepSeekError(`Falha na consolida\xE7\xE3o: ${error.message}`);
       }
-      yield traverse(node);
-      return images;
     });
   }
-  var init_image_utils = __esm({
-    "src/utils/image_utils.ts"() {
-    }
-  });
-
-  // src/utils/serialization_utils.ts
-  function serializeNode(node) {
-    const data = {
-      id: node.id,
-      name: node.name,
-      type: node.type,
-      width: node.width,
-      height: node.height,
-      x: node.x,
-      y: node.y,
-      visible: node.visible,
-      locked: node.locked
-    };
-    if ("opacity" in node) data.opacity = node.opacity;
-    if ("blendMode" in node) data.blendMode = node.blendMode;
-    if ("fills" in node && node.fills !== figma.mixed) {
-      data.fills = node.fills.map((fill) => {
-        if (fill.type === "SOLID") {
-          return { type: "SOLID", color: fill.color, opacity: fill.opacity, visible: fill.visible };
-        }
-        if (fill.type === "IMAGE") {
-          return { type: "IMAGE", visible: fill.visible, imageHash: fill.imageHash, scaleMode: fill.scaleMode };
-        }
-        return { type: fill.type, visible: fill.visible };
-      });
-    }
-    if ("strokes" in node && node.strokes !== figma.mixed) {
-      data.strokes = node.strokes.map((stroke) => {
-        if (stroke.type === "SOLID") {
-          return { type: "SOLID", color: stroke.color, opacity: stroke.opacity, visible: stroke.visible };
-        }
-        return { type: stroke.type, visible: stroke.visible };
-      });
-      data.strokeWeight = node.strokeWeight;
-      data.strokeAlign = node.strokeAlign;
-      data.strokeCap = node.strokeCap;
-      data.strokeJoin = node.strokeJoin;
-      data.dashPattern = node.dashPattern;
-    }
-    if ("effects" in node && node.effects !== figma.mixed) {
-      data.effects = node.effects.map((effect) => ({
-        type: effect.type,
-        visible: effect.visible,
-        radius: effect.radius,
-        offset: effect.offset,
-        spread: effect.spread,
-        color: effect.color,
-        blendMode: effect.blendMode
-      }));
-    }
-    if ("cornerRadius" in node) {
-      if (node.cornerRadius !== figma.mixed) {
-        data.cornerRadius = node.cornerRadius;
-      } else {
-        data.topLeftRadius = node.topLeftRadius;
-        data.topRightRadius = node.topRightRadius;
-        data.bottomLeftRadius = node.bottomLeftRadius;
-        data.bottomRightRadius = node.bottomRightRadius;
-      }
-    }
-    if ("constraints" in node) {
-      data.constraints = node.constraints;
-    }
-    if (node.type === "TEXT") {
-      data.characters = node.characters;
-      data.fontSize = node.fontSize;
-      data.fontName = node.fontName;
-      data.fontWeight = node.fontWeight;
-      data.textAlignHorizontal = node.textAlignHorizontal;
-      data.textAlignVertical = node.textAlignVertical;
-      data.textAutoResize = node.textAutoResize;
-      data.letterSpacing = node.letterSpacing;
-      data.lineHeight = node.lineHeight;
-      data.textCase = node.textCase;
-      data.textDecoration = node.textDecoration;
-      if (node.fills !== figma.mixed && node.fills.length > 0 && node.fills[0].type === "SOLID") {
-        data.color = node.fills[0].color;
-      }
-    }
-    if ("layoutMode" in node) {
-      data.layoutMode = node.layoutMode;
-      data.primaryAxisSizingMode = node.primaryAxisSizingMode;
-      data.counterAxisSizingMode = node.counterAxisSizingMode;
-      data.primaryAxisAlignItems = node.primaryAxisAlignItems;
-      data.counterAxisAlignItems = node.counterAxisAlignItems;
-      data.paddingTop = node.paddingTop;
-      data.paddingRight = node.paddingRight;
-      data.paddingBottom = node.paddingBottom;
-      data.paddingLeft = node.paddingLeft;
-      data.itemSpacing = node.itemSpacing;
-    }
-    if ("children" in node) {
-      data.children = node.children.map((child) => serializeNode(child));
-    }
-    return data;
+  function saveDeepSeekKey(key) {
+    return __async(this, null, function* () {
+      yield figma.clientStorage.setAsync("deepseek_api_key", key);
+    });
   }
-  function getSectionsToAnalyze(node) {
-    return [node];
+  function getDeepSeekKey() {
+    return __async(this, null, function* () {
+      return yield figma.clientStorage.getAsync("deepseek_api_key");
+    });
   }
-  var init_serialization_utils = __esm({
-    "src/utils/serialization_utils.ts"() {
-      init_image_utils();
+  function saveDeepSeekModel(model) {
+    return __async(this, null, function* () {
+      yield figma.clientStorage.setAsync("deepseek_model", model);
+    });
+  }
+  function getDeepSeekModel() {
+    return __async(this, null, function* () {
+      const savedModel = yield figma.clientStorage.getAsync("deepseek_model");
+      return savedModel || DEEPSEEK_MODEL;
+    });
+  }
+  function testDeepSeekConnection() {
+    return __async(this, null, function* () {
+      var _a;
+      const apiKey = yield getDeepSeekKey();
+      if (!apiKey) {
+        return { success: false, message: "API Key n\xE3o configurada" };
+      }
+      const model = yield getDeepSeekModel();
+      console.log(`\u{1F9EA} Testando conex\xE3o com DeepSeek (${model})...`);
+      try {
+        const response = yield fetch(API_BASE_URL2, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: "You are a helpful assistant." },
+              { role: "user", content: "Hello" }
+            ],
+            stream: false
+          })
+        });
+        if (!response.ok) {
+          const errorData = yield response.json();
+          const errorMessage = ((_a = errorData.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
+          console.error("\u274C Erro na resposta DeepSeek:", errorData);
+          throw new DeepSeekError(`Falha na conex\xE3o: ${errorMessage}`);
+        }
+        return { success: true, message: `Conex\xE3o OK com DeepSeek (${model})!` };
+      } catch (e) {
+        console.error("Erro de rede ao testar conex\xE3o DeepSeek:", e);
+        return { success: false, message: e.message || "Erro desconhecido" };
+      }
+    });
+  }
+  function analyzeLayoutDeepSeek(nodeData, originalNodeId, imageData) {
+    return __async(this, null, function* () {
+      var _a, _b, _c;
+      const apiKey = yield getDeepSeekKey();
+      if (!apiKey) throw new DeepSeekError("API Key n\xE3o configurada.");
+      const model = yield getDeepSeekModel();
+      const prompt = ANALYZE_RECREATE_PROMPT.replace("${nodeData}", JSON.stringify(nodeData, null, 2));
+      const requestBody = {
+        model,
+        messages: [
+          { role: "system", content: "You are an expert UI/UX designer and Elementor developer." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.2,
+        // Baixa temperatura para maior precisão estrutural
+        max_tokens: 8192,
+        response_format: { type: "json_object" }
+        // DeepSeek suporta JSON mode
+      };
+      const fullLog = `--- PROMPT ENVIADO PARA DEEPSEEK ---
+${JSON.stringify(requestBody.messages, null, 2)}`;
+      figma.ui.postMessage({ type: "add-gemini-log", data: fullLog });
+      try {
+        console.log(`\u{1F680} Enviando an\xE1lise para DeepSeek (${model})...`);
+        const response = yield fetch(API_BASE_URL2, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+        if (!response.ok) {
+          const errorData = yield response.json();
+          throw new DeepSeekError(`Erro na API DeepSeek: ${response.status}`, response.status, errorData);
+        }
+        const data = yield response.json();
+        const content = (_c = (_b = (_a = data.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content;
+        if (!content) {
+          throw new DeepSeekError("Resposta vazia da API DeepSeek.");
+        }
+        figma.ui.postMessage({ type: "add-gemini-log", data: `--- RESPOSTA DEEPSEEK ---
+${content}` });
+        let jsonString = content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonString = jsonMatch[0];
+        }
+        try {
+          return JSON.parse(jsonString);
+        } catch (e) {
+          console.warn("JSON inv\xE1lido detectado. Tentando reparar...", e);
+          try {
+            const repairedJson = repairJson(jsonString);
+            return JSON.parse(repairedJson);
+          } catch (repairError) {
+            console.error("Falha ao reparar JSON:", repairError);
+            throw new DeepSeekError(`A IA retornou um JSON inv\xE1lido e irrepar\xE1vel: ${e}`);
+          }
+        }
+      } catch (error) {
+        console.error("Erro na an\xE1lise DeepSeek:", error);
+        throw new DeepSeekError(`Falha na an\xE1lise: ${error.message}`);
+      }
+    });
+  }
+  var DEEPSEEK_MODEL, API_BASE_URL2, DeepSeekError;
+  var init_api_deepseek = __esm({
+    "src/api_deepseek.ts"() {
+      init_prompts();
+      init_serialization_utils();
+      DEEPSEEK_MODEL = "deepseek-chat";
+      API_BASE_URL2 = "https://api.deepseek.com/chat/completions";
+      DeepSeekError = class extends Error {
+        constructor(message, statusCode, details) {
+          super(message);
+          this.statusCode = statusCode;
+          this.details = details;
+          this.name = "DeepSeekError";
+        }
+      };
     }
   });
 
@@ -2188,12 +2117,80 @@ REGRAS CR\xCDTICAS:
     "src/code.ts"(exports) {
       init_elementor_compiler();
       init_api_gemini();
-      init_gemini_frame_builder();
+      init_api_deepseek();
       init_image_utils();
       init_serialization_utils();
       function hasLayout4(node) {
         return "layoutMode" in node;
       }
+      var buildNode = (data, parent) => {
+        let node;
+        if (data.type === "FRAME") {
+          const frame = figma.createFrame();
+          node = frame;
+          frame.name = data.name;
+          if (parent) parent.appendChild(node);
+          if (data.width) frame.resize(data.width, typeof data.height === "number" ? data.height : 100);
+          if (data.layoutMode) frame.layoutMode = data.layoutMode;
+          if (data.primaryAxisAlignItems) {
+            if (data.primaryAxisAlignItems === "START") frame.primaryAxisAlignItems = "MIN";
+            else if (data.primaryAxisAlignItems === "END") frame.primaryAxisAlignItems = "MAX";
+            else frame.primaryAxisAlignItems = data.primaryAxisAlignItems;
+          }
+          if (data.counterAxisAlignItems) {
+            if (data.counterAxisAlignItems === "START") frame.counterAxisAlignItems = "MIN";
+            else if (data.counterAxisAlignItems === "END") frame.counterAxisAlignItems = "MAX";
+            else frame.counterAxisAlignItems = data.counterAxisAlignItems;
+          }
+          if (data.itemSpacing) frame.itemSpacing = data.itemSpacing;
+          if (data.paddingTop) frame.paddingTop = data.paddingTop;
+          if (data.paddingBottom) frame.paddingBottom = data.paddingBottom;
+          if (data.paddingLeft) frame.paddingLeft = data.paddingLeft;
+          if (data.paddingRight) frame.paddingRight = data.paddingRight;
+          if (data.cornerRadius) frame.cornerRadius = data.cornerRadius;
+          if (data.topLeftRadius) frame.topLeftRadius = data.topLeftRadius;
+          if (data.topRightRadius) frame.topRightRadius = data.topRightRadius;
+          if (data.bottomLeftRadius) frame.bottomLeftRadius = data.bottomLeftRadius;
+          if (data.bottomRightRadius) frame.bottomRightRadius = data.bottomRightRadius;
+          if (data.strokes) frame.strokes = data.strokes;
+          if (data.strokeWeight) frame.strokeWeight = data.strokeWeight;
+          if (data.fills) frame.fills = data.fills;
+          if (data.layoutSizingHorizontal === "FILL") frame.layoutSizingHorizontal = "FILL";
+          if (data.layoutSizingVertical === "FILL") frame.layoutSizingVertical = "FILL";
+          if (data.layoutSizingVertical === "HUG") frame.layoutSizingVertical = "HUG";
+          if (data.primaryAxisSizingMode) {
+            if (data.primaryAxisSizingMode === "HUG") frame.primaryAxisSizingMode = "AUTO";
+            else if (data.primaryAxisSizingMode === "FILL") frame.primaryAxisSizingMode = "FIXED";
+            else frame.primaryAxisSizingMode = data.primaryAxisSizingMode;
+          }
+          if (data.counterAxisSizingMode) {
+            if (data.counterAxisSizingMode === "HUG") frame.counterAxisSizingMode = "AUTO";
+            else if (data.counterAxisSizingMode === "FILL") frame.counterAxisSizingMode = "FIXED";
+            else frame.counterAxisSizingMode = data.counterAxisSizingMode;
+          }
+          if (data.children) {
+            data.children.forEach((childData) => buildNode(childData, frame));
+          }
+        } else if (data.type === "TEXT") {
+          const text = figma.createText();
+          node = text;
+          text.name = data.name;
+          if (parent) parent.appendChild(node);
+          text.characters = data.characters;
+          if (data.fontSize) text.fontSize = data.fontSize;
+          if (data.fontName) text.fontName = data.fontName;
+          if (data.fills) text.fills = data.fills;
+          else if (data.color) {
+            text.fills = [{ type: "SOLID", color: data.color }];
+          }
+          if (data.textAlignHorizontal) text.textAlignHorizontal = data.textAlignHorizontal;
+          if (data.lineHeight) text.lineHeight = data.lineHeight;
+          if (data.layoutSizingHorizontal === "FILL") text.layoutSizingHorizontal = "FILL";
+        } else {
+          return;
+        }
+        return node;
+      };
       figma.showUI(__html__, { width: 600, height: 600 });
       var compiler;
       figma.clientStorage.getAsync("wp_config").then((config) => {
@@ -2385,15 +2382,22 @@ ${JSON.stringify(sectionAnalysis, null, 2)}`
             }
             figma.notify("\u{1F3A8} Montando frame final otimizado...");
             const finalAnalysis = {
+              type: "FRAME",
+              name: node.name + " (Otimizado)",
               frameName: node.name + " (Otimizado)",
               width: node.width,
               height: node.height,
+              layoutMode: "VERTICAL",
               background: getBackgroundFromNode(node),
               autoLayout: { direction: "vertical", gap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 } },
               children: aggregatedChildren,
               improvements: [...new Set(aggregatedImprovements)]
             };
-            const newFrame = yield createOptimizedFrame(finalAnalysis, node, availableImages);
+            const newFrame = buildNode(finalAnalysis);
+            if (node) {
+              newFrame.x = node.x + node.width + 100;
+              newFrame.y = node.y;
+            }
             figma.currentPage.selection = [newFrame];
             figma.viewport.scrollAndZoomIntoView([newFrame]);
             figma.ui.postMessage({
@@ -2433,6 +2437,127 @@ ${JSON.stringify(consolidationResult, null, 2)}`
           } finally {
             figma.ui.postMessage({ type: "hide-loader" });
           }
+        } else if (msg.type === "save-deepseek-key") {
+          yield saveDeepSeekKey(msg.key);
+          figma.notify("\u{1F511} API Key do DeepSeek salva com sucesso!");
+        } else if (msg.type === "save-deepseek-model") {
+          yield saveDeepSeekModel(msg.model);
+          figma.notify(`\u{1F916} Modelo DeepSeek definido para: ${msg.model}`);
+        } else if (msg.type === "get-deepseek-config") {
+          const apiKey = yield getDeepSeekKey();
+          const model = yield getDeepSeekModel();
+          figma.ui.postMessage({ type: "load-deepseek-config", apiKey, model });
+        } else if (msg.type === "test-deepseek-connection") {
+          figma.notify("Testando conex\xE3o com DeepSeek...");
+          const result = yield testDeepSeekConnection();
+          figma.ui.postMessage(__spreadValues({ type: "deepseek-connection-result" }, result));
+          if (result.success) figma.notify(result.message);
+          else figma.notify("\u274C Falha na conex\xE3o DeepSeek");
+        } else if (msg.type === "analyze-with-deepseek") {
+          const selection = figma.currentPage.selection;
+          if (selection.length !== 1) {
+            figma.notify("\u26A0\uFE0F Selecione apenas 1 frame para an\xE1lise");
+            return;
+          }
+          const node = selection[0];
+          if (node.type !== "FRAME" && node.type !== "SECTION" && node.type !== "COMPONENT" && node.type !== "GROUP") {
+            figma.notify("\u26A0\uFE0F Selecione um Frame, Section, Componente ou Grupo v\xE1lido.");
+            return;
+          }
+          if (!("children" in node)) {
+            figma.notify("\u26A0\uFE0F O elemento selecionado n\xE3o possui filhos para an\xE1lise.");
+            return;
+          }
+          figma.notify("\u{1F916} Iniciando an\xE1lise com DeepSeek...");
+          try {
+            const availableImages = yield extractImagesFromNode(node);
+            const availableImageIds = Object.keys(availableImages);
+            console.log("\u{1F5BC}\uFE0F Imagens extra\xEDdas do original:", availableImageIds);
+            figma.ui.postMessage({ type: "add-gemini-log", data: `\u{1F5BC}\uFE0F Imagens encontradas no original: ${availableImageIds.length}` });
+            const childrenToAnalyze = getSectionsToAnalyze(node);
+            const totalSections = childrenToAnalyze.length;
+            if (totalSections === 0) {
+              throw new Error("O frame selecionado est\xE1 vazio ou n\xE3o possui se\xE7\xF5es vis\xEDveis.");
+            }
+            const aggregatedChildren = [];
+            const aggregatedImprovements = [];
+            for (let i = 0; i < totalSections; i++) {
+              let child = childrenToAnalyze[i];
+              const sectionIndex = i + 1;
+              figma.notify(`\u{1F916} Analisando se\xE7\xE3o ${sectionIndex} de ${totalSections}: ${child.name}...`);
+              figma.ui.postMessage({ type: "add-gemini-log", data: `--- INICIANDO AN\xC1LISE DA SE\xC7\xC3O ${sectionIndex}/${totalSections}: ${child.name} ---` });
+              const sectionSerializedData = serializeNode(child);
+              figma.ui.postMessage({
+                type: "add-gemini-log",
+                data: `\u{1F50D} DADOS COLETADOS (Se\xE7\xE3o ${sectionIndex} - ${child.name}):
+${JSON.stringify(sectionSerializedData, null, 2)}`
+              });
+              const sectionImageData = yield child.exportAsync({ format: "JPG", constraint: { type: "SCALE", value: 1 } });
+              const sectionAnalysis = yield analyzeLayoutDeepSeek(sectionSerializedData, child.id, sectionImageData);
+              figma.ui.postMessage({
+                type: "add-gemini-log",
+                data: `\u{1F916} RESPOSTA DEEPSEEK (Se\xE7\xE3o ${sectionIndex} - ${child.name}):
+${JSON.stringify(sectionAnalysis, null, 2)}`
+              });
+              if (sectionAnalysis.children) {
+                aggregatedChildren.push(...sectionAnalysis.children);
+              }
+              if (sectionAnalysis.improvements) {
+                aggregatedImprovements.push(...sectionAnalysis.improvements);
+              }
+            }
+            figma.notify("\u{1F3A8} Montando frame final otimizado...");
+            const finalAnalysis = {
+              type: "FRAME",
+              name: node.name + " (DeepSeek Otimizado)",
+              frameName: node.name + " (DeepSeek Otimizado)",
+              width: node.width,
+              height: node.height,
+              layoutMode: "VERTICAL",
+              background: getBackgroundFromNode(node),
+              autoLayout: { direction: "vertical", gap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 } },
+              children: aggregatedChildren,
+              improvements: [...new Set(aggregatedImprovements)]
+            };
+            const newFrame = buildNode(finalAnalysis);
+            if (node) {
+              newFrame.x = node.x + node.width + 100;
+              newFrame.y = node.y;
+            }
+            figma.currentPage.selection = [newFrame];
+            figma.viewport.scrollAndZoomIntoView([newFrame]);
+            figma.ui.postMessage({
+              type: "gemini-creation-complete",
+              data: {
+                originalName: node.name,
+                newName: newFrame.name,
+                improvements: finalAnalysis.improvements
+              }
+            });
+            figma.notify("\u{1F517} Iniciando Fase 4: Consolida\xE7\xE3o Final...");
+            figma.ui.postMessage({ type: "add-gemini-log", data: `--- FASE 4: CONSOLIDA\xC7\xC3O ---` });
+            const processedNodes = flattenAnalysisToNodes(finalAnalysis);
+            const consolidationResult = yield consolidateNodes2(processedNodes);
+            figma.ui.postMessage({
+              type: "add-gemini-log",
+              data: `\u2705 CONSOLIDA\xC7\xC3O CONCLU\xCDDA:
+${JSON.stringify(consolidationResult, null, 2)}`
+            });
+            figma.ui.postMessage({
+              type: "consolidation-result",
+              result: consolidationResult
+            });
+            figma.notify("\u2705 Convers\xE3o Completa! JSON gerado.");
+          } catch (e) {
+            console.error("Erro detalhado na an\xE1lise DeepSeek:", e);
+            figma.notify("\u274C Erro na an\xE1lise: " + e.message);
+            figma.ui.postMessage({
+              type: "gemini-error",
+              error: e.message
+            });
+          } finally {
+            figma.ui.postMessage({ type: "hide-loader" });
+          }
         } else if (msg.type === "resize-ui") {
           figma.ui.resize(msg.width, msg.height);
         } else if (msg.type === "create-test-frame") {
@@ -2442,286 +2567,479 @@ ${JSON.stringify(consolidationResult, null, 2)}`
               "name": "Desktop - Homepage Optimized",
               "type": "FRAME",
               "width": 1920,
-              "height": 2e3,
-              "x": 0,
-              "y": 0,
-              "visible": true,
+              "height": 1304,
               "layoutMode": "VERTICAL",
               "primaryAxisSizingMode": "AUTO",
               "counterAxisSizingMode": "FIXED",
-              "primaryAxisAlignItems": "MIN",
-              "counterAxisAlignItems": "CENTER",
-              "itemSpacing": 0,
-              "paddingTop": 0,
-              "paddingRight": 0,
-              "paddingBottom": 0,
-              "paddingLeft": 0,
-              "fills": [
-                {
-                  "type": "SOLID",
-                  "color": { "r": 1, "g": 1, "b": 1 },
-                  "visible": true
-                }
-              ],
+              "fills": [],
               "children": [
                 {
                   "id": "section-hero",
                   "name": "Section 1 - Hero (Full Container)",
                   "type": "FRAME",
+                  "width": 1920,
+                  "height": 571,
                   "layoutMode": "HORIZONTAL",
                   "primaryAxisSizingMode": "FIXED",
                   "counterAxisSizingMode": "AUTO",
-                  "width": 1920,
-                  "paddingTop": 100,
-                  "paddingBottom": 100,
-                  "paddingLeft": 320,
+                  "fills": [],
+                  "paddingTop": 0,
                   "paddingRight": 320,
-                  "itemSpacing": 64,
-                  "primaryAxisAlignItems": "CENTER",
-                  "counterAxisAlignItems": "CENTER",
-                  "fills": [
-                    {
-                      "type": "SOLID",
-                      "color": { "r": 1, "g": 1, "b": 1 }
-                    }
-                  ],
+                  "paddingBottom": 0,
+                  "paddingLeft": 320,
+                  "itemSpacing": 0,
                   "children": [
                     {
                       "id": "hero-content-col",
                       "name": "Container - Left Content",
                       "type": "FRAME",
+                      "width": 610,
+                      "height": 550,
                       "layoutMode": "VERTICAL",
                       "primaryAxisSizingMode": "AUTO",
                       "counterAxisSizingMode": "FIXED",
-                      "layoutSizingHorizontal": "FILL",
-                      "width": 600,
-                      "itemSpacing": 32,
+                      "fills": [],
+                      "itemSpacing": 24,
+                      "primaryAxisAlignItems": "START",
+                      "counterAxisAlignItems": "START",
                       "children": [
                         {
                           "id": "hero-heading",
                           "name": "Heading - Title",
                           "type": "TEXT",
-                          "characters": "O que \xE9 a Harmoniza\xE7\xE3o\nIntima Masculina?",
-                          "fontSize": 48,
-                          "fontName": { "family": "Inter", "style": "Bold" },
+                          "width": 526,
+                          "height": 96,
+                          "characters": "O que \xE9 a Harmoniza\xE7\xE3o\nIntima Masculina ?",
+                          "fontSize": 40,
+                          "fontName": {
+                            "family": "Inter",
+                            "style": "Bold"
+                          },
                           "fontWeight": 700,
-                          "fills": [{ "type": "SOLID", "color": { "r": 7e-3, "g": 0.431, "b": 0.478 } }],
-                          "layoutSizingHorizontal": "FILL"
+                          "textAlignHorizontal": "LEFT",
+                          "textAlignVertical": "CENTER",
+                          "letterSpacing": {
+                            "unit": "PIXELS",
+                            "value": -1
+                          },
+                          "lineHeight": {
+                            "unit": "PIXELS",
+                            "value": 48
+                          },
+                          "textCase": "UPPER",
+                          "color": {
+                            "r": 0.007843137718737125,
+                            "g": 0.4313725531101227,
+                            "b": 0.47843137383461
+                          }
                         },
                         {
                           "id": "hero-text",
                           "name": "Text Editor - Description",
                           "type": "TEXT",
-                          "characters": "A harmoniza\xE7\xE3o \xEDntima masculina \xE9 um procedimento est\xE9tico que visa aumentar tanto o tamanho quanto a circunfer\xEAncia do P\xEAnis, al\xE9m de corrigir assimetrias e melhorar a apar\xEAncia.\n\nO Protocolo NEXX utiliza \xC1cido Hialur\xF4nico, Toxina Botul\xEDnica e FIOS de PDO, produtos seguros, eficazes e compat\xEDveis com o nosso organismo.",
-                          "fontSize": 18,
-                          "fontName": { "family": "Inter", "style": "Regular" },
-                          "lineHeight": { "value": 28, "unit": "PIXELS" },
-                          "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }],
-                          "layoutSizingHorizontal": "FILL"
+                          "width": 554,
+                          "height": 264,
+                          "characters": "A harmoniza\xE7\xE3o \xEDntima masculina \xE9 um procedimento est\xE9tico que visa aumentar tanto o tamanho quanto a circunfer\xEAncia do P\xEAnis, al\xE9m de corrigir assimetrias e melhorar a apar\xEAncia.\n\nO Protocolo NEXX utiliza \xC1cido Hialur\xF4nico, Toxina Botul\xEDnica e FIOS de PDO, produtos seguros, eficazes e compat\xEDveis com o nosso organismo. Trata-se de um procedimento minimamente invasivo, realizado sob anestesia local, com recupera\xE7\xE3o r\xE1pida e resultados imediatos.",
+                          "fontSize": 20,
+                          "fontName": {
+                            "family": "Inter",
+                            "style": "Regular"
+                          },
+                          "fontWeight": 400,
+                          "textAlignHorizontal": "JUSTIFIED",
+                          "textAlignVertical": "CENTER",
+                          "lineHeight": {
+                            "unit": "PIXELS",
+                            "value": 24
+                          },
+                          "color": {
+                            "r": 0.20000000298023224,
+                            "g": 0.20000000298023224,
+                            "b": 0.20000000298023224
+                          }
                         },
                         {
                           "id": "hero-button",
-                          "name": "Button - CTA",
+                          "name": "Button - Agendar Avalia\xE7\xE3o",
                           "type": "FRAME",
+                          "width": 350,
+                          "height": 61,
                           "layoutMode": "HORIZONTAL",
-                          "primaryAxisSizingMode": "AUTO",
-                          "counterAxisSizingMode": "AUTO",
+                          "primaryAxisSizingMode": "FIXED",
+                          "counterAxisSizingMode": "FIXED",
+                          "fills": [
+                            {
+                              "type": "SOLID",
+                              "color": {
+                                "r": 0.007843137718737125,
+                                "g": 0.4313725531101227,
+                                "b": 0.47843137383461
+                              }
+                            }
+                          ],
+                          "cornerRadius": 30,
                           "primaryAxisAlignItems": "CENTER",
                           "counterAxisAlignItems": "CENTER",
-                          "paddingTop": 20,
-                          "paddingBottom": 20,
-                          "paddingLeft": 40,
-                          "paddingRight": 40,
-                          "cornerRadius": 50,
-                          "fills": [{ "type": "SOLID", "color": { "r": 7e-3, "g": 0.431, "b": 0.478 } }],
                           "children": [
                             {
-                              "id": "btn-text",
-                              "name": "Label",
+                              "id": "button-text",
+                              "name": "Text - Agendar Avalia\xE7\xE3o",
                               "type": "TEXT",
+                              "width": 193.4801025390625,
+                              "height": 20,
                               "characters": "Agendar Avalia\xE7\xE3o",
-                              "fontSize": 18,
-                              "fontName": { "family": "Sora", "style": "SemiBold" },
-                              "fills": [{ "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1 } }]
+                              "fontSize": 20,
+                              "fontName": {
+                                "family": "Sora",
+                                "style": "SemiBold"
+                              },
+                              "fontWeight": 600,
+                              "textAlignHorizontal": "LEFT",
+                              "textAlignVertical": "CENTER",
+                              "letterSpacing": {
+                                "unit": "PERCENT",
+                                "value": 0
+                              },
+                              "lineHeight": {
+                                "unit": "PIXELS",
+                                "value": 20
+                              },
+                              "color": {
+                                "r": 1,
+                                "g": 1,
+                                "b": 1
+                              }
                             }
                           ]
                         }
                       ]
                     },
                     {
-                      "id": "hero-image-col",
-                      "name": "Container - Right Image",
+                      "id": "hero-image",
+                      "name": "Image - Banner Homem",
                       "type": "FRAME",
-                      "layoutMode": "VERTICAL",
-                      "primaryAxisSizingMode": "AUTO",
-                      "counterAxisSizingMode": "FIXED",
                       "width": 547,
                       "height": 550,
-                      "cornerRadius": 24,
-                      "topLeftRadius": 24,
-                      "topRightRadius": 24,
-                      "bottomLeftRadius": 270,
-                      "bottomRightRadius": 24,
                       "fills": [
                         {
                           "type": "IMAGE",
-                          "scaleMode": "FILL",
-                          "imageHash": "8940bc040ef8faaed695b736e6eff3a7c543b3b8"
+                          "imageHash": "8940bc040ef8faaed695b736e6eff3a7c543b3b8",
+                          "scaleMode": "CROP"
                         }
-                      ]
+                      ],
+                      "topLeftRadius": 27.43000030517578,
+                      "topRightRadius": 27.43000030517578,
+                      "bottomLeftRadius": 274.25,
+                      "bottomRightRadius": 27.43000030517578
                     }
                   ]
                 },
                 {
-                  "id": "section-features",
-                  "name": "Section 2 - Features (Full Container)",
+                  "id": "section-steps",
+                  "name": "Section 2 - Steps (Full Container)",
                   "type": "FRAME",
+                  "width": 1920,
+                  "height": 677,
                   "layoutMode": "VERTICAL",
                   "primaryAxisSizingMode": "AUTO",
                   "counterAxisSizingMode": "FIXED",
-                  "width": 1920,
-                  "paddingTop": 100,
-                  "paddingBottom": 100,
-                  "paddingLeft": 320,
-                  "paddingRight": 320,
-                  "itemSpacing": 64,
-                  "primaryAxisAlignItems": "CENTER",
                   "fills": [
                     {
                       "type": "SOLID",
-                      "color": { "r": 0.96, "g": 0.97, "b": 0.97 }
+                      "color": {
+                        "r": 0.9647058844566345,
+                        "g": 0.9686274528503418,
+                        "b": 0.9686274528503418
+                      }
                     }
                   ],
+                  "paddingTop": 0,
+                  "paddingRight": 320,
+                  "paddingBottom": 0,
+                  "paddingLeft": 320,
+                  "itemSpacing": 0,
+                  "primaryAxisAlignItems": "CENTER",
+                  "counterAxisAlignItems": "CENTER",
                   "children": [
                     {
-                      "id": "feature-heading",
-                      "name": "Heading - Section Title",
+                      "id": "steps-heading",
+                      "name": "Heading - Steps Title",
                       "type": "TEXT",
+                      "width": 719,
+                      "height": 112,
                       "characters": "ENGROSSE E AUMENTE SEU P\xCANIS COM RESULTADOS IMEDIATOS",
+                      "fontSize": 40,
+                      "fontName": {
+                        "family": "Inter",
+                        "style": "Bold"
+                      },
+                      "fontWeight": 700,
                       "textAlignHorizontal": "CENTER",
-                      "fontSize": 36,
-                      "fontName": { "family": "Inter", "style": "Bold" },
-                      "fills": [{ "type": "SOLID", "color": { "r": 7e-3, "g": 0.431, "b": 0.478 } }]
+                      "textAlignVertical": "CENTER",
+                      "letterSpacing": {
+                        "unit": "PIXELS",
+                        "value": -1
+                      },
+                      "lineHeight": {
+                        "unit": "PIXELS",
+                        "value": 56
+                      },
+                      "textCase": "UPPER",
+                      "color": {
+                        "r": 0.007843137718737125,
+                        "g": 0.4313725531101227,
+                        "b": 0.47843137383461
+                      }
                     },
                     {
-                      "id": "features-grid",
-                      "name": "Container - Grid (Flex Row)",
+                      "id": "steps-container",
+                      "name": "Container - Steps",
                       "type": "FRAME",
+                      "width": 1280,
+                      "height": 265,
                       "layoutMode": "HORIZONTAL",
                       "primaryAxisSizingMode": "AUTO",
                       "counterAxisSizingMode": "FIXED",
+                      "fills": [],
+                      "itemSpacing": 36,
                       "primaryAxisAlignItems": "CENTER",
-                      "itemSpacing": 32,
-                      "layoutSizingHorizontal": "FILL",
+                      "counterAxisAlignItems": "CENTER",
                       "children": [
                         {
-                          "id": "card-1",
-                          "name": "Container - Card 1",
+                          "id": "step-1",
+                          "name": "Step 1 - Anestesia",
                           "type": "FRAME",
+                          "width": 408,
+                          "height": 265,
                           "layoutMode": "VERTICAL",
                           "primaryAxisSizingMode": "AUTO",
                           "counterAxisSizingMode": "FIXED",
-                          "itemSpacing": 16,
-                          "width": 400,
+                          "fills": [
+                            {
+                              "type": "SOLID",
+                              "color": {
+                                "r": 1,
+                                "g": 1,
+                                "b": 1
+                              }
+                            }
+                          ],
+                          "strokes": [
+                            {
+                              "type": "SOLID",
+                              "color": {
+                                "r": 0.15295857191085815,
+                                "g": 0.6660650372505188,
+                                "b": 0.7230768799781799
+                              }
+                            }
+                          ],
+                          "strokeWeight": 1,
+                          "cornerRadius": 12,
+                          "primaryAxisAlignItems": "CENTER",
+                          "counterAxisAlignItems": "CENTER",
+                          "itemSpacing": 8,
                           "children": [
                             {
-                              "id": "img-box-1",
-                              "name": "Image Box",
+                              "id": "step-1-image",
+                              "name": "Image - Anestesia",
                               "type": "FRAME",
-                              "layoutMode": "VERTICAL",
-                              "primaryAxisSizingMode": "FIXED",
-                              "counterAxisSizingMode": "FIXED",
-                              "width": 400,
-                              "height": 260,
-                              "cornerRadius": 12,
-                              "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
-                              "strokeWeight": 1,
-                              "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "42e2afde322e10744ddbea5a95e2ef2849570b61" }]
+                              "width": 408,
+                              "height": 231,
+                              "fills": [
+                                {
+                                  "type": "IMAGE",
+                                  "imageHash": "42e2afde322e10744ddbea5a95e2ef2849570b61",
+                                  "scaleMode": "CROP"
+                                }
+                              ]
                             },
                             {
-                              "id": "text-1",
-                              "name": "Heading",
+                              "id": "step-1-text",
+                              "name": "Text - Anestesia",
                               "type": "TEXT",
+                              "width": 329,
+                              "height": 24,
                               "characters": "Anestesia Local \xE9 Aplicada",
-                              "fontSize": 20,
-                              "textAlignHorizontal": "CENTER",
-                              "layoutSizingHorizontal": "FILL",
-                              "fontName": { "family": "Inter", "style": "Medium" },
-                              "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                              "fontSize": 26,
+                              "fontName": {
+                                "family": "Inter",
+                                "style": "Regular"
+                              },
+                              "fontWeight": 400,
+                              "textAlignHorizontal": "JUSTIFIED",
+                              "textAlignVertical": "CENTER",
+                              "letterSpacing": {
+                                "unit": "PERCENT",
+                                "value": 0
+                              },
+                              "lineHeight": {
+                                "unit": "PIXELS",
+                                "value": 24
+                              },
+                              "color": {
+                                "r": 0.20000000298023224,
+                                "g": 0.20000000298023224,
+                                "b": 0.20000000298023224
+                              }
                             }
                           ]
                         },
                         {
-                          "id": "card-2",
-                          "name": "Container - Card 2",
+                          "id": "step-2",
+                          "name": "Step 2 - Aumento",
                           "type": "FRAME",
+                          "width": 403,
+                          "height": 262,
                           "layoutMode": "VERTICAL",
                           "primaryAxisSizingMode": "AUTO",
                           "counterAxisSizingMode": "FIXED",
-                          "itemSpacing": 16,
-                          "width": 400,
+                          "fills": [
+                            {
+                              "type": "SOLID",
+                              "color": {
+                                "r": 1,
+                                "g": 1,
+                                "b": 1
+                              }
+                            }
+                          ],
+                          "strokes": [
+                            {
+                              "type": "SOLID",
+                              "color": {
+                                "r": 0.01568627543747425,
+                                "g": 0.7607843279838562,
+                                "b": 0.7960784435272217
+                              }
+                            }
+                          ],
+                          "strokeWeight": 1,
+                          "cornerRadius": 12,
+                          "primaryAxisAlignItems": "CENTER",
+                          "counterAxisAlignItems": "CENTER",
+                          "itemSpacing": 8,
                           "children": [
                             {
-                              "id": "img-box-2",
-                              "name": "Image Box",
+                              "id": "step-2-image",
+                              "name": "Image - Aumento",
                               "type": "FRAME",
-                              "layoutMode": "VERTICAL",
-                              "primaryAxisSizingMode": "FIXED",
-                              "counterAxisSizingMode": "FIXED",
-                              "width": 400,
-                              "height": 260,
-                              "cornerRadius": 12,
-                              "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
-                              "strokeWeight": 1,
-                              "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "67d1eeaa0af163b171593ec0086e9b06964feee7" }]
+                              "width": 403,
+                              "height": 233,
+                              "fills": [
+                                {
+                                  "type": "IMAGE",
+                                  "imageHash": "67d1eeaa0af163b171593ec0086e9b06964feee7",
+                                  "scaleMode": "FILL"
+                                }
+                              ]
                             },
                             {
-                              "id": "text-2",
-                              "name": "Heading",
+                              "id": "step-2-text",
+                              "name": "Text - Aumento",
                               "type": "TEXT",
+                              "width": 225,
+                              "height": 24,
                               "characters": "Aumento Imediato",
-                              "fontSize": 20,
-                              "textAlignHorizontal": "CENTER",
-                              "layoutSizingHorizontal": "FILL",
-                              "fontName": { "family": "Inter", "style": "Medium" },
-                              "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                              "fontSize": 26,
+                              "fontName": {
+                                "family": "Inter",
+                                "style": "Regular"
+                              },
+                              "fontWeight": 400,
+                              "textAlignHorizontal": "JUSTIFIED",
+                              "textAlignVertical": "CENTER",
+                              "letterSpacing": {
+                                "unit": "PERCENT",
+                                "value": 0
+                              },
+                              "lineHeight": {
+                                "unit": "PIXELS",
+                                "value": 24
+                              },
+                              "color": {
+                                "r": 0.20000000298023224,
+                                "g": 0.20000000298023224,
+                                "b": 0.20000000298023224
+                              }
                             }
                           ]
                         },
                         {
-                          "id": "card-3",
-                          "name": "Container - Card 3",
+                          "id": "step-3",
+                          "name": "Step 3 - Resultado",
                           "type": "FRAME",
+                          "width": 407,
+                          "height": 264,
                           "layoutMode": "VERTICAL",
                           "primaryAxisSizingMode": "AUTO",
                           "counterAxisSizingMode": "FIXED",
-                          "itemSpacing": 16,
-                          "width": 400,
+                          "fills": [
+                            {
+                              "type": "SOLID",
+                              "color": {
+                                "r": 1,
+                                "g": 1,
+                                "b": 1
+                              }
+                            }
+                          ],
+                          "strokes": [
+                            {
+                              "type": "SOLID",
+                              "color": {
+                                "r": 0.01568627543747425,
+                                "g": 0.7607843279838562,
+                                "b": 0.7960784435272217
+                              }
+                            }
+                          ],
+                          "strokeWeight": 1,
+                          "cornerRadius": 12,
+                          "primaryAxisAlignItems": "CENTER",
+                          "counterAxisAlignItems": "CENTER",
+                          "itemSpacing": 8,
                           "children": [
                             {
-                              "id": "img-box-3",
-                              "name": "Image Box",
+                              "id": "step-3-image",
+                              "name": "Image - Resultado",
                               "type": "FRAME",
-                              "layoutMode": "VERTICAL",
-                              "primaryAxisSizingMode": "FIXED",
-                              "counterAxisSizingMode": "FIXED",
-                              "width": 400,
-                              "height": 260,
-                              "cornerRadius": 12,
-                              "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
-                              "strokeWeight": 1,
-                              "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "ea1036b71582be34af958b067e936c4599722911" }]
+                              "width": 407,
+                              "height": 264,
+                              "fills": [
+                                {
+                                  "type": "IMAGE",
+                                  "imageHash": "ea1036b71582be34af958b067e936c4599722911",
+                                  "scaleMode": "CROP"
+                                }
+                              ],
+                              "topRightRadius": 12,
+                              "bottomRightRadius": 12
                             },
                             {
-                              "id": "text-3",
-                              "name": "Heading",
+                              "id": "step-3-text",
+                              "name": "Text - Resultado",
                               "type": "TEXT",
-                              "characters": "Resultado Final",
-                              "fontSize": 20,
+                              "width": 256,
+                              "height": 48,
+                              "characters": "Resultado Final Com Aumento Imediato",
+                              "fontSize": 26,
+                              "fontName": {
+                                "family": "Inter",
+                                "style": "Regular"
+                              },
+                              "fontWeight": 400,
                               "textAlignHorizontal": "CENTER",
-                              "layoutSizingHorizontal": "FILL",
-                              "fontName": { "family": "Inter", "style": "Medium" },
-                              "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                              "textAlignVertical": "CENTER",
+                              "lineHeight": {
+                                "unit": "PIXELS",
+                                "value": 24
+                              },
+                              "color": {
+                                "r": 0.20000000298023224,
+                                "g": 0.20000000298023224,
+                                "b": 0.20000000298023224
+                              }
                             }
                           ]
                         }
@@ -2735,54 +3053,6 @@ ${JSON.stringify(consolidationResult, null, 2)}`
             yield figma.loadFontAsync({ family: "Inter", style: "Medium" });
             yield figma.loadFontAsync({ family: "Inter", style: "Bold" });
             yield figma.loadFontAsync({ family: "Sora", style: "SemiBold" });
-            const buildNode = (data, parent) => {
-              let node;
-              if (data.type === "FRAME") {
-                const frame = figma.createFrame();
-                node = frame;
-                frame.name = data.name;
-                if (parent) parent.appendChild(node);
-                if (data.width) frame.resize(data.width, typeof data.height === "number" ? data.height : 100);
-                if (data.layoutMode) frame.layoutMode = data.layoutMode;
-                if (data.primaryAxisAlignItems) frame.primaryAxisAlignItems = data.primaryAxisAlignItems;
-                if (data.counterAxisAlignItems) frame.counterAxisAlignItems = data.counterAxisAlignItems;
-                if (data.itemSpacing) frame.itemSpacing = data.itemSpacing;
-                if (data.paddingTop) frame.paddingTop = data.paddingTop;
-                if (data.paddingBottom) frame.paddingBottom = data.paddingBottom;
-                if (data.paddingLeft) frame.paddingLeft = data.paddingLeft;
-                if (data.paddingRight) frame.paddingRight = data.paddingRight;
-                if (data.cornerRadius) frame.cornerRadius = data.cornerRadius;
-                if (data.topLeftRadius) frame.topLeftRadius = data.topLeftRadius;
-                if (data.topRightRadius) frame.topRightRadius = data.topRightRadius;
-                if (data.bottomLeftRadius) frame.bottomLeftRadius = data.bottomLeftRadius;
-                if (data.bottomRightRadius) frame.bottomRightRadius = data.bottomRightRadius;
-                if (data.strokes) frame.strokes = data.strokes;
-                if (data.strokeWeight) frame.strokeWeight = data.strokeWeight;
-                if (data.fills) frame.fills = data.fills;
-                if (data.layoutSizingHorizontal === "FILL") frame.layoutSizingHorizontal = "FILL";
-                if (data.layoutSizingVertical === "FILL") frame.layoutSizingVertical = "FILL";
-                if (data.primaryAxisSizingMode) frame.primaryAxisSizingMode = data.primaryAxisSizingMode;
-                if (data.counterAxisSizingMode) frame.counterAxisSizingMode = data.counterAxisSizingMode;
-                if (data.children) {
-                  data.children.forEach((childData) => buildNode(childData, frame));
-                }
-              } else if (data.type === "TEXT") {
-                const text = figma.createText();
-                node = text;
-                text.name = data.name;
-                if (parent) parent.appendChild(node);
-                text.characters = data.characters;
-                if (data.fontSize) text.fontSize = data.fontSize;
-                if (data.fontName) text.fontName = data.fontName;
-                if (data.fills) text.fills = data.fills;
-                if (data.textAlignHorizontal) text.textAlignHorizontal = data.textAlignHorizontal;
-                if (data.lineHeight) text.lineHeight = data.lineHeight;
-                if (data.layoutSizingHorizontal === "FILL") text.layoutSizingHorizontal = "FILL";
-              } else {
-                return;
-              }
-              return node;
-            };
             const rootFrame = buildNode(testFrameData);
             if (rootFrame) {
               figma.currentPage.selection = [rootFrame];
