@@ -320,3 +320,28 @@ src/
 3. ✅ **Refatoração de Código**: A função `buildNode` foi movida para o escopo global em `src/code.ts` para ser acessível por todos os handlers.
 
 **Impacto:** Permite validar se a IA está gerando estruturas corretas nativamente ou se dependemos excessivamente do pós-processamento.
+
+---
+
+### **FASE 10: Correção de Tratamento de Resposta da IA** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Detecção Inteligente de Formato**: O plugin agora detecta automaticamente o formato da resposta da IA (Gemini e DeepSeek).
+2. ✅ **Suporte a Múltiplos Formatos**: Suporta três formatos de resposta:
+   - Array de elementos (formato antigo)
+   - Objeto com propriedades `children` e `improvements` (formato esperado)
+   - Frame raiz único com `children` aninhados (formato atual das IAs)
+3. ✅ **Tratamento Robusto de Erros**: Adiciona fallback para formatos inesperados, evitando quebra do plugin.
+4. ✅ **Logs de Diagnóstico**: Adiciona warnings no console quando um formato inesperado é detectado.
+5. ✅ **Engine Unificada**: Todas as IAs (Gemini e DeepSeek) agora usam a engine `buildNode` para renderização direta do JSON sem pós-processamento.
+6. ✅ **Carregamento Automático de Fontes**: A engine `buildNode` agora carrega automaticamente as fontes necessárias antes de criar nós de texto, eliminando o erro "Cannot write to node with unloaded font".
+7. ✅ **Validação de Fills e Gradientes**: Implementada validação automática de fills (backgrounds) incluindo:
+   - Validação de SOLID, IMAGE, GRADIENT_LINEAR, GRADIENT_RADIAL, GRADIENT_ANGULAR e GRADIENT_DIAMOND
+   - Correção automática de gradientes sem `gradientTransform` (usa matriz identidade)
+   - Documentação no prompt com exemplos de formatos corretos para a IA
+
+**Impacto:** Elimina o erro que ocorria quando a IA retornava um frame raiz único, permitindo que o plugin funcione corretamente independentemente do formato de resposta da IA. A engine `buildNode` garante renderização fiel ao JSON gerado pela IA, carrega fontes automaticamente e valida/corrige fills antes de aplicá-los.
+
+
+
+

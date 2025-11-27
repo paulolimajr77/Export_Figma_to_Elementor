@@ -19,6 +19,18 @@
     return a;
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+  var __objRest = (source, exclude) => {
+    var target = {};
+    for (var prop in source)
+      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+        target[prop] = source[prop];
+    if (source != null && __getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(source)) {
+        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+          target[prop] = source[prop];
+      }
+    return target;
+  };
   var __esm = (fn, res) => function __init() {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
   };
@@ -1253,6 +1265,12 @@ lembre-se Full container, Container encaixotado, caixas de imagem, caixas de ico
 
 evite o uso de container, dentro de container, dentro de container e assim por diante.(coisa de amador).
 
+**IMPORTANTE:** Mantenha TODOS os fundos (fills), gradientes e imagens EXATAMENTE como est\xE3o no original. N\xC3O remova, simplifique ou altere cores de fundo, gradientes ou imagens. Se um elemento tem fundo no original, ele DEVE ter o mesmo fundo na sa\xEDda. Se n\xE3o tem fundo (fills vazio), mantenha vazio.
+
+**ATEN\xC7\xC3O ESPECIAL:** Se o frame raiz (Section) tem um gradiente ou imagem de fundo, MOVA esse fundo para o PRIMEIRO container filho (Section 1 - Hero, por exemplo), N\xC3O deixe no frame raiz. O frame raiz deve ter "fills": [] vazio, e o fundo deve estar no container de se\xE7\xE3o.
+
+**REGRA T\xC9CNICA:** NUNCA use "counterAxisAlignItems": "STRETCH". Os valores v\xE1lidos s\xE3o: "MIN", "MAX", "CENTER", "BASELINE". Para esticar elementos filhos, use "layoutSizingHorizontal": "FILL" ou "layoutSizingVertical": "FILL" nos pr\xF3prios filhos.
+
 \${nodeData}
 
 quero que devolva o json Aplicando boas pr\xE1ticas visuais, como espa\xE7amentos mais consistentes, grid centralizado e alinhamentos corrigidos, limpando e reorganizando o layout, mantendo tudo exatamente igual visualmente.
@@ -1447,6 +1465,15 @@ DEPOIS (Layout Otimizado - O que voc\xEA deve gerar):
         }
         if (fill.type === "IMAGE") {
           return { type: "IMAGE", visible: fill.visible, imageHash: fill.imageHash, scaleMode: fill.scaleMode };
+        }
+        if (fill.type === "GRADIENT_LINEAR" || fill.type === "GRADIENT_RADIAL" || fill.type === "GRADIENT_ANGULAR" || fill.type === "GRADIENT_DIAMOND") {
+          return {
+            type: fill.type,
+            gradientStops: fill.gradientStops || [],
+            gradientTransform: fill.gradientTransform || [[1, 0, 0], [0, 1, 0]],
+            opacity: fill.opacity,
+            visible: fill.visible
+          };
         }
         return { type: fill.type, visible: fill.visible };
       });
@@ -2123,7 +2150,95 @@ ${content}` });
       function hasLayout4(node) {
         return "layoutMode" in node;
       }
-      var buildNode = (data, parent) => {
+      var loadedFonts = /* @__PURE__ */ new Set();
+      function loadFontIfNeeded(fontName) {
+        return __async(this, null, function* () {
+          const fontKey = `${fontName.family}-${fontName.style}`;
+          if (loadedFonts.has(fontKey)) {
+            return;
+          }
+          try {
+            yield figma.loadFontAsync(fontName);
+            loadedFonts.add(fontKey);
+            console.log(`\u2705 Fonte carregada: ${fontKey}`);
+          } catch (error) {
+            console.warn(`\u26A0\uFE0F N\xE3o foi poss\xEDvel carregar a fonte ${fontKey}. Usando fonte padr\xE3o.`, error);
+            const fallbackFont = { family: "Roboto", style: "Regular" };
+            const fallbackKey = `${fallbackFont.family}-${fallbackFont.style}`;
+            if (!loadedFonts.has(fallbackKey)) {
+              yield figma.loadFontAsync(fallbackFont);
+              loadedFonts.add(fallbackKey);
+            }
+          }
+        });
+      }
+      function validateAndFixFills(fills) {
+        if (!Array.isArray(fills) || fills.length === 0) {
+          return [];
+        }
+        const validFills = [];
+        for (const fill of fills) {
+          if (!fill || typeof fill !== "object") {
+            continue;
+          }
+          if (fill.type === "SOLID") {
+            if (fill.color && typeof fill.color === "object") {
+              const _a = fill.color, { a } = _a, colorWithoutAlpha = __objRest(_a, ["a"]);
+              const opacity = typeof fill.opacity === "number" ? fill.opacity : typeof a === "number" ? a : 1;
+              validFills.push({
+                type: "SOLID",
+                color: colorWithoutAlpha,
+                opacity,
+                visible: typeof fill.visible === "boolean" ? fill.visible : true
+              });
+            }
+            continue;
+          }
+          if (fill.type === "IMAGE") {
+            if (fill.imageHash) {
+              validFills.push({
+                type: "IMAGE",
+                imageHash: fill.imageHash,
+                scaleMode: fill.scaleMode || "FILL",
+                opacity: typeof fill.opacity === "number" ? fill.opacity : 1,
+                visible: typeof fill.visible === "boolean" ? fill.visible : true
+              });
+            }
+            continue;
+          }
+          if (fill.type === "GRADIENT_LINEAR" || fill.type === "GRADIENT_RADIAL" || fill.type === "GRADIENT_ANGULAR" || fill.type === "GRADIENT_DIAMOND") {
+            if (!fill.gradientStops || !Array.isArray(fill.gradientStops) || fill.gradientStops.length === 0) {
+              console.warn(`\u26A0\uFE0F Gradiente ${fill.type} sem gradientStops v\xE1lido. Ignorando.`);
+              continue;
+            }
+            if (!fill.gradientTransform || !Array.isArray(fill.gradientTransform)) {
+              console.warn(`\u26A0\uFE0F Gradiente ${fill.type} sem gradientTransform. Usando matriz identidade.`);
+              fill.gradientTransform = [[1, 0, 0], [0, 1, 0]];
+            }
+            const cleanedGradientStops = fill.gradientStops.map((stop) => {
+              if (stop.color && typeof stop.color === "object") {
+                return __spreadProps(__spreadValues({}, stop), {
+                  color: __spreadProps(__spreadValues({}, stop.color), {
+                    a: typeof stop.color.a === "number" ? stop.color.a : 1
+                  })
+                });
+              }
+              return stop;
+            });
+            validFills.push({
+              type: fill.type,
+              gradientStops: cleanedGradientStops,
+              gradientTransform: fill.gradientTransform,
+              opacity: typeof fill.opacity === "number" ? fill.opacity : 1,
+              visible: typeof fill.visible === "boolean" ? fill.visible : true
+            });
+            continue;
+          }
+          console.warn(`\u26A0\uFE0F Tipo de fill desconhecido: ${fill.type}. Ignorando.`);
+        }
+        return validFills;
+      }
+      var buildNode = (data, parent) => __async(null, null, function* () {
         let node;
         if (data.type === "FRAME") {
           const frame = figma.createFrame();
@@ -2140,7 +2255,8 @@ ${content}` });
           if (data.counterAxisAlignItems) {
             if (data.counterAxisAlignItems === "START") frame.counterAxisAlignItems = "MIN";
             else if (data.counterAxisAlignItems === "END") frame.counterAxisAlignItems = "MAX";
-            else frame.counterAxisAlignItems = data.counterAxisAlignItems;
+            else if (data.counterAxisAlignItems === "STRETCH") {
+            } else frame.counterAxisAlignItems = data.counterAxisAlignItems;
           }
           if (data.itemSpacing) frame.itemSpacing = data.itemSpacing;
           if (data.paddingTop) frame.paddingTop = data.paddingTop;
@@ -2154,7 +2270,18 @@ ${content}` });
           if (data.bottomRightRadius) frame.bottomRightRadius = data.bottomRightRadius;
           if (data.strokes) frame.strokes = data.strokes;
           if (data.strokeWeight) frame.strokeWeight = data.strokeWeight;
-          if (data.fills) frame.fills = data.fills;
+          if (data.fills !== void 0) {
+            if (Array.isArray(data.fills) && data.fills.length === 0) {
+              frame.fills = [];
+            } else {
+              const validatedFills = validateAndFixFills(data.fills);
+              if (validatedFills.length > 0) {
+                frame.fills = validatedFills;
+              } else {
+                frame.fills = [];
+              }
+            }
+          }
           if (data.layoutSizingHorizontal === "FILL") frame.layoutSizingHorizontal = "FILL";
           if (data.layoutSizingVertical === "FILL") frame.layoutSizingVertical = "FILL";
           if (data.layoutSizingVertical === "HUG") frame.layoutSizingVertical = "HUG";
@@ -2169,19 +2296,28 @@ ${content}` });
             else frame.counterAxisSizingMode = data.counterAxisSizingMode;
           }
           if (data.children) {
-            data.children.forEach((childData) => buildNode(childData, frame));
+            for (const childData of data.children) {
+              yield buildNode(childData, frame);
+            }
           }
         } else if (data.type === "TEXT") {
           const text = figma.createText();
           node = text;
           text.name = data.name;
           if (parent) parent.appendChild(node);
-          text.characters = data.characters;
-          if (data.fontSize) text.fontSize = data.fontSize;
+          const fontToLoad = data.fontName || { family: "Inter", style: "Regular" };
+          yield loadFontIfNeeded(fontToLoad);
           if (data.fontName) text.fontName = data.fontName;
-          if (data.fills) text.fills = data.fills;
-          else if (data.color) {
-            text.fills = [{ type: "SOLID", color: data.color }];
+          text.characters = data.characters || "";
+          if (data.fontSize) text.fontSize = data.fontSize;
+          if (data.fills) {
+            const validatedFills = validateAndFixFills(data.fills);
+            if (validatedFills.length > 0) {
+              text.fills = validatedFills;
+            }
+          } else if (data.color) {
+            const _a = data.color, { a } = _a, colorWithoutAlpha = __objRest(_a, ["a"]);
+            text.fills = [{ type: "SOLID", color: colorWithoutAlpha }];
           }
           if (data.textAlignHorizontal) text.textAlignHorizontal = data.textAlignHorizontal;
           if (data.lineHeight) text.lineHeight = data.lineHeight;
@@ -2190,7 +2326,7 @@ ${content}` });
           return;
         }
         return node;
-      };
+      });
       figma.showUI(__html__, { width: 600, height: 600 });
       var compiler;
       figma.clientStorage.getAsync("wp_config").then((config) => {
@@ -2373,11 +2509,21 @@ ${JSON.stringify(sectionSerializedData, null, 2)}`
                 data: `\u{1F916} RESPOSTA DA IA (Se\xE7\xE3o ${sectionIndex} - ${child.name}):
 ${JSON.stringify(sectionAnalysis, null, 2)}`
               });
-              if (sectionAnalysis.children) {
+              if (Array.isArray(sectionAnalysis)) {
+                aggregatedChildren.push(...sectionAnalysis);
+              } else if (sectionAnalysis.type === "FRAME" && sectionAnalysis.children) {
                 aggregatedChildren.push(...sectionAnalysis.children);
-              }
-              if (sectionAnalysis.improvements) {
-                aggregatedImprovements.push(...sectionAnalysis.improvements);
+                if (sectionAnalysis.improvements) {
+                  aggregatedImprovements.push(...sectionAnalysis.improvements);
+                }
+              } else if (sectionAnalysis.children) {
+                aggregatedChildren.push(...sectionAnalysis.children);
+                if (sectionAnalysis.improvements) {
+                  aggregatedImprovements.push(...sectionAnalysis.improvements);
+                }
+              } else {
+                console.warn("\u26A0\uFE0F Formato de resposta inesperado da IA:", sectionAnalysis);
+                aggregatedChildren.push(sectionAnalysis);
               }
             }
             figma.notify("\u{1F3A8} Montando frame final otimizado...");
@@ -2393,7 +2539,7 @@ ${JSON.stringify(sectionAnalysis, null, 2)}`
               children: aggregatedChildren,
               improvements: [...new Set(aggregatedImprovements)]
             };
-            const newFrame = buildNode(finalAnalysis);
+            const newFrame = yield buildNode(finalAnalysis);
             if (node) {
               newFrame.x = node.x + node.width + 100;
               newFrame.y = node.y;
@@ -2499,11 +2645,21 @@ ${JSON.stringify(sectionSerializedData, null, 2)}`
                 data: `\u{1F916} RESPOSTA DEEPSEEK (Se\xE7\xE3o ${sectionIndex} - ${child.name}):
 ${JSON.stringify(sectionAnalysis, null, 2)}`
               });
-              if (sectionAnalysis.children) {
+              if (Array.isArray(sectionAnalysis)) {
+                aggregatedChildren.push(...sectionAnalysis);
+              } else if (sectionAnalysis.type === "FRAME" && sectionAnalysis.children) {
                 aggregatedChildren.push(...sectionAnalysis.children);
-              }
-              if (sectionAnalysis.improvements) {
-                aggregatedImprovements.push(...sectionAnalysis.improvements);
+                if (sectionAnalysis.improvements) {
+                  aggregatedImprovements.push(...sectionAnalysis.improvements);
+                }
+              } else if (sectionAnalysis.children) {
+                aggregatedChildren.push(...sectionAnalysis.children);
+                if (sectionAnalysis.improvements) {
+                  aggregatedImprovements.push(...sectionAnalysis.improvements);
+                }
+              } else {
+                console.warn("\u26A0\uFE0F Formato de resposta inesperado da IA:", sectionAnalysis);
+                aggregatedChildren.push(sectionAnalysis);
               }
             }
             figma.notify("\u{1F3A8} Montando frame final otimizado...");
@@ -2519,7 +2675,7 @@ ${JSON.stringify(sectionAnalysis, null, 2)}`
               children: aggregatedChildren,
               improvements: [...new Set(aggregatedImprovements)]
             };
-            const newFrame = buildNode(finalAnalysis);
+            const newFrame = yield buildNode(finalAnalysis);
             if (node) {
               newFrame.x = node.x + node.width + 100;
               newFrame.y = node.y;
@@ -2567,479 +2723,286 @@ ${JSON.stringify(consolidationResult, null, 2)}`
               "name": "Desktop - Homepage Optimized",
               "type": "FRAME",
               "width": 1920,
-              "height": 1304,
+              "height": 2e3,
+              "x": 0,
+              "y": 0,
+              "visible": true,
               "layoutMode": "VERTICAL",
               "primaryAxisSizingMode": "AUTO",
               "counterAxisSizingMode": "FIXED",
-              "fills": [],
+              "primaryAxisAlignItems": "MIN",
+              "counterAxisAlignItems": "CENTER",
+              "itemSpacing": 0,
+              "paddingTop": 0,
+              "paddingRight": 0,
+              "paddingBottom": 0,
+              "paddingLeft": 0,
+              "fills": [
+                {
+                  "type": "SOLID",
+                  "color": { "r": 1, "g": 1, "b": 1 },
+                  "visible": true
+                }
+              ],
               "children": [
                 {
                   "id": "section-hero",
                   "name": "Section 1 - Hero (Full Container)",
                   "type": "FRAME",
-                  "width": 1920,
-                  "height": 571,
                   "layoutMode": "HORIZONTAL",
                   "primaryAxisSizingMode": "FIXED",
                   "counterAxisSizingMode": "AUTO",
-                  "fills": [],
-                  "paddingTop": 0,
-                  "paddingRight": 320,
-                  "paddingBottom": 0,
+                  "width": 1920,
+                  "paddingTop": 100,
+                  "paddingBottom": 100,
                   "paddingLeft": 320,
-                  "itemSpacing": 0,
+                  "paddingRight": 320,
+                  "itemSpacing": 64,
+                  "primaryAxisAlignItems": "CENTER",
+                  "counterAxisAlignItems": "CENTER",
+                  "fills": [
+                    {
+                      "type": "SOLID",
+                      "color": { "r": 1, "g": 1, "b": 1 }
+                    }
+                  ],
                   "children": [
                     {
                       "id": "hero-content-col",
                       "name": "Container - Left Content",
                       "type": "FRAME",
-                      "width": 610,
-                      "height": 550,
                       "layoutMode": "VERTICAL",
                       "primaryAxisSizingMode": "AUTO",
                       "counterAxisSizingMode": "FIXED",
-                      "fills": [],
-                      "itemSpacing": 24,
-                      "primaryAxisAlignItems": "START",
-                      "counterAxisAlignItems": "START",
+                      "layoutSizingHorizontal": "FILL",
+                      "width": 600,
+                      "itemSpacing": 32,
                       "children": [
                         {
                           "id": "hero-heading",
                           "name": "Heading - Title",
                           "type": "TEXT",
-                          "width": 526,
-                          "height": 96,
-                          "characters": "O que \xE9 a Harmoniza\xE7\xE3o\nIntima Masculina ?",
-                          "fontSize": 40,
-                          "fontName": {
-                            "family": "Inter",
-                            "style": "Bold"
-                          },
+                          "characters": "O que \xE9 a Harmoniza\xE7\xE3o\nIntima Masculina?",
+                          "fontSize": 48,
+                          "fontName": { "family": "Inter", "style": "Bold" },
                           "fontWeight": 700,
-                          "textAlignHorizontal": "LEFT",
-                          "textAlignVertical": "CENTER",
-                          "letterSpacing": {
-                            "unit": "PIXELS",
-                            "value": -1
-                          },
-                          "lineHeight": {
-                            "unit": "PIXELS",
-                            "value": 48
-                          },
-                          "textCase": "UPPER",
-                          "color": {
-                            "r": 0.007843137718737125,
-                            "g": 0.4313725531101227,
-                            "b": 0.47843137383461
-                          }
+                          "fills": [{ "type": "SOLID", "color": { "r": 7e-3, "g": 0.431, "b": 0.478 } }],
+                          "layoutSizingHorizontal": "FILL"
                         },
                         {
                           "id": "hero-text",
                           "name": "Text Editor - Description",
                           "type": "TEXT",
-                          "width": 554,
-                          "height": 264,
-                          "characters": "A harmoniza\xE7\xE3o \xEDntima masculina \xE9 um procedimento est\xE9tico que visa aumentar tanto o tamanho quanto a circunfer\xEAncia do P\xEAnis, al\xE9m de corrigir assimetrias e melhorar a apar\xEAncia.\n\nO Protocolo NEXX utiliza \xC1cido Hialur\xF4nico, Toxina Botul\xEDnica e FIOS de PDO, produtos seguros, eficazes e compat\xEDveis com o nosso organismo. Trata-se de um procedimento minimamente invasivo, realizado sob anestesia local, com recupera\xE7\xE3o r\xE1pida e resultados imediatos.",
-                          "fontSize": 20,
-                          "fontName": {
-                            "family": "Inter",
-                            "style": "Regular"
-                          },
-                          "fontWeight": 400,
-                          "textAlignHorizontal": "JUSTIFIED",
-                          "textAlignVertical": "CENTER",
-                          "lineHeight": {
-                            "unit": "PIXELS",
-                            "value": 24
-                          },
-                          "color": {
-                            "r": 0.20000000298023224,
-                            "g": 0.20000000298023224,
-                            "b": 0.20000000298023224
-                          }
+                          "characters": "A harmoniza\xE7\xE3o \xEDntima masculina \xE9 um procedimento est\xE9tico que visa aumentar tanto o tamanho quanto a circunfer\xEAncia do P\xEAnis, al\xE9m de corrigir assimetrias e melhorar a apar\xEAncia.\n\nO Protocolo NEXX utiliza \xC1cido Hialur\xF4nico, Toxina Botul\xEDnica e FIOS de PDO, produtos seguros, eficazes e compat\xEDveis com o nosso organismo.",
+                          "fontSize": 18,
+                          "fontName": { "family": "Inter", "style": "Regular" },
+                          "lineHeight": { "value": 28, "unit": "PIXELS" },
+                          "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }],
+                          "layoutSizingHorizontal": "FILL"
                         },
                         {
                           "id": "hero-button",
-                          "name": "Button - Agendar Avalia\xE7\xE3o",
+                          "name": "Button - CTA",
                           "type": "FRAME",
-                          "width": 350,
-                          "height": 61,
                           "layoutMode": "HORIZONTAL",
-                          "primaryAxisSizingMode": "FIXED",
-                          "counterAxisSizingMode": "FIXED",
-                          "fills": [
-                            {
-                              "type": "SOLID",
-                              "color": {
-                                "r": 0.007843137718737125,
-                                "g": 0.4313725531101227,
-                                "b": 0.47843137383461
-                              }
-                            }
-                          ],
-                          "cornerRadius": 30,
+                          "primaryAxisSizingMode": "AUTO",
+                          "counterAxisSizingMode": "AUTO",
                           "primaryAxisAlignItems": "CENTER",
                           "counterAxisAlignItems": "CENTER",
+                          "paddingTop": 20,
+                          "paddingBottom": 20,
+                          "paddingLeft": 40,
+                          "paddingRight": 40,
+                          "cornerRadius": 50,
+                          "fills": [{ "type": "SOLID", "color": { "r": 7e-3, "g": 0.431, "b": 0.478 } }],
                           "children": [
                             {
-                              "id": "button-text",
-                              "name": "Text - Agendar Avalia\xE7\xE3o",
+                              "id": "btn-text",
+                              "name": "Label",
                               "type": "TEXT",
-                              "width": 193.4801025390625,
-                              "height": 20,
                               "characters": "Agendar Avalia\xE7\xE3o",
-                              "fontSize": 20,
-                              "fontName": {
-                                "family": "Sora",
-                                "style": "SemiBold"
-                              },
-                              "fontWeight": 600,
-                              "textAlignHorizontal": "LEFT",
-                              "textAlignVertical": "CENTER",
-                              "letterSpacing": {
-                                "unit": "PERCENT",
-                                "value": 0
-                              },
-                              "lineHeight": {
-                                "unit": "PIXELS",
-                                "value": 20
-                              },
-                              "color": {
-                                "r": 1,
-                                "g": 1,
-                                "b": 1
-                              }
+                              "fontSize": 18,
+                              "fontName": { "family": "Sora", "style": "SemiBold" },
+                              "fills": [{ "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1 } }]
                             }
                           ]
                         }
                       ]
                     },
                     {
-                      "id": "hero-image",
-                      "name": "Image - Banner Homem",
+                      "id": "hero-image-col",
+                      "name": "Container - Right Image",
                       "type": "FRAME",
+                      "layoutMode": "VERTICAL",
+                      "primaryAxisSizingMode": "AUTO",
+                      "counterAxisSizingMode": "FIXED",
                       "width": 547,
                       "height": 550,
+                      "cornerRadius": 24,
+                      "topLeftRadius": 24,
+                      "topRightRadius": 24,
+                      "bottomLeftRadius": 270,
+                      "bottomRightRadius": 24,
                       "fills": [
                         {
                           "type": "IMAGE",
-                          "imageHash": "8940bc040ef8faaed695b736e6eff3a7c543b3b8",
-                          "scaleMode": "CROP"
+                          "scaleMode": "FILL",
+                          "imageHash": "8940bc040ef8faaed695b736e6eff3a7c543b3b8"
                         }
-                      ],
-                      "topLeftRadius": 27.43000030517578,
-                      "topRightRadius": 27.43000030517578,
-                      "bottomLeftRadius": 274.25,
-                      "bottomRightRadius": 27.43000030517578
+                      ]
                     }
                   ]
                 },
                 {
-                  "id": "section-steps",
-                  "name": "Section 2 - Steps (Full Container)",
+                  "id": "section-features",
+                  "name": "Section 2 - Features (Full Container)",
                   "type": "FRAME",
-                  "width": 1920,
-                  "height": 677,
                   "layoutMode": "VERTICAL",
                   "primaryAxisSizingMode": "AUTO",
                   "counterAxisSizingMode": "FIXED",
+                  "width": 1920,
+                  "paddingTop": 100,
+                  "paddingBottom": 100,
+                  "paddingLeft": 320,
+                  "paddingRight": 320,
+                  "itemSpacing": 64,
+                  "primaryAxisAlignItems": "CENTER",
                   "fills": [
                     {
                       "type": "SOLID",
-                      "color": {
-                        "r": 0.9647058844566345,
-                        "g": 0.9686274528503418,
-                        "b": 0.9686274528503418
-                      }
+                      "color": { "r": 0.96, "g": 0.97, "b": 0.97 }
                     }
                   ],
-                  "paddingTop": 0,
-                  "paddingRight": 320,
-                  "paddingBottom": 0,
-                  "paddingLeft": 320,
-                  "itemSpacing": 0,
-                  "primaryAxisAlignItems": "CENTER",
-                  "counterAxisAlignItems": "CENTER",
                   "children": [
                     {
-                      "id": "steps-heading",
-                      "name": "Heading - Steps Title",
+                      "id": "feature-heading",
+                      "name": "Heading - Section Title",
                       "type": "TEXT",
-                      "width": 719,
-                      "height": 112,
                       "characters": "ENGROSSE E AUMENTE SEU P\xCANIS COM RESULTADOS IMEDIATOS",
-                      "fontSize": 40,
-                      "fontName": {
-                        "family": "Inter",
-                        "style": "Bold"
-                      },
-                      "fontWeight": 700,
                       "textAlignHorizontal": "CENTER",
-                      "textAlignVertical": "CENTER",
-                      "letterSpacing": {
-                        "unit": "PIXELS",
-                        "value": -1
-                      },
-                      "lineHeight": {
-                        "unit": "PIXELS",
-                        "value": 56
-                      },
-                      "textCase": "UPPER",
-                      "color": {
-                        "r": 0.007843137718737125,
-                        "g": 0.4313725531101227,
-                        "b": 0.47843137383461
-                      }
+                      "fontSize": 36,
+                      "fontName": { "family": "Inter", "style": "Bold" },
+                      "fills": [{ "type": "SOLID", "color": { "r": 7e-3, "g": 0.431, "b": 0.478 } }]
                     },
                     {
-                      "id": "steps-container",
-                      "name": "Container - Steps",
+                      "id": "features-grid",
+                      "name": "Container - Grid (Flex Row)",
                       "type": "FRAME",
-                      "width": 1280,
-                      "height": 265,
                       "layoutMode": "HORIZONTAL",
                       "primaryAxisSizingMode": "AUTO",
-                      "counterAxisSizingMode": "FIXED",
-                      "fills": [],
-                      "itemSpacing": 36,
+                      "counterAxisSizingMode": "AUTO",
                       "primaryAxisAlignItems": "CENTER",
-                      "counterAxisAlignItems": "CENTER",
+                      "itemSpacing": 32,
+                      "layoutSizingHorizontal": "FILL",
                       "children": [
                         {
-                          "id": "step-1",
-                          "name": "Step 1 - Anestesia",
+                          "id": "card-1",
+                          "name": "Container - Card 1",
                           "type": "FRAME",
-                          "width": 408,
-                          "height": 265,
                           "layoutMode": "VERTICAL",
                           "primaryAxisSizingMode": "AUTO",
                           "counterAxisSizingMode": "FIXED",
-                          "fills": [
-                            {
-                              "type": "SOLID",
-                              "color": {
-                                "r": 1,
-                                "g": 1,
-                                "b": 1
-                              }
-                            }
-                          ],
-                          "strokes": [
-                            {
-                              "type": "SOLID",
-                              "color": {
-                                "r": 0.15295857191085815,
-                                "g": 0.6660650372505188,
-                                "b": 0.7230768799781799
-                              }
-                            }
-                          ],
-                          "strokeWeight": 1,
-                          "cornerRadius": 12,
-                          "primaryAxisAlignItems": "CENTER",
-                          "counterAxisAlignItems": "CENTER",
-                          "itemSpacing": 8,
+                          "itemSpacing": 16,
+                          "width": 400,
                           "children": [
                             {
-                              "id": "step-1-image",
-                              "name": "Image - Anestesia",
+                              "id": "img-box-1",
+                              "name": "Image Box",
                               "type": "FRAME",
-                              "width": 408,
-                              "height": 231,
-                              "fills": [
-                                {
-                                  "type": "IMAGE",
-                                  "imageHash": "42e2afde322e10744ddbea5a95e2ef2849570b61",
-                                  "scaleMode": "CROP"
-                                }
-                              ]
+                              "layoutMode": "VERTICAL",
+                              "primaryAxisSizingMode": "FIXED",
+                              "counterAxisSizingMode": "FIXED",
+                              "width": 400,
+                              "height": 260,
+                              "cornerRadius": 12,
+                              "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
+                              "strokeWeight": 1,
+                              "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "42e2afde322e10744ddbea5a95e2ef2849570b61" }]
                             },
                             {
-                              "id": "step-1-text",
-                              "name": "Text - Anestesia",
+                              "id": "text-1",
+                              "name": "Heading",
                               "type": "TEXT",
-                              "width": 329,
-                              "height": 24,
                               "characters": "Anestesia Local \xE9 Aplicada",
-                              "fontSize": 26,
-                              "fontName": {
-                                "family": "Inter",
-                                "style": "Regular"
-                              },
-                              "fontWeight": 400,
-                              "textAlignHorizontal": "JUSTIFIED",
-                              "textAlignVertical": "CENTER",
-                              "letterSpacing": {
-                                "unit": "PERCENT",
-                                "value": 0
-                              },
-                              "lineHeight": {
-                                "unit": "PIXELS",
-                                "value": 24
-                              },
-                              "color": {
-                                "r": 0.20000000298023224,
-                                "g": 0.20000000298023224,
-                                "b": 0.20000000298023224
-                              }
-                            }
-                          ]
-                        },
-                        {
-                          "id": "step-2",
-                          "name": "Step 2 - Aumento",
-                          "type": "FRAME",
-                          "width": 403,
-                          "height": 262,
-                          "layoutMode": "VERTICAL",
-                          "primaryAxisSizingMode": "AUTO",
-                          "counterAxisSizingMode": "FIXED",
-                          "fills": [
-                            {
-                              "type": "SOLID",
-                              "color": {
-                                "r": 1,
-                                "g": 1,
-                                "b": 1
-                              }
-                            }
-                          ],
-                          "strokes": [
-                            {
-                              "type": "SOLID",
-                              "color": {
-                                "r": 0.01568627543747425,
-                                "g": 0.7607843279838562,
-                                "b": 0.7960784435272217
-                              }
-                            }
-                          ],
-                          "strokeWeight": 1,
-                          "cornerRadius": 12,
-                          "primaryAxisAlignItems": "CENTER",
-                          "counterAxisAlignItems": "CENTER",
-                          "itemSpacing": 8,
-                          "children": [
-                            {
-                              "id": "step-2-image",
-                              "name": "Image - Aumento",
-                              "type": "FRAME",
-                              "width": 403,
-                              "height": 233,
-                              "fills": [
-                                {
-                                  "type": "IMAGE",
-                                  "imageHash": "67d1eeaa0af163b171593ec0086e9b06964feee7",
-                                  "scaleMode": "FILL"
-                                }
-                              ]
-                            },
-                            {
-                              "id": "step-2-text",
-                              "name": "Text - Aumento",
-                              "type": "TEXT",
-                              "width": 225,
-                              "height": 24,
-                              "characters": "Aumento Imediato",
-                              "fontSize": 26,
-                              "fontName": {
-                                "family": "Inter",
-                                "style": "Regular"
-                              },
-                              "fontWeight": 400,
-                              "textAlignHorizontal": "JUSTIFIED",
-                              "textAlignVertical": "CENTER",
-                              "letterSpacing": {
-                                "unit": "PERCENT",
-                                "value": 0
-                              },
-                              "lineHeight": {
-                                "unit": "PIXELS",
-                                "value": 24
-                              },
-                              "color": {
-                                "r": 0.20000000298023224,
-                                "g": 0.20000000298023224,
-                                "b": 0.20000000298023224
-                              }
-                            }
-                          ]
-                        },
-                        {
-                          "id": "step-3",
-                          "name": "Step 3 - Resultado",
-                          "type": "FRAME",
-                          "width": 407,
-                          "height": 264,
-                          "layoutMode": "VERTICAL",
-                          "primaryAxisSizingMode": "AUTO",
-                          "counterAxisSizingMode": "FIXED",
-                          "fills": [
-                            {
-                              "type": "SOLID",
-                              "color": {
-                                "r": 1,
-                                "g": 1,
-                                "b": 1
-                              }
-                            }
-                          ],
-                          "strokes": [
-                            {
-                              "type": "SOLID",
-                              "color": {
-                                "r": 0.01568627543747425,
-                                "g": 0.7607843279838562,
-                                "b": 0.7960784435272217
-                              }
-                            }
-                          ],
-                          "strokeWeight": 1,
-                          "cornerRadius": 12,
-                          "primaryAxisAlignItems": "CENTER",
-                          "counterAxisAlignItems": "CENTER",
-                          "itemSpacing": 8,
-                          "children": [
-                            {
-                              "id": "step-3-image",
-                              "name": "Image - Resultado",
-                              "type": "FRAME",
-                              "width": 407,
-                              "height": 264,
-                              "fills": [
-                                {
-                                  "type": "IMAGE",
-                                  "imageHash": "ea1036b71582be34af958b067e936c4599722911",
-                                  "scaleMode": "CROP"
-                                }
-                              ],
-                              "topRightRadius": 12,
-                              "bottomRightRadius": 12
-                            },
-                            {
-                              "id": "step-3-text",
-                              "name": "Text - Resultado",
-                              "type": "TEXT",
-                              "width": 256,
-                              "height": 48,
-                              "characters": "Resultado Final Com Aumento Imediato",
-                              "fontSize": 26,
-                              "fontName": {
-                                "family": "Inter",
-                                "style": "Regular"
-                              },
-                              "fontWeight": 400,
+                              "fontSize": 20,
                               "textAlignHorizontal": "CENTER",
-                              "textAlignVertical": "CENTER",
-                              "lineHeight": {
-                                "unit": "PIXELS",
-                                "value": 24
-                              },
-                              "color": {
-                                "r": 0.20000000298023224,
-                                "g": 0.20000000298023224,
-                                "b": 0.20000000298023224
-                              }
+                              "layoutSizingHorizontal": "FILL",
+                              "fontName": { "family": "Inter", "style": "Medium" },
+                              "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                            }
+                          ]
+                        },
+                        {
+                          "id": "card-2",
+                          "name": "Container - Card 2",
+                          "type": "FRAME",
+                          "layoutMode": "VERTICAL",
+                          "primaryAxisSizingMode": "AUTO",
+                          "counterAxisSizingMode": "FIXED",
+                          "itemSpacing": 16,
+                          "width": 400,
+                          "children": [
+                            {
+                              "id": "img-box-2",
+                              "name": "Image Box",
+                              "type": "FRAME",
+                              "layoutMode": "VERTICAL",
+                              "primaryAxisSizingMode": "FIXED",
+                              "counterAxisSizingMode": "FIXED",
+                              "width": 400,
+                              "height": 260,
+                              "cornerRadius": 12,
+                              "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
+                              "strokeWeight": 1,
+                              "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "67d1eeaa0af163b171593ec0086e9b06964feee7" }]
+                            },
+                            {
+                              "id": "text-2",
+                              "name": "Heading",
+                              "type": "TEXT",
+                              "characters": "Aumento Imediato",
+                              "fontSize": 20,
+                              "textAlignHorizontal": "CENTER",
+                              "layoutSizingHorizontal": "FILL",
+                              "fontName": { "family": "Inter", "style": "Medium" },
+                              "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
+                            }
+                          ]
+                        },
+                        {
+                          "id": "card-3",
+                          "name": "Container - Card 3",
+                          "type": "FRAME",
+                          "layoutMode": "VERTICAL",
+                          "primaryAxisSizingMode": "AUTO",
+                          "counterAxisSizingMode": "FIXED",
+                          "itemSpacing": 16,
+                          "width": 400,
+                          "children": [
+                            {
+                              "id": "img-box-3",
+                              "name": "Image Box",
+                              "type": "FRAME",
+                              "layoutMode": "VERTICAL",
+                              "primaryAxisSizingMode": "FIXED",
+                              "counterAxisSizingMode": "FIXED",
+                              "width": 400,
+                              "height": 260,
+                              "cornerRadius": 12,
+                              "strokes": [{ "type": "SOLID", "color": { "r": 0.015, "g": 0.76, "b": 0.796 } }],
+                              "strokeWeight": 1,
+                              "fills": [{ "type": "IMAGE", "scaleMode": "FILL", "imageHash": "ea1036b71582be34af958b067e936c4599722911" }]
+                            },
+                            {
+                              "id": "text-3",
+                              "name": "Heading",
+                              "type": "TEXT",
+                              "characters": "Resultado Final",
+                              "fontSize": 20,
+                              "textAlignHorizontal": "CENTER",
+                              "layoutSizingHorizontal": "FILL",
+                              "fontName": { "family": "Inter", "style": "Medium" },
+                              "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }]
                             }
                           ]
                         }
@@ -3053,7 +3016,7 @@ ${JSON.stringify(consolidationResult, null, 2)}`
             yield figma.loadFontAsync({ family: "Inter", style: "Medium" });
             yield figma.loadFontAsync({ family: "Inter", style: "Bold" });
             yield figma.loadFontAsync({ family: "Sora", style: "SemiBold" });
-            const rootFrame = buildNode(testFrameData);
+            const rootFrame = yield buildNode(testFrameData);
             if (rootFrame) {
               figma.currentPage.selection = [rootFrame];
               figma.viewport.scrollAndZoomIntoView([rootFrame]);

@@ -41,6 +41,16 @@ export function serializeNode(node: SceneNode): SerializedNode {
             if (fill.type === 'IMAGE') {
                 return { type: 'IMAGE', visible: fill.visible, imageHash: fill.imageHash, scaleMode: fill.scaleMode };
             }
+            // Gradientes - incluir gradientStops e gradientTransform
+            if (fill.type === 'GRADIENT_LINEAR' || fill.type === 'GRADIENT_RADIAL' || fill.type === 'GRADIENT_ANGULAR' || fill.type === 'GRADIENT_DIAMOND') {
+                return {
+                    type: fill.type,
+                    gradientStops: fill.gradientStops || [],
+                    gradientTransform: fill.gradientTransform || [[1, 0, 0], [0, 1, 0]],
+                    opacity: fill.opacity,
+                    visible: fill.visible
+                };
+            }
             return { type: fill.type, visible: fill.visible };
         });
     }

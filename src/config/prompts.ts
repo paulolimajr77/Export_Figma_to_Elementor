@@ -9,6 +9,12 @@ lembre-se Full container, Container encaixotado, caixas de imagem, caixas de ico
 
 evite o uso de container, dentro de container, dentro de container e assim por diante.(coisa de amador).
 
+**IMPORTANTE:** Mantenha TODOS os fundos (fills), gradientes e imagens EXATAMENTE como estão no original. NÃO remova, simplifique ou altere cores de fundo, gradientes ou imagens. Se um elemento tem fundo no original, ele DEVE ter o mesmo fundo na saída. Se não tem fundo (fills vazio), mantenha vazio.
+
+**ATENÇÃO ESPECIAL:** Se o frame raiz (Section) tem um gradiente ou imagem de fundo, MOVA esse fundo para o PRIMEIRO container filho (Section 1 - Hero, por exemplo), NÃO deixe no frame raiz. O frame raiz deve ter "fills": [] vazio, e o fundo deve estar no container de seção.
+
+**REGRA TÉCNICA:** NUNCA use "counterAxisAlignItems": "STRETCH". Os valores válidos são: "MIN", "MAX", "CENTER", "BASELINE". Para esticar elementos filhos, use "layoutSizingHorizontal": "FILL" ou "layoutSizingVertical": "FILL" nos próprios filhos.
+
 \${nodeData}
 
 quero que devolva o json Aplicando boas práticas visuais, como espaçamentos mais consistentes, grid centralizado e alinhamentos corrigidos, limpando e reorganizando o layout, mantendo tudo exatamente igual visualmente.
