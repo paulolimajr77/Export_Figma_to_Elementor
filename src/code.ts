@@ -311,6 +311,7 @@ figma.ui.onmessage = async (msg) => {
 
     // Exportar para Elementor
     if (msg.type === 'export-elementor') {
+        console.log('🚀 Iniciando export-elementor...');
         const selection = figma.currentPage.selection;
         if (selection.length === 0) {
             figma.notify('Selecione ao menos um frame.');
@@ -322,10 +323,13 @@ figma.ui.onmessage = async (msg) => {
         figma.notify('Processando... (Uploads de imagem podem demorar)');
 
         try {
+            console.log('📦 Compilando elementos...');
             const elements = await compiler.compile(selection);
+            console.log('✅ Elementos compilados:', elements);
 
             // Detectar elementos w:nav-menu
             const navMenus = compiler.findNavMenus(elements);
+            console.log('🔍 Menus encontrados:', navMenus);
 
             const template: ElementorTemplate = {
                 type: 'elementor',
@@ -334,11 +338,13 @@ figma.ui.onmessage = async (msg) => {
                 version: '0.4'
             };
 
+            console.log('📤 Enviando export-result para UI...');
             figma.ui.postMessage({
                 type: 'export-result',
                 data: JSON.stringify(template, null, 2),
                 navMenus: navMenus
             });
+            console.log('✅ Mensagem export-result enviada!');
 
             if (navMenus.length > 0) {
                 figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navegação.`);
@@ -346,8 +352,9 @@ figma.ui.onmessage = async (msg) => {
                 figma.notify('JSON gerado com sucesso!');
             }
         } catch (e) {
-            console.error(e);
-            figma.notify('Erro ao exportar.');
+            console.error('❌ ERRO ao exportar:', e);
+            console.error('Stack trace:', (e as Error).stack);
+            figma.notify(`Erro ao exportar: ${(e as Error).message}`);
         }
     }
 

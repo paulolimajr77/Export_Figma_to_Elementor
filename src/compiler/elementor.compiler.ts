@@ -278,6 +278,7 @@ export class ElementorCompiler {
             }
 
             // Descrição
+            // Descrição
             if (descNode) {
                 settings.description_text = descNode.characters;
                 const typo = extractTypography(descNode);
@@ -286,6 +287,8 @@ export class ElementorCompiler {
                     settings[key.replace('typography_', 'description_typography_')] = typo[key];
                 }
                 if (color) settings.description_color = color;
+            } else {
+                settings.description_text = '';
             }
         }
 

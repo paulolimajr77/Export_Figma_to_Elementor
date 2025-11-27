@@ -661,55 +661,84 @@
 
         let finalConsolidationResult = null;
 
-        window.onmessage = (event) => {
-            const msg = event.data.pluginMessage;
-            if (!msg) return;
+        // window.onmessage = (event) => {
+        // const msg = event.data.pluginMessage;
+        // if (!msg) return;
 
-            // ... (existing handlers) ...
+        // // ... (existing handlers) ...
 
-            if (msg.type === 'consolidation-result') {
-                finalConsolidationResult = msg.result;
+        // // Handler para export-elementor (botão "Gerar JSON Elementor")
+        // if (msg.type === 'export-result') {
+        //     console.log('✅ export-result recebido!', msg);
 
-                // Show report UI
-                const reportDiv = document.getElementById('consolidation-report');
-                reportDiv.style.display = 'block';
+        //     const outputArea = document.getElementById('output-area');
+        //     if (outputArea) {
+        //         outputArea.value = msg.data;
+        //         console.log('📝 JSON colocado no output-area');
+        //     } else {
+        //         console.error('❌ output-area não encontrado!');
+        //     }
 
-                // Update Summary
-                const summary = msg.result.report.summary;
-                const summaryDiv = document.getElementById('report-summary');
-                summaryDiv.innerHTML = `
-                    <div>Total Nodes: <strong>${summary.totalNodes}</strong></div>
-                    <div>Convertidos: <strong style="color: var(--success);">${summary.converted}</strong></div>
-                    <div>Customizados: <strong style="color: var(--warning);">${summary.custom}</strong></div>
-                    <div>Avisos: <strong style="color: ${summary.warnings > 0 ? '#e67e22' : 'inherit'};">${summary.warnings}</strong></div>
-                `;
+        //     const logArea = document.getElementById('log-area');
+        //     if (logArea && msg.navMenus && msg.navMenus.length > 0) {
+        //         logArea.value += `\n✅ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação:\n`;
+        //         msg.navMenus.forEach(menu => {
+        //             logArea.value += `  - ${menu.name}\n`;
+        //         });
+        //     }
+        // }
 
-                // Update Warnings
-                const warningsDiv = document.getElementById('report-warnings');
-                const warningsList = warningsDiv.querySelector('ul');
-                if (msg.result.report.warnings && msg.result.report.warnings.length > 0) {
-                    warningsDiv.style.display = 'block';
-                    warningsList.innerHTML = msg.result.report.warnings.map(w => `<li>${w}</li>`).join('');
-                } else {
-                    warningsDiv.style.display = 'none';
-                }
+        // // Handler para upload de imagem
+        // if (msg.type === 'upload-image-request') {
+        //     console.log('📤 Upload request received for:', msg.name);
+        //     uploadImageToWordPress(msg).then(result => {
+        //         parent.postMessage({ pluginMessage: { type: 'upload-image-response', id: msg.id, ...result } }, '*');
+        //     });
+        // }
 
-                // Update Phase Indicator
-                const phases = document.querySelectorAll('#phase-indicator div');
-                if (phases.length >= 4) {
-                    phases[3].innerHTML = '✅ Fase 4: Consolidação (Concluída)';
-                    phases[3].style.fontWeight = 'bold';
-                    phases[3].style.color = 'var(--success)';
-                }
+        // if (msg.type === 'consolidation-result') {
+        //     finalConsolidationResult = msg.result;
 
-                // Auto-copy JSON to clipboard (optional, or just update output area)
-                const outputArea = document.getElementById('output-area');
-                if (outputArea) {
-                    outputArea.value = JSON.stringify(msg.result.elementorJSON, null, 2);
-                    // Switch to Export tab to show result? Maybe not, stay in Gemini tab.
-                }
-            }
-        };
+        //     // Show report UI
+        //     const reportDiv = document.getElementById('consolidation-report');
+        //     reportDiv.style.display = 'block';
+
+        //     // Update Summary
+        //     const summary = msg.result.report.summary;
+        //     const summaryDiv = document.getElementById('report-summary');
+        //     summaryDiv.innerHTML = `
+        //             <div>Total Nodes: <strong>${summary.totalNodes}</strong></div>
+        //             <div>Convertidos: <strong style="color: var(--success);">${summary.converted}</strong></div>
+        //             <div>Customizados: <strong style="color: var(--warning);">${summary.custom}</strong></div>
+        //             <div>Avisos: <strong style="color: ${summary.warnings > 0 ? '#e67e22' : 'inherit'};">${summary.warnings}</strong></div>
+        //         `;
+
+        //     // Update Warnings
+        //     const warningsDiv = document.getElementById('report-warnings');
+        //     const warningsList = warningsDiv.querySelector('ul');
+        //     if (msg.result.report.warnings && msg.result.report.warnings.length > 0) {
+        //         warningsDiv.style.display = 'block';
+        //         warningsList.innerHTML = msg.result.report.warnings.map(w => `<li>${w}</li>`).join('');
+        //     } else {
+        //         warningsDiv.style.display = 'none';
+        //     }
+
+        //     // Update Phase Indicator
+        //     const phases = document.querySelectorAll('#phase-indicator div');
+        //     if (phases.length >= 4) {
+        //         phases[3].innerHTML = '✅ Fase 4: Consolidação (Concluída)';
+        //         phases[3].style.fontWeight = 'bold';
+        //         phases[3].style.color = 'var(--success)';
+        //     }
+
+        //     // Auto-copy JSON to clipboard (optional, or just update output area)
+        //     const outputArea = document.getElementById('output-area');
+        //     if (outputArea) {
+        //         outputArea.value = JSON.stringify(msg.result.elementorJSON, null, 2);
+        //         // Switch to Export tab to show result? Maybe not, stay in Gemini tab.
+        //     }
+        // }
+        // };
 
         document.getElementById('btn-copy-final-json').addEventListener('click', () => {
             if (finalConsolidationResult) {
@@ -1774,6 +1803,52 @@
             if (!msg) return;
 
             switch (msg.type) {
+                case 'consolidation-result':
+                    finalConsolidationResult = msg.result;
+
+                    // Show report UI
+                    const reportDiv = document.getElementById('consolidation-report');
+                    if (reportDiv) reportDiv.style.display = 'block';
+
+                    // Update Summary
+                    const summary = msg.result.report.summary;
+                    const summaryDiv = document.getElementById('report-summary');
+                    if (summaryDiv) {
+                        summaryDiv.innerHTML = `
+                            <div>Total Nodes: <strong>${summary.totalNodes}</strong></div>
+                            <div>Convertidos: <strong style="color: var(--success);">${summary.converted}</strong></div>
+                            <div>Customizados: <strong style="color: var(--warning);">${summary.custom}</strong></div>
+                            <div>Avisos: <strong style="color: ${summary.warnings > 0 ? '#e67e22' : 'inherit'};">${summary.warnings}</strong></div>
+                        `;
+                    }
+
+                    // Update Warnings
+                    const warningsDiv = document.getElementById('report-warnings');
+                    if (warningsDiv) {
+                        const warningsList = warningsDiv.querySelector('ul');
+                        if (msg.result.report.warnings && msg.result.report.warnings.length > 0) {
+                            warningsDiv.style.display = 'block';
+                            if (warningsList) warningsList.innerHTML = msg.result.report.warnings.map(w => `<li>${w}</li>`).join('');
+                        } else {
+                            warningsDiv.style.display = 'none';
+                        }
+                    }
+
+                    // Update Phase Indicator
+                    const phases = document.querySelectorAll('#phase-indicator div');
+                    if (phases.length >= 4) {
+                        phases[3].innerHTML = '✅ Fase 4: Consolidação (Concluída)';
+                        phases[3].style.fontWeight = 'bold';
+                        phases[3].style.color = 'var(--success)';
+                    }
+
+                    // Auto-copy JSON to clipboard (optional, or just update output area)
+                    const outputAreaConsolidation = document.getElementById('output-area');
+                    if (outputAreaConsolidation) {
+                        outputAreaConsolidation.value = JSON.stringify(msg.result.elementorJSON, null, 2);
+                    }
+                    break;
+
                 case 'export-result':
                     document.getElementById('output-area').value = msg.data;
                     document.getElementById('btn-copy').disabled = false;
@@ -1839,6 +1914,23 @@
                     Gemini.showPreviewImage(msg);
                     break;
 
+                case 'upload-image-request':
+                    console.log('📤 Upload request received for:', msg.name);
+                    uploadImageToWordPress(msg).then(result => {
+                        // IMPORTANTE: Preservar msg.id (GUID do plugin) e não deixar result.id (ID do WP) sobrescrever
+                        const response = {
+                            type: 'upload-image-response',
+                            id: msg.id,
+                            success: result.success,
+                            url: result.url,
+                            error: result.error,
+                            wpId: result.id // Renomeando ID do WP para evitar conflito
+                        };
+                        parent.postMessage({ pluginMessage: response }, '*');
+                    });
+                    break;
+                    break;
+
                 case 'add-gemini-log':
                     Gemini.addLog(msg.data);
                     break;
@@ -1854,14 +1946,48 @@
                 case 'gemini-error':
                     alert('❌ Erro: ' + msg.error);
                     break;
-
-                case 'upload-image-request':
-                    // Keep upload logic inline or move to dedicated namespace if complex
-                    // For now, let's just log it to keep this block small
-                    console.log('Upload request received');
-                    break;
             }
         };
+
+        async function uploadImageToWordPress(data) {
+            const wpUrl = document.getElementById('wp-url').value;
+            const wpUser = document.getElementById('wp-user').value;
+            const wpPass = document.getElementById('wp-pass').value;
+
+            if (!wpUrl || !wpUser || !wpPass) {
+                console.warn('⚠️ Configuração WP incompleta. Pulando upload.');
+                // Retorna sucesso falso mas não trava o processo
+                return { success: false, error: 'WP config missing' };
+            }
+
+            try {
+                // Converter Uint8Array para Blob
+                const blob = new Blob([data.data], { type: data.mimeType });
+                const formData = new FormData();
+                formData.append('file', blob, data.name);
+                formData.append('title', data.name.split('.')[0]);
+
+                const response = await fetch(`${wpUrl}/wp-json/wp/v2/media`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(wpUser + ':' + wpPass)
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const json = await response.json();
+                console.log('✅ Upload concluído:', json.source_url);
+                return { success: true, url: json.source_url, id: json.id };
+
+            } catch (error) {
+                console.error('❌ Erro no upload:', error);
+                return { success: false, error: error.message };
+            }
+        }
     </script>
 </body>
 

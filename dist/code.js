@@ -248,9 +248,11 @@
                 this.pendingUploads.set(id, (result2) => {
                   clearTimeout(timeout);
                   if (result2.success) {
+                    console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}`);
                     this.mediaHashCache.set(hash, result2.url);
                     resolve(result2.url);
                   } else {
+                    console.error(`[ImageUploader] Falha no upload:`, result2.error);
                     resolve(null);
                   }
                 });
@@ -276,10 +278,13 @@
          * @param result Resultado do upload
          */
         handleUploadResponse(id, result) {
+          console.log(`[ImageUploader] Recebida resposta para ${id}:`, result);
           const resolver = this.pendingUploads.get(id);
           if (resolver) {
             resolver(result);
             this.pendingUploads.delete(id);
+          } else {
+            console.warn(`[ImageUploader] Nenhuma promessa pendente encontrada para ${id}`);
           }
         }
         /**
@@ -1122,6 +1127,8 @@
                   settings[key.replace("typography_", "description_typography_")] = typo[key];
                 }
                 if (color) settings.description_color = color;
+              } else {
+                settings.description_text = "";
               }
             } else if (widgetSlug === "heading") {
               if (node.type === "TEXT") {
@@ -2348,6 +2355,7 @@ ${content}` });
         console.log("Dados completos:", msg);
         if (!compiler) compiler = new ElementorCompiler({});
         if (msg.type === "export-elementor") {
+          console.log("\u{1F680} Iniciando export-elementor...");
           const selection = figma.currentPage.selection;
           if (selection.length === 0) {
             figma.notify("Selecione ao menos um frame.");
@@ -2356,27 +2364,33 @@ ${content}` });
           if (msg.quality) compiler.setQuality(msg.quality);
           figma.notify("Processando... (Uploads de imagem podem demorar)");
           try {
+            console.log("\u{1F4E6} Compilando elementos...");
             const elements = yield compiler.compile(selection);
+            console.log("\u2705 Elementos compilados:", elements);
             const navMenus = compiler.findNavMenus(elements);
+            console.log("\u{1F50D} Menus encontrados:", navMenus);
             const template = {
               type: "elementor",
               siteurl: ((_a = compiler.wpConfig) == null ? void 0 : _a.url) || "",
               elements,
               version: "0.4"
             };
+            console.log("\u{1F4E4} Enviando export-result para UI...");
             figma.ui.postMessage({
               type: "export-result",
               data: JSON.stringify(template, null, 2),
               navMenus
             });
+            console.log("\u2705 Mensagem export-result enviada!");
             if (navMenus.length > 0) {
               figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navega\xE7\xE3o.`);
             } else {
               figma.notify("JSON gerado com sucesso!");
             }
           } catch (e) {
-            console.error(e);
-            figma.notify("Erro ao exportar.");
+            console.error("\u274C ERRO ao exportar:", e);
+            console.error("Stack trace:", e.stack);
+            figma.notify(`Erro ao exportar: ${e.message}`);
           }
         } else if (msg.type === "save-wp-config") {
           yield figma.clientStorage.setAsync("wp_config", msg.config);

@@ -60,9 +60,11 @@ export class ImageUploader {
                 this.pendingUploads.set(id, (result: any) => {
                     clearTimeout(timeout);
                     if (result.success) {
+                        console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result.url}`);
                         this.mediaHashCache.set(hash, result.url);
                         resolve(result.url);
                     } else {
+                        console.error(`[ImageUploader] Falha no upload:`, result.error);
                         resolve(null);
                     }
                 });
@@ -90,10 +92,13 @@ export class ImageUploader {
      * @param result Resultado do upload
      */
     handleUploadResponse(id: string, result: any): void {
+        console.log(`[ImageUploader] Recebida resposta para ${id}:`, result);
         const resolver = this.pendingUploads.get(id);
         if (resolver) {
             resolver(result);
             this.pendingUploads.delete(id);
+        } else {
+            console.warn(`[ImageUploader] Nenhuma promessa pendente encontrada para ${id}`);
         }
     }
 
