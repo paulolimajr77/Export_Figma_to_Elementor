@@ -79,12 +79,29 @@ export function detectWidgetType(node: SceneNode): string | null {
         return 'text-editor';
     }
 
-    // Imagens e ícones
-    if (lname.includes('image') || lname.includes('img')) return 'image';
-    if (lname.includes('icon') || lname.includes('ico')) return 'icon';
+    // Imagens e ícones (verificação robusta)
+    if (isImageNode(node)) return 'image';
+    if (isIconNode(node)) return 'icon';
+
+    // Divider (Linha ou Retângulo fino)
+    if (node.type === 'LINE') return 'divider';
+    if (node.type === 'RECTANGLE') {
+        const height = node.height;
+        const width = node.width;
+        // Se for muito fino (horizontal ou vertical), é um divider
+        if (height <= 5 || width <= 5) return 'divider';
+
+        // Se não for imagem e não for fino, assume Spacer (se não tiver children, o que Rectangle não tem)
+        return 'spacer';
+    }
 
     // Container/Frame
     if ('layoutMode' in node || node.type === 'GROUP') return 'container';
+
+    // Fallback para vetores não identificados como ícones (mas que são vetores)
+    if (['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION'].includes(node.type)) {
+        return 'icon';
+    }
 
     return null;
 }

@@ -16,7 +16,7 @@ function isArray(value: any): value is ReadonlyArray<any> {
  * Interface para uploader de imagens (para evitar dependência circular)
  */
 export interface ImageUploader {
-    uploadToWordPress(node: SceneNode, format?: string): Promise<string | null>;
+    uploadToWordPress(node: SceneNode, format?: string): Promise<{ url: string, id: number } | null>;
 }
 
 
@@ -50,10 +50,28 @@ export async function extractBackgroundAdvanced(
     // Background com imagem
     else if (bgFill.type === 'IMAGE') {
         settings.background_background = 'classic';
-        const bgUrl = await uploader.uploadToWordPress(node, 'WEBP');
-        if (bgUrl) {
-            settings.background_image = { url: bgUrl, id: 0, source: 'library' };
+
+        // CRÍTICO: Se exportarmos o 'node' diretamente, ele virá com todos os filhos (texto, botões, etc).
+        // Precisamos criar um retângulo temporário APENAS com o fill de imagem para exportar.
+        const tempNode = figma.createRectangle();
+        tempNode.resize(node.width, node.height);
+        tempNode.fills = [bgFill];
+
+        // Mover para fora da vista para não atrapalhar (opcional, mas boa prática)
+        tempNode.x = node.x + 10000;
+        tempNode.y = node.y;
+
+        try {
+            const upload = await uploader.uploadToWordPress(tempNode, 'WEBP');
+            if (upload) {
+                settings.background_image = { url: upload.url, id: upload.id, source: 'library' };
+            }
+        } catch (error) {
+            console.error('[Background] Erro ao exportar imagem de fundo:', error);
+        } finally {
+            tempNode.remove();
         }
+
         settings.background_position = 'center center';
         settings.background_size = 'cover';
         settings.background_repeat = 'no-repeat';

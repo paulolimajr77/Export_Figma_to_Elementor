@@ -426,6 +426,62 @@
             margin-top: 2px;
             margin-bottom: 4px;
         }
+
+        .tree-children {
+            margin-left: 15px;
+            padding-left: 10px;
+            border-left: 1px dashed var(--tree-line);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: 2px;
+            margin-bottom: 4px;
+        }
+
+        /* Estilos para Log Rico */
+        #log-area {
+            height: 150px;
+            font-family: monospace;
+            font-size: 11px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #333;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .log-entry.info {
+            color: #333;
+        }
+
+        .log-entry.warn {
+            color: #e67e22;
+        }
+
+        .log-entry.error {
+            color: #e74c3c;
+        }
+
+        .log-entry.success {
+            color: #27ae60;
+        }
+
+        .log-image {
+            display: block;
+            max-width: 100%;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 
@@ -449,15 +505,51 @@
                 <input type="range" id="quality" min="0.1" max="1.0" step="0.05" value="0.85">
                 <span id="quality-value">85%</span>
             </div>
-            <button id="btn-export" class="btn btn-primary" style="margin-top:10px;">Gerar JSON Elementor</button>
+            <button id="btn-export" class="btn btn-primary" style="margin-top:10px; width: 100%;">Gerar JSON
+                Elementor</button>
+
+            <button id="btn-optimize" class="btn btn-primary" style="margin-top:5px; width: 100%;">
+                🧹 Otimizar Estrutura (Tree Shaking)
+            </button>
+
+            <div style="margin-top:5px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="use-ai-analysis-main" checked>
+                    <span>Usar Análise de IA (Gemini/DeepSeek)</span>
+                </label>
+            </div>
+
+            <button id="btn-analyze-structure" class="btn btn-secondary"
+                style="margin-top:5px; background:#6c5ce7; color:white; border-color:#6c5ce7; width: 100%;">
+                🔍 Analisar Estrutura de Widgets
+            </button>
+
+            <!-- Modal de Resultados da Análise -->
+            <div id="analysis-modal"
+                style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; padding:20px; overflow-y:auto;">
+                <div
+                    style="background:white; border-radius:8px; max-width:700px; margin:20px auto; padding:20px; box-shadow:0 4px 20px rgba(0,0,0,0.2);">
+                    <h3 style="margin-top:0; color:#333;">📊 Resultados da Análise Estrutural</h3>
+
+
+
+                    <div id="analysis-results-container"></div>
+                    <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
+                        <button id="btn-apply-renames" class="btn btn-primary">✅ Aplicar Renomeações</button>
+                        <button id="btn-close-analysis" class="btn btn-secondary">❌ Fechar</button>
+                    </div>
+                </div>
+            </div>
+
+            <label>Código JSON (Copie e cole no Elementor):</label>
+            <textarea id="output-area" readonly></textarea>
+            <button id="btn-copy" class="btn btn-secondary" style="margin-bottom:15px;">Copiar JSON</button>
+            <label>Logs de Processamento:</label>
+            <div id="log-area"></div>
         </div>
+    </div>
 
-        <label>Código JSON (Copie e cole no Elementor):</label>
-        <textarea id="output-area" readonly></textarea>
-        <button id="btn-copy" class="btn btn-secondary" style="margin-bottom:15px;">Copiar JSON</button>
 
-        <label>Logs de Processamento:</label>
-        <textarea id="log-area" readonly></textarea>
     </div>
 
     <!-- ABA 2: PREVIEW -->
@@ -661,84 +753,7 @@
 
         let finalConsolidationResult = null;
 
-        // window.onmessage = (event) => {
-        // const msg = event.data.pluginMessage;
-        // if (!msg) return;
 
-        // // ... (existing handlers) ...
-
-        // // Handler para export-elementor (botão "Gerar JSON Elementor")
-        // if (msg.type === 'export-result') {
-        //     console.log('✅ export-result recebido!', msg);
-
-        //     const outputArea = document.getElementById('output-area');
-        //     if (outputArea) {
-        //         outputArea.value = msg.data;
-        //         console.log('📝 JSON colocado no output-area');
-        //     } else {
-        //         console.error('❌ output-area não encontrado!');
-        //     }
-
-        //     const logArea = document.getElementById('log-area');
-        //     if (logArea && msg.navMenus && msg.navMenus.length > 0) {
-        //         logArea.value += `\n✅ Encontrado(s) ${msg.navMenus.length} menu(s) de navegação:\n`;
-        //         msg.navMenus.forEach(menu => {
-        //             logArea.value += `  - ${menu.name}\n`;
-        //         });
-        //     }
-        // }
-
-        // // Handler para upload de imagem
-        // if (msg.type === 'upload-image-request') {
-        //     console.log('📤 Upload request received for:', msg.name);
-        //     uploadImageToWordPress(msg).then(result => {
-        //         parent.postMessage({ pluginMessage: { type: 'upload-image-response', id: msg.id, ...result } }, '*');
-        //     });
-        // }
-
-        // if (msg.type === 'consolidation-result') {
-        //     finalConsolidationResult = msg.result;
-
-        //     // Show report UI
-        //     const reportDiv = document.getElementById('consolidation-report');
-        //     reportDiv.style.display = 'block';
-
-        //     // Update Summary
-        //     const summary = msg.result.report.summary;
-        //     const summaryDiv = document.getElementById('report-summary');
-        //     summaryDiv.innerHTML = `
-        //             <div>Total Nodes: <strong>${summary.totalNodes}</strong></div>
-        //             <div>Convertidos: <strong style="color: var(--success);">${summary.converted}</strong></div>
-        //             <div>Customizados: <strong style="color: var(--warning);">${summary.custom}</strong></div>
-        //             <div>Avisos: <strong style="color: ${summary.warnings > 0 ? '#e67e22' : 'inherit'};">${summary.warnings}</strong></div>
-        //         `;
-
-        //     // Update Warnings
-        //     const warningsDiv = document.getElementById('report-warnings');
-        //     const warningsList = warningsDiv.querySelector('ul');
-        //     if (msg.result.report.warnings && msg.result.report.warnings.length > 0) {
-        //         warningsDiv.style.display = 'block';
-        //         warningsList.innerHTML = msg.result.report.warnings.map(w => `<li>${w}</li>`).join('');
-        //     } else {
-        //         warningsDiv.style.display = 'none';
-        //     }
-
-        //     // Update Phase Indicator
-        //     const phases = document.querySelectorAll('#phase-indicator div');
-        //     if (phases.length >= 4) {
-        //         phases[3].innerHTML = '✅ Fase 4: Consolidação (Concluída)';
-        //         phases[3].style.fontWeight = 'bold';
-        //         phases[3].style.color = 'var(--success)';
-        //     }
-
-        //     // Auto-copy JSON to clipboard (optional, or just update output area)
-        //     const outputArea = document.getElementById('output-area');
-        //     if (outputArea) {
-        //         outputArea.value = JSON.stringify(msg.result.elementorJSON, null, 2);
-        //         // Switch to Export tab to show result? Maybe not, stay in Gemini tab.
-        //     }
-        // }
-        // };
 
         document.getElementById('btn-copy-final-json').addEventListener('click', () => {
             if (finalConsolidationResult) {
@@ -1108,9 +1123,26 @@
                 if (exportBtn) exportBtn.disabled = false;
             },
 
-            addLog: (msg, type = 'info') => {
+            addLog: (msg, type = 'info', image = null) => {
                 const area = document.getElementById('log-area');
-                area.value += `[${type.toUpperCase()}] ${msg}\n`;
+                if (!area) return;
+
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+
+                // Timestamp
+                const time = new Date().toLocaleTimeString();
+                entry.innerHTML = `<span style="color:#999">[${time}]</span> <strong>[${type.toUpperCase()}]</strong> ${msg}`;
+
+                // Imagem opcional
+                if (image) {
+                    const img = document.createElement('img');
+                    img.src = `data:image/png;base64,${image}`;
+                    img.className = 'log-image';
+                    entry.appendChild(img);
+                }
+
+                area.appendChild(entry);
                 area.scrollTop = area.scrollHeight;
             },
 
@@ -1708,6 +1740,13 @@
 
             // Event listeners para outros botões (movidos para dentro do DOMContentLoaded)
             const btnSaveWP = document.getElementById('btn-save-wp');
+            const btnOptimize = document.getElementById('btn-optimize');
+            if (btnOptimize) {
+                btnOptimize.onclick = () => {
+                    parent.postMessage({ pluginMessage: { type: 'optimize-structure' } }, '*');
+                };
+            }
+
             const btnExport = document.getElementById('btn-export');
             const btnCopy = document.getElementById('btn-copy');
             const searchWidgets = document.getElementById('search-widgets');
@@ -1725,6 +1764,125 @@
                 });
             }
             if (searchWidgets) searchWidgets.addEventListener('input', (e) => Help.renderTree(e.target.value));
+
+            // Event listeners para Análise Estrutural
+            const btnAnalyzeStructure = document.getElementById('btn-analyze-structure');
+            const btnApplyRenames = document.getElementById('btn-apply-renames');
+            const btnCloseAnalysis = document.getElementById('btn-close-analysis');
+            const useAICheckbox = document.getElementById('use-ai-analysis-main'); // ID atualizado
+            const apiKeyInput = document.getElementById('gemini-api-key');
+
+            // Funções de persistência de API key (via plugin, não localStorage)
+            function saveApiKey(key) {
+                if (key) {
+                    parent.postMessage({
+                        pluginMessage: {
+                            type: 'save-analysis-api-key',
+                            apiKey: key
+                        }
+                    }, '*');
+                    console.log('[Storage] API key enviada para salvar');
+                }
+            }
+
+            function loadApiKey() {
+                // Solicitar API key do plugin
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'get-analysis-api-key'
+                    }
+                }, '*');
+            }
+
+            function clearApiKey() {
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'clear-analysis-api-key'
+                    }
+                }, '*');
+                if (apiKeyInput) apiKeyInput.value = '';
+                console.log('[Storage] Solicitação de remoção de API key enviada');
+            }
+
+            // Solicitar API key ao carregar
+            loadApiKey();
+
+            // Toggle AI config visibility (Removido pois não há mais config no modal)
+            // if (useAICheckbox && aiConfigDiv) { ... }
+
+            if (btnAnalyzeStructure) {
+                btnAnalyzeStructure.addEventListener('click', () => {
+                    console.log('[UI] 🔍 Botão de análise clicado');
+
+                    const useAI = document.getElementById('use-ai-analysis-main')?.checked || false;
+                    // A API Key agora é lida apenas do input da aba Gemini
+                    const apiKey = document.getElementById('gemini-api-key')?.value || '';
+
+                    // ✅ Captura modelo selecionado na aba IA Gemini
+                    const selectedModel = document.getElementById('gemini-model-select')?.value || 'gemini-2.5-flash';
+
+                    console.log(`[UI] Configuração: useAI=${useAI}, model=${selectedModel}`);
+
+                    if (useAI && !apiKey) {
+                        alert('⚠️ Para usar a IA Visual, configure sua API Key na aba "IA Gemini".');
+                        // Opcional: mudar para a aba Gemini automaticamente
+                        const tabBtn = document.querySelector('.tab-btn[data-tab="gemini"]');
+                        if (tabBtn) tabBtn.click();
+                        return;
+                    }
+
+                    // Salvar API key se fornecida
+                    if (apiKey) {
+                        saveApiKey(apiKey);
+                    }
+
+                    UI.showLoader(useAI ? 'Analisando com IA...' : 'Analisando estrutura...');
+                    parent.postMessage({
+                        pluginMessage: {
+                            type: 'analyze-structure',
+                            threshold: 85,
+                            useAI: useAI,
+                            apiKey: apiKey,
+                            model: selectedModel,  // ✅ Modelo selecionado pelo usuário
+                            cache: true
+                        }
+                    }, '*');
+                });
+            } else {
+                console.error('[UI] ❌ Botão de análise NÃO encontrado!');
+            }
+
+            if (btnApplyRenames) {
+                btnApplyRenames.addEventListener('click', () => {
+                    const results = window.analysisResults;
+                    if (results) {
+                        parent.postMessage({
+                            pluginMessage: {
+                                type: 'apply-renames',
+                                results: results
+                            }
+                        }, '*');
+                    }
+                });
+            }
+
+            if (btnCloseAnalysis) {
+                btnCloseAnalysis.addEventListener('click', () => {
+                    document.getElementById('analysis-modal').style.display = 'none';
+                });
+            }
+
+            // Botão para esquecer API key
+            const btnForgetKey = document.getElementById('btn-forget-key');
+            if (btnForgetKey) {
+                btnForgetKey.addEventListener('click', () => {
+                    if (confirm('Tem certeza que deseja remover a API key salva?')) {
+                        clearApiKey();
+                        UI.addLog('🗑️ API key removida', 'success');
+                    }
+                });
+            }
+
 
             // JSON Builder event listeners (movidos para dentro do DOMContentLoaded)
             const btnCreateJson = document.getElementById('btn-create-json');
@@ -1855,9 +2013,26 @@
                     UI.addLog("JSON Gerado!", 'success');
 
                     document.getElementById('output-area').select();
-                    navigator.clipboard.writeText(msg.data).then(() => {
-                        UI.addLog("JSON copiado automaticamente!", 'success');
-                    }).catch(e => console.error(e));
+
+                    // Tenta usar a API moderna de Clipboard
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(msg.data).then(() => {
+                            UI.addLog("JSON copiado automaticamente!", 'success');
+                        }).catch(e => {
+                            console.warn('Falha ao copiar via Clipboard API:', e);
+                            document.execCommand('copy'); // Fallback
+                            UI.addLog("JSON copiado (fallback)!", 'success');
+                        });
+                    } else {
+                        // Fallback para navegadores antigos ou contextos sem permissão
+                        try {
+                            document.execCommand('copy');
+                            UI.addLog("JSON copiado automaticamente!", 'success');
+                        } catch (e) {
+                            console.error('Falha ao copiar JSON:', e);
+                            UI.addLog("Por favor, copie o JSON manualmente.", 'warn');
+                        }
+                    }
 
                     if (msg.navMenus && msg.navMenus.length > 0) {
                         // Auto menu logic (simplified for brevity, can be moved to Config or UI)
@@ -1935,6 +2110,10 @@
                     Gemini.addLog(msg.data);
                     break;
 
+                case 'add-log':
+                    UI.addLog(msg.message, msg.level, msg.image);
+                    break;
+
                 case 'show-loader':
                     UI.showLoader(msg.text);
                     break;
@@ -1946,8 +2125,113 @@
                 case 'gemini-error':
                     alert('❌ Erro: ' + msg.error);
                     break;
+
+                case 'analysis-results':
+                    UI.hideLoader();
+                    displayAnalysisResults(msg.results);
+                    break;
+
+                case 'analysis-error':
+                    UI.hideLoader();
+                    alert('❌ Erro na análise: ' + msg.message);
+                    break;
+
+                case 'rename-complete':
+                    alert(`✅ ${msg.count} elemento(s) renomeado(s)!`);
+                    document.getElementById('analysis-modal').style.display = 'none';
+                    break;
+
+                case 'cache-cleared':
+                    UI.addLog('Cache de IA limpo', 'success');
+                    break;
+
+                case 'analysis-api-key':
+                    // Receber API key do plugin e preencher campo
+                    const apiKeyInput = document.getElementById('gemini-api-key');
+                    if (apiKeyInput && msg.apiKey) {
+                        apiKeyInput.value = msg.apiKey;
+                        console.log('[Storage] ✅ API key recebida e preenchida');
+                    }
+                    break;
             }
         };
+
+        // Função para exibir resultados da análise
+        function displayAnalysisResults(results) {
+            console.log('[UI] displayAnalysisResults chamada com:', results);
+
+            const container = document.getElementById('analysis-results-container');
+            const modal = document.getElementById('analysis-modal');
+
+            if (!container) {
+                console.error('[UI] Container não encontrado!');
+                return;
+            }
+
+            if (!results || results.length === 0) {
+                console.warn('[UI] Nenhum resultado para exibir');
+                container.innerHTML = '<p style="color:#999;">Nenhum elemento selecionado ou nenhum widget detectado.</p>';
+                modal.style.display = 'block';
+                return;
+            }
+
+            console.log(`[UI] Exibindo ${results.length} resultados`);
+
+            let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+            html += '<thead><tr style="background:#f5f5f5; border-bottom:2px solid #ddd;">';
+            html += '<th style="padding:10px; text-align:left; color:#222; font-weight:600;">Camada</th>';
+            html += '<th style="padding:10px; text-align:left; color:#222; font-weight:600;">Widget Sugerido</th>';
+            html += '<th style="padding:10px; text-align:center; color:#222; font-weight:600;">Score</th>';
+            html += '<th style="padding:10px; text-align:center; color:#222; font-weight:600;">Método</th>';
+            html += '</tr></thead><tbody>';
+
+            for (const result of results) {
+                console.log('[UI] Processando resultado:', result);
+
+                const match = result.bestMatch;
+                if (!match) {
+                    console.warn('[UI] Resultado sem bestMatch:', result);
+                    continue;
+                }
+
+                const methodIcon = {
+                    'structural': '⚡',
+                    'ai': '🤖',
+                    'hybrid': '✨'
+                }[result.method] || '?';
+
+                const methodLabel = {
+                    'structural': 'Algoritmo',
+                    'ai': 'IA Gemini',
+                    'hybrid': 'Híbrido'
+                }[result.method] || result.method;
+
+                const scoreColor = match.score >= 80 ? '#27ae60' : match.score >= 60 ? '#f39c12' : '#e74c3c';
+
+                // Indentação visual baseada na profundidade
+                const indent = '&nbsp;&nbsp;'.repeat(result.depth || 0);
+                const depthIcon = result.depth > 0 ? '└─ ' : '';
+
+                html += `<tr style="border-bottom:1px solid #eee;">`;
+                html += `<td style="padding:8px; color:#333;">${indent}${depthIcon}<strong style="color:#222;">${result.nodeName}</strong></td>`;
+                html += `<td style="padding:8px;"><code style="background:#e8f4f8; padding:4px 8px; border-radius:4px; color:#0066cc; font-weight:600; border:1px solid #b3d9f2;">${match.pattern.tag}</code></td>`;
+                html += `<td style="padding:8px; text-align:center; color:${scoreColor}; font-weight:bold; font-size:14px;">${Math.round(match.score)}%</td>`;
+                html += `<td style="padding:8px; text-align:center; color:#555; font-weight:500;">${methodIcon} ${methodLabel}</td>`;
+                html += `</tr>`;
+            }
+
+            html += '</tbody></table>';
+            html += `<p style="margin-top:15px; font-size:12px; color:#666;">`;
+            html += `📊 Total: ${results.length} elemento(s) analisado(s)</p>`;
+
+            container.innerHTML = html;
+            modal.style.display = 'block';
+
+            console.log('[UI] Modal exibido com sucesso');
+
+            // Salvar resultados globalmente para uso no botão "Aplicar"
+            window.analysisResults = results;
+        }
 
         /**
          * Converte um Blob de imagem para WebP com compressão

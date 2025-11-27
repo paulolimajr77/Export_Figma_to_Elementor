@@ -23,17 +23,19 @@ export function extractFlexLayout(node: SceneNode): ElementorSettings {
 
     // Mapeamento de alinhamento principal (justify-content)
     const justifyMap: Record<string, string> = {
-        MIN: 'start',
+        MIN: 'flex-start',
         CENTER: 'center',
-        MAX: 'end',
-        SPACE_BETWEEN: 'space-between'
+        MAX: 'flex-end',
+        SPACE_BETWEEN: 'space-between',
+        SPACE_AROUND: 'space-around',
+        SPACE_EVENLY: 'space-evenly'
     };
 
     // Mapeamento de alinhamento cruzado (align-items)
     const alignMap: Record<string, string> = {
-        MIN: 'start',
+        MIN: 'flex-start',
         CENTER: 'center',
-        MAX: 'end',
+        MAX: 'flex-end',
         BASELINE: 'baseline',
         STRETCH: 'stretch'
     };

@@ -366,3 +366,24 @@ src/
 
 
 
+### **FASE 12: Logs Híbridos e Containers Trancados** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Logs Detalhados na UI**: A análise estrutural híbrida agora envia logs em tempo real para l interface do plugin, permitindo que o usuário acompanhe o progresso da IA e do algoritmo (ex: "Screenshot capturado", "IA retornou...").
+2. ✅ **Containers Trancados como Imagem**: Funcionalidade "Flatten Locked Groups". Se um container (Frame/Group) estiver trancado e contiver imagens, ele será exportado como uma única imagem achatada, preservando composições complexas sem fragmentá-las em múltiplos widgets.
+3. ✅ **Correção de Tipagem**: Resolvidos erros de tipagem no `visual.analyzer.ts` garantindo estabilidade no build.
+
+**Impacto:** Maior transparência no processo de análise híbrida e flexibilidade total para exportar designs complexos como assets únicos, simplificando o fluxo de trabalho no Elementor.
+
+---
+
+### **FASE 13: Limpeza e Otimização de Código** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Remoção de Arquivos Mortos**: Exclusão de arquivos de backup, logs temporários e patches antigos (`.txt`, `.patch`, `.backup_*.ts`) que não eram mais utilizados.
+2. ✅ **Limpeza de Código Morto**: Remoção de blocos de código comentados e funções não utilizadas (`unwrapNode`) em `src/code.ts` e `src/ui.html`.
+3. ✅ **Otimização da UI**: Remoção de elementos HTML e scripts comentados que poluiam o código fonte da interface.
+
+**Impacto:** Redução do tamanho do projeto, melhor organização dos arquivos e código fonte mais limpo e legível, facilitando a manutenção futura.
+
+---

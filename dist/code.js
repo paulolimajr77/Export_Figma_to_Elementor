@@ -37,6 +37,10 @@
   var __commonJS = (cb, mod) => function __require() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
   var __async = (__this, __arguments, generator) => {
     return new Promise((resolve, reject) => {
       var fulfilled = (value) => {
@@ -217,7 +221,7 @@
          * Faz upload de uma imagem para o WordPress
          * @param node Nó do Figma a ser exportado
          * @param format Formato da imagem
-         * @returns URL da imagem no WordPress ou null
+         * @returns Objeto com URL e ID da imagem no WordPress ou null
          */
         uploadToWordPress(node, format = "WEBP") {
           return __async(this, null, function* () {
@@ -248,9 +252,10 @@
                 this.pendingUploads.set(id, (result2) => {
                   clearTimeout(timeout);
                   if (result2.success) {
-                    console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}`);
-                    this.mediaHashCache.set(hash, result2.url);
-                    resolve(result2.url);
+                    console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}, ID: ${result2.wpId}`);
+                    const mediaData = { url: result2.url, id: result2.wpId || 0 };
+                    this.mediaHashCache.set(hash, mediaData);
+                    resolve(mediaData);
                   } else {
                     console.error(`[ImageUploader] Falha no upload:`, result2.error);
                     resolve(null);
@@ -278,7 +283,6 @@
          * @param result Resultado do upload
          */
         handleUploadResponse(id, result) {
-          console.log(`[ImageUploader] Recebida resposta para ${id}:`, result);
           const resolver = this.pendingUploads.get(id);
           if (resolver) {
             resolver(result);
@@ -436,15 +440,17 @@
     const isRow = node.layoutMode === "HORIZONTAL";
     settings.flex_direction = isRow ? "row" : "column";
     const justifyMap = {
-      MIN: "start",
+      MIN: "flex-start",
       CENTER: "center",
-      MAX: "end",
-      SPACE_BETWEEN: "space-between"
+      MAX: "flex-end",
+      SPACE_BETWEEN: "space-between",
+      SPACE_AROUND: "space-around",
+      SPACE_EVENLY: "space-evenly"
     };
     const alignMap = {
-      MIN: "start",
+      MIN: "flex-start",
       CENTER: "center",
-      MAX: "end",
+      MAX: "flex-end",
       BASELINE: "baseline",
       STRETCH: "stretch"
     };
@@ -557,9 +563,20 @@
         settings.background_color = convertColor(bgFill);
       } else if (bgFill.type === "IMAGE") {
         settings.background_background = "classic";
-        const bgUrl = yield uploader.uploadToWordPress(node, "WEBP");
-        if (bgUrl) {
-          settings.background_image = { url: bgUrl, id: 0, source: "library" };
+        const tempNode = figma.createRectangle();
+        tempNode.resize(node.width, node.height);
+        tempNode.fills = [bgFill];
+        tempNode.x = node.x + 1e4;
+        tempNode.y = node.y;
+        try {
+          const upload = yield uploader.uploadToWordPress(tempNode, "WEBP");
+          if (upload) {
+            settings.background_image = { url: upload.url, id: upload.id, source: "library" };
+          }
+        } catch (error) {
+          console.error("[Background] Erro ao exportar imagem de fundo:", error);
+        } finally {
+          tempNode.remove();
         }
         settings.background_position = "center center";
         settings.background_size = "cover";
@@ -788,9 +805,19 @@
       if (lname.includes("heading") || lname.includes("title")) return "heading";
       return "text-editor";
     }
-    if (lname.includes("image") || lname.includes("img")) return "image";
-    if (lname.includes("icon") || lname.includes("ico")) return "icon";
+    if (isImageNode(node)) return "image";
+    if (isIconNode(node)) return "icon";
+    if (node.type === "LINE") return "divider";
+    if (node.type === "RECTANGLE") {
+      const height = node.height;
+      const width = node.width;
+      if (height <= 5 || width <= 5) return "divider";
+      return "spacer";
+    }
     if ("layoutMode" in node || node.type === "GROUP") return "container";
+    if (["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION"].includes(node.type)) {
+      return "icon";
+    }
     return null;
   }
   function detectWidgetFromPrefix(name) {
@@ -907,6 +934,186 @@
     }
   });
 
+  // src/optimizers/structure.optimizer.ts
+  var StructureOptimizer;
+  var init_structure_optimizer = __esm({
+    "src/optimizers/structure.optimizer.ts"() {
+      StructureOptimizer = class {
+        /**
+         * Otimiza a estrutura de um nó e seus filhos recursivamente.
+         * @param node O nó a ser otimizado
+         * @returns O nó otimizado (pode ser o próprio nó ou um de seus filhos)
+         */
+        static optimize(node) {
+          if (this.isRedundantContainer(node)) {
+            const child = node.children[0];
+            return this.optimize(child);
+          }
+          return node;
+        }
+        /**
+         * Verifica se um container é redundante e pode ser removido.
+         */
+        static isRedundantContainer(node) {
+          if (node.type !== "FRAME" && node.type !== "GROUP") {
+            return false;
+          }
+          if (node.locked) {
+            return false;
+          }
+          if (node.children.length === 0) {
+            return true;
+          }
+          if (node.children.length !== 1) {
+            return false;
+          }
+          const child = node.children[0];
+          if ("fills" in node && Array.isArray(node.fills)) {
+            const hasVisibleFill = node.fills.some((fill) => fill.visible !== false);
+            if (hasVisibleFill) return false;
+          }
+          if ("strokes" in node && Array.isArray(node.strokes)) {
+            const hasVisibleStroke = node.strokes.some((stroke) => stroke.visible !== false);
+            if (hasVisibleStroke && typeof node.strokeWeight === "number" && node.strokeWeight > 0) return false;
+          }
+          if ("effects" in node && Array.isArray(node.effects)) {
+            const hasVisibleEffect = node.effects.some((effect) => effect.visible !== false);
+            if (hasVisibleEffect) return false;
+          }
+          if ("cornerRadius" in node && typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
+            if (node.clipsContent) return false;
+          }
+          if (node.type === "GROUP") {
+            return true;
+          }
+          if (node.type === "FRAME") {
+            if (node.layoutMode !== "NONE") {
+              if (node.paddingLeft > 0 || node.paddingRight > 0 || node.paddingTop > 0 || node.paddingBottom > 0) {
+                return false;
+              }
+              if (node.itemSpacing > 0 && child.type === "FRAME" && "layoutMode" in child && child.layoutMode !== "NONE") {
+                return false;
+              }
+            } else {
+              if (Math.abs(child.x) < 0.1 && Math.abs(child.y) < 0.1 && Math.abs(child.width - node.width) < 1 && Math.abs(child.height - node.height) < 1) {
+                return true;
+              }
+              return false;
+            }
+          }
+          return true;
+        }
+        /**
+         * Aplica a otimização diretamente no documento Figma (Modifica a estrutura real).
+         * @param node O nó a ser otimizado
+         * @param logCallback Função opcional para enviar logs para a UI
+         * @returns O número de nós removidos
+         */
+        static applyOptimization(node, logCallback) {
+          let removedCount = 0;
+          const nodeName = node.name;
+          const nodeType = node.type;
+          const childrenCount = "children" in node ? node.children.length : 0;
+          console.log(`[Optimizer] \u{1F50D} Analisando: ${nodeName} (tipo: ${nodeType}, filhos: ${childrenCount})`);
+          if ("children" in node) {
+            const children = [...node.children];
+            for (const child of children) {
+              removedCount += this.applyOptimization(child, logCallback);
+            }
+          }
+          const isRedundant = this.isRedundantContainer(node);
+          if (isRedundant) {
+            console.log(`[Optimizer] \u2705 ${nodeName} \xE9 REDUNDANTE - ser\xE1 removido`);
+          } else {
+            if (node.type === "FRAME" || node.type === "GROUP") {
+              const reasons = this.getPreservationReasons(node);
+              if (reasons.length > 0) {
+                console.log(`[Optimizer] \u274C ${nodeName} foi PRESERVADO porque: ${reasons.join(", ")}`);
+                if (logCallback) {
+                  logCallback(`  \u23ED\uFE0F "${nodeName}" preservado: ${reasons.join(", ")}`, "info");
+                }
+              }
+            }
+          }
+          if (isRedundant) {
+            const parent = node.parent;
+            if (parent && "children" in node && node.children.length === 1) {
+              const child = node.children[0];
+              try {
+                parent.appendChild(child);
+                node.remove();
+                console.log(`[Optimizer] \u{1F9F9} Container redundante removido do documento: ${nodeName}`);
+                if (logCallback) {
+                  logCallback(`  \u{1F5D1}\uFE0F Removido: "${nodeName}" (${nodeType})`, "info");
+                }
+                removedCount++;
+              } catch (error) {
+                console.log(`[Optimizer] \u26A0\uFE0F Erro ao remover: ${nodeName} - ${error}`);
+                if (logCallback) {
+                  logCallback(`  \u26A0\uFE0F Erro ao remover "${nodeName}"`, "warn");
+                }
+              }
+            }
+          }
+          return removedCount;
+        }
+        /**
+         * Retorna as razões pelas quais um nó foi preservado (para debugging)
+         */
+        static getPreservationReasons(node) {
+          const reasons = [];
+          if (node.type !== "FRAME" && node.type !== "GROUP") {
+            return reasons;
+          }
+          if (node.locked) {
+            reasons.push("est\xE1 trancado");
+          }
+          if (node.children.length === 0) {
+            return reasons;
+          }
+          if (node.children.length > 1) {
+            reasons.push(`tem ${node.children.length} filhos`);
+          }
+          if ("fills" in node && Array.isArray(node.fills)) {
+            const hasVisibleFill = node.fills.some((fill) => fill.visible !== false);
+            if (hasVisibleFill) {
+              reasons.push("tem cor de fundo");
+            }
+          }
+          if ("strokes" in node && Array.isArray(node.strokes)) {
+            const hasVisibleStroke = node.strokes.some((stroke) => stroke.visible !== false);
+            if (hasVisibleStroke && typeof node.strokeWeight === "number" && node.strokeWeight > 0) {
+              reasons.push("tem borda");
+            }
+          }
+          if ("effects" in node && Array.isArray(node.effects)) {
+            const hasVisibleEffect = node.effects.some((effect) => effect.visible !== false);
+            if (hasVisibleEffect) {
+              reasons.push("tem efeitos");
+            }
+          }
+          if ("cornerRadius" in node && typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
+            if (node.clipsContent) {
+              reasons.push("tem corner radius");
+            }
+          }
+          if (node.type === "FRAME" && node.layoutMode !== "NONE") {
+            if (node.paddingLeft > 0 || node.paddingRight > 0 || node.paddingTop > 0 || node.paddingBottom > 0) {
+              reasons.push(`tem padding`);
+            }
+            if (node.children.length === 1) {
+              const child = node.children[0];
+              if (node.itemSpacing > 0 && child.type === "FRAME" && "layoutMode" in child && child.layoutMode !== "NONE") {
+                reasons.push(`tem gap`);
+              }
+            }
+          }
+          return reasons;
+        }
+      };
+    }
+  });
+
   // src/compiler/elementor.compiler.ts
   function hasLayout3(node) {
     return "layoutMode" in node;
@@ -927,8 +1134,11 @@
       init_layout_extractor();
       init_background_extractor();
       init_typography_extractor();
+      init_structure_optimizer();
       ElementorCompiler = class {
         constructor(wpConfig = {}, quality = 0.85) {
+          this.stats = { optimizedCount: 0 };
+          this.options = {};
           this.wpConfig = wpConfig;
           this.uploader = new ImageUploader(wpConfig, quality);
           this.containerBuilder = new ContainerBuilder(
@@ -939,8 +1149,11 @@
         /**
          * Compila nós do Figma em elementos Elementor
          */
-        compile(nodes) {
-          return __async(this, null, function* () {
+        compile(_0) {
+          return __async(this, arguments, function* (nodes, options = {}) {
+            this.options = options;
+            this.stats = { optimizedCount: 0 };
+            const { optimizeStructure = true } = options;
             if (nodes.length === 1) {
               const node = nodes[0];
               const isArtboard = node.parent && node.parent.type === "PAGE";
@@ -950,7 +1163,7 @@
                 const children = yield Promise.all(
                   frame.children.map((child) => this.processNode(child, null, true))
                 );
-                return children;
+                return { elements: children, stats: this.stats };
               }
             }
             const elements = yield Promise.all(
@@ -958,7 +1171,7 @@
                 return this.processNode(node, null, true);
               }))
             );
-            return elements;
+            return { elements, stats: this.stats };
           });
         }
         /**
@@ -966,7 +1179,18 @@
          */
         processNode(node, parentNode = null, isTopLevel = false) {
           return __async(this, null, function* () {
+            if (this.options.optimizeStructure) {
+              const optimizedNode = StructureOptimizer.optimize(node);
+              if (optimizedNode !== node) {
+                this.stats.optimizedCount++;
+                node = optimizedNode;
+              }
+            }
             const rawName = node.name || "";
+            if (node.locked) {
+              console.log(`[Compiler] \u{1F512} N\xF3 trancado detectado: ${node.name}. Exportando como imagem.`);
+              return this.createExplicitWidget(node, "image");
+            }
             const widgetSlug = detectWidgetFromPrefix(rawName);
             if (widgetSlug) {
               if (["container", "section", "inner-container", "column", "row"].includes(widgetSlug)) {
@@ -990,11 +1214,19 @@
             if (["FRAME", "GROUP", "INSTANCE", "COMPONENT"].includes(node.type)) {
               return this.containerBuilder.build(node, parentNode, isTopLevel);
             }
+            if (isIconNode(node)) {
+              console.log(`[Compiler] \u{1F3A8} Detectado \xEDcone/vetor: ${node.name} (${node.type})`);
+              return this.createExplicitWidget(node, "icon");
+            }
+            console.warn(`[Compiler] \u26A0\uFE0F N\xF3 n\xE3o suportado: "${node.name}" (tipo: ${node.type})`);
             return {
               id: generateGUID(),
               elType: "widget",
               widgetType: "text-editor",
-              settings: { editor: "N\xF3 n\xE3o suportado" },
+              settings: {
+                editor: `<!-- N\xF3 n\xE3o suportado: ${node.type} "${node.name}" -->`,
+                _widget_title: `\u26A0\uFE0F ${node.type}: ${node.name}`
+              },
               elements: []
             };
           });
@@ -1063,8 +1295,8 @@
               return;
             }
             if (widgetSlug === "image") {
-              const url = yield this.uploader.uploadToWordPress(node, "WEBP");
-              settings.image = { url: url || "", id: 0 };
+              const upload = yield this.uploader.uploadToWordPress(node, "WEBP");
+              settings.image = { url: (upload == null ? void 0 : upload.url) || "", id: (upload == null ? void 0 : upload.id) || 0 };
               if ("width" in node) {
                 settings.width = { unit: "px", size: Math.round(node.width) };
               }
@@ -1094,16 +1326,16 @@
               }
               if (imageNode) {
                 if (widgetSlug === "image-box") {
-                  const url = yield this.uploader.uploadToWordPress(imageNode, "WEBP");
-                  if (url) settings.image = { url, id: 0 };
+                  const upload = yield this.uploader.uploadToWordPress(imageNode, "WEBP");
+                  if (upload) settings.image = { url: upload.url, id: upload.id };
                   if ("width" in imageNode) {
                     const w = Math.round(imageNode.width);
                     settings.image_width = { unit: "px", size: w };
                     settings.image_size = { unit: "px", size: w, sizes: [] };
                   }
                 } else {
-                  const url = yield this.uploader.uploadToWordPress(imageNode, "SVG");
-                  if (url) settings.selected_icon = { value: { url, id: 0 }, library: "svg" };
+                  const upload = yield this.uploader.uploadToWordPress(imageNode, "SVG");
+                  if (upload) settings.selected_icon = { value: { url: upload.url, id: upload.id }, library: "svg" };
                   if ("width" in imageNode) {
                     const w = Math.round(imageNode.width);
                     settings.icon_size = { unit: "px", size: w };
@@ -1145,8 +1377,25 @@
                 if (color) settings.text_color = color;
               }
             } else if (widgetSlug === "icon") {
-              const url = yield this.uploader.uploadToWordPress(node, "SVG");
-              if (url) settings.selected_icon = { value: { url, id: 0 }, library: "svg" };
+              const upload = yield this.uploader.uploadToWordPress(node, "SVG");
+              if (upload) settings.selected_icon = { value: { url: upload.url, id: upload.id }, library: "svg" };
+            } else if (widgetSlug === "divider") {
+              settings.style = "solid";
+              settings.weight = { unit: "px", size: "height" in node ? Math.max(1, Math.round(node.height)) : 1 };
+              if ("fills" in node && Array.isArray(node.fills) && node.fills.length > 0) {
+                const fill = node.fills[0];
+                if (fill.type === "SOLID") {
+                  settings.color = `rgba(${Math.round(fill.color.r * 255)}, ${Math.round(fill.color.g * 255)}, ${Math.round(fill.color.b * 255)}, ${fill.opacity || 1})`;
+                }
+              } else if ("strokes" in node && Array.isArray(node.strokes) && node.strokes.length > 0) {
+                const stroke = node.strokes[0];
+                if (stroke.type === "SOLID") {
+                  settings.color = `rgba(${Math.round(stroke.color.r * 255)}, ${Math.round(stroke.color.g * 255)}, ${Math.round(stroke.color.b * 255)}, ${stroke.opacity || 1})`;
+                }
+              }
+            } else if (widgetSlug === "spacer") {
+              settings.space = { unit: "px", size: "height" in node ? Math.round(node.height) : 50 };
+              Object.assign(settings, yield extractBackgroundAdvanced(node, this.uploader));
             }
           });
         }
@@ -2167,12 +2416,842 @@ ${content}` });
     }
   });
 
+  // src/config/widget.patterns.ts
+  var widgetPatterns;
+  var init_widget_patterns = __esm({
+    "src/config/widget.patterns.ts"() {
+      widgetPatterns = [
+        {
+          name: "Image Box",
+          tag: "w:image-box",
+          minScore: 70,
+          category: "basic",
+          structure: {
+            rootType: ["FRAME"],
+            childCount: { min: 2, max: 4 },
+            requiredChildren: [
+              { type: "RECTANGLE", count: 1 },
+              { type: "TEXT", count: 2 }
+            ],
+            properties: {
+              hasAutoLayout: true,
+              layoutMode: "VERTICAL",
+              hasImage: true,
+              textCount: 2
+            }
+          }
+        },
+        {
+          name: "Button",
+          tag: "w:button",
+          minScore: 70,
+          category: "basic",
+          structure: {
+            rootType: ["FRAME", "INSTANCE", "COMPONENT"],
+            childCount: { min: 1, max: 3 },
+            requiredChildren: [
+              { type: "TEXT", count: 1 }
+            ],
+            properties: {
+              hasAutoLayout: true,
+              hasPadding: true,
+              hasBorderRadius: true,
+              hasBackground: true
+            }
+          },
+          scoreFunction: (node) => {
+            if (node.type !== "FRAME" && node.type !== "INSTANCE" && node.type !== "COMPONENT") return 0;
+            let score = 0;
+            const frameNode = node;
+            const hasText = "children" in frameNode && frameNode.children.some((child) => child.type === "TEXT");
+            if (!hasText) return 0;
+            score += 30;
+            if ("layoutMode" in frameNode && frameNode.layoutMode !== "NONE") {
+              score += 20;
+            }
+            if ("paddingLeft" in frameNode && "paddingTop" in frameNode) {
+              const hasPadding = frameNode.paddingLeft > 0 || frameNode.paddingTop > 0 || frameNode.paddingRight > 0 || frameNode.paddingBottom > 0;
+              if (hasPadding) score += 25;
+            }
+            if ("cornerRadius" in frameNode && typeof frameNode.cornerRadius === "number" && frameNode.cornerRadius > 0) {
+              score += 15;
+            }
+            let hasVisualStyle = false;
+            if ("fills" in frameNode) {
+              const fills = frameNode.fills;
+              if (typeof fills !== "symbol" && Array.isArray(fills) && fills.length > 0) {
+                const hasSolidFill = fills.some((fill) => fill.type === "SOLID" && fill.visible !== false);
+                if (hasSolidFill) {
+                  score += 20;
+                  hasVisualStyle = true;
+                }
+              }
+            }
+            if ("strokes" in frameNode && Array.isArray(frameNode.strokes) && frameNode.strokes.length > 0) {
+              if (typeof frameNode.strokeWeight === "number" && frameNode.strokeWeight > 0) {
+                score += 15;
+                hasVisualStyle = true;
+              }
+            }
+            if (!hasVisualStyle) {
+              return 0;
+            }
+            if ("children" in frameNode && frameNode.children.length <= 3) {
+              score += 10;
+            }
+            const name = node.name.toLowerCase();
+            if (name.includes("button") || name.includes("btn") || name.includes("cta")) {
+              score += 15;
+            }
+            return Math.min(score, 100);
+          }
+        },
+        {
+          name: "Icon Box",
+          tag: "w:icon-box",
+          minScore: 70,
+          category: "basic",
+          structure: {
+            rootType: ["FRAME", "COMPONENT", "INSTANCE"],
+            childCount: { min: 2, max: 4 },
+            properties: {
+              hasAutoLayout: true,
+              layoutMode: "VERTICAL"
+            }
+          },
+          scoreFunction: (node) => {
+            if (node.type !== "FRAME" && node.type !== "INSTANCE" && node.type !== "COMPONENT") return 0;
+            let score = 0;
+            const frameNode = node;
+            if (!("children" in frameNode)) return 0;
+            const hasIcon = frameNode.children.some(
+              (child) => child.type === "INSTANCE" || child.type === "COMPONENT" || child.type === "VECTOR" || child.type === "ELLIPSE" || child.type === "FRAME" && child.name.toLowerCase().includes("icon")
+            );
+            const hasText = frameNode.children.some((child) => child.type === "TEXT");
+            if (!hasIcon || !hasText) return 0;
+            score += 40;
+            if ("layoutMode" in frameNode && frameNode.layoutMode === "VERTICAL") {
+              score += 30;
+            }
+            if ("primaryAxisAlignItems" in frameNode && frameNode.primaryAxisAlignItems === "CENTER") {
+              score += 15;
+            }
+            if (frameNode.children.length >= 2 && frameNode.children.length <= 4) {
+              score += 15;
+            }
+            return score;
+          }
+        },
+        {
+          name: "Heading",
+          tag: "w:heading",
+          minScore: 70,
+          category: "basic",
+          structure: {
+            rootType: ["TEXT"],
+            properties: {}
+          },
+          scoreFunction: (node) => {
+            if (node.type !== "TEXT") return 0;
+            const textNode = node;
+            let score = 0;
+            if (typeof textNode.fontSize === "number" && textNode.fontSize >= 18) {
+              score += 50;
+            }
+            const fontWeight = textNode.fontWeight;
+            if (typeof fontWeight === "number" && fontWeight >= 600) {
+              score += 50;
+            }
+            return score;
+          }
+        },
+        {
+          name: "Image",
+          tag: "w:image",
+          minScore: 75,
+          category: "basic",
+          structure: {
+            rootType: ["RECTANGLE", "INSTANCE", "COMPONENT", "FRAME"],
+            properties: {}
+          },
+          scoreFunction: (node) => {
+            if (node.type === "INSTANCE" || node.type === "COMPONENT") {
+              const name = node.name.toLowerCase();
+              if (name.includes("image") || name.includes("img") || name.includes("photo") || name.includes("picture") || name.includes("default")) {
+                return 90;
+              }
+              if ("children" in node && node.children.length > 0) {
+                return 40;
+              }
+              return 60;
+            }
+            if (node.type === "RECTANGLE" && "fills" in node) {
+              const fills = node.fills;
+              if (typeof fills !== "symbol" && Array.isArray(fills)) {
+                const hasImageFill3 = fills.some((fill) => fill.type === "IMAGE");
+                if (hasImageFill3) return 95;
+              }
+            }
+            if (node.type === "FRAME" && "fills" in node) {
+              const fills = node.fills;
+              if (typeof fills !== "symbol" && Array.isArray(fills)) {
+                const hasImageFill3 = fills.some((fill) => fill.type === "IMAGE");
+                if (hasImageFill3) return 85;
+              }
+            }
+            return 0;
+          }
+        },
+        {
+          name: "Text Editor",
+          tag: "w:text",
+          minScore: 60,
+          category: "basic",
+          structure: {
+            rootType: ["TEXT"],
+            properties: {}
+          },
+          scoreFunction: (node) => {
+            if (node.type !== "TEXT") return 0;
+            const textNode = node;
+            if (typeof textNode.fontSize === "number" && textNode.fontSize >= 18) return 0;
+            if (textNode.characters.length < 10) return 40;
+            return 80;
+          }
+        },
+        {
+          name: "Icon",
+          tag: "w:icon",
+          minScore: 80,
+          category: "basic",
+          structure: {
+            rootType: ["VECTOR", "STAR", "POLYGON", "ELLIPSE", "BOOLEAN_OPERATION", "INSTANCE", "COMPONENT"],
+            properties: {}
+          },
+          scoreFunction: (node) => {
+            if (node.type === "INSTANCE" || node.type === "COMPONENT") {
+              if (node.name.toLowerCase().includes("icon")) return 90;
+              if (Math.abs(node.width - node.height) < 2 && node.width < 64) return 70;
+            }
+            if (["VECTOR", "STAR", "POLYGON", "BOOLEAN_OPERATION"].includes(node.type)) {
+              return 80;
+            }
+            return 0;
+          }
+        },
+        {
+          name: "Divider",
+          tag: "w:divider",
+          minScore: 80,
+          category: "basic",
+          structure: {
+            rootType: ["LINE", "RECTANGLE"],
+            properties: {}
+          },
+          scoreFunction: (node) => {
+            if (node.type === "LINE") return 100;
+            if (node.type === "RECTANGLE") {
+              if (node.height <= 2 || node.width <= 2) return 90;
+            }
+            return 0;
+          }
+        },
+        {
+          name: "Container",
+          tag: "c:container",
+          minScore: 60,
+          category: "basic",
+          structure: {
+            rootType: ["FRAME"],
+            properties: {
+              hasAutoLayout: true
+            }
+          },
+          scoreFunction: (node) => {
+            if (node.type !== "FRAME") return 0;
+            const frameNode = node;
+            let score = 0;
+            if (frameNode.layoutMode !== "NONE") {
+              score += 40;
+            }
+            if (frameNode.children.length > 0) {
+              score += 30;
+            }
+            if (frameNode.paddingLeft > 0 || frameNode.paddingTop > 0) {
+              score += 30;
+            }
+            return score;
+          }
+        }
+      ];
+    }
+  });
+
+  // src/analyzers/structure.analyzer.ts
+  function analyzeStructural(node) {
+    const matches = [];
+    for (const pattern of widgetPatterns) {
+      const score = calculateStructuralScore(node, pattern);
+      if (score >= pattern.minScore) {
+        matches.push({
+          pattern,
+          score,
+          method: "structural",
+          confidence: score / 100
+        });
+      }
+    }
+    return matches.sort((a, b) => b.score - a.score);
+  }
+  function calculateStructuralScore(node, pattern) {
+    if (pattern.scoreFunction) {
+      return pattern.scoreFunction(node);
+    }
+    let score = 0;
+    if (pattern.structure.rootType.includes(node.type)) {
+      score += 10;
+    } else {
+      return 0;
+    }
+    score += analyzeHierarchy(node, pattern);
+    score += analyzeVisualProperties(node, pattern);
+    score += analyzeContent(node, pattern);
+    return Math.min(score, 100);
+  }
+  function analyzeHierarchy(node, pattern) {
+    let score = 0;
+    if (!("children" in node)) {
+      return 0;
+    }
+    const children = node.children;
+    if (pattern.structure.childCount) {
+      const { min, max, exact } = pattern.structure.childCount;
+      if (exact !== void 0 && children.length === exact) {
+        score += 20;
+      } else if (min !== void 0 && max !== void 0) {
+        if (children.length >= min && children.length <= max) {
+          score += 15;
+        }
+      } else if (min !== void 0 && children.length >= min) {
+        score += 10;
+      }
+    }
+    if (pattern.structure.requiredChildren) {
+      const pointsPerChild = 20 / pattern.structure.requiredChildren.length;
+      for (const required of pattern.structure.requiredChildren) {
+        const matchingChildren = children.filter((c) => c.type === required.type);
+        if (matchingChildren.length >= required.count) {
+          score += pointsPerChild;
+        }
+      }
+    }
+    return Math.min(score, 40);
+  }
+  function analyzeVisualProperties(node, pattern) {
+    let score = 0;
+    const props = pattern.structure.properties;
+    if (!props) return 0;
+    if (props.hasAutoLayout && "layoutMode" in node) {
+      if (node.layoutMode !== "NONE") {
+        score += 10;
+        if (props.layoutMode && node.layoutMode === props.layoutMode) {
+          score += 5;
+        }
+      }
+    }
+    if (props.hasPadding && "paddingLeft" in node) {
+      if (node.paddingLeft > 0 || node.paddingTop > 0) {
+        score += 5;
+      }
+    }
+    if (props.hasBorderRadius && "cornerRadius" in node) {
+      if (typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
+        score += 5;
+      }
+    }
+    if (props.hasBackground && "fills" in node) {
+      if (node.fills && Array.isArray(node.fills) && node.fills.length > 0) {
+        score += 5;
+      }
+    }
+    return Math.min(score, 30);
+  }
+  function analyzeContent(node, pattern) {
+    let score = 0;
+    const props = pattern.structure.properties;
+    if (!props || !("children" in node)) return 0;
+    const children = node.children;
+    const imageCount = children.filter(
+      (c) => c.type === "RECTANGLE" && hasImageFill2(c)
+    ).length;
+    const iconCount = children.filter(
+      (c) => c.type === "VECTOR" || c.type === "COMPONENT" && c.name.toLowerCase().includes("icon")
+    ).length;
+    const textCount = children.filter((c) => c.type === "TEXT").length;
+    if (props.hasImage && imageCount > 0) {
+      score += 7;
+    }
+    if (props.hasIcon && iconCount > 0) {
+      score += 7;
+    }
+    if (props.hasText && textCount > 0) {
+      score += 6;
+    }
+    if (props.textCount !== void 0 && textCount === props.textCount) {
+      score += 10;
+    }
+    return Math.min(score, 20);
+  }
+  function hasImageFill2(node) {
+    if (!("fills" in node)) return false;
+    const fills = node.fills;
+    if (!Array.isArray(fills)) return false;
+    return fills.some(
+      (fill) => typeof fill === "object" && fill !== null && "type" in fill && fill.type === "IMAGE"
+    );
+  }
+  var init_structure_analyzer = __esm({
+    "src/analyzers/structure.analyzer.ts"() {
+      init_widget_patterns();
+    }
+  });
+
+  // src/analyzers/visual.analyzer.ts
+  function captureElementScreenshot(node) {
+    return __async(this, null, function* () {
+      try {
+        const screenshot = yield node.exportAsync({
+          format: "PNG",
+          constraint: { type: "SCALE", value: 2 }
+          // 2x para melhor qualidade
+        });
+        console.log(`[Visual] Screenshot capturado: ${node.name} (${screenshot.length} bytes)`);
+        figma.ui.postMessage({ type: "add-log", message: `[Visual] Screenshot capturado: ${node.name} (${screenshot.length} bytes)`, level: "info" });
+        return screenshot;
+      } catch (error) {
+        console.error("[Visual] Erro ao capturar screenshot:", error);
+        throw error;
+      }
+    });
+  }
+  function cleanExpiredCache() {
+    const now = Date.now();
+    let removed = 0;
+    for (const [key, value] of screenshotCache.entries()) {
+      if (now - value.timestamp > CACHE_TTL) {
+        screenshotCache.delete(key);
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      console.log(`[Cache] \u{1F5D1}\uFE0F Removidos ${removed} screenshots expirados`);
+    }
+  }
+  function enforceMaxCacheSize() {
+    if (screenshotCache.size > MAX_CACHE_SIZE) {
+      const entries = Array.from(screenshotCache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp);
+      const toRemove = entries.slice(0, screenshotCache.size - MAX_CACHE_SIZE);
+      toRemove.forEach(([key]) => screenshotCache.delete(key));
+      console.log(`[Cache] \u{1F5D1}\uFE0F Removidos ${toRemove.length} screenshots antigos (limite: ${MAX_CACHE_SIZE})`);
+    }
+  }
+  function getCachedScreenshot(node) {
+    return __async(this, null, function* () {
+      const nodeId = node.id;
+      cleanExpiredCache();
+      const cached = screenshotCache.get(nodeId);
+      if (cached) {
+        console.log(`[Cache] \u2705 Screenshot encontrado: ${node.name}`);
+        return cached.data;
+      }
+      console.log(`[Cache] \u{1F4F8} Capturando novo screenshot: ${node.name}`);
+      const screenshot = yield captureElementScreenshot(node);
+      screenshotCache.set(nodeId, {
+        data: screenshot,
+        timestamp: Date.now()
+      });
+      enforceMaxCacheSize();
+      return screenshot;
+    });
+  }
+  function uint8ArrayToBase64(bytes) {
+    const base64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let result = "";
+    let i;
+    for (i = 0; i < bytes.length; i += 3) {
+      const byte1 = bytes[i];
+      const byte2 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+      const byte3 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+      const encoded1 = byte1 >> 2;
+      const encoded2 = (byte1 & 3) << 4 | byte2 >> 4;
+      const encoded3 = (byte2 & 15) << 2 | byte3 >> 6;
+      const encoded4 = byte3 & 63;
+      result += base64chars[encoded1];
+      result += base64chars[encoded2];
+      result += i + 1 < bytes.length ? base64chars[encoded3] : "=";
+      result += i + 2 < bytes.length ? base64chars[encoded4] : "=";
+    }
+    return result;
+  }
+  function createVisualPrompt(node, algorithmResults) {
+    const nodeInfo = {
+      name: node.name,
+      type: node.type,
+      width: "width" in node ? Math.round(node.width) : 0,
+      height: "height" in node ? Math.round(node.height) : 0,
+      childCount: "children" in node ? node.children.length : 0
+    };
+    const algorithmTop3 = algorithmResults.slice(0, 3).map(
+      (match, i) => `${i + 1}. ${match.pattern.tag} (${Math.round(match.score)}%)`
+    ).join("\n");
+    return `Voc\xEA \xE9 um especialista em Elementor (WordPress page builder).
+
+TAREFA:
+Analise a imagem e identifique qual widget do Elementor melhor representa este elemento.
+
+WIDGETS DISPON\xCDVEIS:
+- w:button (bot\xF5es clic\xE1veis com texto)
+- w:heading (t\xEDtulos/cabe\xE7alhos)
+- w:text-editor (par\xE1grafos de texto)
+- w:image (imagens simples)
+- w:image-box (imagem + t\xEDtulo + descri\xE7\xE3o)
+- w:icon (\xEDcone simples SVG/vetor)
+- w:icon-box (\xEDcone + t\xEDtulo + descri\xE7\xE3o em layout vertical)
+- w:divider (separadores/linhas horizontais)
+- w:spacer (espa\xE7amento vazio)
+- c:container (containers/se\xE7\xF5es que agrupam outros elementos)
+
+CONTEXTO DO ELEMENTO:
+Nome: "${nodeInfo.name}"
+Tipo Figma: ${nodeInfo.type}
+Dimens\xF5es: ${nodeInfo.width}x${nodeInfo.height}px
+Filhos: ${nodeInfo.childCount}
+
+AN\xC1LISE ALGOR\xCDTMICA (refer\xEAncia):
+${algorithmTop3}
+
+INSTRU\xC7\xD5ES:
+1. Analise a imagem visualmente
+2. Identifique padr\xF5es visuais (cores, formas, layout, tipografia)
+3. Compare com os widgets do Elementor
+4. Considere a an\xE1lise algor\xEDtmica mas priorize sua an\xE1lise visual
+5. Se for um \xEDcone circular com texto abaixo, \xE9 w:icon-box
+6. Se for um bot\xE3o com fundo colorido e texto, \xE9 w:button
+7. Se for apenas uma imagem sem texto, \xE9 w:image
+
+RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
+{
+  "widget": "w:xxx",
+  "confidence": 85,
+  "reasoning": "Breve explica\xE7\xE3o (m\xE1x 50 palavras)",
+  "visualFeatures": ["feature1", "feature2"],
+  "alternatives": [
+    {"widget": "w:yyy", "confidence": 40}
+  ]
+}`;
+  }
+  function analyzeVisual(node, algorithmResults, apiKey, model = "gemini-1.5-flash-latest") {
+    return __async(this, null, function* () {
+      console.log(`[Visual] Iniciando an\xE1lise visual de: ${node.name}`);
+      figma.ui.postMessage({ type: "add-log", message: `[Visual] Iniciando an\xE1lise visual de: ${node.name}`, level: "info" });
+      try {
+        const screenshot = yield getCachedScreenshot(node);
+        const base64Image = uint8ArrayToBase64(screenshot);
+        figma.ui.postMessage({
+          type: "add-log",
+          message: `[Visual] Screenshot capturado para an\xE1lise: ${node.name}`,
+          level: "info",
+          image: base64Image
+        });
+        const prompt = createVisualPrompt(node, algorithmResults);
+        console.log("[Visual] Enviando para Gemini Vision...");
+        figma.ui.postMessage({ type: "add-log", message: "[Visual] Enviando para Gemini Vision...", level: "info" });
+        const response = yield fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: prompt },
+                  {
+                    inline_data: {
+                      mime_type: "image/png",
+                      data: base64Image
+                    }
+                  }
+                ]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                // Baixa temperatura para respostas mais consistentes
+                maxOutputTokens: 500
+              }
+            })
+          }
+        );
+        if (!response.ok) {
+          const error = yield response.text();
+          throw new Error(`Gemini API error: ${response.status} - ${error}`);
+        }
+        const data = yield response.json();
+        const aiResponse = data.candidates[0].content.parts[0].text;
+        console.log("[Visual] Resposta da IA:", aiResponse);
+        figma.ui.postMessage({ type: "add-log", message: `[Visual] Resposta da IA: ${aiResponse.substring(0, 100)}...`, level: "info" });
+        const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error("Resposta da IA n\xE3o cont\xE9m JSON v\xE1lido");
+        }
+        const analysis = JSON.parse(jsonMatch[0]);
+        console.log(`[Visual] An\xE1lise conclu\xEDda: ${analysis.widget} (${analysis.confidence}%)`);
+        figma.ui.postMessage({ type: "add-log", message: `[Visual] An\xE1lise conclu\xEDda: ${analysis.widget} (${analysis.confidence}%)`, level: "success" });
+        return analysis;
+      } catch (error) {
+        console.error("[Visual] Erro na an\xE1lise visual:", error);
+        throw error;
+      }
+    });
+  }
+  function combineResults(structural, visual) {
+    const structuralBest = structural[0];
+    console.log("[Visual] Combinando resultados:");
+    figma.ui.postMessage({ type: "add-log", message: "[Visual] Combinando resultados:", level: "info" });
+    console.log(`  Algoritmo: ${structuralBest.pattern.tag} (${structuralBest.score}%)`);
+    figma.ui.postMessage({ type: "add-log", message: `  Algoritmo: ${structuralBest.pattern.tag} (${structuralBest.score}%)`, level: "info" });
+    console.log(`  IA Visual: ${visual.widget} (${visual.confidence}%)`);
+    figma.ui.postMessage({ type: "add-log", message: `  IA Visual: ${visual.widget} (${visual.confidence}%)`, level: "info" });
+    const aiPattern = widgetPatterns.find((p) => p.tag === visual.widget);
+    if (!aiPattern) {
+      console.warn(`[Visual] Padr\xE3o n\xE3o encontrado para: ${visual.widget}`);
+      return {
+        pattern: structuralBest.pattern,
+        score: structuralBest.score,
+        method: "structural",
+        confidence: 50
+      };
+    }
+    if (structuralBest.pattern.tag === visual.widget) {
+      const combinedScore = Math.max(structuralBest.score, visual.confidence);
+      console.log(`[Visual] \u2705 Concord\xE2ncia! Score combinado: ${combinedScore}%`);
+      figma.ui.postMessage({ type: "add-log", message: `[Visual] \u2705 Concord\xE2ncia! Score combinado: ${combinedScore}%`, level: "success" });
+      return {
+        pattern: structuralBest.pattern,
+        score: combinedScore,
+        method: "hybrid",
+        confidence: combinedScore,
+        reasoning: `Algoritmo e IA concordam. ${visual.reasoning}`
+      };
+    }
+    if (visual.confidence > 85) {
+      console.log(`[Visual] \u{1F916} IA confiante (${visual.confidence}%) - usando resultado da IA`);
+      figma.ui.postMessage({ type: "add-log", message: `[Visual] \u{1F916} IA confiante (${visual.confidence}%) - usando resultado da IA`, level: "info" });
+      return {
+        pattern: aiPattern,
+        score: visual.confidence,
+        method: "ai",
+        confidence: visual.confidence,
+        reasoning: visual.reasoning
+      };
+    }
+    if (structuralBest.score > 85) {
+      console.log(`[Visual] \u26A1 Algoritmo confiante (${structuralBest.score}%) - usando resultado algor\xEDtmico`);
+      figma.ui.postMessage({ type: "add-log", message: `[Visual] \u26A1 Algoritmo confiante (${structuralBest.score}%) - usando resultado algor\xEDtmico`, level: "info" });
+      return {
+        pattern: structuralBest.pattern,
+        score: structuralBest.score,
+        method: "structural",
+        confidence: structuralBest.score,
+        reasoning: `Algoritmo confiante. IA sugere ${visual.widget} (${visual.confidence}%)`
+      };
+    }
+    const avgScore = Math.round((structuralBest.score + visual.confidence) / 2);
+    console.log(`[Visual] \u2696\uFE0F Desempate - usando IA. Score m\xE9dio: ${avgScore}%`);
+    figma.ui.postMessage({ type: "add-log", message: `[Visual] \u2696\uFE0F Desempate - usando IA. Score m\xE9dio: ${avgScore}%`, level: "warn" });
+    return {
+      pattern: aiPattern,
+      score: avgScore,
+      method: "hybrid",
+      confidence: avgScore,
+      reasoning: `Desempate por IA. ${visual.reasoning}`
+    };
+  }
+  var screenshotCache, CACHE_TTL, MAX_CACHE_SIZE;
+  var init_visual_analyzer = __esm({
+    "src/analyzers/visual.analyzer.ts"() {
+      init_widget_patterns();
+      screenshotCache = /* @__PURE__ */ new Map();
+      CACHE_TTL = 5 * 60 * 1e3;
+      MAX_CACHE_SIZE = 50;
+    }
+  });
+
+  // src/analyzers/hybrid.analyzer.ts
+  var hybrid_analyzer_exports = {};
+  __export(hybrid_analyzer_exports, {
+    analyzeHybrid: () => analyzeHybrid,
+    clearAICache: () => clearAICache,
+    getCacheStats: () => getCacheStats
+  });
+  function analyzeHybrid(node, config) {
+    return __async(this, null, function* () {
+      const startTime = Date.now();
+      console.log("[Hybrid] \u{1F50D} Iniciando an\xE1lise h\xEDbrida...");
+      figma.ui.postMessage({ type: "add-log", message: "[Hybrid] \u{1F50D} Iniciando an\xE1lise h\xEDbrida...", level: "info" });
+      console.log(`[Hybrid] Usar IA: ${config.useAIFallback ? "Sim" : "N\xE3o"}`);
+      figma.ui.postMessage({ type: "add-log", message: `[Hybrid] Usar IA: ${config.useAIFallback ? "Sim" : "N\xE3o"}`, level: "info" });
+      console.log("[Hybrid] \u26A1 Executando an\xE1lise estrutural...");
+      figma.ui.postMessage({ type: "add-log", message: "[Hybrid] \u26A1 Executando an\xE1lise estrutural...", level: "info" });
+      const structuralMatches = analyzeStructural(node);
+      const bestStructural = structuralMatches[0];
+      if (!bestStructural) {
+        console.warn("[Hybrid] \u26A0\uFE0F Nenhum match estrutural encontrado - usando fallback");
+        figma.ui.postMessage({ type: "add-log", message: "[Hybrid] \u26A0\uFE0F Nenhum match estrutural encontrado - usando fallback", level: "warn" });
+        const fallbackMatch = createFallbackMatch(node);
+        return {
+          matches: [fallbackMatch],
+          method: "structural",
+          // Mantém 'structural' para compatibilidade
+          processingTime: Date.now() - startTime
+        };
+      }
+      console.log(`[Hybrid] \u26A1 Melhor match estrutural: ${bestStructural.pattern.tag} (${bestStructural.score}%)`);
+      figma.ui.postMessage({ type: "add-log", message: `[Hybrid] \u26A1 Melhor match estrutural: ${bestStructural.pattern.tag} (${bestStructural.score}%)`, level: "info" });
+      const shouldUseAI = config.useAIFallback && config.apiKey;
+      if (!shouldUseAI) {
+        console.log("[Hybrid] \u2139\uFE0F IA desabilitada ou sem API key - usando apenas algoritmo");
+        figma.ui.postMessage({ type: "add-log", message: "[Hybrid] \u2139\uFE0F IA desabilitada ou sem API key - usando apenas algoritmo", level: "info" });
+        return {
+          matches: structuralMatches,
+          method: "structural",
+          processingTime: Date.now() - startTime
+        };
+      }
+      const threshold = config.structuralThreshold || 70;
+      if (bestStructural.score >= threshold) {
+        console.log(`[Hybrid] \u2705 Algoritmo confiante (${bestStructural.score}% >= ${threshold}%) - pulando IA`);
+        figma.ui.postMessage({ type: "add-log", message: `[Hybrid] \u2705 Algoritmo confiante (${bestStructural.score}% >= ${threshold}%) - pulando IA`, level: "success" });
+        return {
+          matches: structuralMatches,
+          method: "structural",
+          processingTime: Date.now() - startTime
+        };
+      }
+      try {
+        console.log("[Hybrid] \u{1F916} Algoritmo incerto - chamando IA Visual...");
+        figma.ui.postMessage({ type: "add-log", message: "[Hybrid] \u{1F916} Algoritmo incerto - chamando IA Visual...", level: "info" });
+        const visualAnalysis = yield analyzeVisual(
+          node,
+          structuralMatches,
+          config.apiKey,
+          config.model
+        );
+        console.log(`[Hybrid] \u{1F916} IA retornou: ${visualAnalysis.widget} (${visualAnalysis.confidence}%)`);
+        figma.ui.postMessage({ type: "add-log", message: `[Hybrid] \u{1F916} IA retornou: ${visualAnalysis.widget} (${visualAnalysis.confidence}%)`, level: "info" });
+        const combinedMatch = combineResults(structuralMatches, visualAnalysis);
+        console.log(`[Hybrid] \u2728 Resultado final: ${combinedMatch.pattern.tag} (${combinedMatch.score}%) via ${combinedMatch.method}`);
+        figma.ui.postMessage({ type: "add-log", message: `[Hybrid] \u2728 Resultado final: ${combinedMatch.pattern.tag} (${combinedMatch.score}%) via ${combinedMatch.method}`, level: "success" });
+        const finalMatches = [
+          combinedMatch,
+          ...structuralMatches.slice(1)
+        ];
+        return {
+          matches: finalMatches,
+          method: combinedMatch.method,
+          processingTime: Date.now() - startTime
+        };
+      } catch (error) {
+        console.error("[Hybrid] \u274C Erro na an\xE1lise visual:", error);
+        figma.ui.postMessage({ type: "add-log", message: `[Hybrid] \u274C Erro na an\xE1lise visual: ${error}`, level: "error" });
+        console.log("[Hybrid] \u{1F504} Fallback para resultado estrutural");
+        figma.ui.postMessage({ type: "add-log", message: "[Hybrid] \u{1F504} Fallback para resultado estrutural", level: "warn" });
+        return {
+          matches: structuralMatches,
+          method: "structural",
+          processingTime: Date.now() - startTime
+        };
+      }
+    });
+  }
+  function createFallbackMatch(node) {
+    let tag = "c:container";
+    let name = "Container Gen\xE9rico";
+    let score = 30;
+    switch (node.type) {
+      case "TEXT":
+        tag = "w:heading";
+        name = "Heading (Texto)";
+        score = 40;
+        break;
+      case "RECTANGLE":
+      case "ELLIPSE":
+      case "POLYGON":
+      case "STAR":
+      case "LINE":
+      case "VECTOR":
+        tag = "w:divider";
+        name = "Divider (Forma)";
+        score = 35;
+        break;
+      case "FRAME":
+      case "GROUP":
+        if ("children" in node && node.children.length > 0) {
+          tag = "c:container";
+          name = "Container";
+          score = 50;
+        } else {
+          tag = "w:spacer";
+          name = "Spacer (Vazio)";
+          score = 40;
+        }
+        break;
+      case "INSTANCE":
+      case "COMPONENT":
+        tag = "c:container";
+        name = "Container (Componente)";
+        score = 45;
+        break;
+      default:
+        tag = "c:container";
+        name = "Container Desconhecido";
+        score = 30;
+    }
+    return {
+      pattern: {
+        name,
+        tag,
+        minScore: 0,
+        category: "basic",
+        check: () => true
+      },
+      score,
+      method: "structural",
+      confidence: score,
+      reasoning: `Fallback gen\xE9rico para tipo ${node.type}`
+    };
+  }
+  function clearAICache() {
+    console.log("[Hybrid] Cache limpo");
+  }
+  function getCacheStats() {
+    return { size: 0, keys: [] };
+  }
+  var init_hybrid_analyzer = __esm({
+    "src/analyzers/hybrid.analyzer.ts"() {
+      init_structure_analyzer();
+      init_visual_analyzer();
+    }
+  });
+
   // src/code.ts
   var require_code = __commonJS({
     "src/code.ts"(exports) {
       init_elementor_compiler();
       init_api_gemini();
       init_api_deepseek();
+      init_structure_optimizer();
       init_image_utils();
       init_serialization_utils();
       function hasLayout4(node) {
@@ -2198,6 +3277,14 @@ ${content}` });
               loadedFonts.add(fallbackKey);
             }
           }
+        });
+      }
+      function sendLog(message, level = "info") {
+        console.log(`[${level.toUpperCase()}] ${message}`);
+        figma.ui.postMessage({
+          type: "add-log",
+          message,
+          level
         });
       }
       function validateAndFixFills(fills) {
@@ -2376,33 +3463,45 @@ ${content}` });
         console.log("Dados completos:", msg);
         if (!compiler) compiler = new ElementorCompiler({});
         if (msg.type === "export-elementor") {
-          console.log("\u{1F680} Iniciando export-elementor...");
+          sendLog("\u{1F680} Iniciando exporta\xE7\xE3o para Elementor...", "info");
           const selection = figma.currentPage.selection;
           if (selection.length === 0) {
             figma.notify("Selecione ao menos um frame.");
+            sendLog("\u274C Nenhum frame selecionado.", "error");
             return;
           }
-          if (msg.quality) compiler.setQuality(msg.quality);
+          const wpConfig = (yield figma.clientStorage.getAsync("wp_config")) || {};
+          const currentCompiler = new ElementorCompiler(wpConfig, msg.quality || 0.85);
           figma.notify("Processando... (Uploads de imagem podem demorar)");
+          sendLog(`\u{1F4E6} Processando ${selection.length} elemento(s)...`, "info");
           try {
-            console.log("\u{1F4E6} Compilando elementos...");
-            const elements = yield compiler.compile(selection);
-            console.log("\u2705 Elementos compilados:", elements);
-            const navMenus = compiler.findNavMenus(elements);
-            console.log("\u{1F50D} Menus encontrados:", navMenus);
+            sendLog("\u{1F504} Compilando estrutura...", "info");
+            const { elements, stats } = yield currentCompiler.compile(selection, {
+              optimizeStructure: false
+              // Otimização automática DESATIVADA (agora é manual)
+            });
+            sendLog(`\u2705 ${elements.length} elementos compilados com sucesso.`, "info");
+            if (stats && stats.optimizedCount > 0) {
+              sendLog(`\u{1F9F9} Estrutura otimizada: ${stats.optimizedCount} containers redundantes removidos.`, "info");
+            } else {
+            }
+            const navMenus = currentCompiler.findNavMenus(elements);
+            if (navMenus.length > 0) {
+              sendLog(`\u{1F50D} Encontrados ${navMenus.length} menus de navega\xE7\xE3o.`, "info");
+            }
             const template = {
               type: "elementor",
               siteurl: ((_a = compiler.wpConfig) == null ? void 0 : _a.url) || "",
               elements,
               version: "0.4"
             };
-            console.log("\u{1F4E4} Enviando export-result para UI...");
+            sendLog("\u{1F4E4} Gerando JSON final...", "info");
             figma.ui.postMessage({
               type: "export-result",
               data: JSON.stringify(template, null, 2),
               navMenus
             });
-            console.log("\u2705 Mensagem export-result enviada!");
+            sendLog("\u2705 JSON gerado e enviado para a UI!", "info");
             if (navMenus.length > 0) {
               figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navega\xE7\xE3o.`);
             } else {
@@ -2410,7 +3509,7 @@ ${content}` });
             }
           } catch (e) {
             console.error("\u274C ERRO ao exportar:", e);
-            console.error("Stack trace:", e.stack);
+            sendLog(`\u274C Erro fatal ao exportar: ${e.message}`, "error");
             figma.notify(`Erro ao exportar: ${e.message}`);
           }
         } else if (msg.type === "save-wp-config") {
@@ -2422,6 +3521,32 @@ ${content}` });
           const config = yield figma.clientStorage.getAsync("wp_config");
           console.log("Config WP recuperada:", config);
           figma.ui.postMessage({ type: "load-wp-config", config });
+        } else if (msg.type === "optimize-structure") {
+          const selection = figma.currentPage.selection;
+          if (selection.length === 0) {
+            figma.notify("Selecione um frame para otimizar.");
+            sendLog("\u26A0\uFE0F Nenhum frame selecionado.", "warn");
+            return;
+          }
+          sendLog(`\u{1F50D} Iniciando otimiza\xE7\xE3o de estrutura em ${selection.length} elemento(s)...`, "info");
+          figma.notify("Otimizando estrutura...");
+          let totalRemoved = 0;
+          const nodes = [...selection];
+          for (const node of nodes) {
+            sendLog(`\u{1F4CB} Processando: ${node.name}`, "info");
+            const removed = StructureOptimizer.applyOptimization(node, sendLog);
+            if (removed > 0) {
+              sendLog(`  \u2705 ${removed} container(s) removido(s) de "${node.name}"`, "info");
+            }
+            totalRemoved += removed;
+          }
+          if (totalRemoved > 0) {
+            sendLog(`\u{1F389} Estrutura otimizada! Total: ${totalRemoved} containers redundantes removidos.`, "info");
+            figma.notify(`Otimiza\xE7\xE3o conclu\xEDda: ${totalRemoved} itens removidos.`);
+          } else {
+            sendLog("\u2139\uFE0F Nenhum container redundante encontrado. Estrutura j\xE1 est\xE1 otimizada.", "info");
+            figma.notify("Nenhuma otimiza\xE7\xE3o necess\xE1ria.");
+          }
         } else if (msg.type === "get-gemini-config") {
           console.log("\u{1F4E5} Recebido get-gemini-config");
           const apiKey = yield getKey();
@@ -2521,7 +3646,6 @@ ${content}` });
             for (let i = 0; i < totalSections; i++) {
               let child = childrenToAnalyze[i];
               const sectionIndex = i + 1;
-              const originalName = child.name;
               figma.notify(`\u{1F916} Analisando se\xE7\xE3o ${sectionIndex} de ${totalSections}: ${child.name}...`);
               figma.ui.postMessage({ type: "add-gemini-log", data: `--- INICIANDO AN\xC1LISE DA SE\xC7\xC3O ${sectionIndex}/${totalSections}: ${child.name} ---` });
               const sectionImageData = yield child.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: 1.5 } });
@@ -3060,6 +4184,138 @@ ${JSON.stringify(consolidationResult, null, 2)}`
           } catch (e) {
             console.error("Erro ao criar frame de teste:", e);
             figma.notify("\u274C Erro ao criar frame: " + e.message);
+          }
+        } else if (msg.type === "analyze-structure") {
+          const selection = figma.currentPage.selection;
+          if (selection.length === 0) {
+            figma.ui.postMessage({
+              type: "analysis-error",
+              message: "Selecione um ou mais elementos para analisar"
+            });
+            return;
+          }
+          figma.notify(`\u{1F50D} Analisando ${selection.length} elemento(s)...`);
+          try {
+            const { analyzeHybrid: analyzeHybrid2, clearAICache: clearAICache2 } = yield Promise.resolve().then(() => (init_hybrid_analyzer(), hybrid_analyzer_exports));
+            const config = {
+              structuralThreshold: msg.threshold || 85,
+              useAIFallback: msg.useAI !== false,
+              cacheEnabled: msg.cache !== false,
+              apiKey: msg.apiKey,
+              model: msg.model || "gemini-1.5-flash-latest"
+            };
+            const results = [];
+            function analyzeNodeRecursive(node, depth = 0) {
+              return __async(this, null, function* () {
+                const result = yield analyzeHybrid2(node, config);
+                const serializableMatches = result.matches.slice(0, 3).map((match) => ({
+                  pattern: {
+                    name: match.pattern.name,
+                    tag: match.pattern.tag,
+                    minScore: match.pattern.minScore,
+                    category: match.pattern.category
+                  },
+                  score: match.score,
+                  method: match.method,
+                  confidence: match.confidence,
+                  reasoning: match.reasoning
+                }));
+                results.push({
+                  nodeId: node.id,
+                  nodeName: node.name,
+                  depth,
+                  matches: serializableMatches,
+                  bestMatch: serializableMatches[0],
+                  method: result.method,
+                  processingTime: result.processingTime
+                });
+                if ("children" in node && node.children.length > 0) {
+                  for (const child of node.children) {
+                    yield analyzeNodeRecursive(child, depth + 1);
+                  }
+                }
+              });
+            }
+            for (const node of selection) {
+              yield analyzeNodeRecursive(node, 0);
+            }
+            console.log("[Analysis] Resultados:", results);
+            figma.ui.postMessage({
+              type: "analysis-results",
+              results,
+              totalAnalyzed: results.length
+            });
+            figma.notify(`\u2705 An\xE1lise conclu\xEDda! ${results.length} elemento(s) analisado(s).`);
+          } catch (error) {
+            console.error("[Hybrid Analysis] Erro:", error);
+            figma.ui.postMessage({
+              type: "analysis-error",
+              message: error.message || "Erro desconhecido na an\xE1lise"
+            });
+            figma.notify("\u274C Erro na an\xE1lise estrutural");
+          }
+        }
+        if (msg.type === "save-analysis-api-key") {
+          try {
+            yield figma.clientStorage.setAsync("analysis-api-key", msg.apiKey);
+            console.log("[Storage] API key salva com sucesso");
+          } catch (error) {
+            console.error("[Storage] Erro ao salvar API key:", error);
+          }
+        }
+        if (msg.type === "get-analysis-api-key") {
+          try {
+            const apiKey = (yield figma.clientStorage.getAsync("analysis-api-key")) || "";
+            figma.ui.postMessage({
+              type: "analysis-api-key",
+              apiKey
+            });
+            console.log("[Storage] API key enviada para UI");
+          } catch (error) {
+            console.error("[Storage] Erro ao carregar API key:", error);
+            figma.ui.postMessage({
+              type: "analysis-api-key",
+              apiKey: ""
+            });
+          }
+        }
+        if (msg.type === "clear-analysis-api-key") {
+          try {
+            yield figma.clientStorage.deleteAsync("analysis-api-key");
+            console.log("[Storage] API key removida com sucesso");
+            figma.notify("\u{1F5D1}\uFE0F API key removida");
+          } catch (error) {
+            console.error("[Storage] Erro ao remover API key:", error);
+          }
+        } else if (msg.type === "apply-renames") {
+          if (!msg.results || !Array.isArray(msg.results)) {
+            figma.notify("\u274C Dados de renomea\xE7\xE3o inv\xE1lidos");
+            return;
+          }
+          let renamed = 0;
+          for (const result of msg.results) {
+            const node = figma.getNodeById(result.nodeId);
+            if (node && result.bestMatch) {
+              node.name = result.bestMatch.pattern.tag;
+              renamed++;
+            }
+          }
+          figma.notify(`\u2705 ${renamed} elemento(s) renomeado(s)!`);
+          figma.ui.postMessage({
+            type: "rename-complete",
+            count: renamed
+          });
+        } else if (msg.type === "clear-ai-cache") {
+          try {
+            const { clearAICache: clearAICache2 } = yield Promise.resolve().then(() => (init_hybrid_analyzer(), hybrid_analyzer_exports));
+            clearAICache2();
+            figma.ui.postMessage({
+              type: "cache-cleared"
+            });
+            figma.notify("\u{1F5D1}\uFE0F Cache de IA limpo!");
+          } catch (error) {
+            console.error("[Cache] Erro ao limpar:", error);
+            figma.notify("\u274C Erro ao limpar cache");
           }
         }
       });

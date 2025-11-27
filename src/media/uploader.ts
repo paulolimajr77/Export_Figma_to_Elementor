@@ -8,7 +8,7 @@ import { exportNodeAsImage } from './image.exporter';
  */
 export class ImageUploader {
     private pendingUploads: Map<string, (result: any) => void> = new Map();
-    private mediaHashCache: Map<string, string> = new Map();
+    private mediaHashCache: Map<string, { url: string, id: number }> = new Map();
     private nodeHashCache: Map<string, string> = new Map();
     private quality: number = 0.85;
     private wpConfig: WPConfig;
@@ -22,9 +22,9 @@ export class ImageUploader {
      * Faz upload de uma imagem para o WordPress
      * @param node Nó do Figma a ser exportado
      * @param format Formato da imagem
-     * @returns URL da imagem no WordPress ou null
+     * @returns Objeto com URL e ID da imagem no WordPress ou null
      */
-    async uploadToWordPress(node: SceneNode, format: ImageFormat = 'WEBP'): Promise<string | null> {
+    async uploadToWordPress(node: SceneNode, format: ImageFormat = 'WEBP'): Promise<{ url: string, id: number } | null> {
         if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
             console.warn('[F2E] WP config ausente.');
             return null;
@@ -60,9 +60,10 @@ export class ImageUploader {
                 this.pendingUploads.set(id, (result: any) => {
                     clearTimeout(timeout);
                     if (result.success) {
-                        console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result.url}`);
-                        this.mediaHashCache.set(hash, result.url);
-                        resolve(result.url);
+                        console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result.url}, ID: ${result.wpId}`);
+                        const mediaData = { url: result.url, id: result.wpId || 0 };
+                        this.mediaHashCache.set(hash, mediaData);
+                        resolve(mediaData);
                     } else {
                         console.error(`[ImageUploader] Falha no upload:`, result.error);
                         resolve(null);
@@ -92,7 +93,7 @@ export class ImageUploader {
      * @param result Resultado do upload
      */
     handleUploadResponse(id: string, result: any): void {
-        console.log(`[ImageUploader] Recebida resposta para ${id}:`, result);
+        // console.log(`[ImageUploader] Recebida resposta para ${id}:`, result); // Log verboso removido
         const resolver = this.pendingUploads.get(id);
         if (resolver) {
             resolver(result);

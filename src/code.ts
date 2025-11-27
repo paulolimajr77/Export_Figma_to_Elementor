@@ -7,7 +7,7 @@ import type { ElementorTemplate, WPConfig } from './types/elementor.types';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import * as Gemini from './api_gemini';
 import * as DeepSeek from './api_deepseek';
-import type { LayoutAnalysis, ChildNode } from './api_gemini';
+import { StructureOptimizer } from './optimizers/structure.optimizer';
 import { createOptimizedFrame } from './gemini_frame_builder';
 import { extractImagesFromNode, getBackgroundFromNode } from './utils/image_utils';
 import { serializeNode, normalizeFigmaJSON, getSectionsToAnalyze } from './utils/serialization_utils';
@@ -49,6 +49,18 @@ async function loadFontIfNeeded(fontName: FontName): Promise<void> {
             loadedFonts.add(fallbackKey);
         }
     }
+}
+
+/**
+ * Envia um log para a UI do plugin
+ */
+function sendLog(message: string, level: 'info' | 'warn' | 'error' = 'info') {
+    console.log(`[${level.toUpperCase()}] ${message}`);
+    figma.ui.postMessage({
+        type: 'add-log',
+        message: message,
+        level: level
+    });
 }
 
 /**
@@ -311,25 +323,48 @@ figma.ui.onmessage = async (msg) => {
 
     // Exportar para Elementor
     if (msg.type === 'export-elementor') {
-        console.log('🚀 Iniciando export-elementor...');
+        sendLog('🚀 Iniciando exportação para Elementor...', 'info');
         const selection = figma.currentPage.selection;
         if (selection.length === 0) {
             figma.notify('Selecione ao menos um frame.');
+            sendLog('❌ Nenhum frame selecionado.', 'error');
             return;
         }
 
-        if (msg.quality) compiler.setQuality(msg.quality);
+        // Recuperar configuração do WordPress do storage
+        const wpConfig = await figma.clientStorage.getAsync('wp_config') || {};
+
+        // Instanciar compilador com as configurações mais recentes e qualidade
+        const currentCompiler = new ElementorCompiler(wpConfig, msg.quality || 0.85);
 
         figma.notify('Processando... (Uploads de imagem podem demorar)');
+        sendLog(`📦 Processando ${selection.length} elemento(s)...`, 'info');
 
         try {
-            console.log('📦 Compilando elementos...');
-            const elements = await compiler.compile(selection);
-            console.log('✅ Elementos compilados:', elements);
+            sendLog('🔄 Compilando estrutura...', 'info');
+            // Compilar seleção
+            // Passamos a flag useTreeShaking para o método compile (precisaremos atualizar a assinatura do método)
+            // Como o método compile original não aceitava options, vamos passar via setter ou argumento extra
+            // Mas primeiro, vamos atualizar o ElementorCompiler para aceitar essa opção.
+            // Por enquanto, vamos assumir que vamos atualizar o compile para aceitar um objeto de opções ou argumento extra.
+            // Vamos passar como segundo argumento para compile: compile(nodes, options)
+
+            const { elements, stats } = await currentCompiler.compile(selection, {
+                optimizeStructure: false // Otimização automática DESATIVADA (agora é manual)
+            });
+            sendLog(`✅ ${elements.length} elementos compilados com sucesso.`, 'info');
+
+            if (stats && stats.optimizedCount > 0) {
+                sendLog(`🧹 Estrutura otimizada: ${stats.optimizedCount} containers redundantes removidos.`, 'info');
+            } else {
+                // sendLog(`ℹ️ Nenhuma otimização estrutural necessária.`, 'info');
+            }
 
             // Detectar elementos w:nav-menu
-            const navMenus = compiler.findNavMenus(elements);
-            console.log('🔍 Menus encontrados:', navMenus);
+            const navMenus = currentCompiler.findNavMenus(elements);
+            if (navMenus.length > 0) {
+                sendLog(`🔍 Encontrados ${navMenus.length} menus de navegação.`, 'info');
+            }
 
             const template: ElementorTemplate = {
                 type: 'elementor',
@@ -338,13 +373,13 @@ figma.ui.onmessage = async (msg) => {
                 version: '0.4'
             };
 
-            console.log('📤 Enviando export-result para UI...');
+            sendLog('📤 Gerando JSON final...', 'info');
             figma.ui.postMessage({
                 type: 'export-result',
                 data: JSON.stringify(template, null, 2),
                 navMenus: navMenus
             });
-            console.log('✅ Mensagem export-result enviada!');
+            sendLog('✅ JSON gerado e enviado para a UI!', 'info');
 
             if (navMenus.length > 0) {
                 figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navegação.`);
@@ -353,7 +388,7 @@ figma.ui.onmessage = async (msg) => {
             }
         } catch (e) {
             console.error('❌ ERRO ao exportar:', e);
-            console.error('Stack trace:', (e as Error).stack);
+            sendLog(`❌ Erro fatal ao exportar: ${(e as Error).message}`, 'error');
             figma.notify(`Erro ao exportar: ${(e as Error).message}`);
         }
     }
@@ -370,6 +405,39 @@ figma.ui.onmessage = async (msg) => {
         const config = await figma.clientStorage.getAsync('wp_config');
         console.log('Config WP recuperada:', config);
         figma.ui.postMessage({ type: 'load-wp-config', config });
+    }
+
+    // Otimização de Estrutura (Tree Shaking) - Botão Dedicado
+    else if (msg.type === 'optimize-structure') {
+        const selection = figma.currentPage.selection;
+        if (selection.length === 0) {
+            figma.notify('Selecione um frame para otimizar.');
+            sendLog('⚠️ Nenhum frame selecionado.', 'warn');
+            return;
+        }
+
+        sendLog(`🔍 Iniciando otimização de estrutura em ${selection.length} elemento(s)...`, 'info');
+        figma.notify('Otimizando estrutura...');
+        let totalRemoved = 0;
+
+        // Aplica otimização em cada nó selecionado
+        const nodes = [...selection];
+        for (const node of nodes) {
+            sendLog(`📋 Processando: ${node.name}`, 'info');
+            const removed = StructureOptimizer.applyOptimization(node, sendLog);
+            if (removed > 0) {
+                sendLog(`  ✅ ${removed} container(s) removido(s) de "${node.name}"`, 'info');
+            }
+            totalRemoved += removed;
+        }
+
+        if (totalRemoved > 0) {
+            sendLog(`🎉 Estrutura otimizada! Total: ${totalRemoved} containers redundantes removidos.`, 'info');
+            figma.notify(`Otimização concluída: ${totalRemoved} itens removidos.`);
+        } else {
+            sendLog('ℹ️ Nenhum container redundante encontrado. Estrutura já está otimizada.', 'info');
+            figma.notify('Nenhuma otimização necessária.');
+        }
     }
 
     else if (msg.type === 'get-gemini-config') {
@@ -517,11 +585,7 @@ figma.ui.onmessage = async (msg) => {
                 const sectionIndex = i + 1;
 
                 // Aplica unwrapping agressivo para remover containers redundantes
-                const originalName = child.name;
-                // child = unwrapNode(child); // DESATIVADO POR SOLICITAÇÃO DO USUÁRIO
-                // if (child.name !== originalName) {
-                //     figma.notify(`🧹 Simplificando seção ${sectionIndex}: ${originalName} -> ${child.name}`);
-                // }
+
 
                 figma.notify(`🤖 Analisando seção ${sectionIndex} de ${totalSections}: ${child.name}...`);
                 figma.ui.postMessage({ type: 'add-gemini-log', data: `--- INICIANDO ANÁLISE DA SEÇÃO ${sectionIndex}/${totalSections}: ${child.name} ---` });
@@ -1182,6 +1246,183 @@ figma.ui.onmessage = async (msg) => {
         } catch (e: any) {
             console.error("Erro ao criar frame de teste:", e);
             figma.notify("❌ Erro ao criar frame: " + e.message);
+        }
+    }
+
+    // =================================================================
+    // ----- ANÁLISE ESTRUTURAL HÍBRIDA (Algoritmo + IA) -------------
+    // =================================================================
+
+    // Importar módulos de análise
+    else if (msg.type === 'analyze-structure') {
+        const selection = figma.currentPage.selection;
+
+        if (selection.length === 0) {
+            figma.ui.postMessage({
+                type: 'analysis-error',
+                message: 'Selecione um ou mais elementos para analisar'
+            });
+            return;
+        }
+
+        figma.notify(`🔍 Analisando ${selection.length} elemento(s)...`);
+
+        try {
+            // Importar módulos dinamicamente
+            const { analyzeHybrid, clearAICache } = await import('./analyzers/hybrid.analyzer');
+
+            // Configuração da análise
+            const config = {
+                structuralThreshold: msg.threshold || 85,
+                useAIFallback: msg.useAI !== false,
+                cacheEnabled: msg.cache !== false,
+                apiKey: msg.apiKey,
+                model: msg.model || 'gemini-1.5-flash-latest'
+            };
+
+            const results = [];
+
+            // Função recursiva para analisar nó e seus filhos
+            async function analyzeNodeRecursive(node: SceneNode, depth: number = 0) {
+                // Analisar o nó atual
+                const result = await analyzeHybrid(node, config);
+
+                // Serializar matches removendo funções
+                const serializableMatches = result.matches.slice(0, 3).map(match => ({
+                    pattern: {
+                        name: match.pattern.name,
+                        tag: match.pattern.tag,
+                        minScore: match.pattern.minScore,
+                        category: match.pattern.category
+                    },
+                    score: match.score,
+                    method: match.method,
+                    confidence: match.confidence,
+                    reasoning: match.reasoning
+                }));
+
+                // Adicionar aos resultados
+                results.push({
+                    nodeId: node.id,
+                    nodeName: node.name,
+                    depth: depth,
+                    matches: serializableMatches,
+                    bestMatch: serializableMatches[0],
+                    method: result.method,
+                    processingTime: result.processingTime
+                });
+
+                // Analisar filhos recursivamente
+                if ('children' in node && node.children.length > 0) {
+                    for (const child of node.children) {
+                        await analyzeNodeRecursive(child, depth + 1);
+                    }
+                }
+            }
+
+            // Analisar cada elemento selecionado e seus filhos
+            for (const node of selection) {
+                await analyzeNodeRecursive(node, 0);
+            }
+
+            console.log('[Analysis] Resultados:', results);
+
+            figma.ui.postMessage({
+                type: 'analysis-results',
+                results,
+                totalAnalyzed: results.length
+            });
+
+            figma.notify(`✅ Análise concluída! ${results.length} elemento(s) analisado(s).`);
+
+        } catch (error: any) {
+            console.error('[Hybrid Analysis] Erro:', error);
+            figma.ui.postMessage({
+                type: 'analysis-error',
+                message: error.message || 'Erro desconhecido na análise'
+            });
+            figma.notify('❌ Erro na análise estrutural');
+        }
+    }
+
+    // Handler: Salvar API key da análise
+    if (msg.type === 'save-analysis-api-key') {
+        try {
+            await figma.clientStorage.setAsync('analysis-api-key', msg.apiKey);
+            console.log('[Storage] API key salva com sucesso');
+        } catch (error) {
+            console.error('[Storage] Erro ao salvar API key:', error);
+        }
+    }
+
+    // Handler: Carregar API key da análise
+    if (msg.type === 'get-analysis-api-key') {
+        try {
+            const apiKey = await figma.clientStorage.getAsync('analysis-api-key') || '';
+            figma.ui.postMessage({
+                type: 'analysis-api-key',
+                apiKey: apiKey
+            });
+            console.log('[Storage] API key enviada para UI');
+        } catch (error) {
+            console.error('[Storage] Erro ao carregar API key:', error);
+            figma.ui.postMessage({
+                type: 'analysis-api-key',
+                apiKey: ''
+            });
+        }
+    }
+
+    // Handler: Limpar API key da análise
+    if (msg.type === 'clear-analysis-api-key') {
+        try {
+            await figma.clientStorage.deleteAsync('analysis-api-key');
+            console.log('[Storage] API key removida com sucesso');
+            figma.notify('🗑️ API key removida');
+        } catch (error) {
+            console.error('[Storage] Erro ao remover API key:', error);
+        }
+    }
+
+    // Aplicar renomeações sugeridas
+    else if (msg.type === 'apply-renames') {
+        if (!msg.results || !Array.isArray(msg.results)) {
+            figma.notify('❌ Dados de renomeação inválidos');
+            return;
+        }
+
+        let renamed = 0;
+
+        for (const result of msg.results) {
+            const node = figma.getNodeById(result.nodeId);
+            if (node && result.bestMatch) {
+                node.name = result.bestMatch.pattern.tag;
+                renamed++;
+            }
+        }
+
+        figma.notify(`✅ ${renamed} elemento(s) renomeado(s)!`);
+
+        figma.ui.postMessage({
+            type: 'rename-complete',
+            count: renamed
+        });
+    }
+
+    // Limpar cache de IA
+    else if (msg.type === 'clear-ai-cache') {
+        try {
+            const { clearAICache } = await import('./analyzers/hybrid.analyzer');
+            clearAICache();
+
+            figma.ui.postMessage({
+                type: 'cache-cleared'
+            });
+
+            figma.notify('🗑️ Cache de IA limpo!');
+        } catch (error) {
+            console.error('[Cache] Erro ao limpar:', error);
+            figma.notify('❌ Erro ao limpar cache');
         }
     }
 };

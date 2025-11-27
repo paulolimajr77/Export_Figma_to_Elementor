@@ -3,13 +3,17 @@ import { generateGUID, stripWidgetPrefix } from '../utils/guid';
 import { detectRelativePosition } from '../utils/geometry';
 import { ImageUploader } from '../media/uploader';
 import { ContainerBuilder } from '../containers/container.builder';
-import { detectContainerType } from '../containers/container.detector';
 import { detectWidgetType, detectWidgetFromPrefix, isIconNode, isImageNode } from '../widgets/detector';
 import { createTextWidget } from '../widgets/builders/text.builder';
 import { extractBorderStyles, extractShadows, extractOpacity, extractTransform } from '../extractors/styles.extractor';
 import { extractMargin, extractPositioning, extractPadding } from '../extractors/layout.extractor';
 import { extractBackgroundAdvanced } from '../extractors/background.extractor';
 import { extractTypography, extractTextColor } from '../extractors/typography.extractor';
+import { StructureOptimizer } from '../optimizers/structure.optimizer';
+
+export interface CompilerOptions {
+    optimizeStructure?: boolean;
+}
 
 /**
  * Type guards
@@ -23,6 +27,19 @@ function hasCornerRadius(node: SceneNode): node is FrameNode | RectangleNode | C
 }
 
 /**
+ * Verifica recursivamente se um nó contém imagens
+ */
+function hasImageContent(node: SceneNode): boolean {
+    if (isImageNode(node)) return true;
+
+    if ('children' in node) {
+        return node.children.some(child => hasImageContent(child));
+    }
+
+    return false;
+}
+
+/**
  * Compilador principal refatorado
  * Orquestra todos os módulos para gerar JSON Elementor
  */
@@ -30,6 +47,8 @@ export class ElementorCompiler {
     private uploader: ImageUploader;
     private containerBuilder: ContainerBuilder;
     private wpConfig: WPConfig;
+    private stats = { optimizedCount: 0 };
+    private options: CompilerOptions = {};
 
     constructor(wpConfig: WPConfig = {}, quality: number = 0.85) {
         this.wpConfig = wpConfig;
@@ -43,7 +62,11 @@ export class ElementorCompiler {
     /**
      * Compila nós do Figma em elementos Elementor
      */
-    async compile(nodes: readonly SceneNode[]): Promise<ElementorElement[]> {
+    async compile(nodes: readonly SceneNode[], options: CompilerOptions = {}): Promise<{ elements: ElementorElement[], stats: { optimizedCount: number } }> {
+        this.options = options;
+        this.stats = { optimizedCount: 0 };
+        const { optimizeStructure = true } = options;
+
         // Se for um único frame de artboard sem prefixo, processa seus filhos
         if (nodes.length === 1) {
             const node = nodes[0];
@@ -52,17 +75,22 @@ export class ElementorCompiler {
 
             if (node.type === 'FRAME' && isArtboard && !hasPrefix) {
                 const frame = node as FrameNode;
+
+                // Processa filhos diretamente (a otimização ocorrerá dentro de processNode)
                 const children = await Promise.all(
                     frame.children.map(child => this.processNode(child, null, true))
                 );
-                return children;
+                return { elements: children, stats: this.stats };
             }
         }
 
         const elements = await Promise.all(
-            Array.from(nodes).map(async node => this.processNode(node, null, true))
+            Array.from(nodes).map(async node => {
+                // A otimização ocorrerá dentro de processNode
+                return this.processNode(node, null, true);
+            })
         );
-        return elements;
+        return { elements, stats: this.stats };
     }
 
     /**
@@ -73,7 +101,26 @@ export class ElementorCompiler {
         parentNode: SceneNode | null = null,
         isTopLevel: boolean = false
     ): Promise<ElementorElement> {
+        // Otimização de Estrutura (Tree Shaking)
+        // Aplicada aqui para garantir recursividade em toda a árvore
+        if (this.options.optimizeStructure) {
+            const optimizedNode = StructureOptimizer.optimize(node);
+            if (optimizedNode !== node) {
+                // console.log(`[Compiler] 🌳 Nó otimizado: ${node.name} -> ${optimizedNode.name}`);
+                this.stats.optimizedCount++;
+                node = optimizedNode;
+            }
+        }
+
         const rawName = node.name || '';
+
+        // 1. Verificação de Container Trancado (Restaurada)
+        // Se o nó estiver trancado, exportamos como IMAGEM ÚNICA.
+        // Isso melhora drasticamente a performance para ilustrações complexas e respeita a intenção do usuário.
+        if (node.locked) {
+            console.log(`[Compiler] 🔒 Nó trancado detectado: ${node.name}. Exportando como imagem.`);
+            return this.createExplicitWidget(node, 'image');
+        }
 
         // Verifica se tem prefixo explícito
         const widgetSlug = detectWidgetFromPrefix(rawName);
@@ -112,12 +159,22 @@ export class ElementorCompiler {
             return this.containerBuilder.build(node, parentNode, isTopLevel);
         }
 
-        // Fallback: widget de texto
+        // Detecta ícones/vetores antes do fallback
+        if (isIconNode(node)) {
+            console.log(`[Compiler] 🎨 Detectado ícone/vetor: ${node.name} (${node.type})`);
+            return this.createExplicitWidget(node, 'icon');
+        }
+
+        // Fallback melhorado com log informativo
+        console.warn(`[Compiler] ⚠️ Nó não suportado: "${node.name}" (tipo: ${node.type})`);
         return {
             id: generateGUID(),
             elType: 'widget',
             widgetType: 'text-editor',
-            settings: { editor: 'Nó não suportado' },
+            settings: {
+                editor: `<!-- Nó não suportado: ${node.type} "${node.name}" -->`,
+                _widget_title: `⚠️ ${node.type}: ${node.name}`
+            },
             elements: []
         };
     }
@@ -208,8 +265,8 @@ export class ElementorCompiler {
 
         // Image
         if (widgetSlug === 'image') {
-            const url = await this.uploader.uploadToWordPress(node, 'WEBP');
-            settings.image = { url: url || '', id: 0 };
+            const upload = await this.uploader.uploadToWordPress(node, 'WEBP');
+            settings.image = { url: upload?.url || '', id: upload?.id || 0 };
             if ('width' in node) {
                 settings.width = { unit: 'px', size: Math.round((node as any).width) };
             }
@@ -249,16 +306,16 @@ export class ElementorCompiler {
             // Imagem/Ícone
             if (imageNode) {
                 if (widgetSlug === 'image-box') {
-                    const url = await this.uploader.uploadToWordPress(imageNode, 'WEBP');
-                    if (url) settings.image = { url, id: 0 };
+                    const upload = await this.uploader.uploadToWordPress(imageNode, 'WEBP');
+                    if (upload) settings.image = { url: upload.url, id: upload.id };
                     if ('width' in imageNode) {
                         const w = Math.round((imageNode as any).width);
                         settings.image_width = { unit: 'px', size: w };
                         settings.image_size = { unit: 'px', size: w, sizes: [] };
                     }
                 } else {
-                    const url = await this.uploader.uploadToWordPress(imageNode, 'SVG');
-                    if (url) settings.selected_icon = { value: { url, id: 0 }, library: 'svg' };
+                    const upload = await this.uploader.uploadToWordPress(imageNode, 'SVG');
+                    if (upload) settings.selected_icon = { value: { url: upload.url, id: upload.id }, library: 'svg' };
                     if ('width' in imageNode) {
                         const w = Math.round((imageNode as any).width);
                         settings.icon_size = { unit: 'px', size: w };
@@ -277,7 +334,6 @@ export class ElementorCompiler {
                 if (color) settings.title_color = color;
             }
 
-            // Descrição
             // Descrição
             if (descNode) {
                 settings.description_text = descNode.characters;
@@ -314,8 +370,35 @@ export class ElementorCompiler {
 
         // Icon
         else if (widgetSlug === 'icon') {
-            const url = await this.uploader.uploadToWordPress(node, 'SVG');
-            if (url) settings.selected_icon = { value: { url, id: 0 }, library: 'svg' };
+            const upload = await this.uploader.uploadToWordPress(node, 'SVG');
+            if (upload) settings.selected_icon = { value: { url: upload.url, id: upload.id }, library: 'svg' };
+        }
+
+        // Divider
+        else if (widgetSlug === 'divider') {
+            settings.style = 'solid';
+            settings.weight = { unit: 'px', size: ('height' in node) ? Math.max(1, Math.round((node as any).height)) : 1 };
+
+            // Cor do divider
+            if ('fills' in node && Array.isArray((node as any).fills) && (node as any).fills.length > 0) {
+                const fill = (node as any).fills[0];
+                if (fill.type === 'SOLID') {
+                    settings.color = `rgba(${Math.round(fill.color.r * 255)}, ${Math.round(fill.color.g * 255)}, ${Math.round(fill.color.b * 255)}, ${fill.opacity || 1})`;
+                }
+            } else if ('strokes' in node && Array.isArray((node as any).strokes) && (node as any).strokes.length > 0) {
+                const stroke = (node as any).strokes[0];
+                if (stroke.type === 'SOLID') {
+                    settings.color = `rgba(${Math.round(stroke.color.r * 255)}, ${Math.round(stroke.color.g * 255)}, ${Math.round(stroke.color.b * 255)}, ${stroke.opacity || 1})`;
+                }
+            }
+        }
+
+        // Spacer
+        else if (widgetSlug === 'spacer') {
+            settings.space = { unit: 'px', size: ('height' in node) ? Math.round((node as any).height) : 50 };
+
+            // Se tiver background, aplicamos
+            Object.assign(settings, await extractBackgroundAdvanced(node, this.uploader));
         }
     }
 
