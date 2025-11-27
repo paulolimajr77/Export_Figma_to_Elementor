@@ -397,7 +397,8 @@ FORMATO DE SAÍDA (JSON):
 
 REGRAS CRÍTICAS:
 - O JSON deve seguir estritamente a estrutura do Elementor (sections > columns > widgets) OU Containers (preferencial).
-- Se um node for "w:container", ele deve virar um Container do Elementor.
+- "c:container", "c:inner", "section:nome", "column:nome", "w:container" -> DEVEM virar Container do Elementor ("elType": "container").
+- "w:image-box", "w:icon-box" -> DEVEM virar widgets compostos (image-box, icon-box).
 - MAPPING DE AUTO LAYOUT:
   - direction: "row" -> settings: { "flex_direction": "row", "container_type": "flex" }
   - direction: "vertical" -> settings: { "flex_direction": "column", "container_type": "flex" }

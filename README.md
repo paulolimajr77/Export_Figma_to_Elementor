@@ -342,6 +342,27 @@ src/
 
 **Impacto:** Elimina o erro que ocorria quando a IA retornava um frame raiz único, permitindo que o plugin funcione corretamente independentemente do formato de resposta da IA. A engine `buildNode` garante renderização fiel ao JSON gerado pela IA, carrega fontes automaticamente e valida/corrige fills antes de aplicá-los.
 
+---
+
+### **FASE 11: Conversão WebP com Compressão Configurável** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Conversão Real para WebP**: A função `uploadImageToWordPress` agora converte as imagens para o formato WebP usando Canvas API antes do upload para WordPress.
+2. ✅ **Compressão Configurável**: O slider de qualidade no modal agora é efetivamente aplicado durante a conversão, permitindo controle total sobre o tamanho do arquivo (10% a 100%).
+3. ✅ **Função `convertToWebP`**: Nova função auxiliar que:
+   - Carrega a imagem original em um elemento `<img>`
+   - Desenha em um `<canvas>`
+   - Converte para WebP usando `canvas.toBlob()` com o parâmetro de qualidade
+4. ✅ **Logs Informativos**: Adiciona logs detalhados no console:
+   - `🎨 Qualidade de compressão: X%`
+   - `🔄 Convertendo para WebP...`
+   - `✅ Conversão WebP concluída. Tamanho: X KB`
+5. ✅ **Fallback Seguro**: Se a conversão falhar, usa o formato original como fallback, garantindo que o upload não seja interrompido.
+6. ✅ **Renomeação Automática**: Arquivos convertidos têm a extensão alterada para `.webp` automaticamente.
+
+**Impacto:** As imagens exportadas para WordPress agora são corretamente convertidas para WebP com a compressão configurada pelo usuário, resultando em arquivos menores e melhor performance sem perda de qualidade visual.
+
+---
 
 
 

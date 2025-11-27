@@ -1278,6 +1278,26 @@ evite o uso de container, dentro de container, dentro de container e assim por d
 
 **REGRA T\xC9CNICA:** NUNCA use "counterAxisAlignItems": "STRETCH". Os valores v\xE1lidos s\xE3o: "MIN", "MAX", "CENTER", "BASELINE". Para esticar elementos filhos, use "layoutSizingHorizontal": "FILL" ou "layoutSizingVertical": "FILL" nos pr\xF3prios filhos.
 
+**REGRAS DE NOMENCLATURA (CR\xCDTICO):**
+Voc\xEA DEVE renomear as camadas (propriedade "name") usando os seguintes prefixos para que o plugin identifique os widgets automaticamente:
+
+- **Containers:**
+  - "c:container" ou "section:nome" (para se\xE7\xF5es principais)
+  - "c:inner" ou "column:nome" (para colunas internas)
+
+- **Widgets:**
+  - "w:heading" (T\xEDtulos)
+  - "w:text-editor" (Textos longos)
+  - "w:image" (Imagens simples)
+  - "w:image-box" (Imagem + T\xEDtulo + Texto agrupados)
+  - "w:icon-box" (\xCDcone + T\xEDtulo + Texto agrupados)
+  - "w:button" (Bot\xF5es)
+  - "w:video" (V\xEDdeos)
+  - "w:divider" (Divisores)
+  - "w:spacer" (Espa\xE7adores)
+
+Exemplo: Em vez de "Group 1", use "c:container - Hero Section". Em vez de "Heading 2", use "w:heading - T\xEDtulo Principal".
+
 \${nodeData}
 
 quero que devolva o json Aplicando boas pr\xE1ticas visuais, como espa\xE7amentos mais consistentes, grid centralizado e alinhamentos corrigidos, limpando e reorganizando o layout, mantendo tudo exatamente igual visualmente.
@@ -1360,7 +1380,7 @@ DEPOIS (Layout Otimizado - O que voc\xEA deve gerar):
   "children": [
     {
       "id": "section-hero",
-      "name": "Section 1 - Hero (Full Container)",
+      "name": "c:container - Hero Section",
       "type": "FRAME",
       "layoutMode": "HORIZONTAL",
       "primaryAxisSizingMode": "FIXED",
@@ -1368,13 +1388,13 @@ DEPOIS (Layout Otimizado - O que voc\xEA deve gerar):
       "children": [
         {
           "id": "hero-content-col",
-          "name": "Container - Left Content",
+          "name": "c:inner - Left Content",
           "type": "FRAME",
           "layoutMode": "VERTICAL",
           "children": [
             {
               "id": "hero-heading",
-              "name": "Heading - Title",
+              "name": "w:heading - Title",
               "type": "TEXT",
               "characters": "O que \xE9 a Harmoniza\xE7\xE3o\\nIntima Masculina?",
               "fontSize": 48,
@@ -1382,7 +1402,7 @@ DEPOIS (Layout Otimizado - O que voc\xEA deve gerar):
             },
             {
               "id": "hero-text",
-              "name": "Text Editor - Description",
+              "name": "w:text-editor - Description",
               "type": "TEXT",
               "characters": "A harmoniza\xE7\xE3o \xEDntima masculina \xE9 um procedimento est\xE9tico...",
               "fontSize": 18,
@@ -1911,7 +1931,8 @@ FORMATO DE SA\xCDDA (JSON):
 
 REGRAS CR\xCDTICAS:
 - O JSON deve seguir estritamente a estrutura do Elementor (sections > columns > widgets) OU Containers (preferencial).
-- Se um node for "w:container", ele deve virar um Container do Elementor.
+- "c:container", "c:inner", "section:nome", "column:nome", "w:container" -> DEVEM virar Container do Elementor ("elType": "container").
+- "w:image-box", "w:icon-box" -> DEVEM virar widgets compostos (image-box, icon-box).
 - MAPPING DE AUTO LAYOUT:
   - direction: "row" -> settings: { "flex_direction": "row", "container_type": "flex" }
   - direction: "vertical" -> settings: { "flex_direction": "column", "container_type": "flex" }

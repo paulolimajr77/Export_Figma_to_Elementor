@@ -15,6 +15,26 @@ evite o uso de container, dentro de container, dentro de container e assim por d
 
 **REGRA TÉCNICA:** NUNCA use "counterAxisAlignItems": "STRETCH". Os valores válidos são: "MIN", "MAX", "CENTER", "BASELINE". Para esticar elementos filhos, use "layoutSizingHorizontal": "FILL" ou "layoutSizingVertical": "FILL" nos próprios filhos.
 
+**REGRAS DE NOMENCLATURA (CRÍTICO):**
+Você DEVE renomear as camadas (propriedade "name") usando os seguintes prefixos para que o plugin identifique os widgets automaticamente:
+
+- **Containers:**
+  - "c:container" ou "section:nome" (para seções principais)
+  - "c:inner" ou "column:nome" (para colunas internas)
+
+- **Widgets:**
+  - "w:heading" (Títulos)
+  - "w:text-editor" (Textos longos)
+  - "w:image" (Imagens simples)
+  - "w:image-box" (Imagem + Título + Texto agrupados)
+  - "w:icon-box" (Ícone + Título + Texto agrupados)
+  - "w:button" (Botões)
+  - "w:video" (Vídeos)
+  - "w:divider" (Divisores)
+  - "w:spacer" (Espaçadores)
+
+Exemplo: Em vez de "Group 1", use "c:container - Hero Section". Em vez de "Heading 2", use "w:heading - Título Principal".
+
 \${nodeData}
 
 quero que devolva o json Aplicando boas práticas visuais, como espaçamentos mais consistentes, grid centralizado e alinhamentos corrigidos, limpando e reorganizando o layout, mantendo tudo exatamente igual visualmente.
@@ -97,7 +117,7 @@ DEPOIS (Layout Otimizado - O que você deve gerar):
   "children": [
     {
       "id": "section-hero",
-      "name": "Section 1 - Hero (Full Container)",
+      "name": "c:container - Hero Section",
       "type": "FRAME",
       "layoutMode": "HORIZONTAL",
       "primaryAxisSizingMode": "FIXED",
@@ -105,13 +125,13 @@ DEPOIS (Layout Otimizado - O que você deve gerar):
       "children": [
         {
           "id": "hero-content-col",
-          "name": "Container - Left Content",
+          "name": "c:inner - Left Content",
           "type": "FRAME",
           "layoutMode": "VERTICAL",
           "children": [
             {
               "id": "hero-heading",
-              "name": "Heading - Title",
+              "name": "w:heading - Title",
               "type": "TEXT",
               "characters": "O que é a Harmonização\\nIntima Masculina?",
               "fontSize": 48,
@@ -119,7 +139,7 @@ DEPOIS (Layout Otimizado - O que você deve gerar):
             },
             {
               "id": "hero-text",
-              "name": "Text Editor - Description",
+              "name": "w:text-editor - Description",
               "type": "TEXT",
               "characters": "A harmonização íntima masculina é um procedimento estético...",
               "fontSize": 18,
