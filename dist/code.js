@@ -211,7 +211,18 @@
   // src/api_gemini.ts
   function fetchWithTimeout(_0) {
     return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
-      const controller = new AbortController();
+      const AC = typeof AbortController === "function" ? AbortController : null;
+      let controller = null;
+      if (AC) {
+        try {
+          controller = new AC();
+        } catch (e) {
+          controller = null;
+        }
+      }
+      if (!controller) {
+        return yield fetch(url, options);
+      }
       const id = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const resp = yield fetch(url, __spreadProps(__spreadValues({}, options), { signal: controller.signal }));
@@ -1079,7 +1090,18 @@ INSTRUCOES:
   // src/api_openai.ts
   function fetchWithTimeout2(_0) {
     return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS2) {
-      const controller = new AbortController();
+      const AC = typeof AbortController === "function" ? AbortController : null;
+      let controller = null;
+      if (AC) {
+        try {
+          controller = new AC();
+        } catch (e) {
+          controller = null;
+        }
+      }
+      if (!controller) {
+        return yield fetch(url, options);
+      }
       const id = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const resp = yield fetch(url, __spreadProps(__spreadValues({}, options), { signal: controller.signal }));

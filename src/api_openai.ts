@@ -8,7 +8,15 @@ const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_MODEL: OpenAIModel = 'gpt-4.1';
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Response> {
-    const controller = new AbortController();
+    const AC: any = (typeof AbortController === 'function') ? AbortController : null;
+    let controller: any = null;
+    if (AC) {
+        try { controller = new AC(); } catch { controller = null; }
+    }
+    if (!controller) {
+        // Ambiente sem AbortController ou com implementacao quebrada
+        return await fetch(url, options);
+    }
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const resp = await fetch(url, { ...options, signal: controller.signal });
