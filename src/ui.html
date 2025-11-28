@@ -17,7 +17,7 @@
       --color-panel: #ffffff;
       --color-border: #e2e5ec;
       --color-text: #111318;
-      --color-text-secondary: #5b6475;
+      --color-text-secondary: #15181d;
       --color-primary: #0c7bff;
       --color-primary-hover: #0063cc;
       --shadow-1: 0 6px 18px rgba(0,0,0,0.07);
@@ -208,6 +208,24 @@
     *::-webkit-scrollbar { width: 8px; }
     *::-webkit-scrollbar-track { background: transparent; }
     *::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+
+    /* Resizer handle */
+    #resizer-handle {
+      position: fixed;
+      width: 16px;
+      height: 16px;
+      right: 6px;
+      bottom: 6px;
+      cursor: se-resize;
+      opacity: 0.12;
+      background: var(--color-border);
+      border-radius: 4px;
+      transition: opacity var(--anim);
+      z-index: 5;
+    }
+    #resizer-handle:hover { opacity: 0.4; }
+    body.dark #resizer-handle { background: var(--color-border); opacity: 0.18; }
+    body.dark #resizer-handle:hover { opacity: 0.5; }
   </style>
 </head>
 <body>
@@ -218,7 +236,6 @@
         <div class="brand-subtitle">Conversão inteligente para Containers Flex</div>
       </div>
       <div class="top-actions">
-        <button class="btn ghost small" data-action="resize-ui" title="Redimensionar">↔</button>
         <label class="switch" title="Alternar tema">
           <input type="checkbox" id="theme-toggle" />
           <span class="slider">
@@ -313,6 +330,7 @@
       </section>
     </main>
   </div>
+  <div id="resizer-handle" aria-label="Arraste para redimensionar"></div>
 
   <script>
     (() => {

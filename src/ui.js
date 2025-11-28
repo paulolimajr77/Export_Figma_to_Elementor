@@ -120,7 +120,6 @@
           case 'export-wp': send('export-wp', payload); break;
           case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
           case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
-          case 'resize-ui': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
           default: send(action || 'noop', payload);
         }
       });
@@ -169,4 +168,27 @@
   send('load-settings');
   setActiveTab('layout');
   if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
+
+  // Resizer handle (drag to resize the plugin window)
+  const resizer = document.getElementById('resizer-handle');
+  if (resizer) {
+    let startX = 0, startY = 0, startW = window.innerWidth, startH = window.innerHeight;
+    const onMouseMove = (e) => {
+      const newW = Math.min(1500, Math.max(700, startW + (e.clientX - startX)));
+      const newH = Math.min(1000, Math.max(500, startH + (e.clientY - startY)));
+      send('resize-ui', { width: newW, height: newH });
+    };
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    resizer.addEventListener('mousedown', (e) => {
+      startX = e.clientX;
+      startY = e.clientY;
+      startW = window.innerWidth;
+      startH = window.innerHeight;
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
+  }
 })();
