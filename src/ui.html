@@ -556,7 +556,7 @@
     <header class="topbar">
       <div class="brand">
         <div class="brand-title">Figma to WP Elementor</div>
-                <div class="brand-subtitle">Conversao inteligente para Containers Flex</div>
+        <div class="brand-subtitle">Convers&#227;o inteligente para Containers Flex</div>
       </div>
       <div class="top-actions">
         <label class="switch" title="Alternar tema">
@@ -570,8 +570,8 @@
     </header>
 
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="layout">Layout -> Elementor</button>
-      <button class="tab-btn" data-tab="ai">Configuracao da IA</button>
+      <button class="tab-btn active" data-tab="layout">Layout &rarr; Elementor</button>
+      <button class="tab-btn" data-tab="ai">Configura&#231;&#227;o da IA</button>
       <button class="tab-btn" data-tab="wp">WordPress</button>
       <button class="tab-btn" data-tab="help">Ajuda</button>
       <span class="tab-indicator"></span>
@@ -580,7 +580,7 @@
     <main class="tab-panels">
       <section class="tab-panel active" data-panel="layout">
         <div class="card">
-          <div class="card-title">Acoes rapidas</div>
+          <div class="card-title">A&#231;&#245;es r&#225;pidas</div>
           <div class="actions">
             <button class="btn primary" data-action="inspect-layout">Inspecionar Layout</button>
             <button class="btn primary" data-action="generate-json">Gerar JSON</button>
@@ -591,19 +591,19 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-title">Saida / Logs</div>
+          <div class="card-title">Sa&#237;da / Logs</div>
           <div id="progress" class="progress hidden">
             <div class="progress-bar"></div>
             <span class="progress-text">Processando pipeline...</span>
           </div>
-          <textarea id="output" placeholder="O JSON gerado aparecera aqui" readonly></textarea>
+          <textarea id="output" placeholder="O JSON gerado aparecer&#225; aqui" readonly></textarea>
           <div id="logs" class="logs"></div>
         </div>
       </section>
 
                   <section class="tab-panel" data-panel="ai">
         <div class="card">
-          <div class="card-title">Configuracao da IA</div>
+          <div class="card-title">Configura&#231;&#227;o da IA</div>
           <label class="input-label" for="provider_ai">Provedor de IA</label>
           <select id="provider_ai">
             <option value="gemini">Gemini</option>
@@ -620,7 +620,7 @@
               <option value="gemini-1.5-flash-002">gemini-1.5-flash-002 (Fast & Stable)</option>
             </select>
             <div class="actions">
-              <button class="btn primary" data-action="test-gemini">Testar Conexao</button>
+              <button class="btn primary" data-action="test-gemini">Testar conex&#227;o</button>
             </div>
             <div id="gemini-status" class="status"></div>
           </div>
@@ -629,7 +629,7 @@
             <label class="input-label" for="gpt_api_key">OpenAI API Key</label>
             <input id="gpt_api_key" type="password" autocomplete="off" placeholder="Cole sua chave da OpenAI" />
             <div class="actions">
-              <button class="btn primary" data-action="test-gpt">Testar Conexao</button>
+              <button class="btn primary" data-action="test-gpt">Testar conex&#227;o</button>
             </div>
             <div id="gpt-status" class="status"></div>
           </div>
@@ -642,11 +642,11 @@
           <label class="input-label" for="wp_url">WP URL</label>
           <input id="wp_url" type="text" autocomplete="off" placeholder="https://site.com" />
 
-          <label class="input-label" for="wp_user">Usuario WP</label>
-          <input id="wp_user" type="text" autocomplete="username" placeholder="usuario" />
+          <label class="input-label" for="wp_user">Usu&#225;rio WP</label>
+          <input id="wp_user" type="text" autocomplete="username" placeholder="usu&#225;rio" />
 
           <label class="input-label" for="wp_token">Senha do App (Token)</label>
-          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplicacao do WP" />
+          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplica&#231;&#227;o do WP" />
 
           <label class="checkbox">
             <input id="wp_export_images" type="checkbox" />
@@ -654,11 +654,11 @@
           </label>
           <label class="checkbox">
             <input id="wp_create_page" type="checkbox" />
-            <span>Criar pagina automaticamente</span>
+            <span>Criar p&#225;gina automaticamente</span>
           </label>
 
           <div class="actions">
-            <button class="btn primary" data-action="test-wp">Testar Conexao</button>
+            <button class="btn primary" data-action="test-wp">Testar conex&#227;o</button>
             <button class="btn secondary" data-action="export-wp">Exportar WP</button>
           </div>
           <div id="wp-status" class="status"></div>
@@ -667,7 +667,7 @@
 
       <section class="tab-panel" data-panel="help">
         <div class="card">
-          <div class="card-title">Nomenclaturas e Acoes rapidas</div>
+          <div class="card-title">Nomenclaturas e A&#231;&#245;es r&#225;pidas</div>
           <div class="help-grid">
             <div class="help-item"><span class="label">w:heading</span><button class="btn tiny"
                 data-rename="w:heading">Renomear layer</button></div>
