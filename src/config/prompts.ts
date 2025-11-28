@@ -27,7 +27,7 @@ SCHEMA ALVO:
 }
 
 ENTRADA:
-${nodeData}
+\${nodeData}
 
 INSTRUCOES:
 - Mantenha textos e imagens exatamente como no original.

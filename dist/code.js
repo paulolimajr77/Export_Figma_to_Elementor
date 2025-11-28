@@ -53,7 +53,7 @@
   });
 
   // src/utils/serialization_utils.ts
-  function serializeNode(node) {
+  function serializeNode(node, parentId) {
     const data = {
       id: node.id,
       name: node.name,
@@ -63,7 +63,8 @@
       x: node.x,
       y: node.y,
       visible: node.visible,
-      locked: node.locked
+      locked: node.locked,
+      parentId: parentId || null
     };
     if ("opacity" in node) data.opacity = node.opacity;
     if ("blendMode" in node) data.blendMode = node.blendMode;
@@ -142,6 +143,7 @@
     }
     if ("layoutMode" in node) {
       data.layoutMode = node.layoutMode;
+      data.direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
       data.primaryAxisSizingMode = node.primaryAxisSizingMode;
       data.counterAxisSizingMode = node.counterAxisSizingMode;
       data.primaryAxisAlignItems = node.primaryAxisAlignItems;
@@ -151,9 +153,12 @@
       data.paddingBottom = node.paddingBottom;
       data.paddingLeft = node.paddingLeft;
       data.itemSpacing = node.itemSpacing;
+      if ("layoutWrap" in node) {
+        data.layoutWrap = node.layoutWrap;
+      }
     }
     if ("children" in node) {
-      data.children = node.children.map((child) => serializeNode(child));
+      data.children = node.children.map((child) => serializeNode(child, node.id));
     }
     return data;
   }
@@ -220,43 +225,37 @@
     }
     return null;
   }
-  function compileWithRegistry(widget) {
+  function compileWithRegistry(widget, base) {
     const def = findWidgetDefinition(widget.type, widget.kind);
     if (!def) return null;
-    const base = __spreadValues({}, widget.styles);
     return def.compile(widget, base);
   }
   var registry;
   var init_widget_registry = __esm({
     "src/config/widget.registry.ts"() {
       registry = [
-        // Básicos
         {
           key: "heading",
           widgetType: "heading",
           family: "text",
-          requiredFields: ["content"],
           compile: (w, base) => ({ widgetType: "heading", settings: __spreadProps(__spreadValues({}, base), { title: w.content || "Heading" }) })
         },
         {
           key: "text",
           widgetType: "text-editor",
           family: "text",
-          requiredFields: ["content"],
           compile: (w, base) => ({ widgetType: "text-editor", settings: __spreadProps(__spreadValues({}, base), { editor: w.content || "Text" }) })
         },
         {
           key: "button",
           widgetType: "button",
           family: "action",
-          requiredFields: ["content"],
           compile: (w, base) => ({ widgetType: "button", settings: __spreadProps(__spreadValues({}, base), { text: w.content || "Button" }) })
         },
         {
           key: "image",
           widgetType: "image",
           family: "media",
-          requiredFields: ["imageId"],
           compile: (w, base) => ({
             widgetType: "image",
             settings: __spreadProps(__spreadValues({}, base), {
@@ -276,7 +275,7 @@
             settings: __spreadProps(__spreadValues({}, base), { selected_icon: { value: w.content || "fas fa-star", library: "fa-solid" } })
           })
         },
-        // Compostos leves (baseados em hint)
+        // Hint-based simples
         {
           key: "image_box",
           widgetType: "image-box",
@@ -308,182 +307,16 @@
         {
           key: "icon_list",
           widgetType: "icon-list",
-          family: "structure",
+          family: "media",
           aliases: ["icon_list_like", "list_like"],
-          compile: (_w, base) => ({
-            widgetType: "icon-list",
-            settings: __spreadValues({}, base)
-          })
+          compile: (_w, base) => ({ widgetType: "icon-list", settings: __spreadValues({}, base) })
         },
         {
           key: "html",
           widgetType: "html",
           family: "misc",
           aliases: ["custom"],
-          compile: (w, base) => ({
-            widgetType: "html",
-            settings: __spreadProps(__spreadValues({}, base), { html: w.content || "" })
-          })
-        },
-        {
-          key: "shortcode",
-          widgetType: "shortcode",
-          family: "misc",
-          aliases: ["shortcode_like"],
-          compile: (w, base) => ({
-            widgetType: "shortcode",
-            settings: __spreadProps(__spreadValues({}, base), { shortcode: w.content || "" })
-          })
-        },
-        // Complexos
-        {
-          key: "slides",
-          widgetType: "slides",
-          family: "pro",
-          aliases: ["slides_like", "gallery_like"],
-          compile: (w, base) => {
-            const slides = (w.slides || w.items || []).map((item, idx) => {
-              var _a, _b;
-              return {
-                heading: item.title || `Slide ${idx + 1}`,
-                description: item.description || item.content || "",
-                background: {
-                  url: item.image || item.imageUrl || "",
-                  id: item.imageId ? parseInt(item.imageId, 10) : 0
-                },
-                button_text: ((_a = item.callToAction) == null ? void 0 : _a.text) || "",
-                button_url: ((_b = item.callToAction) == null ? void 0 : _b.link) || "",
-                horizontal_position: item.contentAlign || "center"
-              };
-            });
-            return {
-              widgetType: "slides",
-              settings: __spreadProps(__spreadValues({}, base), {
-                slides,
-                content_position: "middle",
-                content_alignment: "center",
-                transition: "slide",
-                speed: 500,
-                autoplay: "yes",
-                pause_on_hover: "yes"
-              })
-            };
-          }
-        },
-        {
-          key: "tabs",
-          widgetType: "tabs",
-          family: "structure",
-          aliases: ["tabs_like"],
-          compile: (w, base) => {
-            const tabs = (w.tabs || w.items || []).map((item, idx) => ({
-              tab_title: item.title || `Tab ${idx + 1}`,
-              tab_content: item.content || ""
-            }));
-            return { widgetType: "tabs", settings: __spreadProps(__spreadValues({}, base), { tabs }) };
-          }
-        },
-        {
-          key: "accordion",
-          widgetType: "accordion",
-          family: "structure",
-          aliases: ["accordion_like"],
-          compile: (w, base) => {
-            const accordion = (w.accordionItems || w.items || []).map((item, idx) => ({
-              tab_title: item.title || `Item ${idx + 1}`,
-              tab_content: item.content || ""
-            }));
-            return { widgetType: "accordion", settings: __spreadProps(__spreadValues({}, base), { accordion }) };
-          }
-        },
-        {
-          key: "toggle",
-          widgetType: "toggle",
-          family: "structure",
-          aliases: ["toggle_like"],
-          compile: (w, base) => {
-            const toggle = (w.toggleItems || w.items || []).map((item, idx) => ({
-              tab_title: item.title || `Item ${idx + 1}`,
-              tab_content: item.content || ""
-            }));
-            return { widgetType: "toggle", settings: __spreadProps(__spreadValues({}, base), { toggle }) };
-          }
-        },
-        {
-          key: "gallery",
-          widgetType: "gallery",
-          family: "media",
-          aliases: ["gallery_like"],
-          compile: (w, base) => {
-            const gallery = (w.galleryItems || w.items || []).map((item, idx) => ({
-              id: item.imageId ? parseInt(item.imageId, 10) : idx,
-              url: item.url || item.image || ""
-            }));
-            return { widgetType: "gallery", settings: __spreadProps(__spreadValues({}, base), { gallery }) };
-          }
-        },
-        {
-          key: "image_carousel",
-          widgetType: "image-carousel",
-          family: "media",
-          aliases: ["carousel_like"],
-          compile: (w, base) => {
-            const carousel = (w.galleryItems || w.items || []).map((item, idx) => ({
-              id: item.imageId ? parseInt(item.imageId, 10) : idx,
-              url: item.url || item.image || ""
-            }));
-            return { widgetType: "image-carousel", settings: __spreadProps(__spreadValues({}, base), { carousel }) };
-          }
-        },
-        {
-          key: "loop_grid",
-          widgetType: "loop-grid",
-          family: "loop",
-          aliases: ["loop_like"],
-          compile: (w, base) => ({
-            widgetType: "loop-grid",
-            settings: __spreadProps(__spreadValues({}, base), { loop_items: w.loopItems || w.items || [] })
-          })
-        },
-        {
-          key: "testimonial",
-          widgetType: "testimonial",
-          family: "text",
-          aliases: ["testimonial_like"],
-          compile: (w, base) => ({
-            widgetType: "testimonial",
-            settings: __spreadProps(__spreadValues({}, base), { testimonials: w.testimonials || w.items || [] })
-          })
-        },
-        {
-          key: "price_table",
-          widgetType: "price-table",
-          family: "pro",
-          aliases: ["price_table_like"],
-          compile: (w, base) => ({
-            widgetType: "price-table",
-            settings: __spreadProps(__spreadValues({}, base), { price_tables: w.priceTables || w.items || [] })
-          })
-        },
-        {
-          key: "price_list",
-          widgetType: "price-list",
-          family: "pro",
-          aliases: ["price_list_like"],
-          compile: (w, base) => ({
-            widgetType: "price-list",
-            settings: __spreadProps(__spreadValues({}, base), { price_list: w.priceListItems || w.items || [] })
-          })
-        },
-        {
-          key: "form",
-          widgetType: "form",
-          family: "pro",
-          aliases: ["form_like"],
-          compile: (w, base) => ({
-            widgetType: "form",
-            settings: __spreadProps(__spreadValues({}, base), { form_fields: w.formFields || w.items || [] })
-          })
+          compile: (w, base) => ({ widgetType: "html", settings: __spreadProps(__spreadValues({}, base), { html: w.content || "" }) })
         }
       ];
     }
@@ -513,6 +346,8 @@
         compileContainer(container, isInner) {
           const id = generateGUID();
           const settings = __spreadValues({
+            _element_id: id,
+            container_type: "flex",
             content_width: container.width === "full" ? "full" : "boxed",
             flex_direction: container.direction === "row" ? "row" : "column"
           }, this.mapContainerStyles(container.styles));
@@ -576,7 +411,8 @@
         }
         compileWidget(widget) {
           const widgetId = generateGUID();
-          const registryResult = compileWithRegistry(widget);
+          const baseSettings = __spreadValues({ _element_id: widgetId }, widget.styles);
+          const registryResult = compileWithRegistry(widget, baseSettings);
           if (registryResult) {
             return {
               id: widgetId,
@@ -587,9 +423,10 @@
             };
           }
           let widgetType = widget.type;
-          const settings = __spreadValues({}, widget.styles);
+          const settings = __spreadValues({}, baseSettings);
           switch (widget.type) {
             case "heading":
+              widgetType = "heading";
               settings.title = widget.content || "Heading";
               break;
             case "text":
@@ -893,6 +730,7 @@
     if (!el.id || !el.elType) throw new Error("Elemento Elementor sem id ou elType.");
     if (!Array.isArray(el.elements)) throw new Error(`Elemento ${el.id} sem elements array.`);
     if (!el.settings) throw new Error(`Elemento ${el.id} sem settings.`);
+    if (el.elType !== "container" && el.elType !== "widget") throw new Error(`Elemento ${el.id} com elType inv\xE1lido.`);
     el.elements.forEach((child) => validateElement(child));
   }
   function computeCoverage(serializedFlat, schema, elementor) {
@@ -928,13 +766,13 @@
       init_uploader();
       init_validation();
       PIPELINE_PROMPT_V3 = `
-Voc\xEA \xE9 um organizador de \xE1rvore Figma para um schema de CONTAINERS flex.
+Voce e um organizador de arvore Figma para um schema de CONTAINERS flex.
 
 REGRAS:
-- N\xC3O ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se folha).
-- N\xC3O classifique por apar\xEAncia. Se n\xE3o souber, type = "custom".
-- N\xC3O invente grids, colunas extras ou imageBox/iconBox.
-- Preservar ordem dos filhos exatamente como a \xE1rvore original.
+- NAO ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se folha).
+- NAO classifique por aparencia. Se nao souber, type = "custom".
+- NAO invente grids, colunas extras ou imageBox/iconBox.
+- Preservar ordem dos filhos exatamente como a arvore original.
 - Mapear layoutMode: HORIZONTAL -> direction=row, VERTICAL -> direction=column, NONE -> column.
 - gap = itemSpacing (se houver).
 - padding = paddingTop/Right/Bottom/Left (se houver).
@@ -956,10 +794,8 @@ SCHEMA:
 }
 
 WIDGETS permitidos: heading | text | button | image | icon | custom
-
 styles: incluir sempre "sourceId" com id do node original.
-
-SA\xCDDA: JSON puro, sem markdown.
+SAIDA: JSON puro, sem markdown.
 `;
       ConversionPipeline = class {
         constructor() {
@@ -973,18 +809,12 @@ SA\xCDDA: JSON puro, sem markdown.
             this.compiler.setWPConfig(wpConfig);
             this.imageUploader.setWPConfig(wpConfig);
             yield this.loadConfig();
-            console.log("[Pipeline] 1. Pr\xE9-processando n\xF3...");
             const preprocessed = this.preprocess(node);
-            console.log("[Pipeline] 2. Enviando para IA...");
             const intermediate = yield this.processWithAI(preprocessed);
-            console.log("[Pipeline] 3. Validando schema...");
-            this.validateAndNormalize(intermediate);
+            this.validateAndNormalize(intermediate, preprocessed.serializedRoot);
             validatePipelineSchema(intermediate);
-            console.log("[Pipeline] 4. Reconciliando nodes...");
             this.reconcileWithSource(intermediate, preprocessed.flatNodes);
-            console.log("[Pipeline] 5. Resolvendo imagens...");
             yield this.resolveImages(intermediate);
-            console.log("[Pipeline] 6. Compilando para Elementor...");
             const elementorJson = this.compiler.compile(intermediate);
             if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
             validateElementorJSON(elementorJson);
@@ -1006,8 +836,8 @@ SA\xCDDA: JSON puro, sem markdown.
           return __async(this, null, function* () {
             this.apiKey = yield getKey();
             this.model = yield getModel();
-            if (!this.apiKey) throw new Error("API Key n\xE3o configurada. Por favor, configure na aba 'IA Gemini'.");
-            if (!this.model) throw new Error("Modelo do Gemini n\xE3o configurado.");
+            if (!this.apiKey) throw new Error("API Key nao configurada. Configure na aba IA.");
+            if (!this.model) throw new Error("Modelo do Gemini nao configurado.");
           });
         }
         preprocess(node) {
@@ -1015,7 +845,7 @@ SA\xCDDA: JSON puro, sem markdown.
           const flatNodes = this.flatten(serializedRoot);
           const tokens = this.deriveTokens(serializedRoot);
           return {
-            pageTitle: serializedRoot.name || "P\xE1gina importada",
+            pageTitle: serializedRoot.name || "Pagina importada",
             tokens,
             serializedRoot,
             flatNodes
@@ -1049,7 +879,7 @@ SA\xCDDA: JSON puro, sem markdown.
         processWithAI(pre) {
           return __async(this, null, function* () {
             var _a, _b, _c, _d, _e;
-            if (!this.apiKey || !this.model) throw new Error("Configura\xE7\xE3o de IA incompleta.");
+            if (!this.apiKey || !this.model) throw new Error("Configuracao de IA incompleta.");
             const endpoint = `${API_BASE_URL}${this.model}:generateContent?key=${this.apiKey}`;
             const inputPayload = {
               title: pre.pageTitle,
@@ -1092,47 +922,45 @@ ${JSON.stringify(inputPayload)}` }
               } catch (err) {
                 attempt++;
                 if (attempt > maxRetries) {
-                  console.error("[Pipeline] Erro no processamento de IA:", err);
                   throw err;
                 }
                 const delay = 1500 * attempt;
-                console.warn(`[Pipeline] Falha na IA (tentativa ${attempt}). Retentando em ${delay}ms...`);
                 yield new Promise((res) => setTimeout(res, delay));
               }
             }
             throw new Error("Falha ao processar IA.");
           });
         }
-        validateAndNormalize(schema) {
-          if (!schema || typeof schema !== "object") throw new Error("Schema inv\xE1lido: n\xE3o \xE9 um objeto.");
-          if (!schema.page || typeof schema.page !== "object") throw new Error("Schema inv\xE1lido: campo 'page' ausente.");
-          if (typeof schema.page.title !== "string") schema.page.title = String(schema.page.title || "P\xE1gina importada");
+        validateAndNormalize(schema, root) {
+          if (!schema || typeof schema !== "object") throw new Error("Schema invalido: nao e um objeto.");
+          if (!schema.page || typeof schema.page !== "object") schema.page = {};
+          if (typeof schema.page.title !== "string") schema.page.title = String(schema.page.title || "Pagina importada");
           if (!schema.page.tokens) schema.page.tokens = {};
           if (typeof schema.page.tokens.primaryColor !== "string") schema.page.tokens.primaryColor = "#000000";
           if (typeof schema.page.tokens.secondaryColor !== "string") schema.page.tokens.secondaryColor = "#FFFFFF";
-          if (!Array.isArray(schema.containers)) {
-            schema.containers = [];
-          }
-          if (schema.containers.length === 0) {
-            schema.containers.push(this.createDefaultContainer());
+          if (!Array.isArray(schema.containers) || schema.containers.length === 0) {
+            schema.containers = [this.createContainerFromSerialized(root, 0)];
           }
           schema.containers = schema.containers.map(
             (container, index) => this.normalizeContainer(container, index)
           );
         }
         normalizeContainer(container, index) {
-          const normalizeWidget = (w) => {
+          const normalizeWidget = (w, idx) => {
             const allowed = ["heading", "text", "button", "image", "icon", "custom"];
             const type = allowed.includes(w == null ? void 0 : w.type) ? w.type : "custom";
             const content = typeof (w == null ? void 0 : w.content) === "string" || (w == null ? void 0 : w.content) === null ? w.content : null;
             const imageId = typeof (w == null ? void 0 : w.imageId) === "string" || (w == null ? void 0 : w.imageId) === null ? w.imageId : null;
-            const styles2 = w && typeof w.styles === "object" && !Array.isArray(w.styles) ? w.styles : {};
-            return { type, content, imageId, styles: styles2 };
+            const styles2 = w && typeof w.styles === "object" && !Array.isArray(w.styles) ? __spreadValues({}, w.styles) : {};
+            if (!styles2.sourceId && typeof (w == null ? void 0 : w.sourceId) === "string") styles2.sourceId = w.sourceId;
+            if (!styles2.sourceId) styles2.sourceId = `widget-${index}-${idx}`;
+            return { type, content, imageId, styles: styles2, kind: w == null ? void 0 : w.kind };
           };
           const direction = (container == null ? void 0 : container.direction) === "row" ? "row" : "column";
           const width = (container == null ? void 0 : container.width) === "boxed" ? "boxed" : "full";
-          const styles = container && typeof container.styles === "object" && !Array.isArray(container.styles) ? container.styles : {};
-          const widgets = Array.isArray(container == null ? void 0 : container.widgets) ? container.widgets.map(normalizeWidget) : [];
+          const styles = container && typeof container.styles === "object" && !Array.isArray(container.styles) ? __spreadValues({}, container.styles) : {};
+          if (!styles.sourceId && typeof (container == null ? void 0 : container.id) === "string") styles.sourceId = container.id;
+          const widgets = Array.isArray(container == null ? void 0 : container.widgets) ? container.widgets.map((w, idx) => normalizeWidget(w, idx)) : [];
           const children = Array.isArray(container == null ? void 0 : container.children) ? container.children.map((c, i) => this.normalizeContainer(c, i)) : [];
           return {
             id: typeof (container == null ? void 0 : container.id) === "string" ? container.id : `container-${index + 1}`,
@@ -1146,36 +974,92 @@ ${JSON.stringify(inputPayload)}` }
         reconcileWithSource(schema, flatNodes) {
           const allSourceIds = new Set(flatNodes.map((n) => n.id));
           const covered = /* @__PURE__ */ new Set();
+          const containerMap = /* @__PURE__ */ new Map();
           const markCoveredWidget = (widget) => {
             var _a;
             const sourceId = (_a = widget.styles) == null ? void 0 : _a.sourceId;
             if (typeof sourceId === "string") covered.add(sourceId);
-            if (typeof widget.imageId === "string") covered.add(widget.imageId);
           };
           const walkContainer = (container) => {
+            var _a;
+            const sourceId = (_a = container.styles) == null ? void 0 : _a.sourceId;
+            if (typeof sourceId === "string") {
+              covered.add(sourceId);
+              containerMap.set(sourceId, container);
+            }
             container.widgets.forEach(markCoveredWidget);
             container.children.forEach(walkContainer);
           };
           schema.containers.forEach(walkContainer);
           const missing = [...allSourceIds].filter((id) => !covered.has(id));
           if (missing.length === 0) return;
-          if (!schema.containers.length) {
-            schema.containers.push(this.createDefaultContainer());
-          }
-          const target = schema.containers[0];
-          missing.forEach((id) => {
-            const sourceNode = flatNodes.find((n) => n.id === id);
-            const widget = {
-              type: "custom",
-              content: typeof (sourceNode == null ? void 0 : sourceNode.characters) === "string" ? sourceNode.characters : null,
-              imageId: null,
-              styles: {
-                sourceId: id,
-                sourceType: sourceNode == null ? void 0 : sourceNode.type,
-                sourceName: sourceNode == null ? void 0 : sourceNode.name
-              }
+          const rootContainer = schema.containers[0] || this.createContainerFromSerialized(flatNodes[0], 0);
+          const nodeById = /* @__PURE__ */ new Map();
+          flatNodes.forEach((n) => nodeById.set(n.id, n));
+          const ensureParentContainer = (parentId) => {
+            if (parentId && containerMap.has(parentId)) return containerMap.get(parentId);
+            return rootContainer;
+          };
+          const createWidgetFromNode = (node) => {
+            const map = {
+              TEXT: "text",
+              VECTOR: "icon",
+              STAR: "icon",
+              ELLIPSE: "icon",
+              RECTANGLE: "image",
+              LINE: "icon"
             };
-            target.widgets.push(widget);
+            const type = map[node.type] || "custom";
+            const content = typeof node.characters === "string" ? node.characters : null;
+            return {
+              type,
+              content,
+              imageId: node.id,
+              styles: {
+                sourceId: node.id,
+                sourceType: node.type,
+                sourceName: node.name
+              },
+              kind: void 0
+            };
+          };
+          const createContainerFromNode = (node) => {
+            const direction = node.layoutMode === "HORIZONTAL" || node.direction === "row" ? "row" : "column";
+            const styles = {
+              sourceId: node.id,
+              sourceType: node.type,
+              sourceName: node.name,
+              gap: node.itemSpacing,
+              paddingTop: node.paddingTop,
+              paddingRight: node.paddingRight,
+              paddingBottom: node.paddingBottom,
+              paddingLeft: node.paddingLeft,
+              primaryAxisAlignItems: node.primaryAxisAlignItems,
+              counterAxisAlignItems: node.counterAxisAlignItems
+            };
+            return {
+              id: `container-${node.id}`,
+              direction,
+              width: "full",
+              styles,
+              widgets: [],
+              children: []
+            };
+          };
+          missing.forEach((id) => {
+            const sourceNode = nodeById.get(id);
+            if (!sourceNode) return;
+            const parent = ensureParentContainer(sourceNode.parentId);
+            if (Array.isArray(sourceNode.children) && sourceNode.children.length > 0) {
+              const newContainer = createContainerFromNode(sourceNode);
+              parent.children.push(newContainer);
+              containerMap.set(sourceNode.id, newContainer);
+              covered.add(sourceNode.id);
+            } else {
+              const widget = createWidgetFromNode(sourceNode);
+              parent.widgets.push(widget);
+              covered.add(sourceNode.id);
+            }
           });
         }
         resolveImages(schema) {
@@ -1185,13 +1069,10 @@ ${JSON.stringify(inputPayload)}` }
                 try {
                   const node = figma.getNodeById(widget.imageId);
                   if (node && (node.type === "FRAME" || node.type === "GROUP" || node.type === "RECTANGLE" || node.type === "INSTANCE" || node.type === "COMPONENT")) {
-                    console.log(`[Pipeline] Uploading image for widget ${widget.type} (${widget.imageId})...`);
                     const result = yield this.imageUploader.uploadToWordPress(node);
                     if (result) {
                       widget.content = result.url;
                       widget.imageId = result.id.toString();
-                    } else {
-                      console.warn(`[Pipeline] Falha no upload da imagem ${widget.imageId}`);
                     }
                   }
                 } catch (e) {
@@ -1212,14 +1093,44 @@ ${JSON.stringify(inputPayload)}` }
             }
           });
         }
-        createDefaultContainer() {
+        createContainerFromSerialized(node, index) {
+          const direction = node.layoutMode === "HORIZONTAL" || node.direction === "row" ? "row" : "column";
+          const styles = {
+            sourceId: node.id,
+            sourceType: node.type,
+            sourceName: node.name,
+            gap: node.itemSpacing,
+            paddingTop: node.paddingTop,
+            paddingRight: node.paddingRight,
+            paddingBottom: node.paddingBottom,
+            paddingLeft: node.paddingLeft,
+            primaryAxisAlignItems: node.primaryAxisAlignItems,
+            counterAxisAlignItems: node.counterAxisAlignItems
+          };
+          const children = [];
+          const widgets = [];
+          if (Array.isArray(node.children)) {
+            node.children.forEach((child) => {
+              if (child.children && child.children.length > 0) {
+                children.push(this.createContainerFromSerialized(child, children.length));
+              } else {
+                const widget = {
+                  type: child.type === "TEXT" ? "text" : child.type === "RECTANGLE" ? "image" : "custom",
+                  content: typeof child.characters === "string" ? child.characters : null,
+                  imageId: child.type === "RECTANGLE" ? child.id : null,
+                  styles: { sourceId: child.id, sourceType: child.type, sourceName: child.name }
+                };
+                widgets.push(widget);
+              }
+            });
+          }
           return {
-            id: "container-1",
-            direction: "column",
+            id: typeof node.id === "string" ? node.id : `container-${index + 1}`,
+            direction,
             width: "full",
-            styles: {},
-            widgets: [],
-            children: []
+            styles,
+            widgets,
+            children
           };
         }
       };
@@ -1235,11 +1146,33 @@ ${JSON.stringify(inputPayload)}` }
       figma.showUI(__html__, { width: 1024, height: 820, themeColors: true });
       var pipeline = new ConversionPipeline();
       var lastJSON = null;
+      var DEFAULT_TIMEOUT_MS = 12e3;
       function toBase64(value) {
         if (typeof btoa === "function") {
           return btoa(value);
         }
         return Buffer.from(value, "utf8").toString("base64");
+      }
+      function fetchWithTimeout(_0) {
+        return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), timeoutMs);
+          try {
+            const resp = yield fetch(url, __spreadProps(__spreadValues({}, options), { signal: controller.signal }));
+            return resp;
+          } finally {
+            clearTimeout(id);
+          }
+        });
+      }
+      function normalizeWpUrl(raw) {
+        if (!raw) return "";
+        let url = raw.trim();
+        if (!/^https?:\/\//i.test(url)) {
+          url = "https://" + url;
+        }
+        url = url.replace(/\/+$/, "");
+        return url;
       }
       function loadSetting(key, defaultValue) {
         return __async(this, null, function* () {
@@ -1398,7 +1331,62 @@ ${JSON.stringify(inputPayload)}` }
             }
             break;
           case "export-wp":
-            figma.ui.postMessage({ type: "wp-status", success: false, message: "Exporta\xE7\xE3o WP n\xE3o implementada neste build." });
+            try {
+              const incoming = msg.wpConfig;
+              const cfg = incoming && incoming.url ? incoming : yield loadWPConfig();
+              const url = normalizeWpUrl((cfg == null ? void 0 : cfg.url) || "");
+              const user = (cfg == null ? void 0 : cfg.user) || "";
+              const token = (cfg == null ? void 0 : cfg.token) || "";
+              if (!lastJSON) {
+                figma.ui.postMessage({ type: "wp-status", success: false, message: "Nenhum JSON gerado para exportar." });
+                break;
+              }
+              if (!url || !user || !token) {
+                figma.ui.postMessage({ type: "wp-status", success: false, message: "URL, usu\xE1rio ou senha do app ausentes." });
+                break;
+              }
+              const auth = `Basic ${toBase64(`${user}:${token}`)}`;
+              const base = url.replace(/\/$/, "");
+              const meEndpoint = `${base}/wp-json/wp/v2/users/me`;
+              const meResp = yield fetchWithTimeout(meEndpoint, { headers: { Authorization: auth } });
+              if (!meResp.ok) {
+                const text = yield meResp.text();
+                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha de autentica\xE7\xE3o (${meResp.status}): ${text}` });
+                break;
+              }
+              const pageEndpoint = `${base}/wp-json/wp/v2/pages`;
+              const pageBody = {
+                title: `FigToEL ${(/* @__PURE__ */ new Date()).toISOString()}`,
+                status: "draft",
+                meta: { _elementor_data: lastJSON },
+                content: "Gerado via FigToEL (Elementor JSON em _elementor_data)."
+              };
+              const pageResp = yield fetchWithTimeout(pageEndpoint, {
+                method: "POST",
+                headers: {
+                  Authorization: auth,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify(pageBody)
+              });
+              if (!pageResp.ok) {
+                const text = yield pageResp.text();
+                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha ao criar p\xE1gina (${pageResp.status}): ${text}` });
+                break;
+              }
+              const pageJson = yield pageResp.json().catch(() => ({}));
+              yield saveSetting("gptel_wp_url", url);
+              yield saveSetting("gptel_wp_user", user);
+              yield saveSetting("gptel_wp_token", token);
+              yield saveSetting("gptel_export_images", !!cfg.exportImages);
+              yield saveSetting("gptel_auto_page", !!cfg.autoPage);
+              const link = (pageJson == null ? void 0 : pageJson.link) || url;
+              figma.ui.postMessage({ type: "wp-status", success: true, message: `P\xE1gina enviada como rascunho. Link: ${link}` });
+            } catch (e) {
+              const aborted = (e == null ? void 0 : e.name) === "AbortError";
+              const msgErr = aborted ? "Tempo limite ao exportar para WP." : (e == null ? void 0 : e.message) || "Erro desconhecido";
+              figma.ui.postMessage({ type: "wp-status", success: false, message: msgErr });
+            }
             break;
           case "test-gemini":
             try {
