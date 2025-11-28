@@ -21,3 +21,14 @@
 
   --shadow-1: 0 1px 3px rgba(0,0,0,0.08);
 }
+
+:root.dark {
+  --color-bg: #1c1c1f;
+  --color-panel: #2a2a2e;
+  --color-border: #3a3a3e;
+  --color-text: #ededed;
+  --color-text-secondary: #bbbbbb;
+  --color-primary: #3ea6ff;
+  --color-primary-hover: #1c8dd5;
+  --shadow-1: 0 1px 4px rgba(0,0,0,0.45);
+}

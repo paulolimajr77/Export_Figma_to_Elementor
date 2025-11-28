@@ -1,17 +1,11 @@
 ﻿(() => {
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const themeToggle = document.getElementById('theme-toggle');
-  const savedTheme = localStorage.getItem('figtoel-theme');
-  const initialDark = savedTheme === 'dark' || (savedTheme === null && prefersDark);
-
-  if (initialDark) document.body.classList.add('dark');
-  if (themeToggle) themeToggle.checked = initialDark;
-
   const tabs = document.querySelectorAll('.tab-btn');
   const contents = document.querySelectorAll('.tab-content');
   const indicator = document.querySelector('.tab-indicator');
   const output = document.getElementById('output');
   const logs = document.getElementById('logs');
+  const themeToggle = document.getElementById('theme-toggle');
+  const darkSheet = document.getElementById('theme-dark');
 
   const fields = {
     gemini_api_key: document.getElementById('gemini_api_key'),
@@ -21,37 +15,52 @@
     wp_export_images: document.getElementById('wp_export_images'),
     wp_create_page: document.getElementById('wp_create_page')
   };
-  if (fields.wp_token) {
-    fields.wp_token.setAttribute('type', 'password');
+
+  function debounce(fn, wait = 300) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), wait);
+    };
   }
 
   function updateIndicator() {
     const active = document.querySelector('.tab-btn.active');
-    if (!indicator || !active) return;
+    if (!indicator || !active || !active.parentElement) return;
     const rect = active.getBoundingClientRect();
     const parentRect = active.parentElement.getBoundingClientRect();
-    indicator.style.width = rect.width + 'px';
-    indicator.style.transform = 'translateX(' + (rect.left - parentRect.left) + 'px)';
+    indicator.style.width = `${rect.width}px`;
+    indicator.style.transform = `translateX(${rect.left - parentRect.left}px)`;
   }
 
   function setActiveTab(name) {
     tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-    contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+    contents.forEach(c => c.classList.toggle('active', c.id === `tab-${name}`));
     updateIndicator();
   }
 
   tabs.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
 
-  function toggleTheme(forceDark) {
-    const shouldDark = typeof forceDark === 'boolean' ? forceDark : !document.body.classList.contains('dark');
-    document.body.classList.toggle('dark', shouldDark);
-    if (themeToggle) themeToggle.checked = shouldDark;
-    localStorage.setItem('figtoel-theme', shouldDark ? 'dark' : 'light');
+  function applyTheme(isDark) {
+    document.documentElement.classList.toggle('dark', isDark);
+    if (themeToggle) themeToggle.checked = isDark;
+    if (darkSheet) darkSheet.disabled = !isDark;
+    localStorage.setItem('figtoel-theme', isDark ? 'dark' : 'light');
+  }
+
+  function initTheme(pref) {
+    const stored = localStorage.getItem('figtoel-theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (typeof pref === 'boolean') {
+      applyTheme(pref);
+    } else {
+      applyTheme(stored === 'dark' || (stored === null && prefersDark));
+    }
   }
 
   if (themeToggle) {
     themeToggle.addEventListener('change', () => {
-      toggleTheme(themeToggle.checked);
+      applyTheme(themeToggle.checked);
       send('save-setting', { key: 'gptel_dark_mode', value: themeToggle.checked });
     });
   }
@@ -63,7 +72,7 @@
   function addLog(message, level = 'info') {
     if (!logs) return;
     const div = document.createElement('div');
-    div.textContent = '[' + level + '] ' + message;
+    div.textContent = `[${level}] ${message}`;
     logs.appendChild(div);
     logs.scrollTo(0, logs.scrollHeight);
   }
@@ -76,35 +85,36 @@
     if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
     if (fields.wp_export_images) fields.wp_export_images.checked = !!payload.exportImages;
     if (fields.wp_create_page) fields.wp_create_page.checked = !!payload.autoPage;
-    if (typeof payload.darkMode === 'boolean') toggleTheme(payload.darkMode);
+    if (typeof payload.darkMode === 'boolean') applyTheme(payload.darkMode);
     updateIndicator();
   }
 
   function watchInputs() {
-    if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', () => send('save-setting', { key: 'gptel_gemini_key', value: fields.gemini_api_key.value }));
-    if (fields.wp_url) fields.wp_url.addEventListener('input', () => send('save-setting', { key: 'gptel_wp_url', value: fields.wp_url.value }));
-    if (fields.wp_user) fields.wp_user.addEventListener('input', () => send('save-setting', { key: 'gptel_wp_user', value: fields.wp_user.value }));
-    if (fields.wp_token) fields.wp_token.addEventListener('input', () => send('save-setting', { key: 'gptel_wp_token', value: fields.wp_token.value }));
+    const saveText = (key, input) => debounce(() => send('save-setting', { key, value: input.value }));
+    if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
+    if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
+    if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
+    if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
     if (fields.wp_export_images) fields.wp_export_images.addEventListener('change', () => send('save-setting', { key: 'gptel_export_images', value: fields.wp_export_images.checked }));
     if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
   }
 
   function bindActions() {
-        document.querySelectorAll('[data-action]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const action = btn.getAttribute('data-action');
-            const payload = {
-              wpConfig: {
-                url: fields.wp_url?.value || '',
-                user: fields.wp_user?.value || '',
-                token: fields.wp_token?.value || '',
-                exportImages: fields.wp_export_images?.checked || false,
-                autoPage: fields.wp_create_page?.checked || false
-              },
-              apiKey: fields.gemini_api_key?.value || ''
-            };
-            switch (action) {
-              case 'inspect': send('inspect'); break;
+    document.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.getAttribute('data-action');
+        const payload = {
+          wpConfig: {
+            url: fields.wp_url?.value || '',
+            user: fields.wp_user?.value || '',
+            token: fields.wp_token?.value || '',
+            exportImages: fields.wp_export_images?.checked || false,
+            autoPage: fields.wp_create_page?.checked || false
+          },
+          apiKey: fields.gemini_api_key?.value || ''
+        };
+        switch (action) {
+          case 'inspect': send('inspect'); break;
           case 'generate-json': send('generate-json', payload); break;
           case 'copy-json': send('copy-json'); break;
           case 'download-json': send('download-json'); break;
@@ -155,6 +165,8 @@
 
   bindActions();
   watchInputs();
+  initTheme();
   send('load-settings');
   setActiveTab('layout');
+  if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
 })();

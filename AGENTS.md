@@ -1,0 +1,5 @@
+- A cada finalização de atualização do codigo, documente as alterações do arquivo README.md
+- Mantenha um arquivo .md com o registro das alterações realizadas.
+- Toda resposta de ser em portugues do Brasil.
+- Todo planejamento que fizer escreva em portugues do Brasil.
+- Após cada atualização salve o progresso no github
