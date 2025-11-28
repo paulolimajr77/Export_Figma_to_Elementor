@@ -838,7 +838,6 @@ SAIDA: JSON puro, sem markdown.
             this.model = yield getModel();
             if (!this.apiKey) throw new Error("API Key nao configurada. Configure na aba IA.");
             if (!this.model) throw new Error("Modelo do Gemini nao configurado.");
-            figma.ui.postMessage({ type: "log", level: "info", message: `[Gemini] Usando modelo: ${this.model}` });
           });
         }
         preprocess(node) {
@@ -1149,7 +1148,7 @@ ${JSON.stringify(inputPayload)}` }
       init_pipeline();
       init_serialization_utils();
       init_api_gemini();
-      figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
+      figma.showUI(__html__, { width: 600, height: 600, themeColors: true });
       var pipeline = new ConversionPipeline();
       var lastJSON = null;
       var DEFAULT_TIMEOUT_MS = 12e3;
@@ -1325,10 +1324,6 @@ ${JSON.stringify(inputPayload)}` }
             break;
           case "generate-json":
             try {
-              if (msg.geminiModel) {
-                yield saveSetting("gemini_model", msg.geminiModel);
-              }
-              figma.ui.postMessage({ type: "generation-start" });
               const wpConfig = msg.wpConfig;
               const debug = !!msg.debug;
               const { elementorJson, debugInfo } = yield generateElementorJSON(wpConfig, debug);
@@ -1428,9 +1423,6 @@ ${JSON.stringify(inputPayload)}` }
             break;
           case "test-gemini":
             try {
-              if (msg.model) {
-                yield saveSetting("gemini_model", msg.model);
-              }
               const inlineKey = msg.apiKey;
               let keyToTest = inlineKey || (yield loadSetting("gptel_gemini_key", ""));
               if (!keyToTest) {

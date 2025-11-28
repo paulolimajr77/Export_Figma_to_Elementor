@@ -3,30 +3,52 @@ import type { WPConfig, ElementorJSON } from './types/elementor.types';
 import { serializeNode } from './utils/serialization_utils';
 import { API_BASE_URL } from './api_gemini';
 
-figma.showUI(__html__, { width: 1024, height: 820, themeColors: true });
+figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 
 const pipeline = new ConversionPipeline();
 let lastJSON: string | null = null;
 
 const DEFAULT_TIMEOUT_MS = 12000;
 
-function toBase64(value: string): string {
-    try {
-        if (typeof btoa === 'function') return btoa(value);
-    } catch (_) { /* ignore */ }
-    if (typeof (globalThis as any).Buffer !== 'undefined') {
-        return (globalThis as any).Buffer.from(value, 'utf8').toString('base64');
+function toBase64(str: string): string {
+    // Implementação robusta de Base64 (RFC 4648) independente de btoa/unescape
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let output = '';
+    let i = 0;
+    while (i < str.length) {
+        const c1 = str.charCodeAt(i++);
+        const c2 = i < str.length ? str.charCodeAt(i++) : NaN;
+        const c3 = i < str.length ? str.charCodeAt(i++) : NaN;
+
+        const e1 = c1 >> 2;
+        const e2 = ((c1 & 3) << 4) | (isNaN(c2) ? 0 : c2 >> 4);
+        const e3 = isNaN(c2) ? 64 : ((c2 & 15) << 2) | (isNaN(c3) ? 0 : c3 >> 6);
+        const e4 = isNaN(c3) ? 64 : c3 & 63;
+
+        output += chars.charAt(e1) + chars.charAt(e2) +
+            (e3 === 64 ? '=' : chars.charAt(e3)) +
+            (e4 === 64 ? '=' : chars.charAt(e4));
     }
-    // fallback inseguro, mas evita quebra
-    return value;
+    return output;
 }
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Response> {
-    const controller = new AbortController();
+    const AC: any = (typeof AbortController !== 'undefined') ? AbortController : null;
+    if (!AC) {
+        // Ambiente sem AbortController: apenas faz o fetch sem timeout real
+        return await fetch(url, options);
+    }
+    const controller = new AC();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const resp = await fetch(url, { ...options, signal: controller.signal });
-        return resp;
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+                ...options.headers,
+                'User-Agent': 'Figma-To-Elementor/1.0'
+            }
+        });
     } finally {
         clearTimeout(id);
     }
@@ -111,7 +133,7 @@ async function deliverResult(json: ElementorJSON, debugInfo?: any) {
     lastJSON = payload;
     figma.ui.postMessage({ type: 'generation-complete', payload, debug: debugInfo });
     try {
-        await figma.clipboard.writeText(payload);
+        await (figma as any).clipboard.writeText(payload);
         figma.notify('JSON Elementor gerado e copiado para a área de transferência.');
     } catch (err) {
         figma.notify('JSON Elementor gerado. Não foi possível copiar automaticamente.', { timeout: 4000 });
@@ -129,6 +151,7 @@ async function sendStoredSettings() {
     if (!geminiKey) {
         geminiKey = await loadSetting<string>('gemini_api_key', '');
     }
+    const geminiModel = await loadSetting<string>('gemini_model', 'gemini-2.5-flash');
     const wpUrl = await loadSetting<string>('gptel_wp_url', '');
     const wpUser = await loadSetting<string>('gptel_wp_user', '');
     const wpToken = await loadSetting<string>('gptel_wp_token', '');
@@ -140,6 +163,7 @@ async function sendStoredSettings() {
         type: 'load-settings',
         payload: {
             geminiKey,
+            geminiModel,
             wpUrl,
             wpUser,
             wpToken,
@@ -167,6 +191,10 @@ figma.ui.onmessage = async (msg) => {
 
         case 'generate-json':
             try {
+                if (msg.geminiModel) {
+                    await saveSetting('gemini_model', msg.geminiModel);
+                }
+                figma.ui.postMessage({ type: 'generation-start' });
                 const wpConfig = msg.wpConfig as WPConfig | undefined;
                 const debug = !!msg.debug;
                 const { elementorJson, debugInfo } = await generateElementorJSON(wpConfig, debug);
@@ -183,7 +211,7 @@ figma.ui.onmessage = async (msg) => {
         case 'copy-json':
             if (lastJSON) {
                 try {
-                    await figma.clipboard.writeText(lastJSON);
+                    await (figma as any).clipboard.writeText(lastJSON);
                     log('JSON copiado.', 'success');
                 } catch (err) {
                     log(`Falha ao copiar: ${err}`, 'warn');
@@ -201,13 +229,20 @@ figma.ui.onmessage = async (msg) => {
             }
             break;
 
-                case 'export-wp':
+        case 'export-wp':
             try {
                 const incoming = msg.wpConfig as WPConfig | undefined;
                 const cfg = incoming && incoming.url ? incoming : await loadWPConfig();
                 const url = normalizeWpUrl(cfg?.url || '');
-                const user = (cfg as any)?.user || '';
-                const token = (cfg as any)?.token || '';
+                const userRaw = (cfg as any)?.user || '';
+                const tokenRaw = (cfg as any)?.token || (cfg as any)?.password || '';
+                const user = (userRaw || '').trim();
+                const token = (tokenRaw || '').replace(/\s+/g, '');
+                figma.ui.postMessage({
+                    type: 'log',
+                    level: 'info',
+                    message: `[WP] Export -> endpoint: ${url || '(vazio)'} / user: ${user || '(vazio)'} / tokenLen: ${token.length}`
+                });
                 if (!lastJSON) {
                     figma.ui.postMessage({ type: 'wp-status', success: false, message: 'Nenhum JSON gerado para exportar.' });
                     break;
@@ -220,9 +255,10 @@ figma.ui.onmessage = async (msg) => {
                 const auth = `Basic ${toBase64(`${user}:${token}`)}`;
                 const base = url.replace(/\/$/, '');
                 const meEndpoint = `${base}/wp-json/wp/v2/users/me`;
-                const meResp = await fetchWithTimeout(meEndpoint, { headers: { Authorization: auth } });
+                const meResp = await fetchWithTimeout(meEndpoint, { headers: { Authorization: auth, Accept: 'application/json' } });
                 if (!meResp.ok) {
                     const text = await meResp.text();
+                    figma.ui.postMessage({ type: 'log', level: 'error', message: `[WP] Auth FAIL (${meResp.status}) -> ${text}` });
                     figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha de autenticação (${meResp.status}): ${text}` });
                     break;
                 }
@@ -268,6 +304,9 @@ figma.ui.onmessage = async (msg) => {
 
         case 'test-gemini':
             try {
+                if (msg.model) {
+                    await saveSetting('gemini_model', msg.model);
+                }
                 const inlineKey = msg.apiKey as string | undefined;
                 let keyToTest = inlineKey || await loadSetting<string>('gptel_gemini_key', '');
                 if (!keyToTest) {
@@ -279,7 +318,7 @@ figma.ui.onmessage = async (msg) => {
                     break;
                 }
 
-                const resp = await fetch(`${API_BASE_URL}models?key=${keyToTest}&pageSize=1`);
+                const resp = await fetch(`${API_BASE_URL}?key=${keyToTest}`);
                 if (!resp.ok) {
                     const text = await resp.text();
                     figma.ui.postMessage({ type: 'gemini-status', success: false, message: `Falha na conexão (${resp.status}): ${text}` });
@@ -297,21 +336,27 @@ figma.ui.onmessage = async (msg) => {
             try {
                 const incoming = msg.wpConfig as WPConfig | undefined;
                 const cfg = incoming && incoming.url ? incoming : await loadWPConfig();
-                const url = cfg?.url || '';
-                const user = (cfg as any)?.user || '';
-                const token = (cfg as any)?.token || '';
+                const url = normalizeWpUrl(cfg?.url || '');
+                const user = ((cfg as any)?.user || '').trim();
+                const token = ((cfg as any)?.token || (cfg as any)?.password || '').replace(/\s+/g, '');
                 if (!url || !user || !token) {
                     figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuário ou senha do app ausentes.' });
                     break;
                 }
-                const endpoint = url.replace(/\/$/, '') + '/wp-json/wp/v2/users/me';
+                figma.ui.postMessage({
+                    type: 'log',
+                    level: 'info',
+                    message: `[WP] Test -> endpoint: ${url} / user: ${user} / tokenLen: ${token.length}`
+                });
+                const endpoint = url + '/wp-json/wp/v2/users/me';
                 const auth = toBase64(`${user}:${token}`);
-                const resp = await fetch(endpoint, {
+                const resp = await fetchWithTimeout(endpoint, {
                     method: 'GET',
-                    headers: { Authorization: `Basic ${auth}` }
+                    headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' }
                 });
                 if (!resp.ok) {
                     const text = await resp.text();
+                    figma.ui.postMessage({ type: 'log', level: 'error', message: `[WP] Test FAIL (${resp.status}) -> ${text}` });
                     figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha (${resp.status}): ${text || 'sem detalhe'}` });
                     break;
                 }
@@ -335,6 +380,10 @@ figma.ui.onmessage = async (msg) => {
 
         case 'load-settings':
             await sendStoredSettings();
+            break;
+
+        case 'reset':
+            lastJSON = null;
             break;
 
         case 'resize-ui':
@@ -363,9 +412,3 @@ figma.ui.onmessage = async (msg) => {
 };
 
 sendStoredSettings();
-
-
-
-
-
-

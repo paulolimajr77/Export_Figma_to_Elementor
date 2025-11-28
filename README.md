@@ -82,7 +82,14 @@ Acoes de exportacao:
 ## Aviso Legal / Licenciamento Comercial
 Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz parte da distribuicao publica. Uso nao autorizado, distribuicao ou engenharia reversa nao sao permitidos.
 
+---
 
+## Notas de manutenção (interno)
+- 28/11/2025: ajustes de UI (toggle sem localStorage em sandbox, handle de resize visível e icone atualizado), fallback de timeout sem AbortController e normalização de URL no teste WordPress; build atualizado.
+- 28/11/2025 (tarde): logs verbosos para teste/export WP (endpoint, usuário, tamanho do token) e normalização de token (remoção de espaços); build atualizado.
+- 28/11/2025 (noite): logs de erro detalhados do Gemini (status/texto e payload quando vazio) em processWithAI; build atualizado.
+- 28/11/2025 (tarde 2): feedback de reset na UI (limpa saída/logs) e build recompilado.
+- 28/11/2025 (noite): correção crítica na autenticação WP (substituição da função toBase64 quebrada por implementação robusta) e adição de User-Agent para evitar bloqueios de segurança; build atualizado.
 
 
 

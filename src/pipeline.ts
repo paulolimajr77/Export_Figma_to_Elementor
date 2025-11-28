@@ -104,6 +104,7 @@ export class ConversionPipeline {
         this.model = await getModel();
         if (!this.apiKey) throw new Error("API Key nao configurada. Configure na aba IA.");
         if (!this.model) throw new Error('Modelo do Gemini nao configurado.');
+        figma.ui.postMessage({ type: 'log', level: 'info', message: `[Gemini] Usando modelo: ${this.model}` });
     }
 
     private preprocess(node: SceneNode): PreprocessedData {
@@ -183,16 +184,21 @@ export class ConversionPipeline {
 
                 if (!response.ok) {
                     const errText = await response.text();
+                    figma.ui.postMessage({ type: 'log', level: 'error', message: `[Gemini] HTTP ${response.status} - ${errText}` });
                     throw new GeminiError(`Erro na API Gemini: ${response.status} - ${errText}`);
                 }
 
                 const result = await response.json();
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!text) throw new Error('Resposta vazia da IA.');
+                if (!text) {
+                    figma.ui.postMessage({ type: 'log', level: 'error', message: `[Gemini] Resposta sem texto. Status OK. Payload: ${JSON.stringify(result)}` });
+                    throw new Error('Resposta vazia da IA.');
+                }
 
                 const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
                 return JSON.parse(clean) as PipelineSchema;
             } catch (err) {
+                figma.ui.postMessage({ type: 'log', level: 'error', message: `[Gemini] Falha tentativa ${attempt + 1}: ${err instanceof Error ? err.message : String(err)}` });
                 attempt++;
                 if (attempt > maxRetries) {
                     throw err;
