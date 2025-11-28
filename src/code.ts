@@ -3,9 +3,6 @@ import type { WPConfig, ElementorJSON } from './types/elementor.types';
 import { serializeNode } from './utils/serialization_utils';
 import { API_BASE_URL } from './api_gemini';
 
-// Buffer is available in the Figma main runtime; declare to satisfy TS
-declare const Buffer: any;
-
 figma.showUI(__html__, { width: 1024, height: 820, themeColors: true });
 
 const pipeline = new ConversionPipeline();
@@ -14,12 +11,14 @@ let lastJSON: string | null = null;
 const DEFAULT_TIMEOUT_MS = 12000;
 
 function toBase64(value: string): string {
-    if (typeof btoa === 'function') {
-        return btoa(value);
+    try {
+        if (typeof btoa === 'function') return btoa(value);
+    } catch (_) { /* ignore */ }
+    if (typeof (globalThis as any).Buffer !== 'undefined') {
+        return (globalThis as any).Buffer.from(value, 'utf8').toString('base64');
     }
-    // Fallback for environments without btoa
-    // eslint-disable-next-line no-undef
-    return Buffer.from(value, 'utf8').toString('base64');
+    // fallback inseguro, mas evita quebra
+    return value;
 }
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Response> {

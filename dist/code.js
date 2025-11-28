@@ -1148,10 +1148,14 @@ ${JSON.stringify(inputPayload)}` }
       var lastJSON = null;
       var DEFAULT_TIMEOUT_MS = 12e3;
       function toBase64(value) {
-        if (typeof btoa === "function") {
-          return btoa(value);
+        try {
+          if (typeof btoa === "function") return btoa(value);
+        } catch (_) {
         }
-        return Buffer.from(value, "utf8").toString("base64");
+        if (typeof globalThis.Buffer !== "undefined") {
+          return globalThis.Buffer.from(value, "utf8").toString("base64");
+        }
+        return value;
       }
       function fetchWithTimeout(_0) {
         return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {

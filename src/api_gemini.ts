@@ -55,7 +55,7 @@ export async function testConnection(): Promise<{ success: boolean; message: str
     const apiKey = await getKey();
     if (!apiKey) return { success: false, message: 'API Key não configurada' };
 
-    const endpoint = `${API_BASE_URL}?key=${apiKey}&pageSize=1`;
+    const endpoint = `${API_BASE_URL}?key=${apiKey}`;
     try {
         const response = await fetchWithTimeout(endpoint, { method: 'GET' });
         if (!response.ok) {
