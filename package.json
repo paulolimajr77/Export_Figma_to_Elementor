@@ -3,13 +3,15 @@
     "version": "1.0.0",
     "description": "Figma to Elementor Exporter",
     "main": "dist/code.js",
-    "scripts": {
+  "scripts": {
         "build": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6",
-        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --watch"
+        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --watch",
+        "test": "vitest run"
     },
     "devDependencies": {
         "@figma/plugin-typings": "*",
         "esbuild": "^0.27.0",
-        "typescript": "*"
+        "typescript": "*",
+        "vitest": "^1.6.0"
     }
 }

@@ -83,3 +83,4 @@ Acoes de exportacao:
 Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz parte da distribuicao publica. Uso nao autorizado, distribuicao ou engenharia reversa nao sao permitidos.
 
 
+
