@@ -173,16 +173,18 @@
   const resizer = document.getElementById('resizer-handle');
   if (resizer) {
     let startX = 0, startY = 0, startW = window.innerWidth, startH = window.innerHeight;
-    const onMouseMove = (e) => {
-      const newW = Math.min(1500, Math.max(700, startW + (e.clientX - startX)));
-      const newH = Math.min(1000, Math.max(500, startH + (e.clientY - startY)));
+    const onMove = (clientX, clientY) => {
+      const newW = Math.min(1500, Math.max(700, startW + (clientX - startX)));
+      const newH = Math.min(1000, Math.max(500, startH + (clientY - startY)));
       send('resize-ui', { width: newW, height: newH });
     };
+    const onMouseMove = (e) => { e.preventDefault(); onMove(e.clientX, e.clientY); };
     const onMouseUp = () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
     resizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       startX = e.clientX;
       startY = e.clientY;
       startW = window.innerWidth;

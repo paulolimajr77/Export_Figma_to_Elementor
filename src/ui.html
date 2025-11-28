@@ -43,7 +43,7 @@
     }
     .app {
       width: 100%;
-      max-width: 1100px;
+      max-width: 800px;
       margin: 0 auto;
       min-height: 100vh;
       padding: var(--space-3);
@@ -212,19 +212,20 @@
     /* Resizer handle */
     #resizer-handle {
       position: fixed;
-      width: 16px;
-      height: 16px;
-      right: 6px;
-      bottom: 6px;
+      width: 20px;
+      height: 20px;
+      right: 8px;
+      bottom: 8px;
       cursor: se-resize;
-      opacity: 0.12;
+      opacity: 0.15;
       background: var(--color-border);
-      border-radius: 4px;
-      transition: opacity var(--anim);
-      z-index: 5;
+      border-radius: 6px;
+      transition: opacity var(--anim), background var(--anim);
+      z-index: 8;
+      box-shadow: var(--shadow-1);
     }
-    #resizer-handle:hover { opacity: 0.4; }
-    body.dark #resizer-handle { background: var(--color-border); opacity: 0.18; }
+    #resizer-handle:hover { opacity: 0.45; }
+    body.dark #resizer-handle { background: var(--color-border); opacity: 0.2; }
     body.dark #resizer-handle:hover { opacity: 0.5; }
   </style>
 </head>
