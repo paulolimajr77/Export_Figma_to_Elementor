@@ -1,117 +1,97 @@
 import type { GeometryNode } from '../types/elementor.types';
 
-
-
 /**
- * Detecta se um nó é um ícone baseado em suas características
- * @param node Nó do Figma
- * @returns true se o nó parece ser um ícone
- */
-export function isIconNode(node: SceneNode): boolean {
-    const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'];
-    const isVector = vectorTypes.includes(node.type);
-    const isSmallFrame = (node.type === 'FRAME' || node.type === 'INSTANCE') &&
-        node.width <= 50 &&
-        node.height <= 50;
-    const name = node.name.toLowerCase();
-
-    return isVector || isSmallFrame || name.includes('icon') || name.includes('vector');
-}
-
-/**
- * Verifica se um nó tem fill de imagem
- * @param node Nó do Figma
- * @returns true se tem fill de imagem
+ * Detector básico sem heurísticas visuais.
+ * Usa apenas propriedades explícitas do node.
  */
 export function hasImageFill(node: GeometryNode): boolean {
     return 'fills' in node && Array.isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
 }
 
-/**
- * Detecta se um nó é uma imagem
- * @param node Nó do Figma
- * @returns true se o nó é uma imagem
- */
-export function isImageNode(node: SceneNode): boolean {
-    // Retângulo com fill de imagem
-    if (node.type === 'RECTANGLE') {
-        return hasImageFill(node as GeometryNode);
-    }
-
-    // Frame/Instance com fill de imagem
-    if (node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT') {
-        if ('fills' in node && Array.isArray(node.fills) && node.fills.some(f => f.type === 'IMAGE')) {
-            return true;
-        }
-    }
-
-    // Nome contém palavras relacionadas a imagem
-    const lname = node.name.toLowerCase();
-    return lname.includes('image') || lname.includes('img') || lname.includes('foto');
-}
-
-/**
- * Detecta o tipo de widget baseado nas características do nó
- * @param node Nó do Figma
- * @returns Tipo do widget ou null se não detectado
- */
-export function detectWidgetType(node: SceneNode): string | null {
+export function detectWidgetType(node: SceneNode): 'heading' | 'text' | 'button' | 'image' | 'icon' | 'custom' {
     const lname = node.name.toLowerCase();
 
-    // Detecção por nome explícito
-    if (lname.includes('button') || lname.includes('btn')) return 'button';
-    if (lname.includes('image-box') || lname.includes('card')) return 'image-box';
-    if (lname.includes('icon-box')) return 'icon-box';
-
-    // Texto deve ser verificado PRIMEIRO para evitar confusão com ícones
+    // Detecção mínima por tipo
     if (node.type === 'TEXT') {
-        if (lname.includes('heading') || lname.includes('title')) return 'heading';
-        return 'text-editor';
+        return (lname.includes('heading') || lname.includes('title')) ? 'heading' : 'text';
     }
 
-    // Imagens e ícones (verificação robusta)
-    if (isImageNode(node)) return 'image';
-    if (isIconNode(node)) return 'icon';
-
-    // Divider (Linha ou Retângulo fino)
-    if (node.type === 'LINE') return 'divider';
-    if (node.type === 'RECTANGLE') {
-        const height = node.height;
-        const width = node.width;
-        // Se for muito fino (horizontal ou vertical), é um divider
-        if (height <= 5 || width <= 5) return 'divider';
-
-        // Se não for imagem e não for fino, assume Spacer (se não tiver children, o que Rectangle não tem)
-        return 'spacer';
+    // Imagens
+    if (node.type === 'RECTANGLE' && hasImageFill(node as GeometryNode)) {
+        return 'image';
+    }
+    if ((node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT') && hasImageFill(node as GeometryNode)) {
+        return 'image';
     }
 
-    // Container/Frame
-    if ('layoutMode' in node || node.type === 'GROUP') return 'container';
-
-    // Fallback para vetores não identificados como ícones (mas que são vetores)
-    if (['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION'].includes(node.type)) {
+    // Ícones (vetores simples)
+    const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'];
+    if (vectorTypes.includes(node.type)) {
         return 'icon';
     }
 
-    return null;
+    // Botão por nome explícito
+    if (lname.includes('button') || lname.includes('btn')) {
+        return 'button';
+    }
+
+    return 'custom';
 }
 
 /**
- * Detecta o tipo de widget baseado em prefixo explícito
- * @param name Nome do nó
- * @returns Slug do widget ou null
+ * Sugestão leve de "kind" baseada em estrutura mínima.
+ * Usa apenas tipos e contagem simples; fallback para undefined.
  */
-export function detectWidgetFromPrefix(name: string): string | null {
-    const prefixMatch = name.match(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i);
-    if (!prefixMatch) return null;
+export function suggestWidgetKind(node: SceneNode): string | undefined {
+    if (!(node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'INSTANCE')) return undefined;
+    if (!('children' in node)) return undefined;
 
-    const prefix = prefixMatch[0].toLowerCase();
-    let slug = name.substring(prefix.length).trim().toLowerCase().split(' ')[0];
+    const children = node.children;
+    const childTypes = children.map(c => c.type);
+    const hasText = childTypes.includes('TEXT');
+    const hasImage = children.some(c => hasImageFill(c as GeometryNode));
+    const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION'];
+    const hasIcon = children.some(c => vectorTypes.includes(c.type));
 
-    // Transformações especiais
-    if (prefix === 'woo:') slug = `woocommerce-${slug}`;
-    if (prefix === 'loop:') slug = `loop-${slug}`;
-    if (prefix === 'slider:') slug = 'slides';
+    // Base: image/text/icon combos
+    if (hasImage && hasText) return 'image_box_like';
+    if (hasIcon && hasText) return 'icon_box_like';
+    if (hasIcon && !hasText && children.length > 1) return 'icon_list_like';
 
-    return slug;
+    // Repetição simples
+    if (children.length >= 3) {
+        const allSameType = children.every(c => c.type === children[0].type);
+        if (allSameType && children[0].type === 'FRAME') return 'loop_like';
+        if (allSameType && children[0].type === 'RECTANGLE') return 'gallery_like';
+    }
+
+    // Slides/testimonial: children frames com heading+text(+imagem)
+    const framesWithText = children.filter(c => c.type === 'FRAME' && 'children' in c && c.children.some(cc => cc.type === 'TEXT'));
+    const homogeneousFrames = framesWithText.length === children.length && framesWithText.length >= 2;
+    if (homogeneousFrames) {
+        // names like "Slide 1", "Slide 2"
+        const namePattern = /^slide\s*\d+|hero\s*slide/gi;
+        const namesMatch = framesWithText.every(f => namePattern.test(f.name.toLowerCase()));
+        if (namesMatch || framesWithText.every(f => 'layoutMode' in f)) {
+            return 'slides_like';
+        }
+        return 'testimonial_like';
+    }
+
+    // Tabs/accordion/toggle by names
+    const lname = node.name.toLowerCase();
+    if (lname.includes('tabs')) return 'tabs_like';
+    if (lname.includes('accordion')) return 'accordion_like';
+    if (lname.includes('toggle')) return 'toggle_like';
+
+    // Carousel: row layout with many images
+    if ('layoutMode' in node && (node as FrameNode).layoutMode === 'HORIZONTAL' && hasImage && children.length >= 4) {
+        return 'carousel_like';
+    }
+
+    // Gallery: many images
+    const imageChildren = children.filter(c => hasImageFill(c as GeometryNode));
+    if (imageChildren.length >= 4) return 'gallery_like';
+
+    return undefined;
 }

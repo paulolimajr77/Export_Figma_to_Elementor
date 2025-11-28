@@ -1,4 +1,4 @@
-// Node extraction utilities for micro-prompts conversion
+// Node extraction utilities preserving the full tree 1:1 (no heuristics, no classification)
 /// <reference types="@figma/plugin-typings" />
 
 export interface DevModeData {
@@ -47,7 +47,7 @@ export interface NodeData {
 }
 
 /**
- * Extrai dados completos de um node incluindo Dev Mode
+ * Extrai dados completos de um node, preservando árvore 1:1 sem qualquer interpretação.
  */
 export function extractNodeData(node: SceneNode): NodeData {
     const devMode: DevModeData = {
@@ -64,9 +64,9 @@ export function extractNodeData(node: SceneNode): NodeData {
 
     const textData: TextData | undefined = node.type === 'TEXT' ? {
         characters: node.characters,
-        fontFamily: typeof node.fontName !== 'symbol' ? node.fontName.family : 'Inter',
-        fontSize: typeof node.fontSize === 'number' ? node.fontSize : 16,
-        fontWeight: typeof node.fontName !== 'symbol' ? node.fontName.style : 'Regular',
+        fontFamily: typeof node.fontName !== 'symbol' ? node.fontName.family : '',
+        fontSize: typeof node.fontSize === 'number' ? node.fontSize : 0,
+        fontWeight: typeof node.fontName !== 'symbol' ? node.fontName.style : '',
         lineHeight: typeof node.lineHeight !== 'symbol' ? node.lineHeight : { unit: 'AUTO' },
         letterSpacing: typeof node.letterSpacing !== 'symbol' ? node.letterSpacing : { value: 0, unit: 'PIXELS' }
     } : undefined;
@@ -86,11 +86,15 @@ export function extractNodeData(node: SceneNode): NodeData {
 }
 
 /**
- * Extrai configurações de Auto Layout de um node
+ * Extrai configurações de Auto Layout sem inferências.
  */
 function extractAutoLayout(node: SceneNode): DevModeData['autoLayout'] {
     if (!('layoutMode' in node) || node.layoutMode === 'NONE') {
-        return undefined;
+        return {
+            direction: 'none',
+            gap: 0,
+            padding: { top: 0, right: 0, bottom: 0, left: 0 }
+        };
     }
 
     return {
@@ -108,12 +112,11 @@ function extractAutoLayout(node: SceneNode): DevModeData['autoLayout'] {
 }
 
 /**
- * Gera CSS baseado nas propriedades do node (similar ao Dev Mode do Figma)
+ * Gera CSS básico a partir das propriedades explícitas (sem deduzir estrutura).
  */
 export function generateCSS(node: SceneNode): string {
     const css: string[] = [];
 
-    // Auto Layout
     if ('layoutMode' in node && node.layoutMode !== 'NONE') {
         css.push('display: flex');
         css.push(`flex-direction: ${node.layoutMode === 'HORIZONTAL' ? 'row' : 'column'}`);
@@ -132,26 +135,19 @@ export function generateCSS(node: SceneNode): string {
         }
     }
 
-    // Background
     if ('fills' in node && typeof node.fills !== 'symbol' && Array.isArray(node.fills) && node.fills.length > 0) {
-        const fill = node.fills[0];
-        if (fill.type === 'SOLID' && fill.visible !== false) {
+        const fill = node.fills.find(f => f.type === 'SOLID' && f.visible !== false) as SolidPaint | undefined;
+        if (fill) {
             const color = rgbToHex(fill.color);
-            const opacity = fill.opacity !== undefined ? fill.opacity : 1;
-            if (opacity < 1) {
-                css.push(`background: ${rgbaToString(fill.color, opacity)}`);
-            } else {
-                css.push(`background: ${color}`);
-            }
+            const opacity = typeof fill.opacity === 'number' ? fill.opacity : 1;
+            css.push(`background: ${opacity < 1 ? rgbaToString(fill.color, opacity) : color}`);
         }
     }
 
-    // Border Radius
     if ('cornerRadius' in node && typeof node.cornerRadius === 'number') {
         css.push(`border-radius: ${node.cornerRadius}px`);
     }
 
-    // Dimensions
     if ('width' in node && 'height' in node) {
         css.push(`width: ${Math.round(node.width)}px`);
         css.push(`height: ${Math.round(node.height)}px`);
@@ -160,22 +156,16 @@ export function generateCSS(node: SceneNode): string {
     return css.join('; ') + ';';
 }
 
-/**
- * Mapeia alinhamento do Figma para CSS
- */
 function mapAlignment(alignment: string): string {
     const map: Record<string, string> = {
-        'MIN': 'flex-start',
-        'CENTER': 'center',
-        'MAX': 'flex-end',
-        'SPACE_BETWEEN': 'space-between'
+        MIN: 'flex-start',
+        CENTER: 'center',
+        MAX: 'flex-end',
+        SPACE_BETWEEN: 'space-between'
     };
     return map[alignment] || alignment.toLowerCase();
 }
 
-/**
- * Converte RGB para HEX
- */
 function rgbToHex(color: RGB): string {
     const r = Math.round(color.r * 255);
     const g = Math.round(color.g * 255);
@@ -183,9 +173,6 @@ function rgbToHex(color: RGB): string {
     return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
 }
 
-/**
- * Converte RGBA para string CSS
- */
 function rgbaToString(color: RGB, opacity: number): string {
     const r = Math.round(color.r * 255);
     const g = Math.round(color.g * 255);

@@ -1,36 +1,59 @@
 export interface PipelineSchema {
-    page: {
-        title: string;
-        tokens: {
-            primaryColor: string;
-            secondaryColor: string;
-        };
-    };
-    sections: Section[];
+    page: PipelinePage;
+    containers: PipelineContainer[];
 }
 
-export interface Section {
+export interface PipelinePage {
+    title: string;
+    tokens: PipelineTokens;
+}
+
+export interface PipelineTokens {
+    primaryColor: string;
+    secondaryColor: string;
+}
+
+export interface PipelineContainer {
     id: string;
-    type: 'hero_two_columns' | 'hero_single_column' | 'grid_3col' | 'grid_4col' | 'card' | 'custom';
+    direction: 'row' | 'column';
     width: 'full' | 'boxed';
-    background: {
-        color?: string;
-        image?: string;
-        gradient?: string;
-    };
-    columns: Column[];
+    styles: Record<string, any>;
+    widgets: PipelineWidget[];
+    children: PipelineContainer[];
 }
 
-export interface Column {
-    span: number; // 1-12
-    widgets: Widget[];
-}
-
-export interface Widget {
-    type: 'heading' | 'text' | 'button' | 'image' | 'icon' | 'iconBox' | 'imageBox' | 'list' | 'divider' | 'html' | 'custom';
+export interface PipelineWidget {
+    type: 'heading' | 'text' | 'button' | 'image' | 'icon' | 'custom' | 'slides';
     content: string | null;
     imageId: string | null;
-    styles: {
-        [key: string]: any;
-    };
+    styles: Record<string, any>;
+    /**
+     * Sugestão opcional de widget mais rico (ex.: "image_box_like", "icon_box_like", "slides_like", "woo_product_like").
+     * Não obrigatório; serve para o registry decidir um widget Elementor mais específico.
+     */
+    kind?: string;
+    // Coleções opcionais para widgets complexos
+    items?: any[];
+    slides?: SlideItem[];
+    tabs?: any[];
+    accordionItems?: any[];
+    toggleItems?: any[];
+    galleryItems?: any[];
+    loopItems?: any[];
+    testimonials?: any[];
+    priceTables?: any[];
+    priceListItems?: any[];
+    formFields?: any[];
+}
+
+export interface SlideItem {
+    id?: string;
+    title?: string;
+    description?: string;
+    imageId?: string;
+    image?: string;
+    backgroundColor?: string;
+    overlayColor?: string;
+    contentAlign?: 'left' | 'center' | 'right';
+    callToAction?: { text: string; link?: string };
 }

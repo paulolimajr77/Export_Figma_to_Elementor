@@ -1,14 +1,67 @@
 import { serializeNode, SerializedNode } from './utils/serialization_utils';
 import { getKey, getModel, API_BASE_URL, GeminiError } from './api_gemini';
-import { PIPELINE_GENERATION_PROMPT } from './config/prompts';
-import { PipelineSchema, Section, Column, Widget } from './types/pipeline.schema';
-import { ElementorJSON, WPConfig } from './types/elementor.types';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
+import { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipeline.schema';
+import { ElementorJSON, WPConfig } from './types/elementor.types';
+import { validatePipelineSchema, validateElementorJSON, computeCoverage } from './utils/validation';
 
 /**
- * Pipeline de Conversão: Figma -> AI -> Schema -> Elementor
+ * Prompt para o schema de containers (Flexbox).
  */
+const PIPELINE_PROMPT_V3 = `
+Você é um organizador de árvore Figma para um schema de CONTAINERS flex.
+
+REGRAS:
+- NÃO ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se folha).
+- NÃO classifique por aparência. Se não souber, type = "custom".
+- NÃO invente grids, colunas extras ou imageBox/iconBox.
+- Preservar ordem dos filhos exatamente como a árvore original.
+- Mapear layoutMode: HORIZONTAL -> direction=row, VERTICAL -> direction=column, NONE -> column.
+- gap = itemSpacing (se houver).
+- padding = paddingTop/Right/Bottom/Left (se houver).
+- background: usar fills do node (cor/imagem/gradiente) se presentes.
+
+SCHEMA:
+{
+  "page": { "title": "...", "tokens": { "primaryColor": "...", "secondaryColor": "..." } },
+  "containers": [
+    {
+      "id": "string",
+      "direction": "row" | "column",
+      "width": "full" | "boxed",
+      "styles": {},
+      "widgets": [ ... ],
+      "children": [ ... ]
+    }
+  ]
+}
+
+WIDGETS permitidos: heading | text | button | image | icon | custom
+
+styles: incluir sempre "sourceId" com id do node original.
+
+SAÍDA: JSON puro, sem markdown.
+`;
+
+interface PreprocessedData {
+    pageTitle: string;
+    tokens: { primaryColor: string; secondaryColor: string };
+    serializedRoot: SerializedNode;
+    flatNodes: SerializedNode[];
+}
+
+/**
+ * Pipeline de Conversão: Figma -> IA -> Schema -> Elementor (containers flex)
+ */
+export interface PipelineDebugInfo {
+    serializedTree: SerializedNode;
+    flatNodes: SerializedNode[];
+    schema: PipelineSchema;
+    elementor: ElementorJSON;
+    coverage: ReturnType<typeof computeCoverage>;
+}
+
 export class ConversionPipeline {
     private apiKey: string | null = null;
     private model: string | null = null;
@@ -18,87 +71,127 @@ export class ConversionPipeline {
 
     constructor() {
         this.compiler = new ElementorCompiler();
-        // Inicializa com config vazia, será atualizada no run
         this.imageUploader = new ImageUploader({});
     }
 
-    /**
-     * Executa o pipeline completo
-     * @param node Nó raiz do Figma a ser convertido
-     */
-    async run(node: SceneNode, wpConfig: WPConfig = {}): Promise<ElementorJSON> {
-        // 0. Configure Compiler & Uploader
+    async run(node: SceneNode, wpConfig: WPConfig = {}, options?: { debug?: boolean }): Promise<ElementorJSON | { elementorJson: ElementorJSON; debugInfo: PipelineDebugInfo }> {
         this.compiler.setWPConfig(wpConfig);
         this.imageUploader.setWPConfig(wpConfig);
 
-        // 1. Setup
         await this.loadConfig();
 
-        // 2. Extraction
-        console.log('[Pipeline] 1. Extraindo dados do nó...');
-        const serializedData = serializeNode(node);
+        console.log('[Pipeline] 1. Pré-processando nó...');
+        const preprocessed = this.preprocess(node);
 
-        // 3. AI Processing
         console.log('[Pipeline] 2. Enviando para IA...');
-        const intermediateSchema = await this.processWithAI(serializedData);
+        const intermediate = await this.processWithAI(preprocessed);
 
-        // 4. Validation
         console.log('[Pipeline] 3. Validando schema...');
-        this.validateSchema(intermediateSchema);
+        this.validateAndNormalize(intermediate);
+        validatePipelineSchema(intermediate);
 
-        // 4.1 Image Resolution (Upload to WP)
-        console.log('[Pipeline] 3.1 Resolvendo imagens...');
-        await this.resolveImages(intermediateSchema);
+        console.log('[Pipeline] 4. Reconciliando nodes...');
+        this.reconcileWithSource(intermediate, preprocessed.flatNodes);
 
-        // 5. Compilation
-        console.log('[Pipeline] 4. Compilando para Elementor...');
-        const elementorJson = this.compiler.compile(intermediateSchema);
+        console.log('[Pipeline] 5. Resolvendo imagens...');
+        await this.resolveImages(intermediate);
 
-        // Inject siteurl if available
-        if (wpConfig.url) {
-            elementorJson.siteurl = wpConfig.url;
+        console.log('[Pipeline] 6. Compilando para Elementor...');
+        const elementorJson = this.compiler.compile(intermediate);
+        if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
+
+        validateElementorJSON(elementorJson);
+
+        if (options?.debug) {
+            const coverage = computeCoverage(preprocessed.flatNodes, intermediate, elementorJson);
+            const debugInfo: PipelineDebugInfo = {
+                serializedTree: preprocessed.serializedRoot,
+                flatNodes: preprocessed.flatNodes,
+                schema: intermediate,
+                elementor: elementorJson,
+                coverage
+            };
+            return { elementorJson, debugInfo };
         }
 
         return elementorJson;
     }
 
-    private async loadConfig() {
+    private async loadConfig(): Promise<void> {
         this.apiKey = await getKey();
         this.model = await getModel();
-        if (!this.apiKey) {
-            throw new Error("API Key não configurada. Por favor, configure na aba 'IA Gemini'.");
-        }
+        if (!this.apiKey) throw new Error("API Key não configurada. Por favor, configure na aba 'IA Gemini'.");
+        if (!this.model) throw new Error("Modelo do Gemini não configurado.");
     }
 
-    /**
-     * Envia os dados para a IA e retorna o Schema Intermediário
-     */
-    private async processWithAI(data: SerializedNode): Promise<PipelineSchema> {
-        if (!this.apiKey || !this.model) throw new Error("Configuração de IA incompleta.");
+    private preprocess(node: SceneNode): PreprocessedData {
+        const serializedRoot = serializeNode(node);
+        const flatNodes = this.flatten(serializedRoot);
+        const tokens = this.deriveTokens(serializedRoot);
+        return {
+            pageTitle: serializedRoot.name || 'Página importada',
+            tokens,
+            serializedRoot,
+            flatNodes
+        };
+    }
+
+    private flatten(root: SerializedNode): SerializedNode[] {
+        const acc: SerializedNode[] = [];
+        const walk = (n: SerializedNode) => {
+            acc.push(n);
+            if (Array.isArray(n.children)) {
+                n.children.forEach((child: SerializedNode) => walk(child));
+            }
+        };
+        walk(root);
+        return acc;
+    }
+
+    private deriveTokens(serializedRoot: SerializedNode): { primaryColor: string; secondaryColor: string } {
+        const defaultTokens = { primaryColor: '#000000', secondaryColor: '#FFFFFF' };
+        const fills = (serializedRoot as any).fills;
+        if (Array.isArray(fills) && fills.length > 0) {
+            const solidFill = fills.find((f: any) => f.type === 'SOLID');
+            if (solidFill?.color) {
+                const { r, g, b } = solidFill.color;
+                const toHex = (c: number) => Math.round(c * 255).toString(16).padStart(2, '0');
+                const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+                return { primaryColor: hex, secondaryColor: '#FFFFFF' };
+            }
+        }
+        return defaultTokens;
+    }
+
+    private async processWithAI(pre: PreprocessedData): Promise<PipelineSchema> {
+        if (!this.apiKey || !this.model) throw new Error('Configuração de IA incompleta.');
 
         const endpoint = `${API_BASE_URL}${this.model}:generateContent?key=${this.apiKey}`;
+        const inputPayload = {
+            title: pre.pageTitle,
+            tokens: pre.tokens,
+            nodes: pre.flatNodes
+        };
 
-        const systemPrompt = PIPELINE_GENERATION_PROMPT;
+        const contents = [{
+            parts: [
+                { text: PIPELINE_PROMPT_V3 },
+                { text: `DADOS DE ENTRADA:\n${JSON.stringify(inputPayload)}` }
+            ]
+        }];
 
         const requestBody = {
-            contents: [{
-                parts: [
-                    { text: systemPrompt },
-                    { text: `DADOS DE ENTRADA:\n${JSON.stringify(data)}` }
-                ]
-            }],
+            contents,
             generationConfig: {
                 temperature: 0.2,
                 maxOutputTokens: 8192,
-                response_mime_type: "application/json",
+                response_mime_type: 'application/json'
             }
         };
 
-        let retries = 0;
-        const maxRetries = 3;
-        const baseDelay = 2000; // 2 seconds
-
-        while (true) {
+        const maxRetries = 2;
+        let attempt = 0;
+        while (attempt <= maxRetries) {
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -107,77 +200,132 @@ export class ConversionPipeline {
                 });
 
                 if (!response.ok) {
-                    if (response.status === 429 && retries < maxRetries) {
-                        const delay = baseDelay * Math.pow(2, retries);
-                        console.warn(`[Pipeline] Rate limit exceeded (429). Retrying in ${delay}ms...`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        retries++;
-                        continue;
-                    }
-
-                    const err = await response.json();
-                    throw new GeminiError(`Erro na API Gemini: ${err.error?.message || response.statusText}`);
+                    const errText = await response.text();
+                    throw new GeminiError(`Erro na API Gemini: ${response.status} - ${errText}`);
                 }
 
                 const result = await response.json();
-                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('Resposta vazia da IA.');
 
-                if (!text) throw new Error("Resposta vazia da IA.");
-
-                // Limpeza básica de markdown se a IA desobedecer
-                const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-                return JSON.parse(cleanText) as PipelineSchema;
-
-            } catch (e: any) {
-                if (retries >= maxRetries || (e instanceof GeminiError && !e.message.includes('429'))) {
-                    console.error("Erro no processamento de IA:", e);
-                    throw e;
+                const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                return JSON.parse(clean) as PipelineSchema;
+            } catch (err) {
+                attempt++;
+                if (attempt > maxRetries) {
+                    console.error('[Pipeline] Erro no processamento de IA:', err);
+                    throw err;
                 }
-                // If it's a fetch error (network), we might also want to retry, but for now focusing on 429 logic inside the loop
-                throw e;
+                const delay = 1500 * attempt;
+                console.warn(`[Pipeline] Falha na IA (tentativa ${attempt}). Retentando em ${delay}ms...`);
+                await new Promise(res => setTimeout(res, delay));
             }
         }
+
+        throw new Error('Falha ao processar IA.');
     }
 
-    /**
-     * Valida o schema retornado pela IA
-     */
-    private validateSchema(schema: any): asserts schema is PipelineSchema {
-        if (!schema || typeof schema !== 'object') throw new Error("Schema inválido: Não é um objeto.");
-        if (!schema.page || !schema.sections) throw new Error("Schema inválido: Faltando 'page' ou 'sections'.");
-        if (!Array.isArray(schema.sections)) throw new Error("Schema inválido: 'sections' deve ser um array.");
+    private validateAndNormalize(schema: any): asserts schema is PipelineSchema {
+        if (!schema || typeof schema !== 'object') throw new Error('Schema inválido: não é um objeto.');
 
-        // Validação básica de profundidade
-        schema.sections.forEach((section: any, idx: number) => {
-            if (!section.columns || !Array.isArray(section.columns)) {
-                throw new Error(`Schema inválido na seção ${idx}: 'columns' ausente ou inválido.`);
-            }
+        if (!schema.page || typeof schema.page !== 'object') throw new Error("Schema inválido: campo 'page' ausente.");
+        if (typeof schema.page.title !== 'string') schema.page.title = String(schema.page.title || 'Página importada');
+        if (!schema.page.tokens) schema.page.tokens = {};
+        if (typeof schema.page.tokens.primaryColor !== 'string') schema.page.tokens.primaryColor = '#000000';
+        if (typeof schema.page.tokens.secondaryColor !== 'string') schema.page.tokens.secondaryColor = '#FFFFFF';
+
+        if (!Array.isArray(schema.containers)) {
+            schema.containers = [];
+        }
+        if (schema.containers.length === 0) {
+            schema.containers.push(this.createDefaultContainer());
+        }
+
+        schema.containers = schema.containers.map((container: any, index: number) =>
+            this.normalizeContainer(container, index)
+        );
+    }
+
+    private normalizeContainer(container: any, index: number): PipelineContainer {
+        const normalizeWidget = (w: any): PipelineWidget => {
+            const allowed: PipelineWidget['type'][] = ['heading', 'text', 'button', 'image', 'icon', 'custom'];
+            const type: PipelineWidget['type'] = allowed.includes(w?.type) ? w.type : 'custom';
+            const content = (typeof w?.content === 'string' || w?.content === null) ? w.content : null;
+            const imageId = (typeof w?.imageId === 'string' || w?.imageId === null) ? w.imageId : null;
+            const styles = (w && typeof w.styles === 'object' && !Array.isArray(w.styles)) ? w.styles : {};
+            return { type, content, imageId, styles };
+        };
+
+        const direction: 'row' | 'column' = container?.direction === 'row' ? 'row' : 'column';
+        const width: 'full' | 'boxed' = container?.width === 'boxed' ? 'boxed' : 'full';
+        const styles = (container && typeof container.styles === 'object' && !Array.isArray(container.styles)) ? container.styles : {};
+        const widgets = Array.isArray(container?.widgets) ? container.widgets.map(normalizeWidget) : [];
+        const children = Array.isArray(container?.children)
+            ? container.children.map((c: any, i: number) => this.normalizeContainer(c, i))
+            : [];
+
+        return {
+            id: typeof container?.id === 'string' ? container.id : `container-${index + 1}`,
+            direction,
+            width,
+            styles,
+            widgets,
+            children
+        };
+    }
+
+    private reconcileWithSource(schema: PipelineSchema, flatNodes: SerializedNode[]): void {
+        const allSourceIds = new Set(flatNodes.map(n => n.id));
+        const covered = new Set<string>();
+
+        const markCoveredWidget = (widget: PipelineWidget) => {
+            const sourceId = widget.styles?.sourceId;
+            if (typeof sourceId === 'string') covered.add(sourceId);
+            if (typeof widget.imageId === 'string') covered.add(widget.imageId);
+        };
+
+        const walkContainer = (container: PipelineContainer) => {
+            container.widgets.forEach(markCoveredWidget);
+            container.children.forEach(walkContainer);
+        };
+
+        schema.containers.forEach(walkContainer);
+
+        const missing = [...allSourceIds].filter(id => !covered.has(id));
+        if (missing.length === 0) return;
+
+        if (!schema.containers.length) {
+            schema.containers.push(this.createDefaultContainer());
+        }
+        const target = schema.containers[0];
+
+        missing.forEach(id => {
+            const sourceNode = flatNodes.find(n => n.id === id);
+            const widget: PipelineWidget = {
+                type: 'custom',
+                content: typeof sourceNode?.characters === 'string' ? sourceNode.characters : null,
+                imageId: null,
+                styles: {
+                    sourceId: id,
+                    sourceType: sourceNode?.type,
+                    sourceName: sourceNode?.name
+                }
+            };
+            target.widgets.push(widget);
         });
     }
 
-    /**
-     * Percorre o schema e faz upload das imagens referenciadas
-     */
     private async resolveImages(schema: PipelineSchema): Promise<void> {
-        const processWidget = async (widget: Widget) => {
-            // Se o widget tem um imageId (ID do nó Figma) e é do tipo que suporta imagem
-            if (widget.imageId && (widget.type === 'image' || widget.type === 'imageBox' || widget.type === 'custom')) {
+        const processWidget = async (widget: PipelineWidget) => {
+            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom')) {
                 try {
                     const node = figma.getNodeById(widget.imageId);
                     if (node && (node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'RECTANGLE' || node.type === 'INSTANCE' || node.type === 'COMPONENT')) {
                         console.log(`[Pipeline] Uploading image for widget ${widget.type} (${widget.imageId})...`);
                         const result = await this.imageUploader.uploadToWordPress(node as SceneNode);
-
                         if (result) {
-                            if (widget.type === 'image') {
-                                widget.content = result.url;
-                            } else {
-                                // Para imageBox ou custom, guardamos a URL nos estilos para não sobrescrever o content (texto)
-                                if (!widget.styles) widget.styles = {};
-                                widget.styles.image_url = result.url;
-                            }
-                            widget.imageId = result.id.toString(); // Atualiza para o ID do WP
+                            widget.content = result.url;
+                            widget.imageId = result.id.toString();
                         } else {
                             console.warn(`[Pipeline] Falha no upload da imagem ${widget.imageId}`);
                         }
@@ -186,22 +334,30 @@ export class ConversionPipeline {
                     console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
                 }
             }
+        };
 
-            // Tratamento especial para ícones (se forem vetores complexos, exportar como SVG/Imagem)
-            if (widget.type === 'icon' && widget.imageId) {
-                // Lógica similar se quisermos exportar ícones como imagens
+        const walkContainer = async (container: PipelineContainer) => {
+            for (const widget of container.widgets) {
+                await processWidget(widget);
+            }
+            for (const child of container.children) {
+                await walkContainer(child);
             }
         };
 
-        // Percorre todas as seções e colunas
-        for (const section of schema.sections) {
-            for (const column of section.columns) {
-                for (const widget of column.widgets) {
-                    await processWidget(widget);
-                }
-            }
+        for (const container of schema.containers) {
+            await walkContainer(container);
         }
     }
+
+    private createDefaultContainer(): PipelineContainer {
+        return {
+            id: 'container-1',
+            direction: 'column',
+            width: 'full',
+            styles: {},
+            widgets: [],
+            children: []
+        };
+    }
 }
-
-

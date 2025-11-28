@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Figma → Elementor Sidebar</title>
+  <link rel="stylesheet" href="../tokens.css">
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <div class="sidebar-app">
+    <aside class="sidebar">
+      <div class="logo">F2E</div>
+      <nav>
+        <button class="nav-btn active" data-panel="layout">Layout</button>
+        <button class="nav-btn" data-panel="ai">IA</button>
+        <button class="nav-btn" data-panel="wp">WordPress</button>
+        <button class="nav-btn" data-panel="help">Ajuda</button>
+      </nav>
+    </aside>
+    <section class="content">
+      <div class="section">
+        <div class="section-title">Ações rápidas</div>
+        <div class="section-body">
+          <button class="btn primary">Gerar JSON</button>
+          <button class="btn">Inspecionar</button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Configurações</div>
+        <div class="section-body">
+          <label class="input-label">API Key</label>
+          <input type="text" placeholder="Gemini API Key">
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

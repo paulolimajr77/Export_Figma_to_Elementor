@@ -1,9 +1,5 @@
 import type { ElementorSettings, GeometryNode } from '../types/elementor.types';
-import { convertColor } from '../utils/colors';
 
-/**
- * Type guards para verificar propriedades dos nós
- */
 function hasStrokes(node: SceneNode): node is GeometryNode {
     return 'strokes' in node;
 }
@@ -16,21 +12,16 @@ function hasCornerRadius(node: SceneNode): node is FrameNode | RectangleNode | C
     return 'cornerRadius' in node || 'topLeftRadius' in node;
 }
 
-
-
 /**
- * Extrai estilos de borda de um nó
- * @param node Nó do Figma
- * @returns Settings de borda do Elementor
+ * Extrai borda (stroke) de forma direta.
  */
 export function extractBorderStyles(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
 
-    // Extrai stroke (borda)
     if (hasStrokes(node) && Array.isArray(node.strokes) && node.strokes.length > 0) {
         const stroke = node.strokes[0];
         if (stroke.type === 'SOLID') {
-            settings.border_color = convertColor(stroke);
+            settings.border_color = rgbaFromSolid(stroke);
             settings.border_border = 'solid';
 
             if ((node as any).strokeWeight !== figma.mixed) {
@@ -47,7 +38,6 @@ export function extractBorderStyles(node: SceneNode): ElementorSettings {
         }
     }
 
-    // Extrai border radius
     const radiusSettings = extractCornerRadius(node);
     Object.assign(settings, radiusSettings);
 
@@ -55,9 +45,7 @@ export function extractBorderStyles(node: SceneNode): ElementorSettings {
 }
 
 /**
- * Extrai border radius de um nó
- * @param node Nó do Figma
- * @returns Settings de border radius
+ * Extrai corner radius (uniforme ou individual).
  */
 export function extractCornerRadius(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
@@ -66,7 +54,6 @@ export function extractCornerRadius(node: SceneNode): ElementorSettings {
         const anyNode: any = node;
 
         if (anyNode.cornerRadius !== figma.mixed && typeof anyNode.cornerRadius === 'number') {
-            // Border radius uniforme
             const r = anyNode.cornerRadius;
             settings.border_radius = {
                 unit: 'px',
@@ -77,7 +64,6 @@ export function extractCornerRadius(node: SceneNode): ElementorSettings {
                 isLinked: true
             };
         } else {
-            // Border radius individual por canto
             settings.border_radius = {
                 unit: 'px',
                 top: anyNode.topLeftRadius || 0,
@@ -93,9 +79,7 @@ export function extractCornerRadius(node: SceneNode): ElementorSettings {
 }
 
 /**
- * Extrai sombras (drop shadow) de um nó
- * @param node Nó do Figma
- * @returns Settings de sombra do Elementor
+ * Extrai sombras drop shadow (se existir).
  */
 export function extractShadows(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
@@ -122,9 +106,7 @@ export function extractShadows(node: SceneNode): ElementorSettings {
 }
 
 /**
- * Extrai opacidade de um nó
- * @param node Nó do Figma
- * @returns Settings de opacidade
+ * Extrai opacidade direta.
  */
 export function extractOpacity(node: SceneNode): ElementorSettings {
     if ('opacity' in node && node.opacity !== 1) {
@@ -134,9 +116,7 @@ export function extractOpacity(node: SceneNode): ElementorSettings {
 }
 
 /**
- * Extrai transformações (rotação) de um nó
- * @param node Nó do Figma
- * @returns Settings de transformação
+ * Extrai rotação direta.
  */
 export function extractTransform(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
@@ -147,4 +127,10 @@ export function extractTransform(node: SceneNode): ElementorSettings {
     }
 
     return settings;
+}
+
+function rgbaFromSolid(paint: SolidPaint): string {
+    const { r, g, b } = paint.color;
+    const a = typeof paint.opacity === 'number' ? paint.opacity : 1;
+    return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
 }

@@ -94,7 +94,7 @@ FORMATO DE SA\xCDDA:
   }
 }`;
   }
-  var ANALYZE_RECREATE_PROMPT, PIPELINE_GENERATION_PROMPT;
+  var ANALYZE_RECREATE_PROMPT;
   var init_prompts = __esm({
     "src/config/prompts.ts"() {
       ANALYZE_RECREATE_PROMPT = `
@@ -251,94 +251,6 @@ DEPOIS (Layout Otimizado - O que voc\xEA deve gerar):
   ]
 }
 \`\`\`
-`;
-      PIPELINE_GENERATION_PROMPT = `
-Voc\xEA \xE9 um assistente especializado em organiza\xE7\xE3o de \xE1rvores de layout para Elementor.
-
-Receber\xE1 um JSON contendo nodes extra\xEDdos do Figma, j\xE1 com:
-- nome do node
-- tipo
-- fills
-- textos
-- children
-- estilos b\xE1sicos
-- propor\xE7\xF5es
-- dimens\xF5es
-
-Sua \xFAnica tarefa \xE9:
-\u2192 ORGANIZAR esses nodes em um schema intermedi\xE1rio v\xE1lido.
-
-N\xC3O CLASSIFIQUE widgets visualmente.
-N\xC3O ignore nodes.
-N\xC3O descarte children.
-N\xC3O adivinhe a inten\xE7\xE3o do design.
-
-Use APENAS a estrutura da \xE1rvore recebida.
-
-=======================
-OUTPUT OBRIGAT\xD3RIO
-=======================
-
-Retorne um JSON no seguinte formato:
-
-{
-  "page": {
-    "title": "<nome do frame raiz>",
-    "tokens": {
-      "primaryColor": "#000000",
-      "secondaryColor": "#000000"
-    }
-  },
-  "sections": [ ... ]
-}
-
-Cada se\xE7\xE3o \xE9:
-
-{
-  "id": "string",
-  "type": "custom",
-  "width": "full" ou "boxed",
-  "background": {},
-  "columns": [
-    {
-      "span": 12,
-      "widgets": [ ... ]
-    }
-  ]
-}
-
-Cada widget \xE9:
-
-{
-  "type": "heading | text | image | button | icon | custom",
-  "content": "texto ou url ou null",
-  "imageId": "id da imagem se houver",
-  "styles": { opcional }
-}
-
-SEM DECIS\xD5ES VISUAIS.
-SEM HEUR\xCDSTICAS COMPLEXAS.
-
-=======================
-REGRAS CR\xCDTICAS
-=======================
-
-1. NUNCA ignore um node com texto.  
-2. NUNCA ignore imagens.  
-3. Se n\xE3o souber classificar \u2192 type = "custom".  
-4. Column sempre come\xE7a com span 12.  
-   (Meu compilador calcula spans depois.)
-5. Cada child do frame vira um widget.  
-6. NUNCA invente estilos.  
-7. NUNCA agrupe nodes diferentes em um widget \xFAnico.  
-8. NUNCA tente identificar imageBox/iconBox aqui.  
-   (Isso \xE9 feito no est\xE1gio de otimiza\xE7\xE3o.)
-
-=======================
-META
-=======================
-
-Sua fun\xE7\xE3o \xE9: organizar, n\xE3o interpretar.
 `;
     }
   });
@@ -1720,14 +1632,63 @@ ${content}` });
   });
 
   // src/pipeline.ts
-  var ConversionPipeline;
+  var PIPELINE_PROMPT_V2, ConversionPipeline;
   var init_pipeline = __esm({
     "src/pipeline.ts"() {
       init_serialization_utils();
       init_api_gemini();
-      init_prompts();
       init_elementor_compiler();
       init_uploader();
+      PIPELINE_PROMPT_V2 = `
+Voc\xEA \xE9 um assistente que organiza \xE1rvores Figma em um SCHEMA INTERMEDI\xC1RIO FIXO.
+
+REGRAS INEGOCI\xC1VEIS:
+- NENHUM node pode ser ignorado. Cada node de entrada vira um widget.
+- N\xE3o agrupe nodes diferentes em um \xFAnico widget.
+- N\xE3o invente spans, grids ou heur\xEDsticas visuais.
+- N\xE3o classifique por apar\xEAncia; use apenas os dados fornecidos.
+- Se n\xE3o souber o tipo, use "custom".
+- Sempre inclua styles.sourceId com o id do node original.
+- Widgets permitidos: heading | text | button | image | icon | custom
+- Section.type \xE9 SEMPRE "custom".
+- Column.span \xE9 SEMPRE 12.
+- Sections devem ter, no m\xEDnimo, uma coluna span 12.
+
+BACKGROUND: apenas { color?, image?, gradient? }
+TOKENS: page.tokens.primaryColor e secondaryColor s\xE3o obrigat\xF3rios. Se n\xE3o houver cor detect\xE1vel, use "#000000" e "#FFFFFF".
+
+SA\xCDDA OBRIGAT\xD3RIA:
+{
+  "page": { "title": "<string>", "tokens": { "primaryColor": "<hex>", "secondaryColor": "<hex>" } },
+  "sections": [
+    {
+      "id": "<string>",
+      "type": "custom",
+      "width": "full" | "boxed",
+      "background": { "color"?: "<hex|rgba>", "image"?: "<string>", "gradient"?: "<string>" },
+      "columns": [
+        {
+          "span": 12,
+          "widgets": [
+            {
+              "type": "heading" | "text" | "button" | "image" | "icon" | "custom",
+              "content": "<string|null>",
+              "imageId": "<string|null>",
+              "styles": { "sourceId": "<node-id>", ...outros_campos_opcionais }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+ENTRADA:
+- Uma lista linear de TODOS os nodes serializados do Figma (com propriedades).
+- O t\xEDtulo sugerido da p\xE1gina.
+
+RESPONDA APENAS COM JSON V\xC1LIDO, sem markdown.
+`;
       ConversionPipeline = class {
         constructor() {
           this.apiKey = null;
@@ -1737,29 +1698,33 @@ ${content}` });
         }
         /**
          * Executa o pipeline completo
-         * @param node Nó raiz do Figma a ser convertido
          */
         run(_0) {
           return __async(this, arguments, function* (node, wpConfig = {}) {
             this.compiler.setWPConfig(wpConfig);
             this.imageUploader.setWPConfig(wpConfig);
             yield this.loadConfig();
-            console.log("[Pipeline] 1. Extraindo dados do n\xF3...");
-            const serializedData = serializeNode(node);
+            console.log("[Pipeline] 1. Pr\xE9-processando n\xF3...");
+            const preprocessed = this.preprocess(node);
             console.log("[Pipeline] 2. Enviando para IA...");
-            const intermediateSchema = yield this.processWithAI(serializedData);
+            const intermediate = yield this.processWithAI(preprocessed);
             console.log("[Pipeline] 3. Validando schema...");
-            this.validateSchema(intermediateSchema);
-            console.log("[Pipeline] 3.1 Resolvendo imagens...");
-            yield this.resolveImages(intermediateSchema);
-            console.log("[Pipeline] 4. Compilando para Elementor...");
-            const elementorJson = this.compiler.compile(intermediateSchema);
+            this.validateAndNormalize(intermediate);
+            console.log("[Pipeline] 4. Reconciliando nodes...");
+            this.reconcileWithSource(intermediate, preprocessed.flatNodes);
+            console.log("[Pipeline] 5. Resolvendo imagens...");
+            yield this.resolveImages(intermediate);
+            console.log("[Pipeline] 6. Compilando para Elementor...");
+            const elementorJson = this.compiler.compile(intermediate);
             if (wpConfig.url) {
               elementorJson.siteurl = wpConfig.url;
             }
             return elementorJson;
           });
         }
+        /**
+         * Carrega configs do Gemini
+         */
         loadConfig() {
           return __async(this, null, function* () {
             this.apiKey = yield getKey();
@@ -1767,35 +1732,90 @@ ${content}` });
             if (!this.apiKey) {
               throw new Error("API Key n\xE3o configurada. Por favor, configure na aba 'IA Gemini'.");
             }
+            if (!this.model) {
+              throw new Error("Modelo do Gemini n\xE3o configurado.");
+            }
           });
         }
         /**
-         * Envia os dados para a IA e retorna o Schema Intermediário
+         * Pré-processa o node Figma para gerar insumos da IA
          */
-        processWithAI(data) {
+        preprocess(node) {
+          const serializedRoot = serializeNode(node);
+          const flatNodes = this.flatten(serializedRoot);
+          const tokens = this.deriveTokens(serializedRoot);
+          return {
+            pageTitle: serializedRoot.name || "P\xE1gina importada",
+            tokens,
+            serializedRoot,
+            flatNodes
+          };
+        }
+        /**
+         * Achata a árvore serializada em uma lista
+         */
+        flatten(root) {
+          const acc = [];
+          const walk = (n) => {
+            acc.push(n);
+            if (Array.isArray(n.children)) {
+              n.children.forEach((child) => walk(child));
+            }
+          };
+          walk(root);
+          return acc;
+        }
+        /**
+         * Deriva cores principais (fallback seguro)
+         */
+        deriveTokens(serializedRoot) {
+          const defaultTokens = { primaryColor: "#000000", secondaryColor: "#FFFFFF" };
+          const fills = serializedRoot.fills;
+          if (Array.isArray(fills) && fills.length > 0) {
+            const solidFill = fills.find((f) => f.type === "SOLID");
+            if (solidFill == null ? void 0 : solidFill.color) {
+              const { r, g, b } = solidFill.color;
+              const toHex = (c) => {
+                const h = Math.round(c * 255).toString(16).padStart(2, "0");
+                return h;
+              };
+              const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+              return { primaryColor: hex, secondaryColor: "#FFFFFF" };
+            }
+          }
+          return defaultTokens;
+        }
+        /**
+         * Monta a requisição e chama a IA
+         */
+        processWithAI(pre) {
           return __async(this, null, function* () {
-            var _a, _b, _c, _d, _e, _f;
+            var _a, _b, _c, _d, _e;
             if (!this.apiKey || !this.model) throw new Error("Configura\xE7\xE3o de IA incompleta.");
             const endpoint = `${API_BASE_URL}${this.model}:generateContent?key=${this.apiKey}`;
-            const systemPrompt = PIPELINE_GENERATION_PROMPT;
+            const inputPayload = {
+              title: pre.pageTitle,
+              tokens: pre.tokens,
+              nodes: pre.flatNodes
+            };
+            const contents = [{
+              parts: [
+                { text: PIPELINE_PROMPT_V2 },
+                { text: `DADOS DE ENTRADA:
+${JSON.stringify(inputPayload)}` }
+              ]
+            }];
             const requestBody = {
-              contents: [{
-                parts: [
-                  { text: systemPrompt },
-                  { text: `DADOS DE ENTRADA:
-${JSON.stringify(data)}` }
-                ]
-              }],
+              contents,
               generationConfig: {
                 temperature: 0.2,
                 maxOutputTokens: 8192,
                 response_mime_type: "application/json"
               }
             };
-            let retries = 0;
-            const maxRetries = 3;
-            const baseDelay = 2e3;
-            while (true) {
+            const maxRetries = 2;
+            let attempt = 0;
+            while (attempt <= maxRetries) {
               try {
                 const response = yield fetch(endpoint, {
                   method: "POST",
@@ -1803,63 +1823,143 @@ ${JSON.stringify(data)}` }
                   body: JSON.stringify(requestBody)
                 });
                 if (!response.ok) {
-                  if (response.status === 429 && retries < maxRetries) {
-                    const delay = baseDelay * Math.pow(2, retries);
-                    console.warn(`[Pipeline] Rate limit exceeded (429). Retrying in ${delay}ms...`);
-                    yield new Promise((resolve) => setTimeout(resolve, delay));
-                    retries++;
-                    continue;
-                  }
-                  const err = yield response.json();
-                  throw new GeminiError(`Erro na API Gemini: ${((_a = err.error) == null ? void 0 : _a.message) || response.statusText}`);
+                  const errText = yield response.text();
+                  throw new GeminiError(`Erro na API Gemini: ${response.status} - ${errText}`);
                 }
                 const result = yield response.json();
-                const text = (_f = (_e = (_d = (_c = (_b = result.candidates) == null ? void 0 : _b[0]) == null ? void 0 : _c.content) == null ? void 0 : _d.parts) == null ? void 0 : _e[0]) == null ? void 0 : _f.text;
+                const text = (_e = (_d = (_c = (_b = (_a = result == null ? void 0 : result.candidates) == null ? void 0 : _a[0]) == null ? void 0 : _b.content) == null ? void 0 : _c.parts) == null ? void 0 : _d[0]) == null ? void 0 : _e.text;
                 if (!text) throw new Error("Resposta vazia da IA.");
-                const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-                return JSON.parse(cleanText);
-              } catch (e) {
-                if (retries >= maxRetries || e instanceof GeminiError && !e.message.includes("429")) {
-                  console.error("Erro no processamento de IA:", e);
-                  throw e;
+                const clean = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+                return JSON.parse(clean);
+              } catch (err) {
+                attempt++;
+                if (attempt > maxRetries) {
+                  console.error("[Pipeline] Erro no processamento de IA:", err);
+                  throw err;
                 }
-                throw e;
+                const delay = 1500 * attempt;
+                console.warn(`[Pipeline] Falha na IA (tentativa ${attempt}). Retentando em ${delay}ms...`);
+                yield new Promise((res) => setTimeout(res, delay));
               }
             }
+            throw new Error("Falha ao processar IA.");
           });
         }
         /**
-         * Valida o schema retornado pela IA
+         * Valida e normaliza o schema recebido
          */
-        validateSchema(schema) {
-          if (!schema || typeof schema !== "object") throw new Error("Schema inv\xE1lido: N\xE3o \xE9 um objeto.");
-          if (!schema.page || !schema.sections) throw new Error("Schema inv\xE1lido: Faltando 'page' ou 'sections'.");
-          if (!Array.isArray(schema.sections)) throw new Error("Schema inv\xE1lido: 'sections' deve ser um array.");
-          schema.sections.forEach((section, idx) => {
-            if (!section.columns || !Array.isArray(section.columns)) {
-              throw new Error(`Schema inv\xE1lido na se\xE7\xE3o ${idx}: 'columns' ausente ou inv\xE1lido.`);
-            }
+        validateAndNormalize(schema) {
+          if (!schema || typeof schema !== "object") throw new Error("Schema inv\xE1lido: n\xE3o \xE9 um objeto.");
+          if (!schema.page || typeof schema.page !== "object") throw new Error("Schema inv\xE1lido: campo 'page' ausente.");
+          if (typeof schema.page.title !== "string") schema.page.title = String(schema.page.title || "P\xE1gina importada");
+          if (!schema.page.tokens) schema.page.tokens = {};
+          if (typeof schema.page.tokens.primaryColor !== "string") schema.page.tokens.primaryColor = "#000000";
+          if (typeof schema.page.tokens.secondaryColor !== "string") schema.page.tokens.secondaryColor = "#FFFFFF";
+          if (!Array.isArray(schema.sections)) {
+            schema.sections = [];
+          }
+          if (schema.sections.length === 0) {
+            schema.sections.push(this.createDefaultSection(schema.page.title));
+          }
+          schema.sections = schema.sections.map((section, index) => {
+            const normalized = {
+              id: typeof section.id === "string" ? section.id : `section-${index + 1}`,
+              type: "custom",
+              width: section.width === "boxed" ? "boxed" : "full",
+              background: this.normalizeBackground(section.background),
+              columns: Array.isArray(section.columns) && section.columns.length > 0 ? section.columns.map((col) => this.normalizeColumn(col)) : [this.createDefaultColumn()]
+            };
+            return normalized;
           });
         }
         /**
-         * Percorre o schema e faz upload das imagens referenciadas
+         * Normaliza background
+         */
+        normalizeBackground(bg) {
+          const normalized = {};
+          if (bg && typeof bg === "object") {
+            if (typeof bg.color === "string") normalized.color = bg.color;
+            if (typeof bg.image === "string") normalized.image = bg.image;
+            if (typeof bg.gradient === "string") normalized.gradient = bg.gradient;
+          }
+          return normalized;
+        }
+        /**
+         * Normaliza coluna (span fixo em 12)
+         */
+        normalizeColumn(col) {
+          const widgets = Array.isArray(col == null ? void 0 : col.widgets) ? col.widgets : [];
+          return {
+            span: 12,
+            widgets: widgets.map((w) => this.normalizeWidget(w))
+          };
+        }
+        /**
+         * Normaliza widget dentro das regras de tipos
+         */
+        normalizeWidget(w) {
+          const allowed = ["heading", "text", "button", "image", "icon", "custom"];
+          const type = allowed.includes(w == null ? void 0 : w.type) ? w.type : "custom";
+          const content = typeof (w == null ? void 0 : w.content) === "string" || (w == null ? void 0 : w.content) === null ? w.content : null;
+          const imageId = typeof (w == null ? void 0 : w.imageId) === "string" || (w == null ? void 0 : w.imageId) === null ? w.imageId : null;
+          const styles = w && typeof w.styles === "object" && !Array.isArray(w.styles) ? w.styles : {};
+          return { type, content, imageId, styles };
+        }
+        /**
+         * Garante que todos os nodes de origem estejam representados no schema (1:1)
+         */
+        reconcileWithSource(schema, flatNodes) {
+          const allSourceIds = new Set(flatNodes.map((n) => n.id));
+          const covered = /* @__PURE__ */ new Set();
+          const markCovered = (widget) => {
+            var _a;
+            const sourceId = (_a = widget.styles) == null ? void 0 : _a.sourceId;
+            if (typeof sourceId === "string") covered.add(sourceId);
+            if (typeof widget.imageId === "string") covered.add(widget.imageId);
+          };
+          schema.sections.forEach((section) => {
+            section.columns.forEach((col) => {
+              col.widgets.forEach(markCovered);
+            });
+          });
+          const missing = [...allSourceIds].filter((id) => !covered.has(id));
+          if (missing.length === 0) return;
+          if (!schema.sections.length) {
+            schema.sections.push(this.createDefaultSection(schema.page.title));
+          }
+          const targetColumn = schema.sections[0].columns[0] || this.createDefaultColumn();
+          if (!schema.sections[0].columns.length) {
+            schema.sections[0].columns.push(targetColumn);
+          }
+          missing.forEach((id) => {
+            const sourceNode = flatNodes.find((n) => n.id === id);
+            const widget = {
+              type: "custom",
+              content: typeof (sourceNode == null ? void 0 : sourceNode.characters) === "string" ? sourceNode.characters : null,
+              imageId: null,
+              styles: {
+                sourceId: id,
+                sourceType: sourceNode == null ? void 0 : sourceNode.type,
+                sourceName: sourceNode == null ? void 0 : sourceNode.name
+              }
+            };
+            targetColumn.widgets.push(widget);
+          });
+        }
+        /**
+         * Upload/resolve imagens referenciadas
          */
         resolveImages(schema) {
           return __async(this, null, function* () {
             const processWidget = (widget) => __async(this, null, function* () {
-              if (widget.imageId && (widget.type === "image" || widget.type === "imageBox" || widget.type === "custom")) {
+              if (widget.imageId && (widget.type === "image" || widget.type === "custom")) {
                 try {
                   const node = figma.getNodeById(widget.imageId);
                   if (node && (node.type === "FRAME" || node.type === "GROUP" || node.type === "RECTANGLE" || node.type === "INSTANCE" || node.type === "COMPONENT")) {
                     console.log(`[Pipeline] Uploading image for widget ${widget.type} (${widget.imageId})...`);
                     const result = yield this.imageUploader.uploadToWordPress(node);
                     if (result) {
-                      if (widget.type === "image") {
-                        widget.content = result.url;
-                      } else {
-                        if (!widget.styles) widget.styles = {};
-                        widget.styles.image_url = result.url;
-                      }
+                      widget.content = result.url;
                       widget.imageId = result.id.toString();
                     } else {
                       console.warn(`[Pipeline] Falha no upload da imagem ${widget.imageId}`);
@@ -1868,8 +1968,6 @@ ${JSON.stringify(data)}` }
                 } catch (e) {
                   console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
                 }
-              }
-              if (widget.type === "icon" && widget.imageId) {
               }
             });
             for (const section of schema.sections) {
@@ -1880,6 +1978,18 @@ ${JSON.stringify(data)}` }
               }
             }
           });
+        }
+        createDefaultSection(title) {
+          return {
+            id: "section-1",
+            type: "custom",
+            width: "full",
+            background: {},
+            columns: [this.createDefaultColumn()]
+          };
+        }
+        createDefaultColumn() {
+          return { span: 12, widgets: [] };
         }
       };
     }

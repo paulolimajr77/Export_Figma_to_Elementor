@@ -1,0 +1,42 @@
+@import url('../../tokens.css');
+
+.app {
+  max-width: 850px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-panel);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: none;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 160ms, transform 160ms;
+}
+.tab-btn:hover { transform: scale(1.03); }
+.tab-btn.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
+.tab-contents { padding: 16px; }
+.panel { background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--color-radius); padding: 16px; margin-bottom: 16px; }
+.panel-header { font-weight: 700; margin-bottom: 10px; }
+.actions-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 10px; }
+.actions-row { display: flex; gap: 10px; margin-top: 10px; }
+.btn { border: 1px solid var(--color-border); background: #eef1f6; color: var(--color-text); border-radius: var(--color-radius); padding: 10px 12px; font-weight: 600; cursor: pointer; }
+.btn.primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.btn.secondary { background: #fff; }
+.input-label { display: block; margin: 10px 0 6px; font-weight: 600; color: var(--color-text-secondary); }
+input[type="text"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--color-radius); background: #fff; color: var(--color-text); }
+.checkbox { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: var(--color-text-secondary); }
+.help-list { margin: 0; padding-left: 18px; line-height: 1.6; color: var(--color-text-secondary); }
