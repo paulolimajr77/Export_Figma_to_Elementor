@@ -8,10 +8,6 @@ function hasFills(node: SceneNode): node is GeometryNode {
     return 'fills' in node;
 }
 
-function isArray(value: any): value is ReadonlyArray<any> {
-    return Array.isArray(value);
-}
-
 /**
  * Interface para uploader de imagens (para evitar dependência circular)
  */
@@ -32,7 +28,7 @@ export async function extractBackgroundAdvanced(
 ): Promise<ElementorSettings> {
     const settings: ElementorSettings = {};
 
-    if (!hasFills(node) || !isArray(node.fills) || node.fills.length === 0) {
+    if (!hasFills(node) || !Array.isArray(node.fills) || node.fills.length === 0) {
         return settings;
     }
 
@@ -126,7 +122,7 @@ export async function extractBackgroundAdvanced(
 export function extractBackgroundColor(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
 
-    if (!hasFills(node) || !isArray(node.fills) || node.fills.length === 0) {
+    if (!hasFills(node) || !Array.isArray(node.fills) || node.fills.length === 0) {
         return settings;
     }
 

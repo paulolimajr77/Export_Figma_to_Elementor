@@ -62,1419 +62,6 @@
     });
   };
 
-  // src/utils/guid.ts
-  function generateGUID() {
-    return "xxxxxxxxxx".replace(/[x]/g, () => (Math.random() * 36 | 0).toString(36));
-  }
-  function stripWidgetPrefix(name) {
-    return name.replace(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i, "").trim();
-  }
-  var init_guid = __esm({
-    "src/utils/guid.ts"() {
-    }
-  });
-
-  // src/utils/geometry.ts
-  function detectRelativePosition(source, target) {
-    if (!source.absoluteBoundingBox || !target.absoluteBoundingBox) return "top";
-    const b1 = source.absoluteBoundingBox;
-    const b2 = target.absoluteBoundingBox;
-    const c1 = { x: b1.x + b1.width / 2, y: b1.y + b1.height / 2 };
-    const c2 = { x: b2.x + b2.width / 2, y: b2.y + b2.height / 2 };
-    const dx = c1.x - c2.x;
-    const dy = c1.y - c2.y;
-    if (Math.abs(dy) > Math.abs(dx)) {
-      return "top";
-    } else {
-      return dx < 0 ? "left" : "right";
-    }
-  }
-  var init_geometry = __esm({
-    "src/utils/geometry.ts"() {
-    }
-  });
-
-  // src/utils/hash.ts
-  function computeHash(bytes) {
-    return __async(this, null, function* () {
-      const chrsz = 8;
-      function rol(num, cnt) {
-        return num << cnt | num >>> 32 - cnt;
-      }
-      function safe_add(x, y) {
-        const lsw = (x & 65535) + (y & 65535);
-        const msw = (x >> 16) + (y >> 16) + (lsw >> 16);
-        return msw << 16 | lsw & 65535;
-      }
-      function sha1_ft(t, b, c, d) {
-        if (t < 20) return b & c | ~b & d;
-        if (t < 40) return b ^ c ^ d;
-        if (t < 60) return b & c | b & d | c & d;
-        return b ^ c ^ d;
-      }
-      function sha1_kt(t) {
-        return t < 20 ? 1518500249 : t < 40 ? 1859775393 : t < 60 ? -1894007588 : -899497514;
-      }
-      function core_sha1(x, len) {
-        x[len >> 5] |= 128 << 24 - len % 32;
-        x[(len + 64 >> 9 << 4) + 15] = len;
-        const w = Array(80);
-        let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878, e = -1009589776;
-        for (let i = 0; i < x.length; i += 16) {
-          const olda = a, oldb = b, oldc = c, oldd = d, olde = e;
-          for (let j = 0; j < 80; j++) {
-            if (j < 16) w[j] = x[i + j];
-            else w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
-            const t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)), safe_add(safe_add(e, w[j]), sha1_kt(j)));
-            e = d;
-            d = c;
-            c = rol(b, 30);
-            b = a;
-            a = t;
-          }
-          a = safe_add(a, olda);
-          b = safe_add(b, oldb);
-          c = safe_add(c, oldc);
-          d = safe_add(d, oldd);
-          e = safe_add(e, olde);
-        }
-        return [a, b, c, d, e];
-      }
-      function binb2hex(binarray) {
-        const hex_tab = "0123456789abcdef";
-        let str = "";
-        for (let i = 0; i < binarray.length * 4; i++) {
-          str += hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 + 4 & 15) + hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 & 15);
-        }
-        return str;
-      }
-      function bytesToWords(bytes2) {
-        const words = [];
-        for (let i = 0; i < bytes2.length; i++) {
-          words[i >>> 2] |= (bytes2[i] & 255) << 24 - i % 4 * 8;
-        }
-        return words;
-      }
-      return binb2hex(core_sha1(bytesToWords(bytes), bytes.length * 8));
-    });
-  }
-  var init_hash = __esm({
-    "src/utils/hash.ts"() {
-    }
-  });
-
-  // src/media/image.exporter.ts
-  function exportNodeAsImage(node, format, quality = 0.85) {
-    return __async(this, null, function* () {
-      try {
-        if (format === "SVG") {
-          const bytes2 = yield node.exportAsync({ format: "SVG" });
-          return { bytes: bytes2, mime: "image/svg+xml", ext: "svg" };
-        }
-        if (format === "WEBP") {
-          const bytes2 = yield node.exportAsync({
-            format: "PNG",
-            constraint: { type: "SCALE", value: 2 }
-          });
-          return { bytes: bytes2, mime: "image/png", ext: "webp", needsConversion: true };
-        }
-        if (format === "JPG") {
-          const bytes2 = yield node.exportAsync({
-            format: "JPG",
-            constraint: { type: "SCALE", value: 2 }
-          });
-          return { bytes: bytes2, mime: "image/jpeg", ext: "jpg" };
-        }
-        const bytes = yield node.exportAsync({
-          format: "PNG",
-          constraint: { type: "SCALE", value: 2 }
-        });
-        return { bytes, mime: "image/png", ext: "png" };
-      } catch (e) {
-        console.error(`[F2E] Failed to export image for "${node.name}" (${node.id}):`, e);
-        return null;
-      }
-    });
-  }
-  var init_image_exporter = __esm({
-    "src/media/image.exporter.ts"() {
-    }
-  });
-
-  // src/media/uploader.ts
-  var ImageUploader;
-  var init_uploader = __esm({
-    "src/media/uploader.ts"() {
-      init_hash();
-      init_guid();
-      init_image_exporter();
-      ImageUploader = class {
-        constructor(wpConfig, quality = 0.85) {
-          this.pendingUploads = /* @__PURE__ */ new Map();
-          this.mediaHashCache = /* @__PURE__ */ new Map();
-          this.nodeHashCache = /* @__PURE__ */ new Map();
-          this.quality = 0.85;
-          this.wpConfig = wpConfig;
-          this.quality = quality;
-        }
-        /**
-         * Faz upload de uma imagem para o WordPress
-         * @param node Nó do Figma a ser exportado
-         * @param format Formato da imagem
-         * @returns Objeto com URL e ID da imagem no WordPress ou null
-         */
-        uploadToWordPress(node, format = "WEBP") {
-          return __async(this, null, function* () {
-            if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
-              console.warn("[F2E] WP config ausente.");
-              return null;
-            }
-            try {
-              const targetFormat = format === "SVG" ? "SVG" : "WEBP";
-              const result = yield exportNodeAsImage(node, targetFormat, this.quality);
-              if (!result) return null;
-              const { bytes, mime, ext, needsConversion } = result;
-              const hash = yield computeHash(bytes);
-              if (this.mediaHashCache.has(hash)) {
-                return this.mediaHashCache.get(hash);
-              }
-              this.nodeHashCache.set(node.id, hash);
-              const id = generateGUID();
-              const safeId = node.id.replace(/[^a-z0-9]/gi, "_");
-              const name = `w_${safeId}_${hash}.${ext}`;
-              return new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                  if (this.pendingUploads.has(id)) {
-                    this.pendingUploads.delete(id);
-                    resolve(null);
-                  }
-                }, 9e4);
-                this.pendingUploads.set(id, (result2) => {
-                  clearTimeout(timeout);
-                  if (result2.success) {
-                    console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}, ID: ${result2.wpId}`);
-                    const mediaData = { url: result2.url, id: result2.wpId || 0 };
-                    this.mediaHashCache.set(hash, mediaData);
-                    resolve(mediaData);
-                  } else {
-                    console.error(`[ImageUploader] Falha no upload:`, result2.error);
-                    resolve(null);
-                  }
-                });
-                figma.ui.postMessage({
-                  type: "upload-image-request",
-                  id,
-                  name,
-                  mimeType: mime,
-                  targetMimeType: "image/webp",
-                  data: bytes,
-                  needsConversion: !!needsConversion
-                });
-              });
-            } catch (e) {
-              console.error("Error preparing upload:", e);
-              return null;
-            }
-          });
-        }
-        /**
-         * Processa resposta de upload da UI
-         * @param id ID do upload
-         * @param result Resultado do upload
-         */
-        handleUploadResponse(id, result) {
-          const resolver = this.pendingUploads.get(id);
-          if (resolver) {
-            resolver(result);
-            this.pendingUploads.delete(id);
-          } else {
-            console.warn(`[ImageUploader] Nenhuma promessa pendente encontrada para ${id}`);
-          }
-        }
-        /**
-         * Atualiza a qualidade de exportação
-         * @param quality Nova qualidade (0.1 a 1.0)
-         */
-        setQuality(quality) {
-          this.quality = Math.max(0.1, Math.min(1, quality));
-        }
-        /**
-         * Atualiza a configuração do WordPress
-         * @param wpConfig Nova configuração
-         */
-        setWPConfig(wpConfig) {
-          this.wpConfig = wpConfig;
-        }
-        /**
-         * Limpa o cache de hashes
-         */
-        clearCache() {
-          this.mediaHashCache.clear();
-          this.nodeHashCache.clear();
-        }
-      };
-    }
-  });
-
-  // src/utils/colors.ts
-  function convertColor(paint) {
-    if (!paint || paint.type !== "SOLID") return "";
-    const { r, g, b } = paint.color;
-    const a = paint.opacity !== void 0 ? paint.opacity : 1;
-    return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
-  }
-  var init_colors = __esm({
-    "src/utils/colors.ts"() {
-    }
-  });
-
-  // src/extractors/styles.extractor.ts
-  function hasStrokes(node) {
-    return "strokes" in node;
-  }
-  function hasEffects(node) {
-    return "effects" in node;
-  }
-  function hasCornerRadius(node) {
-    return "cornerRadius" in node || "topLeftRadius" in node;
-  }
-  function isArray(value) {
-    return Array.isArray(value);
-  }
-  function extractBorderStyles(node) {
-    const settings = {};
-    if (hasStrokes(node) && isArray(node.strokes) && node.strokes.length > 0) {
-      const stroke = node.strokes[0];
-      if (stroke.type === "SOLID") {
-        settings.border_color = convertColor(stroke);
-        settings.border_border = "solid";
-        if (node.strokeWeight !== figma.mixed) {
-          const w = node.strokeWeight;
-          settings.border_width = {
-            unit: "px",
-            top: w,
-            right: w,
-            bottom: w,
-            left: w,
-            isLinked: true
-          };
-        }
-      }
-    }
-    const radiusSettings = extractCornerRadius(node);
-    Object.assign(settings, radiusSettings);
-    return settings;
-  }
-  function extractCornerRadius(node) {
-    const settings = {};
-    if (hasCornerRadius(node)) {
-      const anyNode = node;
-      if (anyNode.cornerRadius !== figma.mixed && typeof anyNode.cornerRadius === "number") {
-        const r = anyNode.cornerRadius;
-        settings.border_radius = {
-          unit: "px",
-          top: r,
-          right: r,
-          bottom: r,
-          left: r,
-          isLinked: true
-        };
-      } else {
-        settings.border_radius = {
-          unit: "px",
-          top: anyNode.topLeftRadius || 0,
-          right: anyNode.topRightRadius || 0,
-          bottom: anyNode.bottomRightRadius || 0,
-          left: anyNode.bottomLeftRadius || 0,
-          isLinked: false
-        };
-      }
-    }
-    return settings;
-  }
-  function extractShadows(node) {
-    const settings = {};
-    if (!hasEffects(node) || !Array.isArray(node.effects)) return settings;
-    const drop = node.effects.find((e) => e.type === "DROP_SHADOW" && e.visible !== false);
-    if (drop) {
-      const { color, offset, radius, spread } = drop;
-      const rgba = `rgba(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)}, ${color.a})`;
-      settings.box_shadow_box_shadow_type = "yes";
-      settings.box_shadow_box_shadow = {
-        horizontal: Math.round(offset.x),
-        vertical: Math.round(offset.y),
-        blur: Math.round(radius),
-        spread: Math.round(spread || 0),
-        color: rgba
-      };
-    }
-    return settings;
-  }
-  function extractOpacity(node) {
-    if ("opacity" in node && node.opacity !== 1) {
-      return { _opacity: { unit: "px", size: node.opacity } };
-    }
-    return {};
-  }
-  function extractTransform(node) {
-    const settings = {};
-    if ("rotation" in node && node.rotation !== 0) {
-      settings._transform_rotate_popover = "custom";
-      settings._transform_rotateZ_effect = { unit: "deg", size: Math.round(node.rotation) };
-    }
-    return settings;
-  }
-  var init_styles_extractor = __esm({
-    "src/extractors/styles.extractor.ts"() {
-      init_colors();
-    }
-  });
-
-  // src/extractors/layout.extractor.ts
-  function hasLayout(node) {
-    return "layoutMode" in node;
-  }
-  function extractFlexLayout(node) {
-    if (!hasLayout(node) || node.layoutMode === "NONE") return {};
-    const settings = {};
-    const isRow = node.layoutMode === "HORIZONTAL";
-    settings.flex_direction = isRow ? "row" : "column";
-    const justifyMap = {
-      MIN: "flex-start",
-      CENTER: "center",
-      MAX: "flex-end",
-      SPACE_BETWEEN: "space-between",
-      SPACE_AROUND: "space-around",
-      SPACE_EVENLY: "space-evenly"
-    };
-    const alignMap = {
-      MIN: "flex-start",
-      CENTER: "center",
-      MAX: "flex-end",
-      BASELINE: "baseline",
-      STRETCH: "stretch"
-    };
-    if (node.primaryAxisAlignItems && justifyMap[node.primaryAxisAlignItems]) {
-      settings.justify_content = justifyMap[node.primaryAxisAlignItems];
-    }
-    if (node.counterAxisAlignItems && alignMap[node.counterAxisAlignItems]) {
-      settings.align_items = alignMap[node.counterAxisAlignItems];
-    }
-    if (node.itemSpacing && node.itemSpacing > 0) {
-      settings.gap = {
-        unit: "px",
-        size: node.itemSpacing,
-        column: node.itemSpacing,
-        row: node.itemSpacing,
-        isLinked: true
-      };
-    }
-    settings.flex_wrap = node.layoutWrap === "WRAP" ? "wrap" : "nowrap";
-    return settings;
-  }
-  function extractPadding(node) {
-    var _a, _b, _c, _d;
-    const frame = node;
-    const top = (_a = frame.paddingTop) != null ? _a : 0;
-    const right = (_b = frame.paddingRight) != null ? _b : 0;
-    const bottom = (_c = frame.paddingBottom) != null ? _c : 0;
-    const left = (_d = frame.paddingLeft) != null ? _d : 0;
-    const isLinked = top === right && top === bottom && top === left;
-    return {
-      padding: {
-        unit: "px",
-        top,
-        right,
-        bottom,
-        left,
-        isLinked
-      }
-    };
-  }
-  function extractMargin(node) {
-    const parent = node.parent;
-    if (!parent || !("layoutMode" in parent) || parent.layoutMode !== "NONE") {
-      return {};
-    }
-    const margin = {};
-    const threshold = 2;
-    if (node.y > threshold) {
-      margin.margin_top = { unit: "px", size: Math.round(node.y) };
-    }
-    if (node.x > threshold) {
-      margin.margin_left = { unit: "px", size: Math.round(node.x) };
-    }
-    if ("width" in parent) {
-      const rightSpace = parent.width - (node.x + node.width);
-      if (rightSpace > threshold) {
-        margin.margin_right = { unit: "px", size: Math.round(rightSpace) };
-      }
-    }
-    if ("height" in parent) {
-      const bottomSpace = parent.height - (node.y + node.height);
-      if (bottomSpace > threshold) {
-        margin.margin_bottom = { unit: "px", size: Math.round(bottomSpace) };
-      }
-    }
-    return margin;
-  }
-  function extractPositioning(node) {
-    const settings = {};
-    const name = node.name.toLowerCase();
-    if (name.includes("fixed")) {
-      settings._position = "fixed";
-      settings._offset_x = { unit: "px", size: Math.round(node.x) };
-      settings._offset_y = { unit: "px", size: Math.round(node.y) };
-    } else if (name.includes("sticky")) {
-      settings._position = "sticky";
-      settings._offset_y = { unit: "px", size: 0 };
-    }
-    if (node.parent && "children" in node.parent) {
-      const siblings = node.parent.children;
-      const index = siblings.indexOf(node);
-      const z = siblings.length - index;
-      if (z > 1) settings._z_index = z;
-    }
-    return settings;
-  }
-  var init_layout_extractor = __esm({
-    "src/extractors/layout.extractor.ts"() {
-    }
-  });
-
-  // src/extractors/background.extractor.ts
-  function hasFills(node) {
-    return "fills" in node;
-  }
-  function isArray2(value) {
-    return Array.isArray(value);
-  }
-  function extractBackgroundAdvanced(node, uploader) {
-    return __async(this, null, function* () {
-      const settings = {};
-      if (!hasFills(node) || !isArray2(node.fills) || node.fills.length === 0) {
-        return settings;
-      }
-      const visibleFills = node.fills.filter((f) => f.visible !== false);
-      if (visibleFills.length === 0) return settings;
-      const bgFill = visibleFills[visibleFills.length - 1];
-      if (bgFill.type === "SOLID") {
-        settings.background_background = "classic";
-        settings.background_color = convertColor(bgFill);
-      } else if (bgFill.type === "IMAGE") {
-        settings.background_background = "classic";
-        const tempNode = figma.createRectangle();
-        tempNode.resize(node.width, node.height);
-        tempNode.fills = [bgFill];
-        tempNode.x = node.x + 1e4;
-        tempNode.y = node.y;
-        try {
-          const upload = yield uploader.uploadToWordPress(tempNode, "WEBP");
-          if (upload) {
-            settings.background_image = { url: upload.url, id: upload.id, source: "library" };
-          }
-        } catch (error) {
-          console.error("[Background] Erro ao exportar imagem de fundo:", error);
-        } finally {
-          tempNode.remove();
-        }
-        settings.background_position = "center center";
-        settings.background_size = "cover";
-        settings.background_repeat = "no-repeat";
-      } else if (bgFill.type === "GRADIENT_LINEAR" || bgFill.type === "GRADIENT_RADIAL") {
-        settings.background_background = "gradient";
-        settings.background_gradient_type = bgFill.type === "GRADIENT_RADIAL" ? "radial" : "linear";
-        const stops = bgFill.gradientStops;
-        if (stops.length > 0) {
-          settings.background_color = convertColor({
-            type: "SOLID",
-            color: stops[0].color,
-            opacity: stops[0].color.a
-          });
-          settings.background_color_stop = {
-            unit: "%",
-            size: Math.round(stops[0].position * 100)
-          };
-        }
-        if (stops.length > 1) {
-          settings.background_color_b = convertColor({
-            type: "SOLID",
-            color: stops[stops.length - 1].color,
-            opacity: stops[stops.length - 1].color.a
-          });
-          settings.background_color_b_stop = {
-            unit: "%",
-            size: Math.round(stops[stops.length - 1].position * 100)
-          };
-        }
-        if (bgFill.type === "GRADIENT_LINEAR") {
-          settings.background_gradient_angle = { unit: "deg", size: 180 };
-        }
-      }
-      return settings;
-    });
-  }
-  var init_background_extractor = __esm({
-    "src/extractors/background.extractor.ts"() {
-      init_colors();
-    }
-  });
-
-  // src/containers/container.detector.ts
-  function hasLayout2(node) {
-    return "layoutMode" in node;
-  }
-  function isExternalContainer(node, isTopLevel = false) {
-    if (!hasLayout2(node)) return false;
-    const frame = node;
-    const lname = node.name.toLowerCase();
-    if (lname.startsWith("c:section") || lname.startsWith("c:boxed")) return true;
-    if (isTopLevel) return true;
-    if (frame.width > 900) return true;
-    const sectionKeywords = ["section", "hero", "header", "footer", "banner", "cta"];
-    if (sectionKeywords.some((kw) => lname.includes(kw))) return true;
-    return false;
-  }
-  function isInnerContainer(node, parentNode) {
-    if (!hasLayout2(node)) return false;
-    const frame = node;
-    const lname = node.name.toLowerCase();
-    if (lname.startsWith("c:inner") || lname.startsWith("c:row") || lname.startsWith("c:col")) {
-      return true;
-    }
-    if (!parentNode) return false;
-    if (hasLayout2(parentNode)) {
-      const parentFrame = parentNode;
-      if (frame.width < parentFrame.width * 0.95) return true;
-    }
-    const innerKeywords = ["inner", "content", "wrapper", "container", "box"];
-    if (innerKeywords.some((kw) => lname.includes(kw))) return true;
-    return false;
-  }
-  function detectContainerType(node, parentNode, isTopLevel) {
-    const lname = node.name.toLowerCase();
-    if (lname.startsWith("c:section") || lname.startsWith("c:boxed")) {
-      return "external";
-    }
-    if (lname.startsWith("c:inner")) {
-      return "inner";
-    }
-    if (isExternalContainer(node, isTopLevel)) {
-      return "external";
-    }
-    if (isInnerContainer(node, parentNode)) {
-      return "inner";
-    }
-    return "normal";
-  }
-  var init_container_detector = __esm({
-    "src/containers/container.detector.ts"() {
-    }
-  });
-
-  // src/containers/container.builder.ts
-  var ContainerBuilder;
-  var init_container_builder = __esm({
-    "src/containers/container.builder.ts"() {
-      init_guid();
-      init_styles_extractor();
-      init_layout_extractor();
-      init_background_extractor();
-      init_container_detector();
-      ContainerBuilder = class {
-        constructor(uploader, processNodeFn) {
-          this.uploader = uploader;
-          this.processNodeFn = processNodeFn;
-        }
-        /**
-         * Constrói um container Elementor a partir de um nó do Figma
-         * @param node Nó do Figma
-         * @param parentNode Nó pai
-         * @param isTopLevel Se é nó de nível superior
-         * @returns Elemento Elementor container
-         */
-        build(node, parentNode = null, isTopLevel = false) {
-          return __async(this, null, function* () {
-            const lname = node.name.toLowerCase();
-            let settings = {};
-            const containerType = detectContainerType(node, parentNode, isTopLevel);
-            let isInner = containerType === "inner";
-            Object.assign(settings, extractBorderStyles(node));
-            Object.assign(settings, extractShadows(node));
-            Object.assign(settings, yield extractBackgroundAdvanced(node, this.uploader));
-            Object.assign(settings, extractPadding(node));
-            Object.assign(settings, extractOpacity(node));
-            Object.assign(settings, extractTransform(node));
-            Object.assign(settings, extractFlexLayout(node));
-            Object.assign(settings, extractMargin(node));
-            if (containerType === "external") {
-              let childToMerge = null;
-              if ("children" in node) {
-                const children = node.children;
-                const frameChildren = children.filter((c) => c.type === "FRAME" || c.type === "INSTANCE");
-                if (frameChildren.length === 1 && isInnerContainer(frameChildren[0], node)) {
-                  childToMerge = frameChildren[0];
-                }
-              }
-              if (childToMerge) {
-                settings.content_width = "boxed";
-                settings.width = { unit: "%", size: 100 };
-                settings.boxed_width = { unit: "px", size: Math.round(childToMerge.width) };
-                Object.assign(settings, extractPadding(childToMerge));
-                Object.assign(settings, extractFlexLayout(childToMerge));
-                const grandChildren = yield Promise.all(
-                  childToMerge.children.map((c) => this.processNodeFn(c, node, false))
-                );
-                return {
-                  id: generateGUID(),
-                  elType: "container",
-                  isInner: false,
-                  settings,
-                  elements: grandChildren
-                };
-              } else {
-                settings.content_width = "full";
-                settings.width = { unit: "%", size: 100 };
-                if ("width" in node && node.width < 1200) {
-                  settings.content_width = "boxed";
-                  settings.boxed_width = { unit: "px", size: Math.round(node.width) };
-                }
-              }
-            } else {
-              isInner = true;
-              settings.content_width = "full";
-            }
-            if (settings._position === "absolute") {
-              delete settings._position;
-            }
-            let childElements = [];
-            if ("children" in node) {
-              childElements = yield Promise.all(
-                node.children.map((child) => this.processNodeFn(child, node, false))
-              );
-            }
-            return {
-              id: generateGUID(),
-              elType: "container",
-              isInner,
-              settings,
-              elements: childElements
-            };
-          });
-        }
-      };
-    }
-  });
-
-  // src/widgets/detector.ts
-  function hasFills2(node) {
-    return "fills" in node;
-  }
-  function isArray3(value) {
-    return Array.isArray(value);
-  }
-  function isIconNode(node) {
-    const vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE"];
-    const isVector = vectorTypes.includes(node.type);
-    const isSmallFrame = (node.type === "FRAME" || node.type === "INSTANCE") && node.width <= 50 && node.height <= 50;
-    const name = node.name.toLowerCase();
-    return isVector || isSmallFrame || name.includes("icon") || name.includes("vector");
-  }
-  function hasImageFill(node) {
-    return hasFills2(node) && isArray3(node.fills) && node.fills.some((p) => p.type === "IMAGE");
-  }
-  function isImageNode(node) {
-    if (node.type === "RECTANGLE") {
-      return hasImageFill(node);
-    }
-    if (node.type === "FRAME" || node.type === "INSTANCE" || node.type === "COMPONENT") {
-      const g = node;
-      if (hasFills2(g) && isArray3(g.fills) && g.fills.some((f) => f.type === "IMAGE")) {
-        return true;
-      }
-    }
-    const lname = node.name.toLowerCase();
-    return lname.includes("image") || lname.includes("img") || lname.includes("foto");
-  }
-  function detectWidgetType(node) {
-    const lname = node.name.toLowerCase();
-    if (lname.includes("button") || lname.includes("btn")) return "button";
-    if (lname.includes("image-box") || lname.includes("card")) return "image-box";
-    if (lname.includes("icon-box")) return "icon-box";
-    if (node.type === "TEXT") {
-      if (lname.includes("heading") || lname.includes("title")) return "heading";
-      return "text-editor";
-    }
-    if (isImageNode(node)) return "image";
-    if (isIconNode(node)) return "icon";
-    if (node.type === "LINE") return "divider";
-    if (node.type === "RECTANGLE") {
-      const height = node.height;
-      const width = node.width;
-      if (height <= 5 || width <= 5) return "divider";
-      return "spacer";
-    }
-    if ("layoutMode" in node || node.type === "GROUP") return "container";
-    if (["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION"].includes(node.type)) {
-      return "icon";
-    }
-    return null;
-  }
-  function detectWidgetFromPrefix(name) {
-    const prefixMatch = name.match(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i);
-    if (!prefixMatch) return null;
-    const prefix = prefixMatch[0].toLowerCase();
-    let slug = name.substring(prefix.length).trim().toLowerCase().split(" ")[0];
-    if (prefix === "woo:") slug = `woocommerce-${slug}`;
-    if (prefix === "loop:") slug = `loop-${slug}`;
-    if (prefix === "slider:") slug = "slides";
-    return slug;
-  }
-  var init_detector = __esm({
-    "src/widgets/detector.ts"() {
-    }
-  });
-
-  // src/extractors/typography.extractor.ts
-  function isArray4(value) {
-    return Array.isArray(value);
-  }
-  function extractTypography(node) {
-    const settings = {};
-    settings.typography_typography = "custom";
-    if (node.fontSize !== figma.mixed) {
-      settings.typography_font_size = { unit: "px", size: Math.round(node.fontSize) };
-    }
-    if (node.fontName !== figma.mixed) {
-      const style = node.fontName.style.toLowerCase();
-      if (style.includes("bold")) settings.typography_font_weight = "700";
-      else if (style.includes("semibold")) settings.typography_font_weight = "600";
-      else if (style.includes("medium")) settings.typography_font_weight = "500";
-      else if (style.includes("light")) settings.typography_font_weight = "300";
-      else settings.typography_font_weight = "400";
-      if (style.includes("italic")) settings.typography_font_style = "italic";
-      settings.typography_font_family = node.fontName.family;
-    }
-    if (node.lineHeight !== figma.mixed && node.lineHeight.unit !== "AUTO") {
-      if (node.lineHeight.unit === "PIXELS") {
-        settings.typography_line_height = { unit: "px", size: Math.round(node.lineHeight.value) };
-      } else if (node.lineHeight.unit === "PERCENT") {
-        settings.typography_line_height = { unit: "em", size: (node.lineHeight.value / 100).toFixed(2) };
-      }
-    }
-    if (node.letterSpacing !== figma.mixed && node.letterSpacing.value !== 0) {
-      settings.typography_letter_spacing = { unit: "px", size: node.letterSpacing.value };
-    }
-    if (node.textAlignHorizontal) {
-      const map = {
-        LEFT: "left",
-        CENTER: "center",
-        RIGHT: "right",
-        JUSTIFIED: "justify"
-      };
-      const key = node.textAlignHorizontal;
-      if (map[key]) settings.align = map[key];
-    }
-    if (node.textDecoration === "UNDERLINE") {
-      settings.typography_text_decoration = "underline";
-    }
-    if (node.textCase === "UPPER") {
-      settings.typography_text_transform = "uppercase";
-    }
-    return settings;
-  }
-  function extractTextColor(node) {
-    if (!("fills" in node) || !isArray4(node.fills) || node.fills.length === 0) return "";
-    const fill = node.fills[0];
-    if (fill.type === "SOLID") {
-      const { r, g, b } = fill.color;
-      const a = fill.opacity !== void 0 ? fill.opacity : 1;
-      return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
-    }
-    return "";
-  }
-  var init_typography_extractor = __esm({
-    "src/extractors/typography.extractor.ts"() {
-    }
-  });
-
-  // src/widgets/builders/text.builder.ts
-  function createTextWidget(node) {
-    const isHeading = node.fontSize > 24 || node.fontName.style.toLowerCase().includes("bold");
-    const widgetType = isHeading ? "heading" : "text-editor";
-    const settings = {};
-    if (isHeading) {
-      settings.title = node.characters;
-    } else {
-      settings.editor = node.characters;
-    }
-    Object.assign(settings, extractTypography(node));
-    const color = extractTextColor(node);
-    if (color) {
-      if (isHeading) {
-        settings.title_color = color;
-      } else {
-        settings.text_color = color;
-      }
-    }
-    Object.assign(settings, extractMargin(node));
-    return {
-      id: generateGUID(),
-      elType: "widget",
-      widgetType,
-      settings,
-      elements: []
-    };
-  }
-  var init_text_builder = __esm({
-    "src/widgets/builders/text.builder.ts"() {
-      init_guid();
-      init_typography_extractor();
-      init_layout_extractor();
-    }
-  });
-
-  // src/optimizers/structure.optimizer.ts
-  var StructureOptimizer;
-  var init_structure_optimizer = __esm({
-    "src/optimizers/structure.optimizer.ts"() {
-      StructureOptimizer = class {
-        /**
-         * Otimiza a estrutura de um nó e seus filhos recursivamente.
-         * @param node O nó a ser otimizado
-         * @returns O nó otimizado (pode ser o próprio nó ou um de seus filhos)
-         */
-        static optimize(node) {
-          if (this.isRedundantContainer(node)) {
-            const child = node.children[0];
-            return this.optimize(child);
-          }
-          return node;
-        }
-        /**
-         * Verifica se um container é redundante e pode ser removido.
-         */
-        static isRedundantContainer(node) {
-          if (node.type !== "FRAME" && node.type !== "GROUP") {
-            return false;
-          }
-          if (node.locked) {
-            return false;
-          }
-          if (node.children.length === 0) {
-            return true;
-          }
-          if (node.children.length !== 1) {
-            return false;
-          }
-          const child = node.children[0];
-          if ("fills" in node && Array.isArray(node.fills)) {
-            const hasVisibleFill = node.fills.some((fill) => fill.visible !== false);
-            if (hasVisibleFill) return false;
-          }
-          if ("strokes" in node && Array.isArray(node.strokes)) {
-            const hasVisibleStroke = node.strokes.some((stroke) => stroke.visible !== false);
-            if (hasVisibleStroke && typeof node.strokeWeight === "number" && node.strokeWeight > 0) return false;
-          }
-          if ("effects" in node && Array.isArray(node.effects)) {
-            const hasVisibleEffect = node.effects.some((effect) => effect.visible !== false);
-            if (hasVisibleEffect) return false;
-          }
-          if ("cornerRadius" in node && typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
-            if (node.clipsContent) return false;
-          }
-          if (node.type === "GROUP") {
-            return true;
-          }
-          if (node.type === "FRAME") {
-            if (node.layoutMode !== "NONE") {
-              if (node.paddingLeft > 0 || node.paddingRight > 0 || node.paddingTop > 0 || node.paddingBottom > 0) {
-                return false;
-              }
-              if (node.itemSpacing > 0 && child.type === "FRAME" && "layoutMode" in child && child.layoutMode !== "NONE") {
-                return false;
-              }
-            } else {
-              if (Math.abs(child.x) < 0.1 && Math.abs(child.y) < 0.1 && Math.abs(child.width - node.width) < 1 && Math.abs(child.height - node.height) < 1) {
-                return true;
-              }
-              return false;
-            }
-          }
-          return true;
-        }
-        /**
-         * Aplica a otimização diretamente no documento Figma (Modifica a estrutura real).
-         * @param node O nó a ser otimizado
-         * @param logCallback Função opcional para enviar logs para a UI
-         * @returns O número de nós removidos
-         */
-        static applyOptimization(node, logCallback) {
-          let removedCount = 0;
-          const nodeName = node.name;
-          const nodeType = node.type;
-          const childrenCount = "children" in node ? node.children.length : 0;
-          console.log(`[Optimizer] \u{1F50D} Analisando: ${nodeName} (tipo: ${nodeType}, filhos: ${childrenCount})`);
-          if ("children" in node) {
-            const children = [...node.children];
-            for (const child of children) {
-              removedCount += this.applyOptimization(child, logCallback);
-            }
-          }
-          const isRedundant = this.isRedundantContainer(node);
-          if (isRedundant) {
-            console.log(`[Optimizer] \u2705 ${nodeName} \xE9 REDUNDANTE - ser\xE1 removido`);
-          } else {
-            if (node.type === "FRAME" || node.type === "GROUP") {
-              const reasons = this.getPreservationReasons(node);
-              if (reasons.length > 0) {
-                console.log(`[Optimizer] \u274C ${nodeName} foi PRESERVADO porque: ${reasons.join(", ")}`);
-                if (logCallback) {
-                  logCallback(`  \u23ED\uFE0F "${nodeName}" preservado: ${reasons.join(", ")}`, "info");
-                }
-              }
-            }
-          }
-          if (isRedundant) {
-            const parent = node.parent;
-            if (parent && "children" in node && node.children.length === 1) {
-              const child = node.children[0];
-              try {
-                parent.appendChild(child);
-                node.remove();
-                console.log(`[Optimizer] \u{1F9F9} Container redundante removido do documento: ${nodeName}`);
-                if (logCallback) {
-                  logCallback(`  \u{1F5D1}\uFE0F Removido: "${nodeName}" (${nodeType})`, "info");
-                }
-                removedCount++;
-              } catch (error) {
-                console.log(`[Optimizer] \u26A0\uFE0F Erro ao remover: ${nodeName} - ${error}`);
-                if (logCallback) {
-                  logCallback(`  \u26A0\uFE0F Erro ao remover "${nodeName}"`, "warn");
-                }
-              }
-            }
-          }
-          return removedCount;
-        }
-        /**
-         * Retorna as razões pelas quais um nó foi preservado (para debugging)
-         */
-        static getPreservationReasons(node) {
-          const reasons = [];
-          if (node.type !== "FRAME" && node.type !== "GROUP") {
-            return reasons;
-          }
-          if (node.locked) {
-            reasons.push("est\xE1 trancado");
-          }
-          if (node.children.length === 0) {
-            return reasons;
-          }
-          if (node.children.length > 1) {
-            reasons.push(`tem ${node.children.length} filhos`);
-          }
-          if ("fills" in node && Array.isArray(node.fills)) {
-            const hasVisibleFill = node.fills.some((fill) => fill.visible !== false);
-            if (hasVisibleFill) {
-              reasons.push("tem cor de fundo");
-            }
-          }
-          if ("strokes" in node && Array.isArray(node.strokes)) {
-            const hasVisibleStroke = node.strokes.some((stroke) => stroke.visible !== false);
-            if (hasVisibleStroke && typeof node.strokeWeight === "number" && node.strokeWeight > 0) {
-              reasons.push("tem borda");
-            }
-          }
-          if ("effects" in node && Array.isArray(node.effects)) {
-            const hasVisibleEffect = node.effects.some((effect) => effect.visible !== false);
-            if (hasVisibleEffect) {
-              reasons.push("tem efeitos");
-            }
-          }
-          if ("cornerRadius" in node && typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
-            if (node.clipsContent) {
-              reasons.push("tem corner radius");
-            }
-          }
-          if (node.type === "FRAME" && node.layoutMode !== "NONE") {
-            if (node.paddingLeft > 0 || node.paddingRight > 0 || node.paddingTop > 0 || node.paddingBottom > 0) {
-              reasons.push(`tem padding`);
-            }
-            if (node.children.length === 1) {
-              const child = node.children[0];
-              if (node.itemSpacing > 0 && child.type === "FRAME" && "layoutMode" in child && child.layoutMode !== "NONE") {
-                reasons.push(`tem gap`);
-              }
-            }
-          }
-          return reasons;
-        }
-      };
-    }
-  });
-
-  // src/compiler/elementor.compiler.ts
-  function hasLayout3(node) {
-    return "layoutMode" in node;
-  }
-  function hasCornerRadius2(node) {
-    return "cornerRadius" in node || "topLeftRadius" in node;
-  }
-  var ElementorCompiler;
-  var init_elementor_compiler = __esm({
-    "src/compiler/elementor.compiler.ts"() {
-      init_guid();
-      init_geometry();
-      init_uploader();
-      init_container_builder();
-      init_detector();
-      init_text_builder();
-      init_styles_extractor();
-      init_layout_extractor();
-      init_background_extractor();
-      init_typography_extractor();
-      init_structure_optimizer();
-      ElementorCompiler = class {
-        constructor(wpConfig = {}, quality = 0.85) {
-          this.stats = { optimizedCount: 0 };
-          this.options = {};
-          this.wpConfig = wpConfig;
-          this.uploader = new ImageUploader(wpConfig, quality);
-          this.containerBuilder = new ContainerBuilder(
-            this.uploader,
-            this.processNode.bind(this)
-          );
-        }
-        /**
-         * Compila nós do Figma em elementos Elementor
-         */
-        compile(_0) {
-          return __async(this, arguments, function* (nodes, options = {}) {
-            this.options = options;
-            this.stats = { optimizedCount: 0 };
-            const { optimizeStructure = true } = options;
-            if (nodes.length === 1) {
-              const node = nodes[0];
-              const isArtboard = node.parent && node.parent.type === "PAGE";
-              const hasPrefix = node.name.match(/^(w:|c:|grid:|loop:|woo:|slider:|pro:|media:)/i);
-              if (node.type === "FRAME" && isArtboard && !hasPrefix) {
-                const frame = node;
-                const children = yield Promise.all(
-                  frame.children.map((child) => this.processNode(child, null, true))
-                );
-                return { elements: children, stats: this.stats };
-              }
-            }
-            const elements = yield Promise.all(
-              Array.from(nodes).map((node) => __async(this, null, function* () {
-                return this.processNode(node, null, true);
-              }))
-            );
-            return { elements, stats: this.stats };
-          });
-        }
-        /**
-         * Processa um nó individual
-         */
-        processNode(node, parentNode = null, isTopLevel = false) {
-          return __async(this, null, function* () {
-            if (this.options.optimizeStructure) {
-              const optimizedNode = StructureOptimizer.optimize(node);
-              if (optimizedNode !== node) {
-                this.stats.optimizedCount++;
-                node = optimizedNode;
-              }
-            }
-            const rawName = node.name || "";
-            if (node.locked) {
-              console.log(`[Compiler] \u{1F512} N\xF3 trancado detectado: ${node.name}. Exportando como imagem.`);
-              return this.createExplicitWidget(node, "image");
-            }
-            const widgetSlug = detectWidgetFromPrefix(rawName);
-            if (widgetSlug) {
-              if (["container", "section", "inner-container", "column", "row"].includes(widgetSlug)) {
-                return this.containerBuilder.build(node, parentNode, isTopLevel);
-              }
-              return this.createExplicitWidget(node, widgetSlug);
-            }
-            const detected = detectWidgetType(node);
-            if (detected === "container") {
-              return this.containerBuilder.build(node, parentNode, isTopLevel);
-            }
-            if (detected) {
-              return this.createExplicitWidget(node, detected);
-            }
-            if (node.type === "TEXT") {
-              return createTextWidget(node);
-            }
-            if (isImageNode(node)) {
-              return this.createExplicitWidget(node, "image");
-            }
-            if (["FRAME", "GROUP", "INSTANCE", "COMPONENT"].includes(node.type)) {
-              return this.containerBuilder.build(node, parentNode, isTopLevel);
-            }
-            if (isIconNode(node)) {
-              console.log(`[Compiler] \u{1F3A8} Detectado \xEDcone/vetor: ${node.name} (${node.type})`);
-              return this.createExplicitWidget(node, "icon");
-            }
-            console.warn(`[Compiler] \u26A0\uFE0F N\xF3 n\xE3o suportado: "${node.name}" (tipo: ${node.type})`);
-            return {
-              id: generateGUID(),
-              elType: "widget",
-              widgetType: "text-editor",
-              settings: {
-                editor: `<!-- N\xF3 n\xE3o suportado: ${node.type} "${node.name}" -->`,
-                _widget_title: `\u26A0\uFE0F ${node.type}: ${node.name}`
-              },
-              elements: []
-            };
-          });
-        }
-        /**
-         * Cria um widget explícito baseado no slug
-         */
-        createExplicitWidget(node, widgetSlug) {
-          return __async(this, null, function* () {
-            const settings = {};
-            const cleanTitle = stripWidgetPrefix(node.name);
-            settings._widget_title = cleanTitle || widgetSlug;
-            const allDescendants = this.findAllChildren(node);
-            let imageNode = null;
-            let titleNode = null;
-            let descNode = null;
-            if (["image-box", "icon-box", "button", "image"].includes(widgetSlug)) {
-              if (widgetSlug === "image-box" || widgetSlug === "image") {
-                imageNode = allDescendants.find((c) => isImageNode(c)) || null;
-              } else if (widgetSlug === "icon-box" || widgetSlug === "icon") {
-                imageNode = allDescendants.find((c) => isIconNode(c)) || null;
-              }
-              const textNodes = allDescendants.filter((c) => c.type === "TEXT");
-              textNodes.sort((a, b) => {
-                var _a, _b;
-                const yA = "absoluteBoundingBox" in a ? ((_a = a.absoluteBoundingBox) == null ? void 0 : _a.y) || 0 : 0;
-                const yB = "absoluteBoundingBox" in b ? ((_b = b.absoluteBoundingBox) == null ? void 0 : _b.y) || 0 : 0;
-                return yA - yB;
-              });
-              if (textNodes.length > 0) titleNode = textNodes[0];
-              if (textNodes.length > 1) descNode = textNodes[1];
-            }
-            const contentNodes = [imageNode, titleNode, descNode].filter((n) => n !== null);
-            const styleNode = this.detectStyleNode(node, contentNodes);
-            Object.assign(settings, extractMargin(node));
-            Object.assign(settings, extractPositioning(node));
-            Object.assign(settings, extractTransform(node));
-            Object.assign(settings, extractOpacity(node));
-            if (styleNode) {
-              Object.assign(settings, yield extractBackgroundAdvanced(styleNode, this.uploader));
-              Object.assign(settings, extractBorderStyles(styleNode));
-              Object.assign(settings, extractShadows(styleNode));
-              if (hasLayout3(styleNode) || hasCornerRadius2(styleNode)) {
-                Object.assign(settings, extractPadding(styleNode));
-              }
-            } else {
-              Object.assign(settings, extractBorderStyles(node));
-              Object.assign(settings, extractShadows(node));
-            }
-            yield this.buildSpecificWidget(widgetSlug, node, settings, imageNode, titleNode, descNode);
-            return {
-              id: generateGUID(),
-              elType: "widget",
-              widgetType: widgetSlug,
-              settings,
-              elements: []
-            };
-          });
-        }
-        /**
-         * Constrói configurações específicas de cada tipo de widget
-         */
-        buildSpecificWidget(widgetSlug, node, settings, imageNode, titleNode, descNode) {
-          return __async(this, null, function* () {
-            if (widgetSlug === "nav-menu") {
-              return;
-            }
-            if (widgetSlug === "image") {
-              const upload = yield this.uploader.uploadToWordPress(node, "WEBP");
-              settings.image = { url: (upload == null ? void 0 : upload.url) || "", id: (upload == null ? void 0 : upload.id) || 0 };
-              if ("width" in node) {
-                settings.width = { unit: "px", size: Math.round(node.width) };
-              }
-            } else if (widgetSlug === "button") {
-              if (titleNode) {
-                settings.text = titleNode.characters;
-                Object.assign(settings, extractTypography(titleNode));
-                const color = extractTextColor(titleNode);
-                if (color) settings.button_text_color = color;
-              } else if (node.type === "TEXT") {
-                settings.text = node.characters;
-              } else {
-                settings.text = "Button";
-              }
-              if (settings.background_color) {
-                settings.button_background_color = settings.background_color;
-                delete settings.background_background;
-                delete settings.background_color;
-              }
-            } else if (widgetSlug === "image-box" || widgetSlug === "icon-box") {
-              if (imageNode && titleNode) {
-                const pos = detectRelativePosition(imageNode, titleNode);
-                settings.position = pos;
-                if (pos === "left" || pos === "right") {
-                  settings.content_vertical_alignment = "middle";
-                }
-              }
-              if (imageNode) {
-                if (widgetSlug === "image-box") {
-                  const upload = yield this.uploader.uploadToWordPress(imageNode, "WEBP");
-                  if (upload) settings.image = { url: upload.url, id: upload.id };
-                  if ("width" in imageNode) {
-                    const w = Math.round(imageNode.width);
-                    settings.image_width = { unit: "px", size: w };
-                    settings.image_size = { unit: "px", size: w, sizes: [] };
-                  }
-                } else {
-                  const upload = yield this.uploader.uploadToWordPress(imageNode, "SVG");
-                  if (upload) settings.selected_icon = { value: { url: upload.url, id: upload.id }, library: "svg" };
-                  if ("width" in imageNode) {
-                    const w = Math.round(imageNode.width);
-                    settings.icon_size = { unit: "px", size: w };
-                  }
-                }
-              }
-              if (titleNode) {
-                settings.title_text = titleNode.characters;
-                const typo = extractTypography(titleNode);
-                const color = extractTextColor(titleNode);
-                for (const key in typo) {
-                  settings[key.replace("typography_", "title_typography_")] = typo[key];
-                }
-                if (color) settings.title_color = color;
-              }
-              if (descNode) {
-                settings.description_text = descNode.characters;
-                const typo = extractTypography(descNode);
-                const color = extractTextColor(descNode);
-                for (const key in typo) {
-                  settings[key.replace("typography_", "description_typography_")] = typo[key];
-                }
-                if (color) settings.description_color = color;
-              } else {
-                settings.description_text = "";
-              }
-            } else if (widgetSlug === "heading") {
-              if (node.type === "TEXT") {
-                settings.title = node.characters;
-                Object.assign(settings, extractTypography(node));
-                const color = extractTextColor(node);
-                if (color) settings.title_color = color;
-              }
-            } else if (widgetSlug === "text-editor") {
-              if (node.type === "TEXT") {
-                settings.editor = node.characters;
-                Object.assign(settings, extractTypography(node));
-                const color = extractTextColor(node);
-                if (color) settings.text_color = color;
-              }
-            } else if (widgetSlug === "icon") {
-              const upload = yield this.uploader.uploadToWordPress(node, "SVG");
-              if (upload) settings.selected_icon = { value: { url: upload.url, id: upload.id }, library: "svg" };
-            } else if (widgetSlug === "divider") {
-              settings.style = "solid";
-              settings.weight = { unit: "px", size: "height" in node ? Math.max(1, Math.round(node.height)) : 1 };
-              if ("fills" in node && Array.isArray(node.fills) && node.fills.length > 0) {
-                const fill = node.fills[0];
-                if (fill.type === "SOLID") {
-                  settings.color = `rgba(${Math.round(fill.color.r * 255)}, ${Math.round(fill.color.g * 255)}, ${Math.round(fill.color.b * 255)}, ${fill.opacity || 1})`;
-                }
-              } else if ("strokes" in node && Array.isArray(node.strokes) && node.strokes.length > 0) {
-                const stroke = node.strokes[0];
-                if (stroke.type === "SOLID") {
-                  settings.color = `rgba(${Math.round(stroke.color.r * 255)}, ${Math.round(stroke.color.g * 255)}, ${Math.round(stroke.color.b * 255)}, ${stroke.opacity || 1})`;
-                }
-              }
-            } else if (widgetSlug === "spacer") {
-              settings.space = { unit: "px", size: "height" in node ? Math.round(node.height) : 50 };
-              Object.assign(settings, yield extractBackgroundAdvanced(node, this.uploader));
-            }
-          });
-        }
-        /**
-         * Detecta o nó que contém os estilos visuais
-         */
-        detectStyleNode(node, internalContentNodes) {
-          if ("fills" in node && Array.isArray(node.fills) && node.fills.length > 0 || "strokes" in node && Array.isArray(node.strokes) && node.strokes.length > 0 || "effects" in node && Array.isArray(node.effects) && node.effects.length > 0) {
-            return node;
-          }
-          if ("children" in node) {
-            const children = node.children;
-            for (let i = children.length - 1; i >= 0; i--) {
-              const child = children[i];
-              if (internalContentNodes.includes(child)) continue;
-              if (child.width < 10 || child.height < 10) continue;
-              if ((child.type === "RECTANGLE" || child.type === "FRAME" || child.type === "ELLIPSE") && ("fills" in child && Array.isArray(child.fills) && child.fills.length > 0 || "strokes" in child && Array.isArray(child.strokes) && child.strokes.length > 0 || "effects" in child && Array.isArray(child.effects) && child.effects.length > 0)) {
-                return child;
-              }
-            }
-          }
-          return node;
-        }
-        /**
-         * Encontra todos os filhos recursivamente
-         */
-        findAllChildren(node, result = []) {
-          if ("children" in node) {
-            for (const child of node.children) {
-              result.push(child);
-              this.findAllChildren(child, result);
-            }
-          }
-          return result;
-        }
-        /**
-         * Encontra todos os elementos nav-menu recursivamente
-         */
-        findNavMenus(elements) {
-          const navMenus = [];
-          const searchRecursive = (els) => {
-            for (const el of els) {
-              if (el.widgetType === "nav-menu") {
-                navMenus.push({
-                  id: el.id,
-                  name: el.settings._widget_title || "Menu de Navega\xE7\xE3o"
-                });
-              }
-              if (el.elements && el.elements.length > 0) {
-                searchRecursive(el.elements);
-              }
-            }
-          };
-          searchRecursive(elements);
-          return navMenus;
-        }
-        /**
-         * Atualiza configuração do WordPress
-         */
-        setWPConfig(wpConfig) {
-          this.wpConfig = wpConfig;
-          this.uploader.setWPConfig(wpConfig);
-        }
-        /**
-         * Atualiza qualidade de exportação
-         */
-        setQuality(quality) {
-          this.uploader.setQuality(quality);
-        }
-        /**
-         * Processa resposta de upload
-         */
-        handleUploadResponse(id, result) {
-          this.uploader.handleUploadResponse(id, result);
-        }
-      };
-    }
-  });
-
   // src/config/prompts.ts
   function buildConsolidationPrompt(processedNodes) {
     return `CONSOLIDA\xC7\xC3O FINAL
@@ -1507,7 +94,7 @@ FORMATO DE SA\xCDDA:
   }
 }`;
   }
-  var ANALYZE_RECREATE_PROMPT;
+  var ANALYZE_RECREATE_PROMPT, PIPELINE_GENERATION_PROMPT;
   var init_prompts = __esm({
     "src/config/prompts.ts"() {
       ANALYZE_RECREATE_PROMPT = `
@@ -1664,6 +251,94 @@ DEPOIS (Layout Otimizado - O que voc\xEA deve gerar):
   ]
 }
 \`\`\`
+`;
+      PIPELINE_GENERATION_PROMPT = `
+Voc\xEA \xE9 um assistente especializado em organiza\xE7\xE3o de \xE1rvores de layout para Elementor.
+
+Receber\xE1 um JSON contendo nodes extra\xEDdos do Figma, j\xE1 com:
+- nome do node
+- tipo
+- fills
+- textos
+- children
+- estilos b\xE1sicos
+- propor\xE7\xF5es
+- dimens\xF5es
+
+Sua \xFAnica tarefa \xE9:
+\u2192 ORGANIZAR esses nodes em um schema intermedi\xE1rio v\xE1lido.
+
+N\xC3O CLASSIFIQUE widgets visualmente.
+N\xC3O ignore nodes.
+N\xC3O descarte children.
+N\xC3O adivinhe a inten\xE7\xE3o do design.
+
+Use APENAS a estrutura da \xE1rvore recebida.
+
+=======================
+OUTPUT OBRIGAT\xD3RIO
+=======================
+
+Retorne um JSON no seguinte formato:
+
+{
+  "page": {
+    "title": "<nome do frame raiz>",
+    "tokens": {
+      "primaryColor": "#000000",
+      "secondaryColor": "#000000"
+    }
+  },
+  "sections": [ ... ]
+}
+
+Cada se\xE7\xE3o \xE9:
+
+{
+  "id": "string",
+  "type": "custom",
+  "width": "full" ou "boxed",
+  "background": {},
+  "columns": [
+    {
+      "span": 12,
+      "widgets": [ ... ]
+    }
+  ]
+}
+
+Cada widget \xE9:
+
+{
+  "type": "heading | text | image | button | icon | custom",
+  "content": "texto ou url ou null",
+  "imageId": "id da imagem se houver",
+  "styles": { opcional }
+}
+
+SEM DECIS\xD5ES VISUAIS.
+SEM HEUR\xCDSTICAS COMPLEXAS.
+
+=======================
+REGRAS CR\xCDTICAS
+=======================
+
+1. NUNCA ignore um node com texto.  
+2. NUNCA ignore imagens.  
+3. Se n\xE3o souber classificar \u2192 type = "custom".  
+4. Column sempre come\xE7a com span 12.  
+   (Meu compilador calcula spans depois.)
+5. Cada child do frame vira um widget.  
+6. NUNCA invente estilos.  
+7. NUNCA agrupe nodes diferentes em um widget \xFAnico.  
+8. NUNCA tente identificar imageBox/iconBox aqui.  
+   (Isso \xE9 feito no est\xE1gio de otimiza\xE7\xE3o.)
+
+=======================
+META
+=======================
+
+Sua fun\xE7\xE3o \xE9: organizar, n\xE3o interpretar.
 `;
     }
   });
@@ -2416,6 +1091,800 @@ ${content}` });
     }
   });
 
+  // src/optimizers/structure.optimizer.ts
+  var StructureOptimizer;
+  var init_structure_optimizer = __esm({
+    "src/optimizers/structure.optimizer.ts"() {
+      StructureOptimizer = class {
+        /**
+         * Otimiza a estrutura de um nó e seus filhos recursivamente.
+         * @param node O nó a ser otimizado
+         * @returns O nó otimizado (pode ser o próprio nó ou um de seus filhos)
+         */
+        static optimize(node) {
+          if (this.isRedundantContainer(node)) {
+            const child = node.children[0];
+            return this.optimize(child);
+          }
+          return node;
+        }
+        /**
+         * Verifica se um container é redundante e pode ser removido.
+         */
+        static isRedundantContainer(node) {
+          if (node.type !== "FRAME" && node.type !== "GROUP") {
+            return false;
+          }
+          if (node.locked) {
+            return false;
+          }
+          if (node.children.length === 0) {
+            return true;
+          }
+          if (node.children.length !== 1) {
+            return false;
+          }
+          const child = node.children[0];
+          if ("fills" in node && Array.isArray(node.fills)) {
+            const hasVisibleFill = node.fills.some((fill) => fill.visible !== false);
+            if (hasVisibleFill) return false;
+          }
+          if ("strokes" in node && Array.isArray(node.strokes)) {
+            const hasVisibleStroke = node.strokes.some((stroke) => stroke.visible !== false);
+            if (hasVisibleStroke && typeof node.strokeWeight === "number" && node.strokeWeight > 0) return false;
+          }
+          if ("effects" in node && Array.isArray(node.effects)) {
+            const hasVisibleEffect = node.effects.some((effect) => effect.visible !== false);
+            if (hasVisibleEffect) return false;
+          }
+          if ("cornerRadius" in node && typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
+            if (node.clipsContent) return false;
+          }
+          if (node.type === "GROUP") {
+            return true;
+          }
+          if (node.type === "FRAME") {
+            if (node.layoutMode !== "NONE") {
+              if (node.paddingLeft > 0 || node.paddingRight > 0 || node.paddingTop > 0 || node.paddingBottom > 0) {
+                return false;
+              }
+              if (node.itemSpacing > 0 && child.type === "FRAME" && "layoutMode" in child && child.layoutMode !== "NONE") {
+                return false;
+              }
+            } else {
+              if (Math.abs(child.x) < 0.1 && Math.abs(child.y) < 0.1 && Math.abs(child.width - node.width) < 1 && Math.abs(child.height - node.height) < 1) {
+                return true;
+              }
+              return false;
+            }
+          }
+          return true;
+        }
+        /**
+         * Aplica a otimização diretamente no documento Figma (Modifica a estrutura real).
+         * @param node O nó a ser otimizado
+         * @param logCallback Função opcional para enviar logs para a UI
+         * @returns O número de nós removidos
+         */
+        static applyOptimization(node, logCallback) {
+          let removedCount = 0;
+          const nodeName = node.name;
+          const nodeType = node.type;
+          const childrenCount = "children" in node ? node.children.length : 0;
+          console.log(`[Optimizer] \u{1F50D} Analisando: ${nodeName} (tipo: ${nodeType}, filhos: ${childrenCount})`);
+          if ("children" in node) {
+            const children = [...node.children];
+            for (const child of children) {
+              removedCount += this.applyOptimization(child, logCallback);
+            }
+          }
+          const isRedundant = this.isRedundantContainer(node);
+          if (isRedundant) {
+            console.log(`[Optimizer] \u2705 ${nodeName} \xE9 REDUNDANTE - ser\xE1 removido`);
+          } else {
+            if (node.type === "FRAME" || node.type === "GROUP") {
+              const reasons = this.getPreservationReasons(node);
+              if (reasons.length > 0) {
+                console.log(`[Optimizer] \u274C ${nodeName} foi PRESERVADO porque: ${reasons.join(", ")}`);
+                if (logCallback) {
+                  logCallback(`  \u23ED\uFE0F "${nodeName}" preservado: ${reasons.join(", ")}`, "info");
+                }
+              }
+            }
+          }
+          if (isRedundant) {
+            const parent = node.parent;
+            if (parent && "children" in node && node.children.length === 1) {
+              const child = node.children[0];
+              try {
+                parent.appendChild(child);
+                node.remove();
+                console.log(`[Optimizer] \u{1F9F9} Container redundante removido do documento: ${nodeName}`);
+                if (logCallback) {
+                  logCallback(`  \u{1F5D1}\uFE0F Removido: "${nodeName}" (${nodeType})`, "info");
+                }
+                removedCount++;
+              } catch (error) {
+                console.log(`[Optimizer] \u26A0\uFE0F Erro ao remover: ${nodeName} - ${error}`);
+                if (logCallback) {
+                  logCallback(`  \u26A0\uFE0F Erro ao remover "${nodeName}"`, "warn");
+                }
+              }
+            }
+          }
+          return removedCount;
+        }
+        /**
+         * Retorna as razões pelas quais um nó foi preservado (para debugging)
+         */
+        static getPreservationReasons(node) {
+          const reasons = [];
+          if (node.type !== "FRAME" && node.type !== "GROUP") {
+            return reasons;
+          }
+          if (node.locked) {
+            reasons.push("est\xE1 trancado");
+          }
+          if (node.children.length === 0) {
+            return reasons;
+          }
+          if (node.children.length > 1) {
+            reasons.push(`tem ${node.children.length} filhos`);
+          }
+          if ("fills" in node && Array.isArray(node.fills)) {
+            const hasVisibleFill = node.fills.some((fill) => fill.visible !== false);
+            if (hasVisibleFill) {
+              reasons.push("tem cor de fundo");
+            }
+          }
+          if ("strokes" in node && Array.isArray(node.strokes)) {
+            const hasVisibleStroke = node.strokes.some((stroke) => stroke.visible !== false);
+            if (hasVisibleStroke && typeof node.strokeWeight === "number" && node.strokeWeight > 0) {
+              reasons.push("tem borda");
+            }
+          }
+          if ("effects" in node && Array.isArray(node.effects)) {
+            const hasVisibleEffect = node.effects.some((effect) => effect.visible !== false);
+            if (hasVisibleEffect) {
+              reasons.push("tem efeitos");
+            }
+          }
+          if ("cornerRadius" in node && typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
+            if (node.clipsContent) {
+              reasons.push("tem corner radius");
+            }
+          }
+          if (node.type === "FRAME" && node.layoutMode !== "NONE") {
+            if (node.paddingLeft > 0 || node.paddingRight > 0 || node.paddingTop > 0 || node.paddingBottom > 0) {
+              reasons.push(`tem padding`);
+            }
+            if (node.children.length === 1) {
+              const child = node.children[0];
+              if (node.itemSpacing > 0 && child.type === "FRAME" && "layoutMode" in child && child.layoutMode !== "NONE") {
+                reasons.push(`tem gap`);
+              }
+            }
+          }
+          return reasons;
+        }
+      };
+    }
+  });
+
+  // src/utils/guid.ts
+  function generateGUID() {
+    return Math.random().toString(36).substring(2, 9);
+  }
+  var init_guid = __esm({
+    "src/utils/guid.ts"() {
+    }
+  });
+
+  // src/compiler/elementor.compiler.ts
+  var ElementorCompiler;
+  var init_elementor_compiler = __esm({
+    "src/compiler/elementor.compiler.ts"() {
+      init_guid();
+      ElementorCompiler = class {
+        constructor() {
+          this.wpConfig = {};
+        }
+        /**
+         * Define a configuração do WordPress
+         */
+        setWPConfig(config) {
+          this.wpConfig = config;
+        }
+        /**
+         * Compila o Schema Intermediário para o formato final do Elementor
+         */
+        compile(schema) {
+          const rootElements = schema.sections.map((section) => this.compileSection(section));
+          return {
+            type: "elementor",
+            siteurl: "",
+            // Pode ser deixado vazio ou configurado via WPConfig
+            elements: rootElements
+          };
+        }
+        compileSection(section) {
+          const sectionId = generateGUID();
+          const settings = {
+            layout: section.width === "full" ? "full_width" : "boxed"
+          };
+          if (section.background.color) {
+            settings.background_background = "classic";
+            settings.background_color = section.background.color;
+          }
+          if (section.background.image) {
+            settings.background_background = "classic";
+            settings.background_image = { url: section.background.image, id: 0 };
+          }
+          if (section.background.gradient) settings.background_background = "gradient";
+          return {
+            id: sectionId,
+            elType: "container",
+            isInner: false,
+            settings: __spreadProps(__spreadValues({}, settings), {
+              content_width: "boxed",
+              flex_direction: "row",
+              // Seção atua como linha para colunas
+              flex_wrap: "wrap"
+            }),
+            elements: section.columns.map((col) => this.compileColumn(col))
+          };
+        }
+        compileColumn(column) {
+          const colId = generateGUID();
+          const colWidth = column.span / 12 * 100;
+          return {
+            id: colId,
+            elType: "container",
+            isInner: false,
+            // Containers aninhados também parecem ser isInner: false no modelo novo, ou true? O exemplo do usuário não mostra aninhamento. Vamos assumir false por enquanto.
+            settings: {
+              content_width: "full",
+              width: { unit: "%", size: colWidth, sizes: [] },
+              flex_direction: "column"
+              // Coluna empilha widgets verticalmente
+            },
+            elements: column.widgets.map((widget) => this.compileWidget(widget))
+          };
+        }
+        compileWidget(widget) {
+          var _a;
+          const widgetId = generateGUID();
+          let widgetType = widget.type;
+          let settings = __spreadValues({}, widget.styles);
+          switch (widget.type) {
+            case "heading":
+              settings.title = widget.content || "Heading";
+              if (widget.styles.color) {
+                settings.title_color = widget.styles.color;
+                delete settings.color;
+              }
+              if (widget.styles.text_align) {
+                settings.align = widget.styles.text_align;
+                delete settings.text_align;
+              }
+              settings.typography_typography = "custom";
+              break;
+            case "text":
+              widgetType = "text-editor";
+              settings.editor = widget.content || "Text";
+              if (widget.styles.color) {
+                settings.text_color = widget.styles.color;
+                delete settings.color;
+              }
+              if (widget.styles.text_align) {
+                settings.align = widget.styles.text_align;
+                delete settings.text_align;
+              }
+              settings.typography_typography = "custom";
+              break;
+            case "button":
+              settings.text = widget.content || "Button";
+              if (widget.styles.color) {
+                settings.button_text_color = widget.styles.color;
+                delete settings.color;
+              }
+              if (widget.styles.text_align) {
+                settings.align = widget.styles.text_align;
+                delete settings.text_align;
+              }
+              settings.typography_typography = "custom";
+              break;
+            case "image":
+              settings.image = {
+                url: widget.content || "",
+                id: widget.imageId ? parseInt(widget.imageId) : 0
+              };
+              break;
+            case "icon":
+              settings.selected_icon = { value: widget.content || "fas fa-star", library: "fa-solid" };
+              break;
+            case "html":
+              widgetType = "html";
+              settings.html = widget.content || "";
+              break;
+            case "divider":
+              widgetType = "divider";
+              break;
+            case "list":
+              widgetType = "icon-list";
+              break;
+            case "imageBox":
+              widgetType = "image-box";
+              settings.image = {
+                url: ((_a = widget.styles) == null ? void 0 : _a.image_url) || "",
+                id: widget.imageId ? parseInt(widget.imageId) : 0
+              };
+              settings.title_text = "Title";
+              settings.description_text = widget.content || "Description";
+              break;
+            case "iconBox":
+              widgetType = "icon-box";
+              settings.selected_icon = { value: "fas fa-star", library: "fa-solid" };
+              settings.title_text = "Title";
+              settings.description_text = widget.content || "Description";
+              break;
+            case "custom":
+              return this.compileCustomContainer(widget);
+            default:
+              console.warn(`Tipo de widget desconhecido: ${widget.type}. Renderizando como Spacer.`);
+              widgetType = "spacer";
+              settings.space = { unit: "px", size: 50, sizes: [] };
+              break;
+          }
+          return {
+            id: widgetId,
+            elType: "widget",
+            widgetType,
+            settings,
+            elements: []
+          };
+        }
+        compileCustomContainer(widget) {
+          const containerId = generateGUID();
+          const styles = widget.styles || {};
+          const settings = {
+            content_width: "boxed",
+            flex_direction: styles.layoutMode === "HORIZONTAL" ? "row" : "column",
+            flex_gap: {
+              unit: "px",
+              column: styles.itemSpacing || 0,
+              row: styles.itemSpacing || 0,
+              isLinked: true
+            },
+            padding: {
+              unit: "px",
+              top: styles.paddingTop || 0,
+              right: styles.paddingRight || 0,
+              bottom: styles.paddingBottom || 0,
+              left: styles.paddingLeft || 0,
+              isLinked: false
+            }
+          };
+          if (widget.styles && widget.styles.image_url) {
+            settings.background_background = "classic";
+            settings.background_image = {
+              url: widget.styles.image_url,
+              id: widget.imageId ? parseInt(widget.imageId) : 0
+            };
+          }
+          if (styles.primaryAxisAlignItems) {
+            const map = { "MIN": "start", "CENTER": "center", "MAX": "end", "SPACE_BETWEEN": "space-between" };
+            settings.justify_content = map[styles.primaryAxisAlignItems] || "start";
+          }
+          if (styles.counterAxisAlignItems) {
+            const map = { "MIN": "start", "CENTER": "center", "MAX": "end" };
+            settings.align_items = map[styles.counterAxisAlignItems] || "start";
+          }
+          if (styles.width) {
+            settings.width = { unit: "px", size: styles.width, sizes: [] };
+            settings.content_width = "full";
+          }
+          return {
+            id: containerId,
+            elType: "container",
+            isInner: false,
+            settings,
+            elements: []
+            // Widgets "custom" no pipeline atual não têm filhos definidos no schema, então retornam vazio
+          };
+        }
+      };
+    }
+  });
+
+  // src/utils/hash.ts
+  function computeHash(bytes) {
+    return __async(this, null, function* () {
+      const chrsz = 8;
+      function rol(num, cnt) {
+        return num << cnt | num >>> 32 - cnt;
+      }
+      function safe_add(x, y) {
+        const lsw = (x & 65535) + (y & 65535);
+        const msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+        return msw << 16 | lsw & 65535;
+      }
+      function sha1_ft(t, b, c, d) {
+        if (t < 20) return b & c | ~b & d;
+        if (t < 40) return b ^ c ^ d;
+        if (t < 60) return b & c | b & d | c & d;
+        return b ^ c ^ d;
+      }
+      function sha1_kt(t) {
+        return t < 20 ? 1518500249 : t < 40 ? 1859775393 : t < 60 ? -1894007588 : -899497514;
+      }
+      function core_sha1(x, len) {
+        x[len >> 5] |= 128 << 24 - len % 32;
+        x[(len + 64 >> 9 << 4) + 15] = len;
+        const w = Array(80);
+        let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878, e = -1009589776;
+        for (let i = 0; i < x.length; i += 16) {
+          const olda = a, oldb = b, oldc = c, oldd = d, olde = e;
+          for (let j = 0; j < 80; j++) {
+            if (j < 16) w[j] = x[i + j];
+            else w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
+            const t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)), safe_add(safe_add(e, w[j]), sha1_kt(j)));
+            e = d;
+            d = c;
+            c = rol(b, 30);
+            b = a;
+            a = t;
+          }
+          a = safe_add(a, olda);
+          b = safe_add(b, oldb);
+          c = safe_add(c, oldc);
+          d = safe_add(d, oldd);
+          e = safe_add(e, olde);
+        }
+        return [a, b, c, d, e];
+      }
+      function binb2hex(binarray) {
+        const hex_tab = "0123456789abcdef";
+        let str = "";
+        for (let i = 0; i < binarray.length * 4; i++) {
+          str += hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 + 4 & 15) + hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 & 15);
+        }
+        return str;
+      }
+      function bytesToWords(bytes2) {
+        const words = [];
+        for (let i = 0; i < bytes2.length; i++) {
+          words[i >>> 2] |= (bytes2[i] & 255) << 24 - i % 4 * 8;
+        }
+        return words;
+      }
+      return binb2hex(core_sha1(bytesToWords(bytes), bytes.length * 8));
+    });
+  }
+  var init_hash = __esm({
+    "src/utils/hash.ts"() {
+    }
+  });
+
+  // src/media/image.exporter.ts
+  function exportNodeAsImage(node, format, quality = 0.85) {
+    return __async(this, null, function* () {
+      try {
+        if (format === "SVG") {
+          const bytes2 = yield node.exportAsync({ format: "SVG" });
+          return { bytes: bytes2, mime: "image/svg+xml", ext: "svg" };
+        }
+        if (format === "WEBP") {
+          const bytes2 = yield node.exportAsync({
+            format: "PNG",
+            constraint: { type: "SCALE", value: 2 }
+          });
+          return { bytes: bytes2, mime: "image/png", ext: "webp", needsConversion: true };
+        }
+        if (format === "JPG") {
+          const bytes2 = yield node.exportAsync({
+            format: "JPG",
+            constraint: { type: "SCALE", value: 2 }
+          });
+          return { bytes: bytes2, mime: "image/jpeg", ext: "jpg" };
+        }
+        const bytes = yield node.exportAsync({
+          format: "PNG",
+          constraint: { type: "SCALE", value: 2 }
+        });
+        return { bytes, mime: "image/png", ext: "png" };
+      } catch (e) {
+        console.error(`[F2E] Failed to export image for "${node.name}" (${node.id}):`, e);
+        return null;
+      }
+    });
+  }
+  var init_image_exporter = __esm({
+    "src/media/image.exporter.ts"() {
+    }
+  });
+
+  // src/media/uploader.ts
+  var ImageUploader;
+  var init_uploader = __esm({
+    "src/media/uploader.ts"() {
+      init_hash();
+      init_guid();
+      init_image_exporter();
+      ImageUploader = class {
+        constructor(wpConfig, quality = 0.85) {
+          this.pendingUploads = /* @__PURE__ */ new Map();
+          this.mediaHashCache = /* @__PURE__ */ new Map();
+          this.nodeHashCache = /* @__PURE__ */ new Map();
+          this.quality = 0.85;
+          this.wpConfig = wpConfig;
+          this.quality = quality;
+        }
+        /**
+         * Faz upload de uma imagem para o WordPress
+         * @param node Nó do Figma a ser exportado
+         * @param format Formato da imagem
+         * @returns Objeto com URL e ID da imagem no WordPress ou null
+         */
+        uploadToWordPress(node, format = "WEBP") {
+          return __async(this, null, function* () {
+            if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
+              console.warn("[F2E] WP config ausente.");
+              return null;
+            }
+            try {
+              const targetFormat = format === "SVG" ? "SVG" : "WEBP";
+              const result = yield exportNodeAsImage(node, targetFormat, this.quality);
+              if (!result) return null;
+              const { bytes, mime, ext, needsConversion } = result;
+              const hash = yield computeHash(bytes);
+              if (this.mediaHashCache.has(hash)) {
+                return this.mediaHashCache.get(hash);
+              }
+              this.nodeHashCache.set(node.id, hash);
+              const id = generateGUID();
+              const safeId = node.id.replace(/[^a-z0-9]/gi, "_");
+              const name = `w_${safeId}_${hash}.${ext}`;
+              return new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                  if (this.pendingUploads.has(id)) {
+                    this.pendingUploads.delete(id);
+                    resolve(null);
+                  }
+                }, 9e4);
+                this.pendingUploads.set(id, (result2) => {
+                  clearTimeout(timeout);
+                  if (result2.success) {
+                    console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}, ID: ${result2.wpId}`);
+                    const mediaData = { url: result2.url, id: result2.wpId || 0 };
+                    this.mediaHashCache.set(hash, mediaData);
+                    resolve(mediaData);
+                  } else {
+                    console.error(`[ImageUploader] Falha no upload:`, result2.error);
+                    resolve(null);
+                  }
+                });
+                figma.ui.postMessage({
+                  type: "upload-image-request",
+                  id,
+                  name,
+                  mimeType: mime,
+                  targetMimeType: "image/webp",
+                  data: bytes,
+                  needsConversion: !!needsConversion
+                });
+              });
+            } catch (e) {
+              console.error("Error preparing upload:", e);
+              return null;
+            }
+          });
+        }
+        /**
+         * Processa resposta de upload da UI
+         * @param id ID do upload
+         * @param result Resultado do upload
+         */
+        handleUploadResponse(id, result) {
+          const resolver = this.pendingUploads.get(id);
+          if (resolver) {
+            resolver(result);
+            this.pendingUploads.delete(id);
+          } else {
+            console.warn(`[ImageUploader] Nenhuma promessa pendente encontrada para ${id}`);
+          }
+        }
+        /**
+         * Atualiza a qualidade de exportação
+         * @param quality Nova qualidade (0.1 a 1.0)
+         */
+        setQuality(quality) {
+          this.quality = Math.max(0.1, Math.min(1, quality));
+        }
+        /**
+         * Atualiza a configuração do WordPress
+         * @param wpConfig Nova configuração
+         */
+        setWPConfig(wpConfig) {
+          this.wpConfig = wpConfig;
+        }
+        /**
+         * Limpa o cache de hashes
+         */
+        clearCache() {
+          this.mediaHashCache.clear();
+          this.nodeHashCache.clear();
+        }
+      };
+    }
+  });
+
+  // src/pipeline.ts
+  var ConversionPipeline;
+  var init_pipeline = __esm({
+    "src/pipeline.ts"() {
+      init_serialization_utils();
+      init_api_gemini();
+      init_prompts();
+      init_elementor_compiler();
+      init_uploader();
+      ConversionPipeline = class {
+        constructor() {
+          this.apiKey = null;
+          this.model = null;
+          this.compiler = new ElementorCompiler();
+          this.imageUploader = new ImageUploader({});
+        }
+        /**
+         * Executa o pipeline completo
+         * @param node Nó raiz do Figma a ser convertido
+         */
+        run(_0) {
+          return __async(this, arguments, function* (node, wpConfig = {}) {
+            this.compiler.setWPConfig(wpConfig);
+            this.imageUploader.setWPConfig(wpConfig);
+            yield this.loadConfig();
+            console.log("[Pipeline] 1. Extraindo dados do n\xF3...");
+            const serializedData = serializeNode(node);
+            console.log("[Pipeline] 2. Enviando para IA...");
+            const intermediateSchema = yield this.processWithAI(serializedData);
+            console.log("[Pipeline] 3. Validando schema...");
+            this.validateSchema(intermediateSchema);
+            console.log("[Pipeline] 3.1 Resolvendo imagens...");
+            yield this.resolveImages(intermediateSchema);
+            console.log("[Pipeline] 4. Compilando para Elementor...");
+            const elementorJson = this.compiler.compile(intermediateSchema);
+            if (wpConfig.url) {
+              elementorJson.siteurl = wpConfig.url;
+            }
+            return elementorJson;
+          });
+        }
+        loadConfig() {
+          return __async(this, null, function* () {
+            this.apiKey = yield getKey();
+            this.model = yield getModel();
+            if (!this.apiKey) {
+              throw new Error("API Key n\xE3o configurada. Por favor, configure na aba 'IA Gemini'.");
+            }
+          });
+        }
+        /**
+         * Envia os dados para a IA e retorna o Schema Intermediário
+         */
+        processWithAI(data) {
+          return __async(this, null, function* () {
+            var _a, _b, _c, _d, _e, _f;
+            if (!this.apiKey || !this.model) throw new Error("Configura\xE7\xE3o de IA incompleta.");
+            const endpoint = `${API_BASE_URL}${this.model}:generateContent?key=${this.apiKey}`;
+            const systemPrompt = PIPELINE_GENERATION_PROMPT;
+            const requestBody = {
+              contents: [{
+                parts: [
+                  { text: systemPrompt },
+                  { text: `DADOS DE ENTRADA:
+${JSON.stringify(data)}` }
+                ]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 8192,
+                response_mime_type: "application/json"
+              }
+            };
+            let retries = 0;
+            const maxRetries = 3;
+            const baseDelay = 2e3;
+            while (true) {
+              try {
+                const response = yield fetch(endpoint, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(requestBody)
+                });
+                if (!response.ok) {
+                  if (response.status === 429 && retries < maxRetries) {
+                    const delay = baseDelay * Math.pow(2, retries);
+                    console.warn(`[Pipeline] Rate limit exceeded (429). Retrying in ${delay}ms...`);
+                    yield new Promise((resolve) => setTimeout(resolve, delay));
+                    retries++;
+                    continue;
+                  }
+                  const err = yield response.json();
+                  throw new GeminiError(`Erro na API Gemini: ${((_a = err.error) == null ? void 0 : _a.message) || response.statusText}`);
+                }
+                const result = yield response.json();
+                const text = (_f = (_e = (_d = (_c = (_b = result.candidates) == null ? void 0 : _b[0]) == null ? void 0 : _c.content) == null ? void 0 : _d.parts) == null ? void 0 : _e[0]) == null ? void 0 : _f.text;
+                if (!text) throw new Error("Resposta vazia da IA.");
+                const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                return JSON.parse(cleanText);
+              } catch (e) {
+                if (retries >= maxRetries || e instanceof GeminiError && !e.message.includes("429")) {
+                  console.error("Erro no processamento de IA:", e);
+                  throw e;
+                }
+                throw e;
+              }
+            }
+          });
+        }
+        /**
+         * Valida o schema retornado pela IA
+         */
+        validateSchema(schema) {
+          if (!schema || typeof schema !== "object") throw new Error("Schema inv\xE1lido: N\xE3o \xE9 um objeto.");
+          if (!schema.page || !schema.sections) throw new Error("Schema inv\xE1lido: Faltando 'page' ou 'sections'.");
+          if (!Array.isArray(schema.sections)) throw new Error("Schema inv\xE1lido: 'sections' deve ser um array.");
+          schema.sections.forEach((section, idx) => {
+            if (!section.columns || !Array.isArray(section.columns)) {
+              throw new Error(`Schema inv\xE1lido na se\xE7\xE3o ${idx}: 'columns' ausente ou inv\xE1lido.`);
+            }
+          });
+        }
+        /**
+         * Percorre o schema e faz upload das imagens referenciadas
+         */
+        resolveImages(schema) {
+          return __async(this, null, function* () {
+            const processWidget = (widget) => __async(this, null, function* () {
+              if (widget.imageId && (widget.type === "image" || widget.type === "imageBox" || widget.type === "custom")) {
+                try {
+                  const node = figma.getNodeById(widget.imageId);
+                  if (node && (node.type === "FRAME" || node.type === "GROUP" || node.type === "RECTANGLE" || node.type === "INSTANCE" || node.type === "COMPONENT")) {
+                    console.log(`[Pipeline] Uploading image for widget ${widget.type} (${widget.imageId})...`);
+                    const result = yield this.imageUploader.uploadToWordPress(node);
+                    if (result) {
+                      if (widget.type === "image") {
+                        widget.content = result.url;
+                      } else {
+                        if (!widget.styles) widget.styles = {};
+                        widget.styles.image_url = result.url;
+                      }
+                      widget.imageId = result.id.toString();
+                    } else {
+                      console.warn(`[Pipeline] Falha no upload da imagem ${widget.imageId}`);
+                    }
+                  }
+                } catch (e) {
+                  console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
+                }
+              }
+              if (widget.type === "icon" && widget.imageId) {
+              }
+            });
+            for (const section of schema.sections) {
+              for (const column of section.columns) {
+                for (const widget of column.widgets) {
+                  yield processWidget(widget);
+                }
+              }
+            }
+          });
+        }
+      };
+    }
+  });
+
   // src/config/widget.patterns.ts
   var widgetPatterns;
   var init_widget_patterns = __esm({
@@ -2588,15 +2057,15 @@ ${content}` });
             if (node.type === "RECTANGLE" && "fills" in node) {
               const fills = node.fills;
               if (typeof fills !== "symbol" && Array.isArray(fills)) {
-                const hasImageFill3 = fills.some((fill) => fill.type === "IMAGE");
-                if (hasImageFill3) return 95;
+                const hasImageFill2 = fills.some((fill) => fill.type === "IMAGE");
+                if (hasImageFill2) return 95;
               }
             }
             if (node.type === "FRAME" && "fills" in node) {
               const fills = node.fills;
               if (typeof fills !== "symbol" && Array.isArray(fills)) {
-                const hasImageFill3 = fills.some((fill) => fill.type === "IMAGE");
-                if (hasImageFill3) return 85;
+                const hasImageFill2 = fills.some((fill) => fill.type === "IMAGE");
+                if (hasImageFill2) return 85;
               }
             }
             return 0;
@@ -2782,7 +2251,7 @@ ${content}` });
     if (!props || !("children" in node)) return 0;
     const children = node.children;
     const imageCount = children.filter(
-      (c) => c.type === "RECTANGLE" && hasImageFill2(c)
+      (c) => c.type === "RECTANGLE" && hasImageFill(c)
     ).length;
     const iconCount = children.filter(
       (c) => c.type === "VECTOR" || c.type === "COMPONENT" && c.name.toLowerCase().includes("icon")
@@ -2802,7 +2271,7 @@ ${content}` });
     }
     return Math.min(score, 20);
   }
-  function hasImageFill2(node) {
+  function hasImageFill(node) {
     if (!("fills" in node)) return false;
     const fills = node.fills;
     if (!Array.isArray(fills)) return false;
@@ -2967,7 +2436,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
         console.log("[Visual] Enviando para Gemini Vision...");
         figma.ui.postMessage({ type: "add-log", message: "[Visual] Enviando para Gemini Vision...", level: "info" });
         const response = yield fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          `${API_BASE_URL}${model}:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: {
@@ -2995,7 +2464,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
         );
         if (!response.ok) {
           const error = yield response.text();
-          throw new Error(`Gemini API error: ${response.status} - ${error}`);
+          throw new GeminiError(`Gemini API error: ${response.status} - ${error}`, response.status);
         }
         const data = yield response.json();
         const aiResponse = data.candidates[0].content.parts[0].text;
@@ -3003,7 +2472,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
         figma.ui.postMessage({ type: "add-log", message: `[Visual] Resposta da IA: ${aiResponse.substring(0, 100)}...`, level: "info" });
         const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
-          throw new Error("Resposta da IA n\xE3o cont\xE9m JSON v\xE1lido");
+          throw new GeminiError("Resposta da IA n\xE3o cont\xE9m JSON v\xE1lido");
         }
         const analysis = JSON.parse(jsonMatch[0]);
         console.log(`[Visual] An\xE1lise conclu\xEDda: ${analysis.widget} (${analysis.confidence}%)`);
@@ -3082,6 +2551,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
   var init_visual_analyzer = __esm({
     "src/analyzers/visual.analyzer.ts"() {
       init_widget_patterns();
+      init_api_gemini();
       screenshotCache = /* @__PURE__ */ new Map();
       CACHE_TTL = 5 * 60 * 1e3;
       MAX_CACHE_SIZE = 50;
@@ -3164,7 +2634,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
         };
       } catch (error) {
         console.error("[Hybrid] \u274C Erro na an\xE1lise visual:", error);
-        figma.ui.postMessage({ type: "add-log", message: `[Hybrid] \u274C Erro na an\xE1lise visual: ${error}`, level: "error" });
+        figma.ui.postMessage({ type: "add-log", message: `[Hybrid] \u274C Erro na an\xE1lise visual: ${error.message || error}`, level: "error" });
         console.log("[Hybrid] \u{1F504} Fallback para resultado estrutural");
         figma.ui.postMessage({ type: "add-log", message: "[Hybrid] \u{1F504} Fallback para resultado estrutural", level: "warn" });
         return {
@@ -3224,7 +2694,10 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
         tag,
         minScore: 0,
         category: "basic",
-        check: () => true
+        structure: {
+          rootType: [],
+          properties: {}
+        }
       },
       score,
       method: "structural",
@@ -3248,13 +2721,13 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
   // src/code.ts
   var require_code = __commonJS({
     "src/code.ts"(exports) {
-      init_elementor_compiler();
       init_api_gemini();
       init_api_deepseek();
       init_structure_optimizer();
       init_image_utils();
       init_serialization_utils();
-      function hasLayout4(node) {
+      init_pipeline();
+      function hasLayout(node) {
         return "layoutMode" in node;
       }
       var loadedFonts = /* @__PURE__ */ new Set();
@@ -3443,9 +2916,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
         return node;
       });
       figma.showUI(__html__, { width: 600, height: 600 });
-      var compiler;
       figma.clientStorage.getAsync("wp_config").then((config) => {
-        compiler = new ElementorCompiler(config || {});
         if (config) {
           figma.ui.postMessage({ type: "load-wp-config", config });
         }
@@ -3458,63 +2929,30 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
         });
       });
       figma.ui.onmessage = (msg) => __async(null, null, function* () {
-        var _a;
         console.log("\u{1F4E8} Mensagem recebida:", msg.type);
         console.log("Dados completos:", msg);
-        if (!compiler) compiler = new ElementorCompiler({});
         if (msg.type === "export-elementor") {
-          sendLog("\u{1F680} Iniciando exporta\xE7\xE3o para Elementor...", "info");
+          figma.notify('\u26A0\uFE0F Use o bot\xE3o "Converter com Pipeline Estrito" para melhores resultados.');
           const selection = figma.currentPage.selection;
-          if (selection.length === 0) {
-            figma.notify("Selecione ao menos um frame.");
-            sendLog("\u274C Nenhum frame selecionado.", "error");
+          if (selection.length !== 1) {
+            figma.notify("Selecione exatamente 1 frame.");
             return;
           }
-          const wpConfig = (yield figma.clientStorage.getAsync("wp_config")) || {};
-          const currentCompiler = new ElementorCompiler(wpConfig, msg.quality || 0.85);
-          figma.notify("Processando... (Uploads de imagem podem demorar)");
-          sendLog(`\u{1F4E6} Processando ${selection.length} elemento(s)...`, "info");
           try {
-            sendLog("\u{1F504} Compilando estrutura...", "info");
-            const { elements, stats } = yield currentCompiler.compile(selection, {
-              optimizeStructure: false
-              // Otimização automática DESATIVADA (agora é manual)
-            });
-            sendLog(`\u2705 ${elements.length} elementos compilados com sucesso.`, "info");
-            if (stats && stats.optimizedCount > 0) {
-              sendLog(`\u{1F9F9} Estrutura otimizada: ${stats.optimizedCount} containers redundantes removidos.`, "info");
-            } else {
-            }
-            const navMenus = currentCompiler.findNavMenus(elements);
-            if (navMenus.length > 0) {
-              sendLog(`\u{1F50D} Encontrados ${navMenus.length} menus de navega\xE7\xE3o.`, "info");
-            }
-            const template = {
-              type: "elementor",
-              siteurl: ((_a = compiler.wpConfig) == null ? void 0 : _a.url) || "",
-              elements,
-              version: "0.4"
-            };
-            sendLog("\u{1F4E4} Gerando JSON final...", "info");
+            const pipeline = new ConversionPipeline();
+            const wpConfig = (yield figma.clientStorage.getAsync("wp_config")) || {};
+            const json = yield pipeline.run(selection[0], wpConfig);
             figma.ui.postMessage({
               type: "export-result",
-              data: JSON.stringify(template, null, 2),
-              navMenus
+              data: JSON.stringify(json.content, null, 2)
             });
-            sendLog("\u2705 JSON gerado e enviado para a UI!", "info");
-            if (navMenus.length > 0) {
-              figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navega\xE7\xE3o.`);
-            } else {
-              figma.notify("JSON gerado com sucesso!");
-            }
+            figma.notify("\u2705 Convers\xE3o conclu\xEDda (Pipeline)!");
           } catch (e) {
-            console.error("\u274C ERRO ao exportar:", e);
-            sendLog(`\u274C Erro fatal ao exportar: ${e.message}`, "error");
-            figma.notify(`Erro ao exportar: ${e.message}`);
+            figma.notify("\u274C Erro: " + e.message);
           }
         } else if (msg.type === "save-wp-config") {
           yield figma.clientStorage.setAsync("wp_config", msg.config);
-          compiler.setWPConfig(msg.config);
+          yield figma.clientStorage.setAsync("wp_config", msg.config);
           figma.notify("Configura\xE7\xF5es salvas.");
         } else if (msg.type === "get-wp-config") {
           console.log("\u{1F4E5} Recebido get-wp-config");
@@ -3554,7 +2992,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
           console.log("Gemini config recuperada - API Key:", apiKey ? "presente" : "ausente", "Modelo:", model);
           figma.ui.postMessage({ type: "load-gemini-config", apiKey, model });
         } else if (msg.type === "upload-image-response") {
-          compiler.handleUploadResponse(msg.id, msg);
+          console.warn("Upload response ignored in legacy mode");
         } else if (msg.type === "rename-layer") {
           const sel = figma.currentPage.selection;
           if (sel.length === 1) {
@@ -3568,7 +3006,7 @@ RESPONDA APENAS COM JSON V\xC1LIDO (sem markdown, sem \`\`\`):
             id: n.id,
             name: n.name,
             type: n.type,
-            layout: hasLayout4(n) ? n.layoutMode : "none"
+            layout: hasLayout(n) ? n.layoutMode : "none"
           }));
           figma.ui.postMessage({ type: "debug-result", data: JSON.stringify(debug, null, 2) });
         } else if (msg.type === "resize-ui") {
@@ -4316,6 +3754,31 @@ ${JSON.stringify(consolidationResult, null, 2)}`
           } catch (error) {
             console.error("[Cache] Erro ao limpar:", error);
             figma.notify("\u274C Erro ao limpar cache");
+          }
+        } else if (msg.type === "run-conversion-pipeline") {
+          const selection = figma.currentPage.selection;
+          if (selection.length !== 1) {
+            figma.notify("Selecione exatamente 1 frame para converter.");
+            return;
+          }
+          figma.notify("\u{1F680} Iniciando Pipeline de Convers\xE3o Estrita...");
+          try {
+            const pipeline = new ConversionPipeline();
+            const wpConfig = (yield figma.clientStorage.getAsync("wp_config")) || {};
+            const json = yield pipeline.run(selection[0], wpConfig);
+            figma.ui.postMessage({
+              type: "export-result",
+              data: JSON.stringify(json, null, 2)
+            });
+            figma.notify("\u2705 Convers\xE3o conclu\xEDda com sucesso!");
+          } catch (e) {
+            console.error("Erro no pipeline:", e);
+            figma.notify("\u274C Erro no pipeline: " + e.message);
+            figma.ui.postMessage({
+              type: "add-log",
+              message: `Erro no pipeline: ${e.message}`,
+              level: "error"
+            });
           }
         }
       });

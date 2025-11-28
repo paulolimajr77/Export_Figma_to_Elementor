@@ -4,13 +4,14 @@
 
 // -------------------- Imports dos Módulos Refatorados --------------------
 import type { ElementorTemplate, WPConfig } from './types/elementor.types';
-import { ElementorCompiler } from './compiler/elementor.compiler';
+// import { ElementorCompiler } from './compiler/elementor.compiler';
 import * as Gemini from './api_gemini';
 import * as DeepSeek from './api_deepseek';
 import { StructureOptimizer } from './optimizers/structure.optimizer';
 import { createOptimizedFrame } from './gemini_frame_builder';
 import { extractImagesFromNode, getBackgroundFromNode } from './utils/image_utils';
 import { serializeNode, normalizeFigmaJSON, getSectionsToAnalyze } from './utils/serialization_utils';
+import { ConversionPipeline } from './pipeline';
 
 // -------------------- Type Guards (mantidos para compatibilidade) --------------------
 function hasLayout(node: SceneNode): node is FrameNode | ComponentNode | InstanceNode {
@@ -289,11 +290,8 @@ const buildNode = async (data: any, parent?: FrameNode): Promise<SceneNode> => {
 // -------------------- Main Execution --------------------
 figma.showUI(__html__, { width: 600, height: 600 });
 
-let compiler: ElementorCompiler;
-
 // Carrega configuração do WordPress salva
 figma.clientStorage.getAsync('wp_config').then(config => {
-    compiler = new ElementorCompiler(config || {});
     if (config) {
         figma.ui.postMessage({ type: 'load-wp-config', config });
     }
@@ -319,84 +317,37 @@ figma.ui.onmessage = async (msg) => {
     console.log('📨 Mensagem recebida:', msg.type);
     console.log('Dados completos:', msg);
 
-    if (!compiler) compiler = new ElementorCompiler({});
 
-    // Exportar para Elementor
+
+    // Exportar para Elementor (LEGADO - Redirecionando para Pipeline)
     if (msg.type === 'export-elementor') {
-        sendLog('🚀 Iniciando exportação para Elementor...', 'info');
+        figma.notify('⚠️ Use o botão "Converter com Pipeline Estrito" para melhores resultados.');
+        // Redireciona para o novo pipeline
         const selection = figma.currentPage.selection;
-        if (selection.length === 0) {
-            figma.notify('Selecione ao menos um frame.');
-            sendLog('❌ Nenhum frame selecionado.', 'error');
+        if (selection.length !== 1) {
+            figma.notify('Selecione exatamente 1 frame.');
             return;
         }
 
-        // Recuperar configuração do WordPress do storage
-        const wpConfig = await figma.clientStorage.getAsync('wp_config') || {};
-
-        // Instanciar compilador com as configurações mais recentes e qualidade
-        const currentCompiler = new ElementorCompiler(wpConfig, msg.quality || 0.85);
-
-        figma.notify('Processando... (Uploads de imagem podem demorar)');
-        sendLog(`📦 Processando ${selection.length} elemento(s)...`, 'info');
-
         try {
-            sendLog('🔄 Compilando estrutura...', 'info');
-            // Compilar seleção
-            // Passamos a flag useTreeShaking para o método compile (precisaremos atualizar a assinatura do método)
-            // Como o método compile original não aceitava options, vamos passar via setter ou argumento extra
-            // Mas primeiro, vamos atualizar o ElementorCompiler para aceitar essa opção.
-            // Por enquanto, vamos assumir que vamos atualizar o compile para aceitar um objeto de opções ou argumento extra.
-            // Vamos passar como segundo argumento para compile: compile(nodes, options)
+            const pipeline = new ConversionPipeline();
+            const wpConfig = await figma.clientStorage.getAsync('wp_config') || {};
+            const json = await pipeline.run(selection[0], wpConfig);
 
-            const { elements, stats } = await currentCompiler.compile(selection, {
-                optimizeStructure: false // Otimização automática DESATIVADA (agora é manual)
-            });
-            sendLog(`✅ ${elements.length} elementos compilados com sucesso.`, 'info');
-
-            if (stats && stats.optimizedCount > 0) {
-                sendLog(`🧹 Estrutura otimizada: ${stats.optimizedCount} containers redundantes removidos.`, 'info');
-            } else {
-                // sendLog(`ℹ️ Nenhuma otimização estrutural necessária.`, 'info');
-            }
-
-            // Detectar elementos w:nav-menu
-            const navMenus = currentCompiler.findNavMenus(elements);
-            if (navMenus.length > 0) {
-                sendLog(`🔍 Encontrados ${navMenus.length} menus de navegação.`, 'info');
-            }
-
-            const template: ElementorTemplate = {
-                type: 'elementor',
-                siteurl: (compiler as any).wpConfig?.url || '',
-                elements,
-                version: '0.4'
-            };
-
-            sendLog('📤 Gerando JSON final...', 'info');
             figma.ui.postMessage({
                 type: 'export-result',
-                data: JSON.stringify(template, null, 2),
-                navMenus: navMenus
+                data: JSON.stringify(json.content, null, 2)
             });
-            sendLog('✅ JSON gerado e enviado para a UI!', 'info');
-
-            if (navMenus.length > 0) {
-                figma.notify(`JSON gerado! Encontrado(s) ${navMenus.length} menu(s) de navegação.`);
-            } else {
-                figma.notify('JSON gerado com sucesso!');
-            }
-        } catch (e) {
-            console.error('❌ ERRO ao exportar:', e);
-            sendLog(`❌ Erro fatal ao exportar: ${(e as Error).message}`, 'error');
-            figma.notify(`Erro ao exportar: ${(e as Error).message}`);
+            figma.notify('✅ Conversão concluída (Pipeline)!');
+        } catch (e: any) {
+            figma.notify('❌ Erro: ' + e.message);
         }
     }
 
     // Salvar configuração do WordPress
     else if (msg.type === 'save-wp-config') {
         await figma.clientStorage.setAsync('wp_config', msg.config);
-        compiler.setWPConfig(msg.config);
+        await figma.clientStorage.setAsync('wp_config', msg.config);
         figma.notify('Configurações salvas.');
     }
 
@@ -450,7 +401,8 @@ figma.ui.onmessage = async (msg) => {
 
     // Resposta de upload de imagem
     else if (msg.type === 'upload-image-response') {
-        compiler.handleUploadResponse(msg.id, msg);
+        // compiler.handleUploadResponse(msg.id, msg);
+        console.warn('Upload response ignored in legacy mode');
     }
 
     // Renomear layer
@@ -1423,6 +1375,45 @@ figma.ui.onmessage = async (msg) => {
         } catch (error) {
             console.error('[Cache] Erro ao limpar:', error);
             figma.notify('❌ Erro ao limpar cache');
+        }
+    }
+
+    // =================================================================
+    // ----- PIPELINE DE CONVERSÃO ESTRITA (Fase 13) ------------------
+    // =================================================================
+    else if (msg.type === 'run-conversion-pipeline') {
+        const selection = figma.currentPage.selection;
+        if (selection.length !== 1) {
+            figma.notify('Selecione exatamente 1 frame para converter.');
+            return;
+        }
+
+        figma.notify('🚀 Iniciando Pipeline de Conversão Estrita...');
+
+        try {
+            const pipeline = new ConversionPipeline();
+
+            // Recuperar configuração do WordPress
+            const wpConfig = await figma.clientStorage.getAsync('wp_config') || {};
+
+            const json = await pipeline.run(selection[0], wpConfig);
+
+
+
+            figma.ui.postMessage({
+                type: 'export-result',
+                data: JSON.stringify(json, null, 2)
+            });
+
+            figma.notify('✅ Conversão concluída com sucesso!');
+        } catch (e: any) {
+            console.error('Erro no pipeline:', e);
+            figma.notify('❌ Erro no pipeline: ' + e.message);
+            figma.ui.postMessage({
+                type: 'add-log',
+                message: `Erro no pipeline: ${e.message}`,
+                level: 'error'
+            });
         }
     }
 };

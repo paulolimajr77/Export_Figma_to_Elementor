@@ -16,9 +16,7 @@ function hasCornerRadius(node: SceneNode): node is FrameNode | RectangleNode | C
     return 'cornerRadius' in node || 'topLeftRadius' in node;
 }
 
-function isArray(value: any): value is ReadonlyArray<any> {
-    return Array.isArray(value);
-}
+
 
 /**
  * Extrai estilos de borda de um nó
@@ -29,7 +27,7 @@ export function extractBorderStyles(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
 
     // Extrai stroke (borda)
-    if (hasStrokes(node) && isArray(node.strokes) && node.strokes.length > 0) {
+    if (hasStrokes(node) && Array.isArray(node.strokes) && node.strokes.length > 0) {
         const stroke = node.strokes[0];
         if (stroke.type === 'SOLID') {
             settings.border_color = convertColor(stroke);

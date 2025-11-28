@@ -3,7 +3,7 @@
  * @returns String GUID de 10 caracteres alfanuméricos
  */
 export function generateGUID(): string {
-    return 'xxxxxxxxxx'.replace(/[x]/g, () => ((Math.random() * 36) | 0).toString(36));
+    return Math.random().toString(36).substring(2, 9);
 }
 
 /**

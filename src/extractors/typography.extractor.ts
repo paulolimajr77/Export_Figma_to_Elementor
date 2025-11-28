@@ -1,11 +1,6 @@
 import type { ElementorSettings } from '../types/elementor.types';
 
-/**
- * Verifica se um valor é um array (type guard para readonly arrays)
- */
-function isArray(value: any): value is ReadonlyArray<any> {
-    return Array.isArray(value);
-}
+
 
 /**
  * Extrai tipografia de um nó de texto do Figma
@@ -83,7 +78,7 @@ export function extractTypography(node: TextNode): ElementorSettings {
  * @returns Cor em formato RGBA CSS
  */
 export function extractTextColor(node: TextNode): string {
-    if (!('fills' in node) || !isArray(node.fills) || node.fills.length === 0) return '';
+    if (!('fills' in node) || !Array.isArray(node.fills) || node.fills.length === 0) return '';
 
     const fill = node.fills[0];
     if (fill.type === 'SOLID') {

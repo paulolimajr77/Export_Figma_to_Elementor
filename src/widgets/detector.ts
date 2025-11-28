@@ -1,15 +1,6 @@
 import type { GeometryNode } from '../types/elementor.types';
 
-/**
- * Type guards
- */
-function hasFills(node: SceneNode): node is GeometryNode {
-    return 'fills' in node;
-}
 
-function isArray(value: any): value is ReadonlyArray<any> {
-    return Array.isArray(value);
-}
 
 /**
  * Detecta se um nó é um ícone baseado em suas características
@@ -20,8 +11,8 @@ export function isIconNode(node: SceneNode): boolean {
     const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'];
     const isVector = vectorTypes.includes(node.type);
     const isSmallFrame = (node.type === 'FRAME' || node.type === 'INSTANCE') &&
-        (node as any).width <= 50 &&
-        (node as any).height <= 50;
+        node.width <= 50 &&
+        node.height <= 50;
     const name = node.name.toLowerCase();
 
     return isVector || isSmallFrame || name.includes('icon') || name.includes('vector');
@@ -33,7 +24,7 @@ export function isIconNode(node: SceneNode): boolean {
  * @returns true se tem fill de imagem
  */
 export function hasImageFill(node: GeometryNode): boolean {
-    return hasFills(node) && isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
+    return 'fills' in node && Array.isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
 }
 
 /**
@@ -49,8 +40,7 @@ export function isImageNode(node: SceneNode): boolean {
 
     // Frame/Instance com fill de imagem
     if (node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT') {
-        const g = node as any;
-        if (hasFills(g) && isArray(g.fills) && g.fills.some((f: any) => f.type === 'IMAGE')) {
+        if ('fills' in node && Array.isArray(node.fills) && node.fills.some(f => f.type === 'IMAGE')) {
             return true;
         }
     }

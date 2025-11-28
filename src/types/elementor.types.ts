@@ -34,11 +34,14 @@ export interface ElementorElement {
  * Template completo do Elementor
  */
 export interface ElementorTemplate {
-    type: string;
+    type: "elementor";
     siteurl: string;
     elements: ElementorElement[];
-    version: string;
+    version?: string; // Optional now
+    page_settings?: ElementorSettings; // Optional
 }
+
+export type ElementorJSON = ElementorTemplate;
 
 /**
  * Tipos de nós do Figma que possuem propriedades geométricas

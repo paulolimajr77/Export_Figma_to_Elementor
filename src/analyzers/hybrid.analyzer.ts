@@ -101,9 +101,9 @@ export async function analyzeHybrid(
             processingTime: Date.now() - startTime
         };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[Hybrid] ❌ Erro na análise visual:', error);
-        figma.ui.postMessage({ type: 'add-log', message: `[Hybrid] ❌ Erro na análise visual: ${error}`, level: 'error' });
+        figma.ui.postMessage({ type: 'add-log', message: `[Hybrid] ❌ Erro na análise visual: ${error.message || error}`, level: 'error' });
 
         console.log('[Hybrid] 🔄 Fallback para resultado estrutural');
         figma.ui.postMessage({ type: 'add-log', message: '[Hybrid] 🔄 Fallback para resultado estrutural', level: 'warn' });
@@ -172,7 +172,10 @@ function createFallbackMatch(node: SceneNode): WidgetMatch {
             tag: tag,
             minScore: 0,
             category: 'basic',
-            check: () => true
+            structure: {
+                rootType: [],
+                properties: {}
+            }
         },
         score: score,
         method: 'structural',

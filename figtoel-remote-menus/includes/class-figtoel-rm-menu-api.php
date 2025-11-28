@@ -268,12 +268,21 @@ class FIGTOEL_RM_Menu_API {
                 $url = '#';
             }
 
+            $target      = isset( $item['target'] ) ? sanitize_text_field( $item['target'] ) : '';
+            $classes     = isset( $item['classes'] ) ? ( is_array( $item['classes'] ) ? $item['classes'] : explode( ' ', sanitize_text_field( $item['classes'] ) ) ) : [];
+            $attr_title  = isset( $item['attr_title'] ) ? sanitize_text_field( $item['attr_title'] ) : '';
+            $description = isset( $item['description'] ) ? sanitize_textarea_field( $item['description'] ) : '';
+
             $menu_item_data = [
-                'menu-item-title'     => $title,
-                'menu-item-url'       => $url,
-                'menu-item-status'    => 'publish',
-                'menu-item-parent-id' => (int) $parent_item_id,
-                'menu-item-type'      => 'custom',
+                'menu-item-title'       => $title,
+                'menu-item-url'         => $url,
+                'menu-item-status'      => 'publish',
+                'menu-item-parent-id'   => (int) $parent_item_id,
+                'menu-item-type'        => 'custom',
+                'menu-item-target'      => $target,
+                'menu-item-classes'     => $classes,
+                'menu-item-attr-title'  => $attr_title,
+                'menu-item-description' => $description,
             ];
 
             $item_id = wp_update_nav_menu_item( $menu_id, 0, $menu_item_data );

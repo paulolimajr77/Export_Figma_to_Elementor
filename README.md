@@ -387,3 +387,15 @@ src/
 **Impacto:** Redução do tamanho do projeto, melhor organização dos arquivos e código fonte mais limpo e legível, facilitando a manutenção futura.
 
 ---
+
+### **FASE 14: Pipeline de Imagens e Prompt Simplificado** ✅ 🆕
+**Commit:** `[atual]`
+
+1. ✅ **Pipeline de Resolução de Imagens**: Implementado o método `resolveImages` que itera sobre o schema intermediário, faz upload das imagens para o WordPress e injeta as URLs corretas nos widgets antes da compilação final. Isso resolve o problema de imagens faltando (`src=""`) no Elementor.
+2. ✅ **Prompt Simplificado**: O prompt da IA (`PIPELINE_GENERATION_PROMPT`) foi reescrito para focar exclusivamente na organização estrutural (Seções/Colunas/Widgets), removendo heurísticas visuais complexas. A interpretação visual agora é delegada ao compilador, garantindo maior precisão.
+3. ✅ **Correção de HTML Fallback**: A IA foi explicitamente proibida de usar widgets `html` para layouts. Layouts complexos agora são marcados como `custom` e convertidos corretamente em Containers do Elementor pelo compilador.
+4. ✅ **Suporte a Background Images**: O compilador foi atualizado para aplicar corretamente imagens de fundo em containers personalizados (`custom`), utilizando as URLs resolvidas pelo pipeline.
+
+**Impacto:** Exportação de imagens robusta e confiável, eliminação de "buracos" no layout e geração de estruturas Elementor nativas (Containers) em vez de blocos HTML, resultando em um site editável e profissional.
+
+---

@@ -524,6 +524,11 @@
                 🔍 Analisar Estrutura de Widgets
             </button>
 
+            <button id="btn-run-pipeline" class="btn btn-primary"
+                style="margin-top:15px; background:#27ae60; color:white; border-color:#27ae60; width: 100%;">
+                🚀 Converter com Pipeline Estrito (Novo)
+            </button>
+
             <!-- Modal de Resultados da Análise -->
             <div id="analysis-modal"
                 style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; padding:20px; overflow-y:auto;">
@@ -736,7 +741,7 @@
                         </div>
                         <div style="margin-top: 10px; display: flex; gap: 8px;">
                             <button id="btn-copy-final-json" class="btn btn-primary" style="font-size: 10px;">Copiar
-                                JSON Final</button>
+                                para Elementor (Ctrl+V)</button>
                             <button id="btn-download-report" class="btn btn-secondary" style="font-size: 10px;">Ver
                                 Detalhes</button>
                         </div>
@@ -757,7 +762,10 @@
 
         document.getElementById('btn-copy-final-json').addEventListener('click', () => {
             if (finalConsolidationResult) {
-                const jsonStr = JSON.stringify(finalConsolidationResult.elementorJSON, null, 2);
+                // Elementor expects an array of elements for "Paste from other site"
+                // The new structure uses 'content', but we fallback to 'elements' just in case
+                const elementsToCopy = finalConsolidationResult.elementorJSON.elements || finalConsolidationResult.elementorJSON.content || [];
+                const jsonStr = JSON.stringify(elementsToCopy, null, 2);
                 const textarea = document.createElement('textarea');
                 textarea.value = jsonStr;
                 document.body.appendChild(textarea);
@@ -1463,12 +1471,26 @@
 
                 try {
                     const data = JSON.parse(jsonStr);
-                    if (data.elements) {
-                        data.elements.forEach(el => container.appendChild(Preview.createDomElement(el)));
+                    let elements = [];
+                    if (Array.isArray(data)) {
+                        elements = data;
+                    } else if (data.content) {
+                        elements = data.content;
+                    } else if (data.elements) {
+                        elements = data.elements;
+                    }
+
+                    if (elements.length > 0) {
+                        elements.forEach(el => container.appendChild(Preview.createDomElement(el)));
                     }
                 } catch (e) {
                     container.innerHTML = `<div style="color:red;">Erro JSON: ${e.message}</div>`;
                 }
+            },
+
+            loadJSON: (jsonStr, navMenus) => {
+                document.getElementById('output-area').value = jsonStr;
+                Preview.update();
             },
 
             createDomElement: (el) => {
@@ -1850,6 +1872,15 @@
                 });
             } else {
                 console.error('[UI] ❌ Botão de análise NÃO encontrado!');
+            }
+
+            // Event listener para Pipeline Estrito
+            const btnRunPipeline = document.getElementById('btn-run-pipeline');
+            if (btnRunPipeline) {
+                btnRunPipeline.addEventListener('click', () => {
+                    console.log('[UI] 🚀 Botão Pipeline Estrito clicado');
+                    parent.postMessage({ pluginMessage: { type: 'run-conversion-pipeline' } }, '*');
+                });
             }
 
             if (btnApplyRenames) {

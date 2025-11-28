@@ -1,5 +1,6 @@
 import { WidgetMatch } from '../types/elementor.types';
 import { widgetPatterns } from '../config/widget.patterns';
+import { API_BASE_URL, GeminiError } from '../api_gemini';
 
 /**
  * Resultado da análise visual com IA
@@ -259,7 +260,7 @@ export async function analyzeVisual(
         figma.ui.postMessage({ type: 'add-log', message: '[Visual] Enviando para Gemini Vision...', level: 'info' });
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            `${API_BASE_URL}${model}:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: {
@@ -287,7 +288,7 @@ export async function analyzeVisual(
 
         if (!response.ok) {
             const error = await response.text();
-            throw new Error(`Gemini API error: ${response.status} - ${error}`);
+            throw new GeminiError(`Gemini API error: ${response.status} - ${error}`, response.status);
         }
 
         const data = await response.json();
@@ -300,7 +301,7 @@ export async function analyzeVisual(
         // Remover markdown se presente
         const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
-            throw new Error('Resposta da IA não contém JSON válido');
+            throw new GeminiError('Resposta da IA não contém JSON válido');
         }
 
         const analysis: VisualAnalysis = JSON.parse(jsonMatch[0]);
