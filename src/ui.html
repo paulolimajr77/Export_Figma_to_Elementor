@@ -1,34 +1,234 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FigToEL — Figma to Elementor</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="tokens.css">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="ui-dark.css" id="theme-dark" disabled>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Figma to WP Elementor</title>
+  <style>
+    /* tokens */
+    :root {
+      --font: "Inter", sans-serif;
+      --space-1: 6px;
+      --space-2: 12px;
+      --space-3: 18px;
+      --space-4: 24px;
+      --radius: 10px;
+      --color-bg: #f5f6fb;
+      --color-panel: #ffffff;
+      --color-border: #e2e5ec;
+      --color-text: #111318;
+      --color-text-secondary: #5b6475;
+      --color-primary: #0c7bff;
+      --color-primary-hover: #0063cc;
+      --shadow-1: 0 6px 18px rgba(0,0,0,0.07);
+    }
+    :root.dark {
+      --color-bg: #1c1c1f;
+      --color-panel: #2a2a2e;
+      --color-border: #3a3a3e;
+      --color-text: #ededed;
+      --color-text-secondary: #bbbbbb;
+      --color-primary: #3ea6ff;
+      --color-primary-hover: #1c8dd5;
+      --shadow-1: 0 8px 20px rgba(0,0,0,0.35);
+    }
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+    :root { --anim: 180ms ease; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font, 'Inter'), system-ui, -apple-system, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+    }
+    .app {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: var(--space-3);
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-2);
+    }
+    .brand { display: flex; flex-direction: column; gap: 4px; }
+    .brand-title { font-weight: 700; font-size: 19px; color: var(--color-text); }
+    .brand-subtitle { font-size: 13px; color: var(--color-text-secondary); }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .btn {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform var(--anim), box-shadow var(--anim), background var(--anim);
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-1); }
+    .btn.primary { background: #0c7bff; border-color: #0c7bff; color: #fff; }
+    .btn.secondary { background: #eef1f6; color: var(--color-text); }
+    .btn.ghost { background: var(--color-panel); }
+    .btn.small { padding: 6px 10px; font-size: 12px; }
+    .btn.tiny { padding: 6px 10px; font-size: 12px; }
+    .switch { position: relative; display: inline-block; width: 56px; height: 30px; }
+    .switch input { display: none; }
+    .slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: var(--color-border);
+      border-radius: 999px;
+      transition: var(--anim);
+    }
+    .slider:before {
+      content: "";
+      position: absolute; left: 4px; top: 4px;
+      width: 22px; height: 22px;
+      background: var(--color-panel);
+      border-radius: 50%;
+      box-shadow: var(--shadow-1);
+      transition: var(--anim);
+      z-index: 2;
+    }
+    .slider .sun, .slider .moon {
+      position: absolute; font-size: 13px; top: 7px;
+      transition: var(--anim);
+    }
+    .slider .sun { left: 10px; opacity: 1; }
+    .slider .moon { right: 10px; opacity: 0; }
+    input:checked + .slider { background: var(--color-primary); }
+    input:checked + .slider:before { transform: translateX(26px); }
+    input:checked + .slider .sun { opacity: 0; transform: translateX(-6px); }
+    input:checked + .slider .moon { opacity: 1; transform: translateX(6px); }
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: var(--space-2);
+      border: none;
+      background: transparent;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      position: relative;
+      transition: color var(--anim), background var(--anim);
+    }
+    .tab-btn.active { color: var(--color-primary); }
+    .tab-btn:hover { background: rgba(0,0,0,0.02); }
+    .tab-indicator {
+      position: absolute; bottom: 0; left: 0;
+      height: 3px; width: 25%;
+      background: var(--color-primary);
+      transition: transform var(--anim), width var(--anim);
+    }
+    .tab-panels { margin-top: var(--space-2); }
+    .tab-panel { display: none; animation: fadeIn var(--anim); }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px);} to {opacity:1; transform: translateY(0);} }
+    .card {
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
+      box-shadow: var(--shadow-1);
+    }
+    .card-title { font-weight: 700; margin-bottom: var(--space-2); color: var(--color-text); }
+    .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-2); }
+    .input-label { display: block; margin: var(--space-2) 0 var(--space-1); font-weight: 600; color: var(--color-text-secondary); }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: #fff;
+      color: var(--color-text);
+    }
+    .checkbox { display: flex; gap: 8px; align-items: center; margin: 6px 0; color: var(--color-text-secondary); }
+    #output {
+      width: 100%;
+      min-height: 160px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 12px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      background: #f5f6f8;
+      resize: vertical;
+      color: var(--color-text);
+    }
+    .logs {
+      margin-top: 10px;
+      min-height: 80px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: #f8fafc;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      overflow-y: auto;
+    }
+    .status { margin-top: 10px; font-size: 13px; color: var(--color-text-secondary); }
+    .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-2); }
+    .help-item {
+      padding: var(--space-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .help-item .label { font-weight: 600; color: var(--color-text); }
+    .muted { color: var(--color-text-secondary); font-size: 12px; margin-top: var(--space-2); }
+    body.dark {
+      background: var(--color-bg);
+      color: var(--color-text);
+    }
+    body.dark .tabs { border-color: var(--color-border); background: var(--color-panel); }
+    body.dark .tab-btn { color: var(--color-text-secondary); }
+    body.dark .tab-btn.active { color: var(--color-primary); }
+    body.dark .card { background: var(--color-panel); border-color: var(--color-border); }
+    body.dark .btn.secondary { background: #333; color: #eee; }
+    body.dark .btn.ghost { background: #2a2a2e; color: #eee; }
+    body.dark input[type="text"], body.dark input[type="password"] { background: #1f1f22; border-color: var(--color-border); color: #eee; }
+    body.dark #output { background: #242424; color: #eee; border-color: var(--color-border); }
+    body.dark .logs { background: #242424; color: #bbb; border-color: var(--color-border); }
+    body.dark .help-item { background: #2f2f2f; border-color: var(--color-border); }
+    body.dark .help-item .label { color: #eee; }
+    * { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+    *::-webkit-scrollbar { width: 8px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+  </style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="title">Figma to WP Elementor</div>
-        <div class="subtitle">Conversão inteligente para Containers Flex</div>
+        <div class="brand-title">Figma to WP Elementor</div>
+        <div class="brand-subtitle">Conversão inteligente para Containers Flex</div>
       </div>
       <div class="top-actions">
-        <button class="btn ghost small" data-action="resize-large" title="Aumentar janela">↔</button>
-        <label class="switch fancy" title="Alternar tema">
-          <input type="checkbox" id="theme-toggle">
+        <button class="btn ghost small" data-action="resize-ui" title="Redimensionar">↔</button>
+        <label class="switch" title="Alternar tema">
+          <input type="checkbox" id="theme-toggle" />
           <span class="slider">
-            <span class="icon sun">☀</span>
-            <span class="icon moon">🌙</span>
+            <span class="sun">☀</span>
+            <span class="moon">🌙</span>
           </span>
         </label>
       </div>
     </header>
 
-    <nav class="tab-bar">
+    <nav class="tabs">
       <button class="tab-btn active" data-tab="layout">Layout → Elementor</button>
       <button class="tab-btn" data-tab="ai">Configuração da IA</button>
       <button class="tab-btn" data-tab="wp">WordPress</button>
@@ -36,12 +236,12 @@
       <span class="tab-indicator"></span>
     </nav>
 
-    <main class="tab-contents">
-      <section id="tab-layout" class="tab-content active">
+    <main class="tab-panels">
+      <section class="tab-panel active" data-panel="layout">
         <div class="card">
-          <div class="card-header">Ações rápidas</div>
-          <div class="grid-actions">
-            <button class="btn primary" data-action="inspect">Inspecionar Layout</button>
+          <div class="card-title">Ações rápidas</div>
+          <div class="actions">
+            <button class="btn primary" data-action="inspect-layout">Inspecionar Layout</button>
             <button class="btn primary" data-action="generate-json">Gerar JSON</button>
             <button class="btn secondary" data-action="copy-json">Copiar JSON</button>
             <button class="btn secondary" data-action="download-json">Baixar JSON</button>
@@ -49,46 +249,46 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-header">Saída / Logs</div>
+          <div class="card-title">Saída / Logs</div>
           <textarea id="output" placeholder="O JSON gerado aparecerá aqui" readonly></textarea>
           <div id="logs" class="logs"></div>
         </div>
       </section>
 
-      <section id="tab-ai" class="tab-content">
+      <section class="tab-panel" data-panel="ai">
         <div class="card">
-          <div class="card-header">Configuração da IA (Gemini)</div>
+          <div class="card-title">Configuração da IA (Gemini)</div>
           <label class="input-label" for="gemini_api_key">Gemini API Key</label>
-          <input id="gemini_api_key" type="password" autocomplete="off" placeholder="Cole sua API Key do Gemini">
-          <div class="actions-row">
+          <input id="gemini_api_key" type="password" autocomplete="off" placeholder="Cole sua API Key do Gemini" />
+          <div class="actions">
             <button class="btn primary" data-action="test-gemini">Testar Conexão</button>
           </div>
           <div id="gemini-status" class="status"></div>
         </div>
       </section>
 
-      <section id="tab-wp" class="tab-content">
+      <section class="tab-panel" data-panel="wp">
         <div class="card">
-          <div class="card-header">WordPress</div>
+          <div class="card-title">WordPress</div>
           <label class="input-label" for="wp_url">WP URL</label>
-          <input id="wp_url" type="text" autocomplete="off" placeholder="https://site.com">
+          <input id="wp_url" type="text" autocomplete="off" placeholder="https://site.com" />
 
           <label class="input-label" for="wp_user">Usuário WP</label>
-          <input id="wp_user" type="text" autocomplete="username" placeholder="usuario">
+          <input id="wp_user" type="text" autocomplete="username" placeholder="usuario" />
 
           <label class="input-label" for="wp_token">Senha do App (Token)</label>
-          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplicação do WP">
+          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplicação do WP" />
 
           <label class="checkbox">
-            <input id="wp_export_images" type="checkbox">
+            <input id="wp_export_images" type="checkbox" />
             <span>Exportar imagens automaticamente</span>
           </label>
           <label class="checkbox">
-            <input id="wp_create_page" type="checkbox">
+            <input id="wp_create_page" type="checkbox" />
             <span>Criar página automaticamente</span>
           </label>
 
-          <div class="actions-row">
+          <div class="actions">
             <button class="btn primary" data-action="test-wp">Testar Conexão</button>
             <button class="btn secondary" data-action="export-wp">Exportar WP</button>
           </div>
@@ -96,16 +296,16 @@
         </div>
       </section>
 
-      <section id="tab-help" class="tab-content">
+      <section class="tab-panel" data-panel="help">
         <div class="card">
-          <div class="card-header">Nomenclaturas e Ações rápidas</div>
+          <div class="card-title">Nomenclaturas e Ações rápidas</div>
           <div class="help-grid">
-            <div class="help-item"><div class="label">w:heading</div><button class="btn tiny" data-rename="w:heading">Renomear layer</button></div>
-            <div class="help-item"><div class="label">w:text</div><button class="btn tiny" data-rename="w:text">Renomear layer</button></div>
-            <div class="help-item"><div class="label">w:button</div><button class="btn tiny" data-rename="w:button">Renomear layer</button></div>
-            <div class="help-item"><div class="label">w:image</div><button class="btn tiny" data-rename="w:image">Renomear layer</button></div>
-            <div class="help-item"><div class="label">w:icon</div><button class="btn tiny" data-rename="w:icon">Renomear layer</button></div>
-            <div class="help-item"><div class="label">c:container</div><button class="btn tiny" data-rename="c:container">Renomear layer</button></div>
+            <div class="help-item"><span class="label">w:heading</span><button class="btn tiny" data-rename="w:heading">Renomear layer</button></div>
+            <div class="help-item"><span class="label">w:text</span><button class="btn tiny" data-rename="w:text">Renomear layer</button></div>
+            <div class="help-item"><span class="label">w:button</span><button class="btn tiny" data-rename="w:button">Renomear layer</button></div>
+            <div class="help-item"><span class="label">w:image</span><button class="btn tiny" data-rename="w:image">Renomear layer</button></div>
+            <div class="help-item"><span class="label">w:icon</span><button class="btn tiny" data-rename="w:icon">Renomear layer</button></div>
+            <div class="help-item"><span class="label">c:container</span><button class="btn tiny" data-rename="c:container">Renomear layer</button></div>
           </div>
           <p class="muted">Clique para renomear a layer selecionada no Figma com a nomenclatura adequada.</p>
         </div>
@@ -113,6 +313,179 @@
     </main>
   </div>
 
-  <script src="ui.js"></script>
+  <script>
+    (() => {
+      const tabs = document.querySelectorAll('.tab-btn');
+      const panels = document.querySelectorAll('.tab-panel');
+      const indicator = document.querySelector('.tab-indicator');
+      const output = document.getElementById('output');
+      const logs = document.getElementById('logs');
+      const themeToggle = document.getElementById('theme-toggle');
+      const darkSheet = document.getElementById('theme-dark');
+
+      const fields = {
+        gemini_api_key: document.getElementById('gemini_api_key'),
+        wp_url: document.getElementById('wp_url'),
+        wp_user: document.getElementById('wp_user'),
+        wp_token: document.getElementById('wp_token'),
+        wp_export_images: document.getElementById('wp_export_images'),
+        wp_create_page: document.getElementById('wp_create_page')
+      };
+
+      function debounce(fn, wait = 300) {
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...args), wait);
+        };
+      }
+
+      function updateIndicator() {
+        const active = document.querySelector('.tab-btn.active');
+        if (!indicator || !active || !active.parentElement) return;
+        const rect = active.getBoundingClientRect();
+        const parentRect = active.parentElement.getBoundingClientRect();
+        indicator.style.width = `${rect.width}px`;
+        indicator.style.transform = `translateX(${rect.left - parentRect.left}px)`;
+      }
+
+      function setActiveTab(name) {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+        panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
+        updateIndicator();
+      }
+
+      tabs.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
+
+      function applyTheme(isDark) {
+        document.documentElement.classList.toggle('dark', isDark);
+        if (themeToggle) themeToggle.checked = isDark;
+        if (darkSheet) darkSheet.disabled = !isDark;
+        localStorage.setItem('figtoel-theme', isDark ? 'dark' : 'light');
+      }
+
+      function initTheme(pref) {
+        const stored = localStorage.getItem('figtoel-theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (typeof pref === 'boolean') applyTheme(pref);
+        else applyTheme(stored === 'dark' || (stored === null && prefersDark));
+      }
+
+      if (themeToggle) {
+        themeToggle.addEventListener('change', () => {
+          applyTheme(themeToggle.checked);
+          send('save-setting', { key: 'gptel_dark_mode', value: themeToggle.checked });
+        });
+      }
+
+      function send(type, payload = {}) {
+        parent.postMessage({ pluginMessage: { type, ...payload } }, '*');
+      }
+
+      function addLog(message, level = 'info') {
+        if (!logs) return;
+        const div = document.createElement('div');
+        div.textContent = `[${level}] ${message}`;
+        logs.appendChild(div);
+        logs.scrollTo(0, logs.scrollHeight);
+      }
+
+      function loadStoredSettings(payload) {
+        if (!payload) return;
+        if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
+        if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
+        if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
+        if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
+        if (fields.wp_export_images) fields.wp_export_images.checked = !!payload.exportImages;
+        if (fields.wp_create_page) fields.wp_create_page.checked = !!payload.autoPage;
+        if (typeof payload.darkMode === 'boolean') applyTheme(payload.darkMode);
+        updateIndicator();
+      }
+
+      function watchInputs() {
+        const saveText = (key, el) => debounce(() => send('save-setting', { key, value: el.value }));
+        if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
+        if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
+        if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
+        if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
+        if (fields.wp_export_images) fields.wp_export_images.addEventListener('change', () => send('save-setting', { key: 'gptel_export_images', value: fields.wp_export_images.checked }));
+        if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
+      }
+
+      function bindActions() {
+        document.querySelectorAll('[data-action]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const action = btn.getAttribute('data-action');
+            const payload = {
+              wpConfig: {
+                url: fields.wp_url?.value || '',
+                user: fields.wp_user?.value || '',
+                token: fields.wp_token?.value || '',
+                exportImages: fields.wp_export_images?.checked || false,
+                autoPage: fields.wp_create_page?.checked || false
+              },
+              apiKey: fields.gemini_api_key?.value || ''
+            };
+            switch (action) {
+              case 'inspect-layout': send('inspect'); break;
+              case 'generate-json': send('generate-json', payload); break;
+              case 'optimize-structure': send('optimize-structure', payload); break;
+              case 'analyze-widgets': send('analyze-widgets', payload); break;
+              case 'copy-json': send('copy-json'); break;
+              case 'download-json': send('download-json'); break;
+              case 'export-wp': send('export-wp', payload); break;
+              case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
+              case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
+              case 'resize-ui': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
+              default: send(action || 'noop', payload);
+            }
+          });
+        });
+        document.querySelectorAll('[data-rename]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const name = btn.getAttribute('data-rename');
+            send('rename-layer', { name });
+          });
+        });
+      }
+
+      window.onmessage = (event) => {
+        const msg = (event.data || {}).pluginMessage;
+        if (!msg) return;
+        switch (msg.type) {
+          case 'preview':
+            if (output) output.value = msg.payload || '';
+            break;
+          case 'generation-complete':
+            if (output) output.value = msg.payload || '';
+            addLog('JSON gerado.', 'info');
+            break;
+          case 'gemini-status':
+            addLog(msg.message || 'Status Gemini', msg.success ? 'success' : 'error');
+            const gs = document.getElementById('gemini-status');
+            if (gs) gs.textContent = msg.message;
+            break;
+          case 'wp-status':
+            addLog(msg.message || 'Status WP', msg.success ? 'success' : 'error');
+            const ws = document.getElementById('wp-status');
+            if (ws) ws.textContent = msg.message;
+            break;
+          case 'log':
+            addLog(msg.message, msg.level);
+            break;
+          case 'load-settings':
+            loadStoredSettings(msg.payload);
+            break;
+        }
+      };
+
+      bindActions();
+      watchInputs();
+      initTheme();
+      send('load-settings');
+      setActiveTab('layout');
+      if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
+    })();
+  </script>
 </body>
 </html>

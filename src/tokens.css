@@ -1,25 +1,18 @@
 :root {
   --font: "Inter", sans-serif;
-
   --space-1: 6px;
   --space-2: 12px;
-  --space-3: 20px;
-  --space-4: 28px;
-
-  --radius: 8px;
-  --border: 1px solid var(--color-border);
-
-  --color-bg: #f7f7f9;
+  --space-3: 18px;
+  --space-4: 24px;
+  --radius: 10px;
+  --color-bg: #f5f6fb;
   --color-panel: #ffffff;
-  --color-border: #e1e1e6;
-
-  --color-text: #111;
-  --color-text-secondary: #555;
-
-  --color-primary: #007aff;
+  --color-border: #e2e5ec;
+  --color-text: #111318;
+  --color-text-secondary: #5b6475;
+  --color-primary: #0c7bff;
   --color-primary-hover: #0063cc;
-
-  --shadow-1: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-1: 0 6px 18px rgba(0,0,0,0.07);
 }
 
 :root.dark {
@@ -30,5 +23,5 @@
   --color-text-secondary: #bbbbbb;
   --color-primary: #3ea6ff;
   --color-primary-hover: #1c8dd5;
-  --shadow-1: 0 1px 4px rgba(0,0,0,0.45);
+  --shadow-1: 0 8px 20px rgba(0,0,0,0.35);
 }

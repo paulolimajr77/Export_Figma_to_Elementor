@@ -1,6 +1,6 @@
-﻿(() => {
+(() => {
   const tabs = document.querySelectorAll('.tab-btn');
-  const contents = document.querySelectorAll('.tab-content');
+  const panels = document.querySelectorAll('.tab-panel');
   const indicator = document.querySelector('.tab-indicator');
   const output = document.getElementById('output');
   const logs = document.getElementById('logs');
@@ -35,7 +35,7 @@
 
   function setActiveTab(name) {
     tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-    contents.forEach(c => c.classList.toggle('active', c.id === `tab-${name}`));
+    panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
     updateIndicator();
   }
 
@@ -51,11 +51,8 @@
   function initTheme(pref) {
     const stored = localStorage.getItem('figtoel-theme');
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (typeof pref === 'boolean') {
-      applyTheme(pref);
-    } else {
-      applyTheme(stored === 'dark' || (stored === null && prefersDark));
-    }
+    if (typeof pref === 'boolean') applyTheme(pref);
+    else applyTheme(stored === 'dark' || (stored === null && prefersDark));
   }
 
   if (themeToggle) {
@@ -90,7 +87,7 @@
   }
 
   function watchInputs() {
-    const saveText = (key, input) => debounce(() => send('save-setting', { key, value: input.value }));
+    const saveText = (key, el) => debounce(() => send('save-setting', { key, value: el.value }));
     if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
     if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
     if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
@@ -114,14 +111,17 @@
           apiKey: fields.gemini_api_key?.value || ''
         };
         switch (action) {
-          case 'inspect': send('inspect'); break;
+          case 'inspect-layout': send('inspect'); break;
           case 'generate-json': send('generate-json', payload); break;
+          case 'optimize-structure': send('optimize-structure', payload); break;
+          case 'analyze-widgets': send('analyze-widgets', payload); break;
           case 'copy-json': send('copy-json'); break;
           case 'download-json': send('download-json'); break;
           case 'export-wp': send('export-wp', payload); break;
           case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
           case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
-          case 'resize-large': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
+          case 'resize-ui': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
+          default: send(action || 'noop', payload);
         }
       });
     });
@@ -134,7 +134,7 @@
   }
 
   window.onmessage = (event) => {
-    const msg = event.data.pluginMessage;
+    const msg = (event.data || {}).pluginMessage;
     if (!msg) return;
     switch (msg.type) {
       case 'preview':
