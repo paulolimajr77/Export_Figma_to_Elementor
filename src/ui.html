@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -350,6 +350,15 @@
       color: var(--color-text-secondary);
     }
 
+    .provider-block {
+      display: none;
+    }
+
+    body[data-provider="gemini"] .provider-gemini,
+    body[data-provider="gpt"] .provider-gpt {
+      display: block;
+    }
+
     .help-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -547,22 +556,22 @@
     <header class="topbar">
       <div class="brand">
         <div class="brand-title">Figma to WP Elementor</div>
-        <div class="brand-subtitle">Conversão inteligente para Containers Flex</div>
+        <div class="brand-subtitle">ConversÃ£o inteligente para Containers Flex</div>
       </div>
       <div class="top-actions">
         <label class="switch" title="Alternar tema">
           <input type="checkbox" id="theme-toggle" />
           <span class="slider">
-            <span class="sun">☀</span>
-            <span class="moon">🌙</span>
+            <span class="sun">â˜€</span>
+            <span class="moon">ðŸŒ™</span>
           </span>
         </label>
       </div>
     </header>
 
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="layout">Layout → Elementor</button>
-      <button class="tab-btn" data-tab="ai">Configuração da IA</button>
+      <button class="tab-btn active" data-tab="layout">Layout â†’ Elementor</button>
+      <button class="tab-btn" data-tab="ai">ConfiguraÃ§Ã£o da IA</button>
       <button class="tab-btn" data-tab="wp">WordPress</button>
       <button class="tab-btn" data-tab="help">Ajuda</button>
       <span class="tab-indicator"></span>
@@ -571,7 +580,7 @@
     <main class="tab-panels">
       <section class="tab-panel active" data-panel="layout">
         <div class="card">
-          <div class="card-title">Ações rápidas</div>
+          <div class="card-title">AÃ§Ãµes rÃ¡pidas</div>
           <div class="actions">
             <button class="btn primary" data-action="inspect-layout">Inspecionar Layout</button>
             <button class="btn primary" data-action="generate-json">Gerar JSON</button>
@@ -582,32 +591,48 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-title">Saída / Logs</div>
+          <div class="card-title">SaÃ­da / Logs</div>
           <div id="progress" class="progress hidden">
             <div class="progress-bar"></div>
             <span class="progress-text">Processando pipeline...</span>
           </div>
-          <textarea id="output" placeholder="O JSON gerado aparecerá aqui" readonly></textarea>
+          <textarea id="output" placeholder="O JSON gerado aparecerÃ¡ aqui" readonly></textarea>
           <div id="logs" class="logs"></div>
         </div>
       </section>
 
-      <section class="tab-panel" data-panel="ai">
+                  <section class="tab-panel" data-panel="ai">
         <div class="card">
-          <div class="card-title">Configuração da IA (Gemini)</div>
-          <label class="input-label" for="gemini_api_key">Gemini API Key</label>
-          <input id="gemini_api_key" type="password" autocomplete="off" placeholder="Cole sua API Key do Gemini" />
-          <label class="input-label" for="gemini_model">Modelo</label>
-          <select id="gemini_model">
-            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-            <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-            <option value="gemini-1.5-pro">gemini-1.5-pro</option>
-            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+          <div class="card-title">Configuracao da IA</div>
+          <label class="input-label" for="provider_ai">Provedor de IA</label>
+          <select id="provider_ai">
+            <option value="gemini">Gemini</option>
+            <option value="gpt">GPT (OpenAI)</option>
           </select>
-          <div class="actions">
-            <button class="btn primary" data-action="test-gemini">Testar Conexão</button>
+
+          <div class="provider-block provider-gemini">
+            <label class="input-label" for="gemini_api_key">Gemini API Key</label>
+            <input id="gemini_api_key" type="password" autocomplete="off" placeholder="Cole sua API Key do Gemini" />
+            <label class="input-label" for="gemini_model">Modelo</label>
+            <select id="gemini_model">
+              <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Experimental)</option>
+              <option value="gemini-1.5-pro-002">gemini-1.5-pro-002 (Stable)</option>
+              <option value="gemini-1.5-flash-002">gemini-1.5-flash-002 (Fast & Stable)</option>
+            </select>
+            <div class="actions">
+              <button class="btn primary" data-action="test-gemini">Testar Conexao</button>
+            </div>
+            <div id="gemini-status" class="status"></div>
           </div>
-          <div id="gemini-status" class="status"></div>
+
+          <div class="provider-block provider-gpt">
+            <label class="input-label" for="gpt_api_key">OpenAI API Key</label>
+            <input id="gpt_api_key" type="password" autocomplete="off" placeholder="Cole sua chave da OpenAI" />
+            <div class="actions">
+              <button class="btn primary" data-action="test-gpt">Testar conexao</button>
+            </div>
+            <div id="gpt-status" class="status"></div>
+          </div>
         </div>
       </section>
 
@@ -617,11 +642,11 @@
           <label class="input-label" for="wp_url">WP URL</label>
           <input id="wp_url" type="text" autocomplete="off" placeholder="https://site.com" />
 
-          <label class="input-label" for="wp_user">Usuário WP</label>
+          <label class="input-label" for="wp_user">UsuÃ¡rio WP</label>
           <input id="wp_user" type="text" autocomplete="username" placeholder="usuario" />
 
           <label class="input-label" for="wp_token">Senha do App (Token)</label>
-          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplicação do WP" />
+          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplicaÃ§Ã£o do WP" />
 
           <label class="checkbox">
             <input id="wp_export_images" type="checkbox" />
@@ -629,11 +654,11 @@
           </label>
           <label class="checkbox">
             <input id="wp_create_page" type="checkbox" />
-            <span>Criar página automaticamente</span>
+            <span>Criar pÃ¡gina automaticamente</span>
           </label>
 
           <div class="actions">
-            <button class="btn primary" data-action="test-wp">Testar Conexão</button>
+            <button class="btn primary" data-action="test-wp">Testar ConexÃ£o</button>
             <button class="btn secondary" data-action="export-wp">Exportar WP</button>
           </div>
           <div id="wp-status" class="status"></div>
@@ -642,7 +667,7 @@
 
       <section class="tab-panel" data-panel="help">
         <div class="card">
-          <div class="card-title">Nomenclaturas e Ações rápidas</div>
+          <div class="card-title">Nomenclaturas e AÃ§Ãµes rÃ¡pidas</div>
           <div class="help-grid">
             <div class="help-item"><span class="label">w:heading</span><button class="btn tiny"
                 data-rename="w:heading">Renomear layer</button></div>
@@ -671,17 +696,26 @@
       const indicator = document.querySelector('.tab-indicator');
       const output = document.getElementById('output');
       const logs = document.getElementById('logs');
+      const progress = document.getElementById('progress');
+      const btnCopy = document.querySelector('[data-action="copy-json"]');
+      const btnDownload = document.querySelector('[data-action="download-json"]');
+      const btnExport = document.querySelector('[data-action="export-wp"]');
       const themeToggle = document.getElementById('theme-toggle');
       const darkSheet = document.getElementById('theme-dark');
 
       const fields = {
+        provider_ai: document.getElementById('provider_ai'),
         gemini_api_key: document.getElementById('gemini_api_key'),
+        gemini_model: document.getElementById('gemini_model'),
+        gpt_api_key: document.getElementById('gpt_api_key'),
         wp_url: document.getElementById('wp_url'),
         wp_user: document.getElementById('wp_user'),
         wp_token: document.getElementById('wp_token'),
         wp_export_images: document.getElementById('wp_export_images'),
         wp_create_page: document.getElementById('wp_create_page')
       };
+
+      const storage = null; // desativado para evitar SecurityError em sandbox
 
       function debounce(fn, wait = 300) {
         let t;
@@ -706,19 +740,31 @@
         updateIndicator();
       }
 
+      function setProvider(providerId) {
+        const value = providerId === 'gpt' ? 'gpt' : 'gemini';
+        document.body?.setAttribute('data-provider', value);
+        if (fields.provider_ai) fields.provider_ai.value = value;
+      }
+
       tabs.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
 
-      // storage desabilitado para evitar erros em sandbox
       function applyTheme(isDark) {
         document.documentElement.classList.toggle('dark', isDark);
         if (themeToggle) themeToggle.checked = isDark;
         if (darkSheet) darkSheet.disabled = !isDark;
+        if (storage) {
+          try { storage.setItem('figtoel-theme', isDark ? 'dark' : 'light'); } catch (_) { /* ignore */ }
+        }
       }
 
       function initTheme(pref) {
+        let stored = null;
+        if (storage) {
+          try { stored = storage.getItem('figtoel-theme'); } catch (_) { stored = null; }
+        }
         const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (typeof pref === 'boolean') applyTheme(pref);
-        else applyTheme(prefersDark);
+        else applyTheme(stored === 'dark' || (stored === null && prefersDark));
       }
 
       if (themeToggle) {
@@ -734,15 +780,23 @@
 
       function addLog(message, level = 'info') {
         if (!logs) return;
+        const now = new Date();
+        const time = now.toLocaleTimeString('pt-BR', { hour12: false });
         const div = document.createElement('div');
-        div.textContent = `[${level}] ${message}`;
+        div.textContent = `[${time}] [${level}] ${message}`;
         logs.appendChild(div);
         logs.scrollTo(0, logs.scrollHeight);
       }
 
       function loadStoredSettings(payload) {
         if (!payload) return;
+        if (fields.provider_ai) setProvider(payload.providerAi || 'gemini');
         if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
+        if (fields.gemini_model && payload.geminiModel) {
+          fields.gemini_model.value = payload.geminiModel;
+          addLog(`Modelo carregado: ${payload.geminiModel}`, 'info');
+        }
+        if (fields.gpt_api_key) fields.gpt_api_key.value = payload.gptKey || '';
         if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
         if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
         if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
@@ -754,7 +808,20 @@
 
       function watchInputs() {
         const saveText = (key, el) => debounce(() => send('save-setting', { key, value: el.value }));
+        if (fields.provider_ai) {
+          fields.provider_ai.addEventListener('change', () => {
+            setProvider(fields.provider_ai.value);
+            send('save-setting', { key: 'provider_ai', value: fields.provider_ai.value });
+          });
+        }
         if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
+        if (fields.gemini_model) {
+          fields.gemini_model.addEventListener('change', () => {
+            send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value });
+            addLog(`Modelo alterado para: ${fields.gemini_model.value}`, 'info');
+          });
+        }
+        if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gpt_api_key', fields.gpt_api_key));
         if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
         if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
         if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
@@ -762,11 +829,18 @@
         if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
       }
 
-      function bindActions() {
+            function bindActions() {
         document.querySelectorAll('[data-action]').forEach(btn => {
           btn.addEventListener('click', () => {
+            if (btn.disabled && ['copy-json', 'download-json', 'export-wp'].includes(btn.getAttribute('data-action') || '')) {
+              return;
+            }
             const action = btn.getAttribute('data-action');
+            if (fields.gemini_model && fields.gemini_model.value) {
+              send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value });
+            }
             const payload = {
+              providerAi: fields.provider_ai?.value || 'gemini',
               wpConfig: {
                 url: fields.wp_url?.value || '',
                 user: fields.wp_user?.value || '',
@@ -774,17 +848,35 @@
                 exportImages: fields.wp_export_images?.checked || false,
                 autoPage: fields.wp_create_page?.checked || false
               },
-              apiKey: fields.gemini_api_key?.value || ''
+              apiKey: fields.gemini_api_key?.value || '',
+              gptApiKey: fields.gpt_api_key?.value || '',
+              geminiModel: fields.gemini_model?.value || ''
             };
+            if (payload.geminiModel) {
+              send('save-setting', { key: 'gemini_model', value: payload.geminiModel });
+            }
             switch (action) {
               case 'inspect-layout': send('inspect'); break;
-              case 'generate-json': send('generate-json', payload); break;
+              case 'generate-json':
+                toggleProgress(true);
+                send('generate-json', payload);
+                break;
               case 'optimize-structure': send('optimize-structure', payload); break;
               case 'analyze-widgets': send('analyze-widgets', payload); break;
               case 'copy-json': send('copy-json'); break;
               case 'download-json': send('download-json'); break;
               case 'export-wp': send('export-wp', payload); break;
+              case 'reset':
+                if (output) output.value = '';
+                if (logs) logs.innerHTML = '';
+                if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
+                toggleProgress(false);
+                toggleResultButtons(false);
+                addLog('Sessao reiniciada.', 'info');
+                send('reset');
+                break;
               case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
+              case 'test-gpt': send('test-gpt', { apiKey: payload.gptApiKey }); break;
               case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
               case 'resize-ui': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
               default: send(action || 'noop', payload);
@@ -798,7 +890,6 @@
           });
         });
       }
-
       window.onmessage = (event) => {
         const msg = (event.data || {}).pluginMessage;
         if (!msg) return;
@@ -809,11 +900,27 @@
           case 'generation-complete':
             if (output) output.value = msg.payload || '';
             addLog('JSON gerado.', 'info');
+            toggleProgress(false);
+            toggleResultButtons(true);
+            break;
+          case 'generation-error':
+            toggleProgress(false);
+            toggleResultButtons(false);
+            alert(`Erro na geraÃ§Ã£o: ${msg.message}`);
+            break;
+          case 'generation-start':
+            toggleProgress(true);
+            toggleResultButtons(false);
             break;
           case 'gemini-status':
             addLog(msg.message || 'Status Gemini', msg.success ? 'success' : 'error');
             const gs = document.getElementById('gemini-status');
             if (gs) gs.textContent = msg.message;
+            break;
+          case 'gpt-status':
+            addLog(msg.message || 'Status GPT', msg.success ? 'success' : 'error');
+            const gptStatus = document.getElementById('gpt-status');
+            if (gptStatus) gptStatus.textContent = msg.message;
             break;
           case 'wp-status':
             addLog(msg.message || 'Status WP', msg.success ? 'success' : 'error');
@@ -821,6 +928,9 @@
             if (ws) ws.textContent = msg.message;
             break;
           case 'log':
+            if (typeof msg.message === 'string' && msg.message.includes('Iniciando pipeline')) {
+              toggleProgress(true);
+            }
             addLog(msg.message, msg.level);
             break;
           case 'load-settings':
@@ -832,16 +942,35 @@
       bindActions();
       watchInputs();
       initTheme();
+      setProvider(fields.provider_ai?.value || 'gemini');
       send('load-settings');
       setActiveTab('layout');
       if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
 
-      // Resizer (mouse + touch)
+      function toggleResultButtons(enabled) {
+        if (btnCopy) btnCopy.disabled = !enabled;
+        if (btnDownload) btnDownload.disabled = !enabled;
+        if (btnExport) btnExport.disabled = !enabled;
+      }
+      toggleResultButtons(false);
+
+      function toggleProgress(show) {
+        if (!progress) return;
+        if (show) {
+          progress.classList.remove('hidden');
+          progress.style.display = 'flex';
+        } else {
+          progress.classList.add('hidden');
+          progress.style.display = 'none';
+        }
+      }
+
+      // Resizer handle (drag to resize the plugin window)
       const resizer = document.getElementById('resizer-handle');
       if (resizer) {
         let startX = 0, startY = 0, startW = window.innerWidth, startH = window.innerHeight;
         const onMove = (clientX, clientY) => {
-          const newW = Math.min(1500, Math.max(700, startW + (clientX - startX)));
+          const newW = Math.min(1500, Math.max(600, startW + (clientX - startX)));
           const newH = Math.min(1000, Math.max(500, startH + (clientY - startY)));
           send('resize-ui', { width: newW, height: newH });
         };
@@ -859,6 +988,7 @@
           window.addEventListener('mousemove', onMouseMove);
           window.addEventListener('mouseup', onMouseUp);
         });
+        // suporte touch
         const onTouchMove = (e) => {
           const t = e.touches[0];
           if (t) onMove(t.clientX, t.clientY);
@@ -883,3 +1013,6 @@
 </body>
 
 </html>
+
+
+

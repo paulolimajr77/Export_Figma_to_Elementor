@@ -162,43 +162,183 @@
     }
     return data;
   }
+  function repairJson(jsonString) {
+    let repaired = jsonString.trim();
+    if (repaired.endsWith(",")) {
+      repaired = repaired.slice(0, -1);
+    }
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < repaired.length; i++) {
+      const char = repaired[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === "{") openBraces++;
+        else if (char === "}") openBraces--;
+        else if (char === "[") openBrackets++;
+        else if (char === "]") openBrackets--;
+      }
+    }
+    while (openBraces > 0) {
+      repaired += "}";
+      openBraces--;
+    }
+    while (openBrackets > 0) {
+      repaired += "]";
+      openBrackets--;
+    }
+    return repaired;
+  }
   var init_serialization_utils = __esm({
     "src/utils/serialization_utils.ts"() {
       init_image_utils();
     }
   });
 
-  // src/config/prompts.ts
-  var init_prompts = __esm({
-    "src/config/prompts.ts"() {
-    }
-  });
-
   // src/api_gemini.ts
+  function fetchWithTimeout(_0) {
+    return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const resp = yield fetch(url, __spreadProps(__spreadValues({}, options), { signal: controller.signal }));
+        return resp;
+      } finally {
+        clearTimeout(id);
+      }
+    });
+  }
   function getKey() {
     return __async(this, null, function* () {
       return yield figma.clientStorage.getAsync("gemini_api_key");
     });
   }
-  function getModel() {
+  function saveModel(model) {
     return __async(this, null, function* () {
-      const savedModel = yield figma.clientStorage.getAsync("gemini_model");
-      return savedModel || GEMINI_MODEL;
+      yield figma.clientStorage.setAsync("gemini_model", model);
     });
   }
-  var GEMINI_MODEL, API_BASE_URL, GeminiError;
+  function cleanJson(content) {
+    return content.replace(/```json/gi, "").replace(/```/g, "").trim();
+  }
+  function parseGeminiJson(content) {
+    const clean = cleanJson(content);
+    return JSON.parse(clean);
+  }
+  var GEMINI_MODEL, API_BASE_URL, DEFAULT_TIMEOUT_MS, geminiProvider;
   var init_api_gemini = __esm({
     "src/api_gemini.ts"() {
-      init_prompts();
       init_serialization_utils();
-      GEMINI_MODEL = "gemini-2.5-flash";
+      GEMINI_MODEL = "gemini-1.5-flash-002";
       API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
-      GeminiError = class extends Error {
-        constructor(message, statusCode, details) {
-          super(message);
-          this.statusCode = statusCode;
-          this.details = details;
-          this.name = "GeminiError";
+      DEFAULT_TIMEOUT_MS = 12e3;
+      geminiProvider = {
+        id: "gemini",
+        model: GEMINI_MODEL,
+        setModel(model) {
+          this.model = model;
+          saveModel(model).catch(() => {
+          });
+        },
+        generateSchema(input) {
+          return __async(this, null, function* () {
+            var _a, _b, _c, _d, _e, _f;
+            const apiKey = input.apiKey || (yield getKey());
+            if (!apiKey) {
+              return { ok: false, message: "API Key do Gemini nao configurada." };
+            }
+            const model = this.model || GEMINI_MODEL;
+            const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
+            const contents = [{
+              parts: [
+                { text: input.instructions },
+                { text: input.prompt },
+                { text: `SNAPSHOT:
+${JSON.stringify(input.snapshot)}` }
+              ]
+            }];
+            const requestBody = {
+              contents,
+              generationConfig: {
+                temperature: 0.15,
+                maxOutputTokens: 8192,
+                response_mime_type: "application/json"
+              }
+            };
+            try {
+              const response = yield fetchWithTimeout(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody)
+              });
+              if (!response.ok) {
+                const rawText = yield response.text();
+                let parsed = null;
+                try {
+                  parsed = JSON.parse(rawText);
+                } catch (e) {
+                  parsed = rawText;
+                }
+                const message = ((_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
+                return { ok: false, message: `Falha na API Gemini: ${message}`, raw: parsed };
+              }
+              const data = yield response.json();
+              const text = (_f = (_e = (_d = (_c = (_b = data == null ? void 0 : data.candidates) == null ? void 0 : _b[0]) == null ? void 0 : _c.content) == null ? void 0 : _d.parts) == null ? void 0 : _e[0]) == null ? void 0 : _f.text;
+              if (!text) {
+                return { ok: false, message: "Resposta vazia da Gemini.", raw: data };
+              }
+              try {
+                const schema = parseGeminiJson(text);
+                return { ok: true, schema, raw: data };
+              } catch (e) {
+                try {
+                  const repaired = repairJson(cleanJson(text));
+                  const schema = JSON.parse(repaired);
+                  return { ok: true, schema, raw: data };
+                } catch (err) {
+                  return { ok: false, message: "Resposta nao JSON da Gemini.", raw: text };
+                }
+              }
+            } catch (err) {
+              const aborted = (err == null ? void 0 : err.name) === "AbortError";
+              const message = aborted ? "Timeout na chamada Gemini." : (err == null ? void 0 : err.message) || "Erro desconhecido na Gemini.";
+              return { ok: false, message, raw: err };
+            }
+          });
+        },
+        testConnection(apiKey) {
+          return __async(this, null, function* () {
+            var _a;
+            const keyToTest = apiKey || (yield getKey());
+            if (!keyToTest) return { ok: false, message: "API Key nao configurada" };
+            const endpoint = `${API_BASE_URL}?key=${keyToTest}`;
+            try {
+              const response = yield fetchWithTimeout(endpoint, { method: "GET" });
+              if (!response.ok) {
+                const errorData = yield response.json().catch(() => ({}));
+                const message = ((_a = errorData == null ? void 0 : errorData.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
+                return { ok: false, message: `Falha na conexao: ${message}`, raw: errorData };
+              }
+              return { ok: true, message: "Conexao com Gemini verificada." };
+            } catch (e) {
+              const aborted = (e == null ? void 0 : e.name) === "AbortError";
+              const baseMessage = aborted ? "Tempo limite ao testar conexao." : (e == null ? void 0 : e.message) || "Erro desconhecido";
+              return { ok: false, message: baseMessage, raw: e };
+            }
+          });
         }
       };
     }
@@ -756,29 +896,24 @@
     }
   });
 
-  // src/pipeline.ts
-  var PIPELINE_PROMPT_V3, ConversionPipeline;
-  var init_pipeline = __esm({
-    "src/pipeline.ts"() {
-      init_serialization_utils();
-      init_api_gemini();
-      init_elementor_compiler();
-      init_uploader();
-      init_validation();
-      PIPELINE_PROMPT_V3 = `
-Voce e um organizador de arvore Figma para um schema de CONTAINERS flex.
+  // src/config/prompts.ts
+  var ANALYZE_RECREATE_PROMPT;
+  var init_prompts = __esm({
+    "src/config/prompts.ts"() {
+      ANALYZE_RECREATE_PROMPT = `
+Organize a arvore Figma em um schema de CONTAINERS FLEX simples.
 
-REGRAS:
-- NAO ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se folha).
+REGRAS CRITICAS:
+- NAO ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se for folha).
 - NAO classifique por aparencia. Se nao souber, type = "custom".
-- NAO invente grids, colunas extras ou imageBox/iconBox.
-- Preservar ordem dos filhos exatamente como a arvore original.
-- Mapear layoutMode: HORIZONTAL -> direction=row, VERTICAL -> direction=column, NONE -> column.
-- gap = itemSpacing (se houver).
-- padding = paddingTop/Right/Bottom/Left (se houver).
-- background: usar fills do node (cor/imagem/gradiente) se presentes.
+- NAO invente grids, sections/columns ou imageBox/iconBox.
+- Preserve a ordem original dos filhos.
+- Mapear auto-layout: HORIZONTAL -> direction=row; VERTICAL/NONE -> direction=column.
+- gap = itemSpacing; padding = paddingTop/Right/Bottom/Left; background = fills/gradiente/imagem se houver.
+- Widgets permitidos: heading | text | button | image | icon | custom.
+- styles deve incluir sourceId com o id do node original.
 
-SCHEMA:
+SCHEMA ALVO:
 {
   "page": { "title": "...", "tokens": { "primaryColor": "...", "secondaryColor": "..." } },
   "containers": [
@@ -787,20 +922,36 @@ SCHEMA:
       "direction": "row" | "column",
       "width": "full" | "boxed",
       "styles": {},
-      "widgets": [ ... ],
+      "widgets": [ { "type": "heading|text|button|image|icon|custom", "content": "...", "imageId": null, "styles": {} } ],
       "children": [ ... ]
     }
   ]
 }
 
-WIDGETS permitidos: heading | text | button | image | icon | custom
-styles: incluir sempre "sourceId" com id do node original.
-SAIDA: JSON puro, sem markdown.
+ENTRADA:
+\${nodeData}
+
+INSTRUCOES:
+- Mantenha textos e imagens exatamente como no original.
+- Nao agrupe nos diferentes em um unico widget.
+- Se o node tem filhos -> container; se nao tem -> widget simples.
+- width use "full" (padrao); direction derive do layoutMode.
 `;
+    }
+  });
+
+  // src/pipeline.ts
+  var ConversionPipeline;
+  var init_pipeline = __esm({
+    "src/pipeline.ts"() {
+      init_serialization_utils();
+      init_api_gemini();
+      init_elementor_compiler();
+      init_uploader();
+      init_validation();
+      init_prompts();
       ConversionPipeline = class {
         constructor() {
-          this.apiKey = null;
-          this.model = null;
           this.compiler = new ElementorCompiler();
           this.imageUploader = new ImageUploader({});
         }
@@ -808,37 +959,27 @@ SAIDA: JSON puro, sem markdown.
           return __async(this, arguments, function* (node, wpConfig = {}, options) {
             this.compiler.setWPConfig(wpConfig);
             this.imageUploader.setWPConfig(wpConfig);
-            yield this.loadConfig();
+            const provider = (options == null ? void 0 : options.provider) || geminiProvider;
             const preprocessed = this.preprocess(node);
-            const intermediate = yield this.processWithAI(preprocessed);
-            this.validateAndNormalize(intermediate, preprocessed.serializedRoot);
-            validatePipelineSchema(intermediate);
-            this.reconcileWithSource(intermediate, preprocessed.flatNodes);
-            yield this.resolveImages(intermediate);
-            const elementorJson = this.compiler.compile(intermediate);
+            const schema = yield this.generateSchema(preprocessed, provider, options == null ? void 0 : options.apiKey);
+            this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
+            validatePipelineSchema(schema);
+            yield this.resolveImages(schema);
+            const elementorJson = this.compiler.compile(schema);
             if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
             validateElementorJSON(elementorJson);
             if (options == null ? void 0 : options.debug) {
-              const coverage = computeCoverage(preprocessed.flatNodes, intermediate, elementorJson);
+              const coverage = computeCoverage(preprocessed.flatNodes, schema, elementorJson);
               const debugInfo = {
                 serializedTree: preprocessed.serializedRoot,
                 flatNodes: preprocessed.flatNodes,
-                schema: intermediate,
+                schema,
                 elementor: elementorJson,
                 coverage
               };
               return { elementorJson, debugInfo };
             }
             return elementorJson;
-          });
-        }
-        loadConfig() {
-          return __async(this, null, function* () {
-            this.apiKey = yield getKey();
-            this.model = yield getModel();
-            if (!this.apiKey) throw new Error("API Key nao configurada. Configure na aba IA.");
-            if (!this.model) throw new Error("Modelo do Gemini nao configurado.");
-            figma.ui.postMessage({ type: "log", level: "info", message: `[Gemini] Usando modelo: ${this.model}` });
           });
         }
         preprocess(node) {
@@ -877,204 +1018,36 @@ SAIDA: JSON puro, sem markdown.
           }
           return defaultTokens;
         }
-        processWithAI(pre) {
+        generateSchema(pre, provider, apiKey) {
           return __async(this, null, function* () {
-            var _a, _b, _c, _d, _e;
-            if (!this.apiKey || !this.model) throw new Error("Configuracao de IA incompleta.");
-            const endpoint = `${API_BASE_URL}${this.model}:generateContent?key=${this.apiKey}`;
-            const inputPayload = {
-              title: pre.pageTitle,
-              tokens: pre.tokens,
-              nodes: pre.flatNodes
-            };
-            const contents = [{
-              parts: [
-                { text: PIPELINE_PROMPT_V3 },
-                { text: `DADOS DE ENTRADA:
-${JSON.stringify(inputPayload)}` }
-              ]
-            }];
-            const requestBody = {
-              contents,
-              generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 8192,
-                response_mime_type: "application/json"
-              }
-            };
-            const maxRetries = 2;
-            let attempt = 0;
-            while (attempt <= maxRetries) {
-              try {
-                const response = yield fetch(endpoint, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(requestBody)
-                });
-                if (!response.ok) {
-                  const errText = yield response.text();
-                  figma.ui.postMessage({ type: "log", level: "error", message: `[Gemini] HTTP ${response.status} - ${errText}` });
-                  throw new GeminiError(`Erro na API Gemini: ${response.status} - ${errText}`);
-                }
-                const result = yield response.json();
-                const text = (_e = (_d = (_c = (_b = (_a = result == null ? void 0 : result.candidates) == null ? void 0 : _a[0]) == null ? void 0 : _b.content) == null ? void 0 : _c.parts) == null ? void 0 : _d[0]) == null ? void 0 : _e.text;
-                if (!text) {
-                  figma.ui.postMessage({ type: "log", level: "error", message: `[Gemini] Resposta sem texto. Status OK. Payload: ${JSON.stringify(result)}` });
-                  throw new Error("Resposta vazia da IA.");
-                }
-                const clean = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-                return JSON.parse(clean);
-              } catch (err) {
-                figma.ui.postMessage({ type: "log", level: "error", message: `[Gemini] Falha tentativa ${attempt + 1}: ${err instanceof Error ? err.message : String(err)}` });
-                attempt++;
-                if (attempt > maxRetries) {
-                  throw err;
-                }
-                const delay = 1500 * attempt;
-                yield new Promise((res) => setTimeout(res, delay));
-              }
+            const prompt = ANALYZE_RECREATE_PROMPT.replace("${nodeData}", JSON.stringify(pre.serializedRoot, null, 2));
+            const instructions = "Gere o schema Flex do Elementor sem ignorar nenhum node. Preserve ordem, ids e preencha styles.sourceId.";
+            const response = yield provider.generateSchema({
+              prompt,
+              snapshot: pre.serializedRoot,
+              instructions,
+              apiKey
+            });
+            if (!response.ok || !response.schema) {
+              throw new Error(response.message || "IA nao retornou schema.");
             }
-            throw new Error("Falha ao processar IA.");
+            return response.schema;
           });
         }
-        validateAndNormalize(schema, root) {
+        validateAndNormalize(schema, root, tokens) {
           if (!schema || typeof schema !== "object") throw new Error("Schema invalido: nao e um objeto.");
-          if (!schema.page || typeof schema.page !== "object") schema.page = {};
-          if (typeof schema.page.title !== "string") schema.page.title = String(schema.page.title || "Pagina importada");
-          if (!schema.page.tokens) schema.page.tokens = {};
-          if (typeof schema.page.tokens.primaryColor !== "string") schema.page.tokens.primaryColor = "#000000";
-          if (typeof schema.page.tokens.secondaryColor !== "string") schema.page.tokens.secondaryColor = "#FFFFFF";
-          if (!Array.isArray(schema.containers) || schema.containers.length === 0) {
-            schema.containers = [this.createContainerFromSerialized(root, 0)];
-          }
-          schema.containers = schema.containers.map(
-            (container, index) => this.normalizeContainer(container, index)
-          );
-        }
-        normalizeContainer(container, index) {
-          const normalizeWidget = (w, idx) => {
-            const allowed = ["heading", "text", "button", "image", "icon", "custom"];
-            const type = allowed.includes(w == null ? void 0 : w.type) ? w.type : "custom";
-            const content = typeof (w == null ? void 0 : w.content) === "string" || (w == null ? void 0 : w.content) === null ? w.content : null;
-            const imageId = typeof (w == null ? void 0 : w.imageId) === "string" || (w == null ? void 0 : w.imageId) === null ? w.imageId : null;
-            const styles2 = w && typeof w.styles === "object" && !Array.isArray(w.styles) ? __spreadValues({}, w.styles) : {};
-            if (!styles2.sourceId && typeof (w == null ? void 0 : w.sourceId) === "string") styles2.sourceId = w.sourceId;
-            if (!styles2.sourceId) styles2.sourceId = `widget-${index}-${idx}`;
-            return { type, content, imageId, styles: styles2, kind: w == null ? void 0 : w.kind };
-          };
-          const direction = (container == null ? void 0 : container.direction) === "row" ? "row" : "column";
-          const width = (container == null ? void 0 : container.width) === "boxed" ? "boxed" : "full";
-          const styles = container && typeof container.styles === "object" && !Array.isArray(container.styles) ? __spreadValues({}, container.styles) : {};
-          if (!styles.sourceId && typeof (container == null ? void 0 : container.id) === "string") styles.sourceId = container.id;
-          const widgets = Array.isArray(container == null ? void 0 : container.widgets) ? container.widgets.map((w, idx) => normalizeWidget(w, idx)) : [];
-          const children = Array.isArray(container == null ? void 0 : container.children) ? container.children.map((c, i) => this.normalizeContainer(c, i)) : [];
-          return {
-            id: typeof (container == null ? void 0 : container.id) === "string" ? container.id : `container-${index + 1}`,
-            direction,
-            width,
-            styles,
-            widgets,
-            children
-          };
-        }
-        reconcileWithSource(schema, flatNodes) {
-          const allSourceIds = new Set(flatNodes.map((n) => n.id));
-          const covered = /* @__PURE__ */ new Set();
-          const containerMap = /* @__PURE__ */ new Map();
-          const markCoveredWidget = (widget) => {
-            var _a;
-            const sourceId = (_a = widget.styles) == null ? void 0 : _a.sourceId;
-            if (typeof sourceId === "string") covered.add(sourceId);
-          };
-          const walkContainer = (container) => {
-            var _a;
-            const sourceId = (_a = container.styles) == null ? void 0 : _a.sourceId;
-            if (typeof sourceId === "string") {
-              covered.add(sourceId);
-              containerMap.set(sourceId, container);
-            }
-            container.widgets.forEach(markCoveredWidget);
-            container.children.forEach(walkContainer);
-          };
-          schema.containers.forEach(walkContainer);
-          const missing = [...allSourceIds].filter((id) => !covered.has(id));
-          if (missing.length === 0) return;
-          const rootContainer = schema.containers[0] || this.createContainerFromSerialized(flatNodes[0], 0);
-          const nodeById = /* @__PURE__ */ new Map();
-          flatNodes.forEach((n) => nodeById.set(n.id, n));
-          const ensureParentContainer = (parentId) => {
-            if (parentId && containerMap.has(parentId)) return containerMap.get(parentId);
-            return rootContainer;
-          };
-          const createWidgetFromNode = (node) => {
-            const map = {
-              TEXT: "text",
-              VECTOR: "icon",
-              STAR: "icon",
-              ELLIPSE: "icon",
-              RECTANGLE: "image",
-              LINE: "icon"
-            };
-            const type = map[node.type] || "custom";
-            const content = typeof node.characters === "string" ? node.characters : null;
-            return {
-              type,
-              content,
-              imageId: node.id,
-              styles: {
-                sourceId: node.id,
-                sourceType: node.type,
-                sourceName: node.name
-              },
-              kind: void 0
-            };
-          };
-          const createContainerFromNode = (node) => {
-            const direction = node.layoutMode === "HORIZONTAL" || node.direction === "row" ? "row" : "column";
-            const styles = {
-              sourceId: node.id,
-              sourceType: node.type,
-              sourceName: node.name,
-              gap: node.itemSpacing,
-              paddingTop: node.paddingTop,
-              paddingRight: node.paddingRight,
-              paddingBottom: node.paddingBottom,
-              paddingLeft: node.paddingLeft,
-              primaryAxisAlignItems: node.primaryAxisAlignItems,
-              counterAxisAlignItems: node.counterAxisAlignItems
-            };
-            return {
-              id: `container-${node.id}`,
-              direction,
-              width: "full",
-              styles,
-              widgets: [],
-              children: []
-            };
-          };
-          missing.forEach((id) => {
-            const sourceNode = nodeById.get(id);
-            if (!sourceNode) return;
-            const parent = ensureParentContainer(sourceNode.parentId);
-            if (Array.isArray(sourceNode.children) && sourceNode.children.length > 0) {
-              const newContainer = createContainerFromNode(sourceNode);
-              parent.children.push(newContainer);
-              containerMap.set(sourceNode.id, newContainer);
-              covered.add(sourceNode.id);
-            } else {
-              const widget = createWidgetFromNode(sourceNode);
-              parent.widgets.push(widget);
-              covered.add(sourceNode.id);
-            }
-          });
+          if (!schema.page) schema.page = { title: root.name, tokens };
+          if (!schema.page.tokens) schema.page.tokens = tokens;
+          if (!schema.page.title) schema.page.title = root.name;
+          if (!Array.isArray(schema.containers)) schema.containers = [];
         }
         resolveImages(schema) {
           return __async(this, null, function* () {
             const processWidget = (widget) => __async(this, null, function* () {
-              if (widget.imageId && (widget.type === "image" || widget.type === "custom")) {
+              if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
                 try {
                   const node = figma.getNodeById(widget.imageId);
-                  if (node && (node.type === "FRAME" || node.type === "GROUP" || node.type === "RECTANGLE" || node.type === "INSTANCE" || node.type === "COMPONENT")) {
+                  if (node) {
                     const result = yield this.imageUploader.uploadToWordPress(node);
                     if (result) {
                       widget.content = result.url;
@@ -1099,45 +1072,170 @@ ${JSON.stringify(inputPayload)}` }
             }
           });
         }
-        createContainerFromSerialized(node, index) {
-          const direction = node.layoutMode === "HORIZONTAL" || node.direction === "row" ? "row" : "column";
-          const styles = {
-            sourceId: node.id,
-            sourceType: node.type,
-            sourceName: node.name,
-            gap: node.itemSpacing,
-            paddingTop: node.paddingTop,
-            paddingRight: node.paddingRight,
-            paddingBottom: node.paddingBottom,
-            paddingLeft: node.paddingLeft,
-            primaryAxisAlignItems: node.primaryAxisAlignItems,
-            counterAxisAlignItems: node.counterAxisAlignItems
-          };
-          const children = [];
-          const widgets = [];
-          if (Array.isArray(node.children)) {
-            node.children.forEach((child) => {
-              if (child.children && child.children.length > 0) {
-                children.push(this.createContainerFromSerialized(child, children.length));
-              } else {
-                const widget = {
-                  type: child.type === "TEXT" ? "text" : child.type === "RECTANGLE" ? "image" : "custom",
-                  content: typeof child.characters === "string" ? child.characters : null,
-                  imageId: child.type === "RECTANGLE" ? child.id : null,
-                  styles: { sourceId: child.id, sourceType: child.type, sourceName: child.name }
-                };
-                widgets.push(widget);
+      };
+    }
+  });
+
+  // src/api_openai.ts
+  function fetchWithTimeout2(_0) {
+    return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS2) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const resp = yield fetch(url, __spreadProps(__spreadValues({}, options), { signal: controller.signal }));
+        return resp;
+      } finally {
+        clearTimeout(id);
+      }
+    });
+  }
+  function getOpenAIKey() {
+    return __async(this, null, function* () {
+      return yield figma.clientStorage.getAsync("gpt_api_key");
+    });
+  }
+  function saveOpenAIModel(model) {
+    return __async(this, null, function* () {
+      yield figma.clientStorage.setAsync("gpt_model", model);
+    });
+  }
+  function cleanJson2(content) {
+    return content.replace(/```json/gi, "").replace(/```/g, "").trim();
+  }
+  function parseJsonResponse(rawContent) {
+    return __async(this, null, function* () {
+      const clean = cleanJson2(rawContent);
+      try {
+        return JSON.parse(clean);
+      } catch (err) {
+        throw new Error("Resposta nao JSON");
+      }
+    });
+  }
+  var OPENAI_API_URL, DEFAULT_TIMEOUT_MS2, DEFAULT_MODEL, openaiProvider;
+  var init_api_openai = __esm({
+    "src/api_openai.ts"() {
+      OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+      DEFAULT_TIMEOUT_MS2 = 12e3;
+      DEFAULT_MODEL = "gpt-4.1";
+      openaiProvider = {
+        id: "gpt",
+        model: DEFAULT_MODEL,
+        setModel(model) {
+          this.model = model;
+          saveOpenAIModel(model).catch(() => {
+          });
+        },
+        generateSchema(input) {
+          return __async(this, null, function* () {
+            var _a, _b, _c, _d;
+            const apiKey = input.apiKey || (yield getOpenAIKey());
+            if (!apiKey) {
+              return { ok: false, message: "API Key do OpenAI nao configurada." };
+            }
+            const requestBody = {
+              model: this.model,
+              messages: [
+                { role: "system", content: input.instructions },
+                { role: "user", content: input.prompt },
+                { role: "user", content: `SNAPSHOT:
+${JSON.stringify(input.snapshot)}` }
+              ],
+              temperature: 0.2,
+              max_tokens: 8192,
+              response_format: { type: "json_object" }
+            };
+            try {
+              const response = yield fetchWithTimeout2(OPENAI_API_URL, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(requestBody)
+              });
+              if (!response.ok) {
+                const rawText = yield response.text();
+                let parsed = null;
+                try {
+                  parsed = JSON.parse(rawText);
+                } catch (e) {
+                  parsed = rawText;
+                }
+                const message = ((_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
+                return { ok: false, message: `Falha na API OpenAI: ${message}`, raw: parsed };
               }
-            });
-          }
-          return {
-            id: typeof node.id === "string" ? node.id : `container-${index + 1}`,
-            direction,
-            width: "full",
-            styles,
-            widgets,
-            children
-          };
+              const data = yield response.json();
+              const content = (_d = (_c = (_b = data == null ? void 0 : data.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content;
+              if (!content) {
+                return { ok: false, message: "Resposta vazia da OpenAI.", raw: data };
+              }
+              try {
+                const schema = yield parseJsonResponse(content);
+                return { ok: true, schema, raw: data };
+              } catch (err) {
+                return { ok: false, message: (err == null ? void 0 : err.message) || "Resposta nao JSON", raw: content };
+              }
+            } catch (err) {
+              const aborted = (err == null ? void 0 : err.name) === "AbortError";
+              const message = aborted ? "Timeout na chamada OpenAI." : (err == null ? void 0 : err.message) || "Erro desconhecido ao chamar OpenAI.";
+              return { ok: false, message, raw: err };
+            }
+          });
+        },
+        testConnection(apiKey) {
+          return __async(this, null, function* () {
+            var _a, _b, _c, _d;
+            const keyToTest = apiKey || (yield getOpenAIKey());
+            if (!keyToTest) {
+              return { ok: false, message: "API Key do OpenAI nao configurada." };
+            }
+            const requestBody = {
+              model: this.model,
+              messages: [
+                { role: "user", content: "ping" }
+              ],
+              temperature: 0,
+              max_tokens: 16,
+              response_format: { type: "json_object" }
+            };
+            try {
+              const response = yield fetchWithTimeout2(OPENAI_API_URL, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${keyToTest}`
+                },
+                body: JSON.stringify(requestBody)
+              });
+              if (!response.ok) {
+                const rawText = yield response.text();
+                let parsed = null;
+                try {
+                  parsed = JSON.parse(rawText);
+                } catch (e) {
+                  parsed = rawText;
+                }
+                const message = ((_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
+                return { ok: false, message: `Falha ao testar OpenAI: ${message}`, raw: parsed };
+              }
+              const data = yield response.json();
+              const content = (_d = (_c = (_b = data == null ? void 0 : data.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content;
+              if (!content) {
+                return { ok: false, message: "Resposta vazia.", raw: data };
+              }
+              try {
+                yield parseJsonResponse(content);
+                return { ok: true, message: "Conexao com OpenAI verificada.", raw: data };
+              } catch (e) {
+                return { ok: false, message: "Resposta nao JSON ao testar OpenAI.", raw: content };
+              }
+            } catch (err) {
+              const aborted = (err == null ? void 0 : err.name) === "AbortError";
+              const message = aborted ? "Timeout ao testar conexao OpenAI." : (err == null ? void 0 : err.message) || "Erro desconhecido ao testar OpenAI.";
+              return { ok: false, message, raw: err };
+            }
+          });
         }
       };
     }
@@ -1149,10 +1247,15 @@ ${JSON.stringify(inputPayload)}` }
       init_pipeline();
       init_serialization_utils();
       init_api_gemini();
+      init_api_openai();
       figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
       var pipeline = new ConversionPipeline();
       var lastJSON = null;
-      var DEFAULT_TIMEOUT_MS = 12e3;
+      var DEFAULT_TIMEOUT_MS3 = 12e3;
+      var DEFAULT_PROVIDER = "gemini";
+      function getActiveProvider(providerId) {
+        return providerId === "gpt" ? openaiProvider : geminiProvider;
+      }
       function toBase64(str) {
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let output = "";
@@ -1169,8 +1272,8 @@ ${JSON.stringify(inputPayload)}` }
         }
         return output;
       }
-      function fetchWithTimeout(_0) {
-        return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+      function fetchWithTimeout3(_0) {
+        return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS3) {
           const AC = typeof AbortController !== "undefined" ? AbortController : null;
           if (!AC) {
             return yield fetch(url, options);
@@ -1240,6 +1343,41 @@ ${JSON.stringify(inputPayload)}` }
           return { url, user, token, exportImages, autoPage };
         });
       }
+      function resolveProviderConfig(msg) {
+        return __async(this, null, function* () {
+          const incomingProvider = (msg == null ? void 0 : msg.providerAi) || (yield loadSetting("provider_ai", DEFAULT_PROVIDER));
+          const providerId = incomingProvider === "gpt" ? "gpt" : DEFAULT_PROVIDER;
+          yield saveSetting("provider_ai", providerId);
+          const provider = getActiveProvider(providerId);
+          if (providerId === "gpt") {
+            const inlineKey2 = msg == null ? void 0 : msg.gptApiKey;
+            let key2 = inlineKey2 || (yield loadSetting("gpt_api_key", ""));
+            if (inlineKey2) {
+              yield saveSetting("gpt_api_key", inlineKey2);
+            }
+            const storedModel = yield loadSetting("gpt_model", openaiProvider.model);
+            openaiProvider.setModel(storedModel || openaiProvider.model);
+            if (!key2) throw new Error("OpenAI API Key nao configurada.");
+            return { provider, apiKey: key2, providerId };
+          }
+          const inlineKey = msg == null ? void 0 : msg.apiKey;
+          let key = inlineKey || (yield loadSetting("gptel_gemini_key", ""));
+          if (!key) {
+            key = yield loadSetting("gemini_api_key", "");
+          }
+          if (inlineKey) {
+            yield saveSetting("gptel_gemini_key", inlineKey);
+            yield saveSetting("gemini_api_key", inlineKey);
+          }
+          const model = (msg == null ? void 0 : msg.geminiModel) || (yield loadSetting("gemini_model", GEMINI_MODEL));
+          if (model) {
+            yield saveSetting("gemini_model", model);
+            geminiProvider.setModel(model);
+          }
+          if (!key) throw new Error("Gemini API Key nao configurada.");
+          return { provider, apiKey: key, providerId };
+        });
+      }
       function getSelectedNode() {
         const selection = figma.currentPage.selection;
         if (!selection || selection.length === 0) {
@@ -1247,13 +1385,14 @@ ${JSON.stringify(inputPayload)}` }
         }
         return selection[0];
       }
-      function generateElementorJSON(customWP, debug) {
+      function generateElementorJSON(aiPayload, customWP, debug) {
         return __async(this, null, function* () {
           const node = getSelectedNode();
           const wpConfig = customWP || (yield loadWPConfig());
-          log("Iniciando pipeline...", "info");
-          const result = yield pipeline.run(node, wpConfig, { debug });
-          log("Pipeline conclu\xEDdo.", "success");
+          const { provider, apiKey, providerId } = yield resolveProviderConfig(aiPayload);
+          log(`Iniciando pipeline (${providerId.toUpperCase()})...`, "info");
+          const result = yield pipeline.run(node, wpConfig, { debug, provider, apiKey });
+          log("Pipeline concluido.", "success");
           if (debug && result.elementorJson) {
             return result;
           }
@@ -1270,9 +1409,9 @@ ${JSON.stringify(inputPayload)}` }
           figma.ui.postMessage({ type: "generation-complete", payload, debug: debugInfo });
           try {
             yield figma.clipboard.writeText(payload);
-            figma.notify("JSON Elementor gerado e copiado para a \xE1rea de transfer\xEAncia.");
+            figma.notify("JSON Elementor gerado e copiado para a area de transferencia.");
           } catch (err) {
-            figma.notify("JSON Elementor gerado. N\xE3o foi poss\xEDvel copiar automaticamente.", { timeout: 4e3 });
+            figma.notify("JSON Elementor gerado. Nao foi possivel copiar automaticamente.", { timeout: 4e3 });
             log(`Falha ao copiar: ${err}`, "warn");
           }
         });
@@ -1287,7 +1426,10 @@ ${JSON.stringify(inputPayload)}` }
           if (!geminiKey) {
             geminiKey = yield loadSetting("gemini_api_key", "");
           }
-          const geminiModel = yield loadSetting("gemini_model", "gemini-2.5-flash");
+          const geminiModel = yield loadSetting("gemini_model", GEMINI_MODEL);
+          const providerAi = yield loadSetting("provider_ai", DEFAULT_PROVIDER);
+          const gptKey = yield loadSetting("gpt_api_key", "");
+          const gptModel = yield loadSetting("gpt_model", openaiProvider.model);
           const wpUrl = yield loadSetting("gptel_wp_url", "");
           const wpUser = yield loadSetting("gptel_wp_user", "");
           const wpToken = yield loadSetting("gptel_wp_token", "");
@@ -1299,6 +1441,9 @@ ${JSON.stringify(inputPayload)}` }
             payload: {
               geminiKey,
               geminiModel,
+              providerAi,
+              gptKey,
+              gptModel,
               wpUrl,
               wpUser,
               wpToken,
@@ -1318,20 +1463,17 @@ ${JSON.stringify(inputPayload)}` }
               const node = getSelectedNode();
               const serialized = serializeNode(node);
               sendPreview(serialized);
-              log("\xC1rvore inspecionada.", "info");
+              log("Arvore inspecionada.", "info");
             } catch (error) {
               log((error == null ? void 0 : error.message) || String(error), "error");
             }
             break;
           case "generate-json":
             try {
-              if (msg.geminiModel) {
-                yield saveSetting("gemini_model", msg.geminiModel);
-              }
               figma.ui.postMessage({ type: "generation-start" });
               const wpConfig = msg.wpConfig;
               const debug = !!msg.debug;
-              const { elementorJson, debugInfo } = yield generateElementorJSON(wpConfig, debug);
+              const { elementorJson, debugInfo } = yield generateElementorJSON(msg, wpConfig, debug);
               yield deliverResult(elementorJson, debugInfo);
               sendPreview(elementorJson);
             } catch (error) {
@@ -1379,17 +1521,17 @@ ${JSON.stringify(inputPayload)}` }
                 break;
               }
               if (!url || !user || !token) {
-                figma.ui.postMessage({ type: "wp-status", success: false, message: "URL, usu\xE1rio ou senha do app ausentes." });
+                figma.ui.postMessage({ type: "wp-status", success: false, message: "URL, usuario ou senha do app ausentes." });
                 break;
               }
               const auth = `Basic ${toBase64(`${user}:${token}`)}`;
               const base = url.replace(/\/$/, "");
               const meEndpoint = `${base}/wp-json/wp/v2/users/me`;
-              const meResp = yield fetchWithTimeout(meEndpoint, { headers: { Authorization: auth, Accept: "application/json" } });
+              const meResp = yield fetchWithTimeout3(meEndpoint, { headers: { Authorization: auth, Accept: "application/json" } });
               if (!meResp.ok) {
                 const text = yield meResp.text();
                 figma.ui.postMessage({ type: "log", level: "error", message: `[WP] Auth FAIL (${meResp.status}) -> ${text}` });
-                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha de autentica\xE7\xE3o (${meResp.status}): ${text}` });
+                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha de autenticacao (${meResp.status}): ${text}` });
                 break;
               }
               const pageEndpoint = `${base}/wp-json/wp/v2/pages`;
@@ -1399,7 +1541,7 @@ ${JSON.stringify(inputPayload)}` }
                 meta: { _elementor_data: lastJSON },
                 content: "Gerado via FigToEL (Elementor JSON em _elementor_data)."
               };
-              const pageResp = yield fetchWithTimeout(pageEndpoint, {
+              const pageResp = yield fetchWithTimeout3(pageEndpoint, {
                 method: "POST",
                 headers: {
                   Authorization: auth,
@@ -1409,7 +1551,7 @@ ${JSON.stringify(inputPayload)}` }
               });
               if (!pageResp.ok) {
                 const text = yield pageResp.text();
-                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha ao criar p\xE1gina (${pageResp.status}): ${text}` });
+                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha ao criar pagina (${pageResp.status}): ${text}` });
                 break;
               }
               const pageJson = yield pageResp.json().catch(() => ({}));
@@ -1419,7 +1561,7 @@ ${JSON.stringify(inputPayload)}` }
               yield saveSetting("gptel_export_images", !!cfg.exportImages);
               yield saveSetting("gptel_auto_page", !!cfg.autoPage);
               const link = (pageJson == null ? void 0 : pageJson.link) || url;
-              figma.ui.postMessage({ type: "wp-status", success: true, message: `P\xE1gina enviada como rascunho. Link: ${link}` });
+              figma.ui.postMessage({ type: "wp-status", success: true, message: `Pagina enviada como rascunho. Link: ${link}` });
             } catch (e) {
               const aborted = (e == null ? void 0 : e.name) === "AbortError";
               const msgErr = aborted ? "Tempo limite ao exportar para WP." : (e == null ? void 0 : e.message) || "Erro desconhecido";
@@ -1430,26 +1572,29 @@ ${JSON.stringify(inputPayload)}` }
             try {
               if (msg.model) {
                 yield saveSetting("gemini_model", msg.model);
+                geminiProvider.setModel(msg.model);
               }
               const inlineKey = msg.apiKey;
-              let keyToTest = inlineKey || (yield loadSetting("gptel_gemini_key", ""));
-              if (!keyToTest) {
-                keyToTest = yield loadSetting("gemini_api_key", "");
+              if (inlineKey) {
+                yield saveSetting("gptel_gemini_key", inlineKey);
+                yield saveSetting("gemini_api_key", inlineKey);
               }
-              if (!keyToTest) {
-                figma.ui.postMessage({ type: "gemini-status", success: false, message: "API Key n\xE3o informada." });
-                break;
-              }
-              const resp = yield fetch(`${API_BASE_URL}?key=${keyToTest}`);
-              if (!resp.ok) {
-                const text = yield resp.text();
-                figma.ui.postMessage({ type: "gemini-status", success: false, message: `Falha na conex\xE3o (${resp.status}): ${text}` });
-                break;
-              }
-              yield saveSetting("gptel_gemini_key", keyToTest);
-              figma.ui.postMessage({ type: "gemini-status", success: true, message: "Conex\xE3o com Gemini verificada." });
+              const res = yield geminiProvider.testConnection(inlineKey);
+              figma.ui.postMessage({ type: "gemini-status", success: res.ok, message: res.message });
             } catch (e) {
               figma.ui.postMessage({ type: "gemini-status", success: false, message: `Erro: ${(e == null ? void 0 : e.message) || e}` });
+            }
+            break;
+          case "test-gpt":
+            try {
+              const inlineKey = msg.apiKey || msg.gptApiKey || "";
+              if (inlineKey) {
+                yield saveSetting("gpt_api_key", inlineKey);
+              }
+              const res = yield openaiProvider.testConnection(inlineKey || void 0);
+              figma.ui.postMessage({ type: "gpt-status", success: res.ok, message: res.message });
+            } catch (e) {
+              figma.ui.postMessage({ type: "gpt-status", success: false, message: `Erro: ${(e == null ? void 0 : e.message) || e}` });
             }
             break;
           case "test-wp":
@@ -1460,7 +1605,7 @@ ${JSON.stringify(inputPayload)}` }
               const user = ((cfg == null ? void 0 : cfg.user) || "").trim();
               const token = ((cfg == null ? void 0 : cfg.token) || (cfg == null ? void 0 : cfg.password) || "").replace(/\s+/g, "");
               if (!url || !user || !token) {
-                figma.ui.postMessage({ type: "wp-status", success: false, message: "URL, usu\xE1rio ou senha do app ausentes." });
+                figma.ui.postMessage({ type: "wp-status", success: false, message: "URL, usuario ou senha do app ausentes." });
                 break;
               }
               figma.ui.postMessage({
@@ -1470,7 +1615,7 @@ ${JSON.stringify(inputPayload)}` }
               });
               const endpoint = url + "/wp-json/wp/v2/users/me";
               const auth = toBase64(`${user}:${token}`);
-              const resp = yield fetchWithTimeout(endpoint, {
+              const resp = yield fetchWithTimeout3(endpoint, {
                 method: "GET",
                 headers: { Authorization: `Basic ${auth}`, Accept: "application/json" }
               });
@@ -1486,7 +1631,7 @@ ${JSON.stringify(inputPayload)}` }
               yield saveSetting("gptel_wp_token", token);
               yield saveSetting("gptel_export_images", !!cfg.exportImages);
               yield saveSetting("gptel_auto_page", !!autoPage);
-              figma.ui.postMessage({ type: "wp-status", success: true, message: "Conex\xE3o com WordPress verificada." });
+              figma.ui.postMessage({ type: "wp-status", success: true, message: "Conexao com WordPress verificada." });
             } catch (e) {
               figma.ui.postMessage({ type: "wp-status", success: false, message: `Erro: ${(e == null ? void 0 : e.message) || e}` });
             }

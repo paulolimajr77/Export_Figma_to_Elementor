@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   const tabs = document.querySelectorAll('.tab-btn');
   const panels = document.querySelectorAll('.tab-panel');
   const indicator = document.querySelector('.tab-indicator');
@@ -12,8 +12,10 @@
   const darkSheet = document.getElementById('theme-dark');
 
  const fields = {
+    provider_ai: document.getElementById('provider_ai'),
     gemini_api_key: document.getElementById('gemini_api_key'),
     gemini_model: document.getElementById('gemini_model'),
+    gpt_api_key: document.getElementById('gpt_api_key'),
     wp_url: document.getElementById('wp_url'),
     wp_user: document.getElementById('wp_user'),
     wp_token: document.getElementById('wp_token'),
@@ -44,6 +46,12 @@
     tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
     panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
     updateIndicator();
+  }
+
+  function setProvider(providerId) {
+    const value = providerId === 'gpt' ? 'gpt' : 'gemini';
+    document.body?.setAttribute('data-provider', value);
+    if (fields.provider_ai) fields.provider_ai.value = value;
   }
 
   tabs.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
@@ -88,8 +96,10 @@
 
   function loadStoredSettings(payload) {
     if (!payload) return;
+    if (fields.provider_ai) setProvider(payload.providerAi || 'gemini');
     if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
     if (fields.gemini_model && payload.geminiModel) fields.gemini_model.value = payload.geminiModel;
+    if (fields.gpt_api_key) fields.gpt_api_key.value = payload.gptKey || '';
     if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
     if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
     if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
@@ -101,8 +111,15 @@
 
   function watchInputs() {
     const saveText = (key, el) => debounce(() => send('save-setting', { key, value: el.value }));
+    if (fields.provider_ai) {
+      fields.provider_ai.addEventListener('change', () => {
+        setProvider(fields.provider_ai.value);
+        send('save-setting', { key: 'provider_ai', value: fields.provider_ai.value });
+      });
+    }
     if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
     if (fields.gemini_model) fields.gemini_model.addEventListener('change', () => send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value }));
+    if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gpt_api_key', fields.gpt_api_key));
     if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
     if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
     if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
@@ -110,7 +127,7 @@
     if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
   }
 
-  function bindActions() {
+    function bindActions() {
     document.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (btn.disabled && ['copy-json', 'download-json', 'export-wp'].includes(btn.getAttribute('data-action') || '')) {
@@ -121,6 +138,7 @@
           send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value });
         }
         const payload = {
+          providerAi: fields.provider_ai?.value || 'gemini',
           wpConfig: {
             url: fields.wp_url?.value || '',
             user: fields.wp_user?.value || '',
@@ -129,9 +147,9 @@
             autoPage: fields.wp_create_page?.checked || false
           },
           apiKey: fields.gemini_api_key?.value || '',
+          gptApiKey: fields.gpt_api_key?.value || '',
           geminiModel: fields.gemini_model?.value || ''
         };
-        // salva sempre o modelo selecionado
         if (payload.geminiModel) {
           send('save-setting', { key: 'gemini_model', value: payload.geminiModel });
         }
@@ -152,10 +170,11 @@
             if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
             toggleProgress(false);
             toggleResultButtons(false);
-            addLog('Sessão reiniciada.', 'info');
+            addLog('Sessao reiniciada.', 'info');
             send('reset');
             break;
           case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
+          case 'test-gpt': send('test-gpt', { apiKey: payload.gptApiKey }); break;
           case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
           default: send(action || 'noop', payload);
         }
@@ -195,6 +214,11 @@
         const gs = document.getElementById('gemini-status');
         if (gs) gs.textContent = msg.message;
         break;
+      case 'gpt-status':
+        addLog(msg.message || 'Status GPT', msg.success ? 'success' : 'error');
+        const gptStatus = document.getElementById('gpt-status');
+        if (gptStatus) gptStatus.textContent = msg.message;
+        break;
       case 'wp-status':
         addLog(msg.message || 'Status WP', msg.success ? 'success' : 'error');
         const ws = document.getElementById('wp-status');
@@ -215,6 +239,7 @@
   bindActions();
   watchInputs();
   initTheme();
+  setProvider(fields.provider_ai?.value || 'gemini');
   send('load-settings');
   setActiveTab('layout');
   if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
@@ -281,3 +306,4 @@
     }, { passive: true });
   }
 })();
+

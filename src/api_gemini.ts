@@ -1,17 +1,17 @@
-﻿// Integração Gemini ajustada para containers flex
+// Integracao Gemini ajustada para containers flex
 /// <reference types="@figma/plugin-typings" />
 
 import { ANALYZE_RECREATE_PROMPT } from './config/prompts';
 import { repairJson } from './utils/serialization_utils';
+import { GenerateSchemaInput, SchemaProvider } from './types/providers';
+import { PipelineSchema } from './types/pipeline.schema';
 
 export type GeminiModel =
-    | 'gemini-2.5-pro'
-    | 'gemini-2.5-flash'
-    | 'gemini-2.5-flash-lite'
-    | 'gemini-2.0-flash'
-    | 'gemini-2.0-flash-lite';
+    | 'gemini-2.0-flash-exp'
+    | 'gemini-1.5-pro-002'
+    | 'gemini-1.5-flash-002';
 
-export const GEMINI_MODEL: GeminiModel = 'gemini-2.5-flash';
+export const GEMINI_MODEL: GeminiModel = 'gemini-1.5-flash-002';
 export const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
 const DEFAULT_TIMEOUT_MS = 12000;
 
@@ -50,245 +50,132 @@ export async function getModel(): Promise<GeminiModel> {
     return savedModel || GEMINI_MODEL;
 }
 
-// ==================== Teste de conexão ====================
-export async function testConnection(): Promise<{ success: boolean; message: string }> {
+function cleanJson(content: string): string {
+    return content.replace(/```json/gi, '').replace(/```/g, '').trim();
+}
+
+function parseGeminiJson(content: string): PipelineSchema {
+    const clean = cleanJson(content);
+    return JSON.parse(clean) as PipelineSchema;
+}
+
+// ==================== Teste de conexao ====================
+export async function testConnection(): Promise<{ success: boolean; ok: boolean; message: string }> {
     const apiKey = await getKey();
-    if (!apiKey) return { success: false, message: 'API Key não configurada' };
+    if (!apiKey) return { success: false, ok: false, message: 'API Key nao configurada' };
 
     const endpoint = `${API_BASE_URL}?key=${apiKey}`;
     try {
         const response = await fetchWithTimeout(endpoint, { method: 'GET' });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const message = errorData?.error?.message || `HTTP ${response.status}`;
-            throw new GeminiError(`Falha na conexão: ${message}`, response.status, errorData);
+            const message = (errorData as any)?.error?.message || `HTTP ${response.status}`;
+            throw new GeminiError(`Falha na conexao: ${message}`, response.status, errorData);
         }
-        return { success: true, message: 'Conexão com Gemini verificada.' };
+        return { success: true, ok: true, message: 'Conexao com Gemini verificada.' };
     } catch (e: any) {
         const aborted = e?.name === 'AbortError';
-        const baseMessage = aborted ? 'Tempo limite ao testar conexão.' : (e?.message || 'Erro desconhecido');
-        return { success: false, message: baseMessage };
+        const baseMessage = aborted ? 'Tempo limite ao testar conexao.' : (e?.message || 'Erro desconhecido');
+        return { success: false, ok: false, message: baseMessage };
     }
 }
 
-// ==================== Geração (análise + recriação) ====================
-export async function analyzeAndRecreate(
-    imageData: Uint8Array,
-    availableImageIds: string[] = [],
-    nodeData: any = null,
-    promptType: 'full' | 'micro' = 'full'
-): Promise<LayoutAnalysis> {
-    const apiKey = await getKey();
-    if (!apiKey) throw new GeminiError('API Key não configurada. Configure em Settings.');
+export const geminiProvider: SchemaProvider = {
+    id: 'gemini',
+    model: GEMINI_MODEL,
 
-    const model = await getModel();
-    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
+    setModel(model: string) {
+        this.model = model;
+        saveModel(model as GeminiModel).catch(() => { /* best effort */ });
+    },
 
-    // micro-prompt só texto
-    if (promptType === 'micro' && nodeData?.prompt) {
-        const requestBody = {
-            contents: [{ parts: [{ text: nodeData.prompt }] }]
-        };
-        const response = await fetchWithTimeout(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new GeminiError(`Gemini API error: ${response.statusText}`, response.status, errorData);
+    async generateSchema(input: GenerateSchemaInput): Promise<SchemaResponse> {
+        const apiKey = input.apiKey || await getKey();
+        if (!apiKey) {
+            return { ok: false, message: 'API Key do Gemini nao configurada.' };
         }
-        const data = await response.json();
-        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        try {
-            return JSON.parse(textResponse);
-        } catch {
-            return { response: textResponse } as any;
-        }
-    }
 
-    const base64Image = arrayBufferToBase64(imageData);
-    const width = nodeData ? nodeData.width : 1440;
-    const height = nodeData ? nodeData.height : 900;
-    const prompt = ANALYZE_RECREATE_PROMPT
-        .replace('${availableImageIds}', availableImageIds.join(', '))
-        .replace('${nodeData}', nodeData ? JSON.stringify(nodeData, null, 2) : 'Sem dados estruturais.')
-        .replace(/\${width}/g, width.toString())
-        .replace(/\${height}/g, height.toString());
+        const model = this.model || GEMINI_MODEL;
+        const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
 
-    const requestBody = {
-        contents: [{
+        const contents = [{
             parts: [
-                { text: prompt },
-                { inline_data: { mime_type: 'image/png', data: base64Image } }
+                { text: input.instructions },
+                { text: input.prompt },
+                { text: `SNAPSHOT:\n${JSON.stringify(input.snapshot)}` }
             ]
-        }],
-        generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 8192,
-            response_mime_type: 'application/json'
-        }
-    };
+        }];
 
-    const requestLog = { ...requestBody, contents: [{ parts: [{ text: prompt }, { text: '[imagem omitida]' }] }] };
-    figma.ui.postMessage({ type: 'add-gemini-log', data: `--- REQUISIÇÃO ---\n${JSON.stringify(requestLog, null, 2)}` });
-
-    try {
-        const response = await fetchWithTimeout(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData?.error?.message || `Erro na API: ${response.status}`;
-            throw new GeminiError(errorMessage, response.status, errorData);
-        }
-
-        const data = await response.json();
-        figma.ui.postMessage({ type: 'add-gemini-log', data: `--- RESPOSTA ---\n${JSON.stringify(data, null, 2)}` });
-
-        if (!data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
-            const errorMessage = data.error?.message || 'Resposta vazia ou malformada.';
-            throw new GeminiError(errorMessage, undefined, data);
-        }
-
-        const candidate = data.candidates[0];
-        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
-            throw new GeminiError('Conteúdo vazio.');
-        }
-
-        let responseText = candidate.content.parts[0].text;
-        const startIndex = responseText.indexOf('{');
-        if (startIndex === -1) throw new GeminiError('Nenhum objeto JSON encontrado na resposta.');
-        let endIndex = responseText.lastIndexOf('}');
-        if (endIndex === -1 || endIndex < startIndex) endIndex = responseText.length;
-        let jsonString = responseText.substring(startIndex, endIndex + 1);
+        const requestBody = {
+            contents,
+            generationConfig: {
+                temperature: 0.15,
+                maxOutputTokens: 8192,
+                response_mime_type: 'application/json'
+            }
+        };
 
         try {
-            return JSON.parse(jsonString);
-        } catch (e) {
+            const response = await fetchWithTimeout(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const rawText = await response.text();
+                let parsed: any = null;
+                try { parsed = JSON.parse(rawText); } catch { parsed = rawText; }
+                const message = (parsed as any)?.error?.message || `HTTP ${response.status}`;
+                return { ok: false, message: `Falha na API Gemini: ${message}`, raw: parsed };
+            }
+
+            const data = await response.json();
+            const text = (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) {
+                return { ok: false, message: 'Resposta vazia da Gemini.', raw: data };
+            }
+
             try {
-                const repairedJson = repairJson(jsonString);
-                return JSON.parse(repairedJson);
-            } catch (repairError) {
-                if (candidate.finishReason === 'MAX_TOKENS') {
-                    throw new GeminiError('Resposta truncada; reduza o frame.', undefined, { finishReason: 'MAX_TOKENS' });
+                const schema = parseGeminiJson(text);
+                return { ok: true, schema, raw: data };
+            } catch {
+                // tenta reparar JSON para nao descartar nenhum node
+                try {
+                    const repaired = repairJson(cleanJson(text));
+                    const schema = JSON.parse(repaired) as PipelineSchema;
+                    return { ok: true, schema, raw: data };
+                } catch (err) {
+                    return { ok: false, message: 'Resposta nao JSON da Gemini.', raw: text };
                 }
-                throw new GeminiError('Falha ao processar JSON retornado pela IA.', undefined, repairError);
             }
+        } catch (err: any) {
+            const aborted = err?.name === 'AbortError';
+            const message = aborted ? 'Timeout na chamada Gemini.' : (err?.message || 'Erro desconhecido na Gemini.');
+            return { ok: false, message, raw: err };
         }
-    } catch (error: any) {
-        figma.ui.postMessage({ type: 'add-gemini-log', data: `--- ERRO ---\n${error.message}` });
-        if (error instanceof GeminiError) throw error;
-        throw new GeminiError(`Erro na API Gemini: ${error.message}`, undefined, error);
-    }
-}
+    },
 
-export async function consolidateNodes(processedNodes: ProcessedNode[]): Promise<ConsolidationResult> {
-    const apiKey = await getKey();
-    if (!apiKey) throw new GeminiError('API Key não configurada.');
+    async testConnection(apiKey?: string): Promise<{ ok: boolean; message: string; raw?: any }> {
+        const keyToTest = apiKey || await getKey();
+        if (!keyToTest) return { ok: false, message: 'API Key nao configurada' };
 
-    const model = await getModel();
-    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
-    const prompt = buildConsolidationPrompt(processedNodes);
-
-    const requestBody = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 8192,
-            response_mime_type: 'application/json'
-        }
-    };
-
-    try {
-        const response = await fetchWithTimeout(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new GeminiError(`Erro na consolidação: ${response.status}`, response.status, errorData);
-        }
-
-        const data = await response.json();
-        const candidate = data.candidates?.[0];
-        if (!candidate?.content?.parts?.[0]?.text) {
-            throw new GeminiError('Resposta vazia da consolidação.');
-        }
-
-        const responseText = candidate.content.parts[0].text;
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new GeminiError('JSON não encontrado na resposta de consolidação.');
-
-        let jsonString = jsonMatch[0];
+        const endpoint = `${API_BASE_URL}?key=${keyToTest}`;
         try {
-            return JSON.parse(jsonString);
-        } catch (parseError) {
-            try {
-                const repairedJson = repairJson(jsonString);
-                return JSON.parse(repairedJson);
-            } catch (repairError) {
-                throw new GeminiError(`JSON malformado e não reparável: ${repairError}`);
+            const response = await fetchWithTimeout(endpoint, { method: 'GET' });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const message = (errorData as any)?.error?.message || `HTTP ${response.status}`;
+                return { ok: false, message: `Falha na conexao: ${message}`, raw: errorData };
             }
-        }
-    } catch (error: any) {
-        throw new GeminiError(`Falha na consolidação: ${error.message}`);
-    }
-}
-
-function buildConsolidationPrompt(nodes: ProcessedNode[]): string {
-    return `
-CONSOLIDACAO FINAL - ELEMENTOR JSON (FLEX CONTAINERS)
-
-Voce recebeu ${nodes.length} nodes processados individualmente.
-Monte a hierarquia final usando elType "container" e widgets basicos (heading, text, button, image, icon, custom).
-
-REGRAS:
-- Nao crie sections/columns.
-- Use flex_direction row/column conforme direction.
-- Preserve todos os nodes: nenhum pode sumir.
-- IDs unicos.
-
-NODES:
-${JSON.stringify(nodes, null, 2)}
-`;
-}
-
-function arrayBufferToBase64(buffer: Uint8Array): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    let result = '';
-    let i = 0;
-    const len = buffer.length;
-
-    while (i < len) {
-        const byte1 = buffer[i++];
-        const byte2 = (i < len) ? buffer[i++] : NaN;
-        const byte3 = (i < len) ? buffer[i++] : NaN;
-
-        const enc1 = byte1 >> 2;
-        const enc2 = ((byte1 & 3) << 4) | (isNaN(byte2) ? 0 : byte2 >> 4);
-        const enc3 = ((byte2 & 15) << 2) | (isNaN(byte3) ? 0 : byte3 >> 6);
-        const enc4 = byte3 & 63;
-
-        result += chars.charAt(enc1) + chars.charAt(enc2);
-        if (isNaN(byte2)) {
-            result += '==';
-        } else {
-            result += chars.charAt(enc3);
-            if (isNaN(byte3)) {
-                result += '=';
-            } else {
-                result += chars.charAt(enc4);
-            }
+            return { ok: true, message: 'Conexao com Gemini verificada.' };
+        } catch (e: any) {
+            const aborted = e?.name === 'AbortError';
+            const baseMessage = aborted ? 'Tempo limite ao testar conexao.' : (e?.message || 'Erro desconhecido');
+            return { ok: false, message: baseMessage, raw: e };
         }
     }
-    return result;
-}
+};
 
 // ==================== Tipos ====================
 export interface LayoutAnalysis {

@@ -27,6 +27,16 @@ FigToEL e um plugin comercial que converte designs do Figma em paginas Elementor
 - Elementor Pro (para slides, tabs, accordion, loop grid)
 - WordPress com REST API ativa (para exportacao automatica)
 
+## OpenAI / GPT
+- Como habilitar: na aba \"Configuracao da IA\" selecione \"GPT (OpenAI)\" no dropdown de provedor de IA.
+- Como inserir a API Key: cole a chave no campo \"OpenAI API Key\"; o plugin grava em clientStorage seguro do Figma.
+- Como testar a conexao: clique em \"Testar conexao\" na area do GPT para validar a chave e ver o status na UI.
+- Modelos suportados:
+  - gpt-4.1
+  - gpt-o1
+  - gpt-mini
+- Fallback: o pipeline usa sempre o provedor selecionado para gerar o schema Flex; ao trocar de provedor todo o fluxo IA -> schema -> compiler segue a escolha ativa.
+
 ---
 
 ## Como Usar (Fluxo do Usuario)
@@ -87,10 +97,8 @@ Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz 
 ## Notas de manutenção (interno)
 - 28/11/2025: ajustes de UI (toggle sem localStorage em sandbox, handle de resize visível e icone atualizado), fallback de timeout sem AbortController e normalização de URL no teste WordPress; build atualizado.
 - 28/11/2025 (tarde): logs verbosos para teste/export WP (endpoint, usuário, tamanho do token) e normalização de token (remoção de espaços); build atualizado.
-- 28/11/2025 (noite): logs de erro detalhados do Gemini (status/texto e payload quando vazio) em processWithAI; build atualizado.
+- 28/11/2025 (noite): correção da UI (barra de progresso e seleção de modelo Gemini) substituindo script inline obsoleto pela lógica correta do ui.js; build atualizado.
+- 28/11/2025 (noite): melhorias de feedback (logs com timestamp, alertas de erro visíveis) e ajuste na API Gemini (modelos 2.0-flash-exp/1.5 e limite de tokens aumentado para 16k); build atualizado.
+- 28/11/2025 (noite): refatoração completa do pipeline para "Naming Mode" (redução drástica de tokens, payload simplificado para IA, remoção de modelos inválidos); build atualizado.
 - 28/11/2025 (tarde 2): feedback de reset na UI (limpa saída/logs) e build recompilado.
 - 28/11/2025 (noite): correção crítica na autenticação WP (substituição da função toBase64 quebrada por implementação robusta) e adição de User-Agent para evitar bloqueios de segurança; build atualizado.
-
-
-
-

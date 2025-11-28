@@ -1,7 +1,9 @@
 ﻿import { ConversionPipeline } from './pipeline';
 import type { WPConfig, ElementorJSON } from './types/elementor.types';
 import { serializeNode } from './utils/serialization_utils';
-import { API_BASE_URL } from './api_gemini';
+import { GEMINI_MODEL, geminiProvider } from './api_gemini';
+import { openaiProvider } from './api_openai';
+import { SchemaProvider } from './types/providers';
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 
@@ -9,9 +11,14 @@ const pipeline = new ConversionPipeline();
 let lastJSON: string | null = null;
 
 const DEFAULT_TIMEOUT_MS = 12000;
+const DEFAULT_PROVIDER = 'gemini';
+
+function getActiveProvider(providerId?: string): SchemaProvider {
+    return providerId === 'gpt' ? openaiProvider : geminiProvider;
+}
 
 function toBase64(str: string): string {
-    // Implementação robusta de Base64 (RFC 4648) independente de btoa/unescape
+    // Implementacao robusta de Base64 (RFC 4648) independente de btoa/unescape
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
     let output = '';
     let i = 0;
@@ -104,6 +111,44 @@ async function loadWPConfig(): Promise<WPConfig> {
     return { url, user, token, exportImages, autoPage } as any;
 }
 
+async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvider; apiKey: string; providerId: string }> {
+    const incomingProvider = (msg?.providerAi as string) || await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
+    const providerId = incomingProvider === 'gpt' ? 'gpt' : DEFAULT_PROVIDER;
+    await saveSetting('provider_ai', providerId);
+    const provider = getActiveProvider(providerId);
+
+    if (providerId === 'gpt') {
+        const inlineKey = msg?.gptApiKey as string | undefined;
+        let key = inlineKey || await loadSetting<string>('gpt_api_key', '');
+        if (inlineKey) {
+            await saveSetting('gpt_api_key', inlineKey);
+        }
+        const storedModel = await loadSetting<string>('gpt_model', openaiProvider.model);
+        openaiProvider.setModel(storedModel || openaiProvider.model);
+        if (!key) throw new Error('OpenAI API Key nao configurada.');
+        return { provider, apiKey: key, providerId };
+    }
+
+    const inlineKey = msg?.apiKey as string | undefined;
+    let key = inlineKey || await loadSetting<string>('gptel_gemini_key', '');
+    if (!key) {
+        key = await loadSetting<string>('gemini_api_key', '');
+    }
+    if (inlineKey) {
+        await saveSetting('gptel_gemini_key', inlineKey);
+        await saveSetting('gemini_api_key', inlineKey);
+    }
+
+    const model = msg?.geminiModel || await loadSetting<string>('gemini_model', GEMINI_MODEL);
+    if (model) {
+        await saveSetting('gemini_model', model);
+        geminiProvider.setModel(model);
+    }
+
+    if (!key) throw new Error('Gemini API Key nao configurada.');
+    return { provider, apiKey: key, providerId };
+}
+
 function getSelectedNode(): SceneNode {
     const selection = figma.currentPage.selection;
     if (!selection || selection.length === 0) {
@@ -112,12 +157,13 @@ function getSelectedNode(): SceneNode {
     return selection[0];
 }
 
-async function generateElementorJSON(customWP?: WPConfig, debug?: boolean): Promise<{ elementorJson: ElementorJSON; debugInfo?: any }> {
+async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug?: boolean): Promise<{ elementorJson: ElementorJSON; debugInfo?: any }> {
     const node = getSelectedNode();
     const wpConfig = customWP || await loadWPConfig();
-    log('Iniciando pipeline...', 'info');
-    const result = await pipeline.run(node, wpConfig, { debug }) as any;
-    log('Pipeline concluído.', 'success');
+    const { provider, apiKey, providerId } = await resolveProviderConfig(aiPayload);
+    log(`Iniciando pipeline (${providerId.toUpperCase()})...`, 'info');
+    const result = await pipeline.run(node, wpConfig, { debug, provider, apiKey }) as any;
+    log('Pipeline concluido.', 'success');
     if (debug && result.elementorJson) {
         return result;
     }
@@ -134,9 +180,9 @@ async function deliverResult(json: ElementorJSON, debugInfo?: any) {
     figma.ui.postMessage({ type: 'generation-complete', payload, debug: debugInfo });
     try {
         await (figma as any).clipboard.writeText(payload);
-        figma.notify('JSON Elementor gerado e copiado para a área de transferência.');
+        figma.notify('JSON Elementor gerado e copiado para a area de transferencia.');
     } catch (err) {
-        figma.notify('JSON Elementor gerado. Não foi possível copiar automaticamente.', { timeout: 4000 });
+        figma.notify('JSON Elementor gerado. Nao foi possivel copiar automaticamente.', { timeout: 4000 });
         log(`Falha ao copiar: ${err}`, 'warn');
     }
 }
@@ -151,7 +197,10 @@ async function sendStoredSettings() {
     if (!geminiKey) {
         geminiKey = await loadSetting<string>('gemini_api_key', '');
     }
-    const geminiModel = await loadSetting<string>('gemini_model', 'gemini-2.5-flash');
+    const geminiModel = await loadSetting<string>('gemini_model', GEMINI_MODEL);
+    const providerAi = await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
+    const gptKey = await loadSetting<string>('gpt_api_key', '');
+    const gptModel = await loadSetting<string>('gpt_model', openaiProvider.model);
     const wpUrl = await loadSetting<string>('gptel_wp_url', '');
     const wpUser = await loadSetting<string>('gptel_wp_user', '');
     const wpToken = await loadSetting<string>('gptel_wp_token', '');
@@ -164,6 +213,9 @@ async function sendStoredSettings() {
         payload: {
             geminiKey,
             geminiModel,
+            providerAi,
+            gptKey,
+            gptModel,
             wpUrl,
             wpUser,
             wpToken,
@@ -183,7 +235,7 @@ figma.ui.onmessage = async (msg) => {
                 const node = getSelectedNode();
                 const serialized = serializeNode(node);
                 sendPreview(serialized);
-                log('Árvore inspecionada.', 'info');
+                log('Arvore inspecionada.', 'info');
             } catch (error: any) {
                 log(error?.message || String(error), 'error');
             }
@@ -191,13 +243,10 @@ figma.ui.onmessage = async (msg) => {
 
         case 'generate-json':
             try {
-                if (msg.geminiModel) {
-                    await saveSetting('gemini_model', msg.geminiModel);
-                }
                 figma.ui.postMessage({ type: 'generation-start' });
                 const wpConfig = msg.wpConfig as WPConfig | undefined;
                 const debug = !!msg.debug;
-                const { elementorJson, debugInfo } = await generateElementorJSON(wpConfig, debug);
+                const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug);
                 await deliverResult(elementorJson, debugInfo);
                 sendPreview(elementorJson);
             } catch (error: any) {
@@ -248,7 +297,7 @@ figma.ui.onmessage = async (msg) => {
                     break;
                 }
                 if (!url || !user || !token) {
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuário ou senha do app ausentes.' });
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuario ou senha do app ausentes.' });
                     break;
                 }
 
@@ -259,7 +308,7 @@ figma.ui.onmessage = async (msg) => {
                 if (!meResp.ok) {
                     const text = await meResp.text();
                     figma.ui.postMessage({ type: 'log', level: 'error', message: `[WP] Auth FAIL (${meResp.status}) -> ${text}` });
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha de autenticação (${meResp.status}): ${text}` });
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha de autenticacao (${meResp.status}): ${text}` });
                     break;
                 }
 
@@ -282,7 +331,7 @@ figma.ui.onmessage = async (msg) => {
 
                 if (!pageResp.ok) {
                     const text = await pageResp.text();
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha ao criar página (${pageResp.status}): ${text}` });
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha ao criar pagina (${pageResp.status}): ${text}` });
                     break;
                 }
 
@@ -294,7 +343,7 @@ figma.ui.onmessage = async (msg) => {
                 await saveSetting('gptel_auto_page', !!(cfg as any).autoPage);
 
                 const link = pageJson?.link || url;
-                figma.ui.postMessage({ type: 'wp-status', success: true, message: `Página enviada como rascunho. Link: ${link}` });
+                figma.ui.postMessage({ type: 'wp-status', success: true, message: `Pagina enviada como rascunho. Link: ${link}` });
             } catch (e: any) {
                 const aborted = e?.name === 'AbortError';
                 const msgErr = aborted ? 'Tempo limite ao exportar para WP.' : (e?.message || 'Erro desconhecido');
@@ -306,29 +355,30 @@ figma.ui.onmessage = async (msg) => {
             try {
                 if (msg.model) {
                     await saveSetting('gemini_model', msg.model);
+                    geminiProvider.setModel(msg.model);
                 }
                 const inlineKey = msg.apiKey as string | undefined;
-                let keyToTest = inlineKey || await loadSetting<string>('gptel_gemini_key', '');
-                if (!keyToTest) {
-                    keyToTest = await loadSetting<string>('gemini_api_key', '');
+                if (inlineKey) {
+                    await saveSetting('gptel_gemini_key', inlineKey);
+                    await saveSetting('gemini_api_key', inlineKey);
                 }
-
-                if (!keyToTest) {
-                    figma.ui.postMessage({ type: 'gemini-status', success: false, message: 'API Key não informada.' });
-                    break;
-                }
-
-                const resp = await fetch(`${API_BASE_URL}?key=${keyToTest}`);
-                if (!resp.ok) {
-                    const text = await resp.text();
-                    figma.ui.postMessage({ type: 'gemini-status', success: false, message: `Falha na conexão (${resp.status}): ${text}` });
-                    break;
-                }
-
-                await saveSetting('gptel_gemini_key', keyToTest);
-                figma.ui.postMessage({ type: 'gemini-status', success: true, message: 'Conexão com Gemini verificada.' });
+                const res = await geminiProvider.testConnection(inlineKey);
+                figma.ui.postMessage({ type: 'gemini-status', success: res.ok, message: res.message });
             } catch (e: any) {
                 figma.ui.postMessage({ type: 'gemini-status', success: false, message: `Erro: ${e?.message || e}` });
+            }
+            break;
+
+        case 'test-gpt':
+            try {
+                const inlineKey = (msg.apiKey as string) || (msg.gptApiKey as string) || '';
+                if (inlineKey) {
+                    await saveSetting('gpt_api_key', inlineKey);
+                }
+                const res = await openaiProvider.testConnection(inlineKey || undefined);
+                figma.ui.postMessage({ type: 'gpt-status', success: res.ok, message: res.message });
+            } catch (e: any) {
+                figma.ui.postMessage({ type: 'gpt-status', success: false, message: `Erro: ${e?.message || e}` });
             }
             break;
 
@@ -340,7 +390,7 @@ figma.ui.onmessage = async (msg) => {
                 const user = ((cfg as any)?.user || '').trim();
                 const token = ((cfg as any)?.token || (cfg as any)?.password || '').replace(/\s+/g, '');
                 if (!url || !user || !token) {
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuário ou senha do app ausentes.' });
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuario ou senha do app ausentes.' });
                     break;
                 }
                 figma.ui.postMessage({
@@ -366,7 +416,7 @@ figma.ui.onmessage = async (msg) => {
                 await saveSetting('gptel_wp_token', token);
                 await saveSetting('gptel_export_images', !!(cfg as any).exportImages);
                 await saveSetting('gptel_auto_page', !!autoPage);
-                figma.ui.postMessage({ type: 'wp-status', success: true, message: 'Conexão com WordPress verificada.' });
+                figma.ui.postMessage({ type: 'wp-status', success: true, message: 'Conexao com WordPress verificada.' });
             } catch (e: any) {
                 figma.ui.postMessage({ type: 'wp-status', success: false, message: `Erro: ${e?.message || e}` });
             }
