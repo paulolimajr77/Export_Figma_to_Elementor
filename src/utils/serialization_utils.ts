@@ -15,7 +15,7 @@ export interface SerializedNode {
     [key: string]: any; // Allow other properties for flexibility
 }
 
-export function serializeNode(node: SceneNode): SerializedNode {
+export function serializeNode(node: SceneNode, parentId?: string): SerializedNode {
     const data: SerializedNode = {
         id: node.id,
         name: node.name,
@@ -26,6 +26,7 @@ export function serializeNode(node: SceneNode): SerializedNode {
         y: node.y,
         visible: node.visible,
         locked: node.locked,
+        parentId: parentId || null
     };
 
     // Opacity & Blend Mode
@@ -122,6 +123,7 @@ export function serializeNode(node: SceneNode): SerializedNode {
     // Auto Layout
     if ('layoutMode' in node) {
         data.layoutMode = node.layoutMode;
+        data.direction = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
         data.primaryAxisSizingMode = node.primaryAxisSizingMode;
         data.counterAxisSizingMode = node.counterAxisSizingMode;
         data.primaryAxisAlignItems = node.primaryAxisAlignItems;
@@ -131,11 +133,14 @@ export function serializeNode(node: SceneNode): SerializedNode {
         data.paddingBottom = node.paddingBottom;
         data.paddingLeft = node.paddingLeft;
         data.itemSpacing = node.itemSpacing;
+        if ('layoutWrap' in node) {
+            data.layoutWrap = (node as any).layoutWrap;
+        }
     }
 
     // Children
     if ('children' in node) {
-        data.children = node.children.map(child => serializeNode(child));
+        data.children = node.children.map(child => serializeNode(child, node.id));
     }
 
     return data;

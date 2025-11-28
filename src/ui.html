@@ -3,95 +3,349 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Figma → Elementor</title>
-  <link rel="stylesheet" href="tokens.css">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="ui-dark.css">
-  <script defer src="ui.js"></script>
+  <title>FigToEL — Figma → Elementor</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    :root {
+      --radius: 8px;
+      --space-1: 6px;
+      --space-2: 12px;
+      --space-3: 18px;
+      --space-4: 24px;
+      --color-bg: #F7F7F9;
+      --color-panel: #FFFFFF;
+      --color-border: #E3E3E7;
+      --color-text: #111;
+      --color-text-secondary: #666;
+      --color-primary: #007AFF;
+      --color-primary-hover: #0063CC;
+      --shadow-1: 0 1px 2px rgba(0,0,0,0.06);
+      --anim: 160ms;
+    }
+    :root.dark {
+      --color-bg: #1C1C1C;
+      --color-panel: #2A2A2A;
+      --color-border: #3A3A3A;
+      --color-text: #EEE;
+      --color-text-secondary: #BBB;
+      --color-primary: #3EA6FF;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+    }
+    .app { max-width: 800px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; padding: var(--space-2); }
+    .topbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: var(--space-2); }
+    .brand { display: flex; align-items: center; gap: var(--space-2); }
+    .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); box-shadow: 0 0 0 5px rgba(0,122,255,0.12); }
+    .title { font-weight: 700; font-size: 16px; }
+    .subtitle { color: var(--color-text-secondary); font-size: 12px; }
+    .switch { position: relative; display: inline-block; width: 52px; height: 28px; }
+    .switch input { display: none; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: var(--color-border); transition: var(--anim); border-radius: 999px; display: inline-block; }
+    .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; top: 4px; background: var(--color-panel); transition: var(--anim); border-radius: 50%; box-shadow: var(--shadow-1); z-index: 2; }
+    .slider:after { position: absolute; content: "☀"; font-size: 12px; left: 10px; top: 7px; color: #f5c542; transition: var(--anim); opacity: 1; z-index: 1; }
+    .slider .moon-icon { position: absolute; content: "🌙"; font-size: 12px; right: 10px; top: 7px; color: #c9d6ff; opacity: 0; transition: var(--anim); z-index: 1; }
+    input:checked + .slider { background: var(--color-primary); }
+    input:checked + .slider:before { transform: translateX(24px); }
+    input:checked + .slider:after { opacity: 0; transform: translateX(-6px); }
+    input:checked + .slider .moon-icon { opacity: 1; transform: translateX(6px); }
+    .tab-bar { display: flex; border-bottom: 1px solid var(--color-border); background: var(--color-panel); position: relative; }
+    .tab-btn { flex: 1; padding: var(--space-2); border: none; background: none; font-weight: 600; color: var(--color-text-secondary); cursor: pointer; border-bottom: 2px solid transparent; transition: color var(--anim), transform var(--anim), border-color var(--anim); }
+    .tab-btn:hover { transform: scale(1.02); }
+    .tab-btn.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+    .tab-indicator { position: absolute; bottom: 0; left: 0; height: 2px; width: 25%; background: var(--color-primary); transition: transform var(--anim), width var(--anim); }
+    .tab-contents { flex: 1; overflow-y: auto; padding: var(--space-3) 0; }
+    .tab-content { display: none; opacity: 0; transform: translateY(6px); transition: opacity var(--anim), transform var(--anim); }
+    .tab-content.active { display: block; opacity: 1; transform: translateY(0); }
+    .card { background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); margin-bottom: var(--space-3); box-shadow: var(--shadow-1); }
+    .card-header { font-weight: 700; margin-bottom: var(--space-2); }
+    .grid-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
+    .actions-row { display: flex; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; }
+    .btn { border: 1px solid var(--color-border); background: #eef1f6; color: var(--color-text); border-radius: var(--radius); padding: 10px 12px; font-weight: 600; cursor: pointer; transition: all var(--anim); }
+    .btn.primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .btn.secondary { background: #fff; }
+    .btn.tiny { padding: 6px 10px; font-size: 12px; }
+    .btn:hover { filter: brightness(0.97); }
+    .input-label { display: block; margin: var(--space-2) 0 var(--space-1); font-weight: 600; color: var(--color-text-secondary); }
+    input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 14px; background: #fff; color: var(--color-text); }
+    .checkbox { display: flex; align-items: center; gap: var(--space-1); margin: var(--space-1) 0; color: var(--color-text-secondary); }
+    #output { width: 100%; min-height: 160px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: 12px; font-family: "SFMono-Regular", Consolas, monospace; background: #f5f6f8; resize: vertical; color: var(--color-text); }
+    .logs { margin-top: 10px; min-height: 80px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: 10px; background: #f8fafc; font-size: 12px; color: var(--color-text-secondary); overflow-y: auto; }
+    .status { margin-top: 10px; font-size: 13px; color: var(--color-text-secondary); }
+    .help-list { margin: 0; padding-left: 18px; line-height: 1.6; color: var(--color-text-secondary); }
+    .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-2); }
+    .help-item { padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); background: #f9fafb; display: flex; align-items: center; justify-content: space-between; }
+    .help-item .label { font-weight: 600; color: var(--color-text); }
+    .muted { color: var(--color-text-secondary); font-size: 12px; margin-top: var(--space-2); }
+    body.dark { background: #1C1C1C; color: #EEE; }
+    body.dark .app { background: #1C1C1C; }
+    body.dark .tab-bar { background: #2A2A2A; border-bottom-color: #3A3A3A; }
+    body.dark .tab-btn { color: #BBB; }
+    body.dark .tab-btn.active { color: #3EA6FF; border-bottom-color: #3EA6FF; }
+    body.dark .card { background: #2A2A2A; border-color: #3A3A3A; color: #EEE; }
+    body.dark .btn { background: #444; border-color: #3A3A3A; color: #EEE; }
+    body.dark .btn.primary { background: #3EA6FF; border-color: #3EA6FF; color: #0b1d2a; }
+    body.dark .btn.secondary { background: #333; }
+    body.dark input[type="text"], body.dark input[type="password"] { background: #1C1C1C; border-color: #3A3A3A; color: #EEE; }
+    body.dark #output { background: #242424; color: #EEE; border-color: #3A3A3A; }
+    body.dark .logs { background: #242424; color: #BBB; border-color: #3A3A3A; }
+    body.dark .status { color: #BBB; }
+    body.dark .help-list { color: #BBB; }
+    body.dark .help-item { background: #2f2f2f; border-color: #3A3A3A; }
+    * { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+    *::-webkit-scrollbar { width: 8px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+  </style>
 </head>
 <body>
   <div class="app">
-    <header class="tab-bar">
+    <div class="topbar">
+      <div class="brand">
+        <div class="title">Figma to WP Elementor</div>
+      </div>
+      <div class="top-actions">
+        <button class="btn ghost small" data-action="resize-large" title="Aumentar janela">⤢</button>
+        <label class="switch fancy">
+          <input type="checkbox" id="theme-toggle">
+          <span class="slider"><span class="moon-icon">🌙</span></span>
+        </label>
+      </div>
+    </div>
+
+    <nav class="tab-bar">
       <button class="tab-btn active" data-tab="layout">Layout → Elementor</button>
       <button class="tab-btn" data-tab="ai">Configuração da IA</button>
       <button class="tab-btn" data-tab="wp">WordPress</button>
       <button class="tab-btn" data-tab="help">Ajuda</button>
-    </header>
+      <span class="tab-indicator"></span>
+    </nav>
 
     <main class="tab-contents">
-      <!-- Layout -->
       <section id="tab-layout" class="tab-content active">
-        <div class="panel">
-          <div class="panel-header">Ações rápidas</div>
-          <div class="actions-grid">
+        <div class="card">
+          <div class="card-header">Ações rápidas</div>
+          <div class="grid-actions">
             <button class="btn primary" data-action="inspect">Inspecionar Layout</button>
-            <button class="btn primary" data-action="generate-json">Gerar JSON Elementor</button>
+            <button class="btn primary" data-action="generate-json">Gerar JSON</button>
             <button class="btn" data-action="copy-json">Copiar JSON</button>
             <button class="btn" data-action="download-json">Baixar JSON</button>
-            <button class="btn secondary" data-action="export-wp">Exportar WP</button>
           </div>
         </div>
-
-        <div class="panel">
-          <div class="panel-header">Saída / Logs</div>
-          <textarea id="output" readonly placeholder="O JSON gerado aparecerá aqui"></textarea>
+        <div class="card">
+          <div class="card-header">Saída / Logs</div>
+          <textarea id="output" placeholder="O JSON gerado aparecerá aqui" readonly></textarea>
           <div id="logs" class="logs"></div>
         </div>
       </section>
 
-      <!-- IA -->
       <section id="tab-ai" class="tab-content">
-        <div class="panel">
-          <div class="panel-header">Configuração da IA (Gemini)</div>
-          <label class="input-label" for="ai-key">API Key</label>
-          <input id="ai-key" type="password" placeholder="Cole sua API Key do Gemini">
-          <button class="btn primary" data-action="test-gemini">Testar conexão</button>
+        <div class="card">
+          <div class="card-header">Configuração da IA (Gemini)</div>
+          <label class="input-label" for="gemini_api_key">Gemini API Key</label>
+          <input id="gemini_api_key" type="password" placeholder="Cole sua API Key do Gemini">
+          <div class="actions-row">
+            <button class="btn primary" data-action="test-gemini">Testar Conexão</button>
+          </div>
           <div id="gemini-status" class="status"></div>
         </div>
       </section>
 
-      <!-- WP -->
       <section id="tab-wp" class="tab-content">
-        <div class="panel">
-          <div class="panel-header">WordPress</div>
-          <label class="input-label" for="wp-url">WP URL</label>
-          <input id="wp-url" type="text" placeholder="https://site.com">
+        <div class="card">
+          <div class="card-header">WordPress</div>
+          <label class="input-label" for="wp_url">WP URL</label>
+          <input id="wp_url" type="text" placeholder="https://site.com">
 
-          <label class="input-label" for="wp-token">WP Token</label>
-          <input id="wp-token" type="text" placeholder="Token ou Basic Auth">
+          <label class="input-label" for="wp_user">Usuário WP</label>
+          <input id="wp_user" type="text" placeholder="usuario">
+
+          <label class="input-label" for="wp_token">Senha do App (Token)</label>
+          <input id="wp_token" type="password" placeholder="Senha de aplicação do WP">
 
           <label class="checkbox">
-            <input id="chk-export-images" type="checkbox" checked>
-            <span>Exportar imagens</span>
+            <input id="wp_export_images" type="checkbox">
+            <span>Exportar imagens automaticamente</span>
           </label>
           <label class="checkbox">
-            <input id="chk-create-page" type="checkbox">
+            <input id="wp_create_page" type="checkbox">
             <span>Criar página automaticamente</span>
           </label>
 
           <div class="actions-row">
-            <button class="btn primary" data-action="test-wp">Testar WP</button>
+            <button class="btn primary" data-action="test-wp">Testar Conexão</button>
             <button class="btn secondary" data-action="export-wp">Exportar WP</button>
           </div>
           <div id="wp-status" class="status"></div>
         </div>
       </section>
 
-      <!-- Ajuda -->
       <section id="tab-help" class="tab-content">
-        <div class="panel">
-          <div class="panel-header">Boas práticas</div>
-          <ul class="help-list">
-            <li>Selecione um frame raiz no Figma antes de gerar.</li>
-            <li>Use Auto Layout no Figma para preservar flex-direction.</li>
-            <li>Evite agrupar manualmente widgets em colunas; o plugin usa containers flex.</li>
-            <li>Preencha API Key do Gemini para validações e prompts mais consistentes.</li>
-            <li>Configure WP URL e Token se quiser exportar imagens/página.</li>
-            <li>Use “Inspecionar Layout” para checar a árvore antes de gerar.</li>
-          </ul>
+        <div class="card">
+          <div class="card-header">Nomenclaturas e Ações rápidas</div>
+          <div class="help-grid">
+            <div class="help-item"><div class="label">w:heading</div><button class="btn tiny" data-rename="w:heading">Renomear layer</button></div>
+            <div class="help-item"><div class="label">w:text</div><button class="btn tiny" data-rename="w:text">Renomear layer</button></div>
+            <div class="help-item"><div class="label">w:button</div><button class="btn tiny" data-rename="w:button">Renomear layer</button></div>
+            <div class="help-item"><div class="label">w:image</div><button class="btn tiny" data-rename="w:image">Renomear layer</button></div>
+            <div class="help-item"><div class="label">w:icon</div><button class="btn tiny" data-rename="w:icon">Renomear layer</button></div>
+            <div class="help-item"><div class="label">c:container</div><button class="btn tiny" data-rename="c:container">Renomear layer</button></div>
+          </div>
+          <p class="muted">Clique para renomear a layer selecionada no Figma com a nomenclatura adequada.</p>
         </div>
       </section>
     </main>
   </div>
+
+  <script>
+    (() => {
+      const tabs = document.querySelectorAll('.tab-btn');
+      const contents = document.querySelectorAll('.tab-content');
+      const indicator = document.querySelector('.tab-indicator');
+      const output = document.getElementById('output');
+      const logs = document.getElementById('logs');
+      const themeToggle = document.getElementById('theme-toggle');
+
+      const fields = {
+        gemini_api_key: document.getElementById('gemini_api_key'),
+        wp_url: document.getElementById('wp_url'),
+        wp_token: document.getElementById('wp_token'),
+        wp_export_images: document.getElementById('wp_export_images'),
+        wp_create_page: document.getElementById('wp_create_page')
+      };
+
+      function updateIndicator() {
+        const active = document.querySelector('.tab-btn.active');
+        if (!indicator || !active) return;
+        const rect = active.getBoundingClientRect();
+        const parentRect = active.parentElement.getBoundingClientRect();
+        indicator.style.width = rect.width + 'px';
+        indicator.style.transform = 'translateX(' + (rect.left - parentRect.left) + 'px)';
+      }
+
+      function setActiveTab(name) {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+        contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+        updateIndicator();
+      }
+
+      tabs.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
+
+      function toggleTheme(forceDark) {
+        const shouldDark = typeof forceDark === 'boolean' ? forceDark : !document.body.classList.contains('dark');
+        document.body.classList.toggle('dark', shouldDark);
+        if (themeToggle) themeToggle.checked = shouldDark;
+      }
+
+      if (themeToggle) {
+        themeToggle.addEventListener('change', () => {
+          toggleTheme(themeToggle.checked);
+          send('save-setting', { key: 'gptel_dark_mode', value: themeToggle.checked });
+        });
+      }
+
+      function send(type, payload = {}) {
+        parent.postMessage({ pluginMessage: { type, ...payload } }, '*');
+      }
+
+      function addLog(message, level = 'info') {
+        if (!logs) return;
+        const div = document.createElement('div');
+        div.textContent = '[' + level + '] ' + message;
+        logs.appendChild(div);
+        logs.scrollTo(0, logs.scrollHeight);
+      }
+
+      function loadStoredSettings(payload) {
+        if (!payload) return;
+        if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
+        if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
+        if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
+        if (fields.wp_export_images) fields.wp_export_images.checked = !!payload.exportImages;
+        if (fields.wp_create_page) fields.wp_create_page.checked = !!payload.autoPage;
+        if (typeof payload.darkMode === 'boolean') toggleTheme(payload.darkMode);
+        updateIndicator();
+      }
+
+      function watchInputs() {
+        if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', () => send('save-setting', { key: 'gptel_gemini_key', value: fields.gemini_api_key.value }));
+        if (fields.wp_url) fields.wp_url.addEventListener('input', () => send('save-setting', { key: 'gptel_wp_url', value: fields.wp_url.value }));
+        if (fields.wp_token) fields.wp_token.addEventListener('input', () => send('save-setting', { key: 'gptel_wp_token', value: fields.wp_token.value }));
+        if (fields.wp_export_images) fields.wp_export_images.addEventListener('change', () => send('save-setting', { key: 'gptel_export_images', value: fields.wp_export_images.checked }));
+        if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
+      }
+
+      function bindActions() {
+        document.querySelectorAll('[data-action]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const action = btn.getAttribute('data-action');
+            const payload = {
+              wpConfig: {
+                url: fields.wp_url?.value || '',
+                token: fields.wp_token?.value || '',
+                exportImages: fields.wp_export_images?.checked || false,
+                createPage: fields.wp_create_page?.checked || false
+              },
+              apiKey: fields.gemini_api_key?.value || ''
+            };
+            switch (action) {
+              case 'inspect': send('inspect'); break;
+              case 'generate-json': send('generate-json', payload); break;
+              case 'copy-json': send('copy-json'); break;
+              case 'download-json': send('download-json'); break;
+              case 'export-wp': send('export-wp', payload); break;
+              case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
+              case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
+            }
+          });
+        });
+        document.querySelectorAll('[data-rename]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const name = btn.getAttribute('data-rename');
+            send('rename-layer', { name });
+          });
+        });
+      }
+
+      window.onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg) return;
+        switch (msg.type) {
+          case 'preview':
+            if (output) output.value = msg.payload || '';
+            break;
+          case 'generation-complete':
+            if (output) output.value = msg.payload || '';
+            addLog('JSON gerado.', 'info');
+            break;
+          case 'gemini-status':
+            addLog(msg.message || 'Status Gemini', msg.success ? 'success' : 'error');
+            const gs = document.getElementById('gemini-status');
+            if (gs) gs.textContent = msg.message;
+            break;
+          case 'wp-status':
+            addLog(msg.message || 'Status WP', msg.success ? 'success' : 'error');
+            const ws = document.getElementById('wp-status');
+            if (ws) ws.textContent = msg.message;
+            break;
+          case 'log':
+            addLog(msg.message, msg.level);
+            break;
+          case 'load-settings':
+            loadStoredSettings(msg.payload);
+            break;
+        }
+      };
+
+      bindActions();
+      watchInputs();
+      send('load-settings');
+      updateIndicator();
+    })();
+  </script>
 </body>
 </html>

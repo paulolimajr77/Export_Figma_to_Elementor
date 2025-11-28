@@ -1,4 +1,4 @@
-import { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
+﻿import { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
 import { ElementorJSON, ElementorElement, ElementorSettings, WPConfig } from '../types/elementor.types';
 import { generateGUID } from '../utils/guid';
 import { compileWithRegistry } from '../config/widget.registry';
@@ -25,6 +25,8 @@ export class ElementorCompiler {
     private compileContainer(container: PipelineContainer, isInner: boolean): ElementorElement {
         const id = generateGUID();
         const settings: ElementorSettings = {
+            _element_id: id,
+            container_type: 'flex',
             content_width: container.width === 'full' ? 'full' : 'boxed',
             flex_direction: container.direction === 'row' ? 'row' : 'column',
             ...this.mapContainerStyles(container.styles)
@@ -105,9 +107,10 @@ export class ElementorCompiler {
 
     private compileWidget(widget: PipelineWidget): ElementorElement {
         const widgetId = generateGUID();
+        const baseSettings: ElementorSettings = { _element_id: widgetId, ...widget.styles };
 
-        // Tenta registry primeiro
-        const registryResult = compileWithRegistry(widget);
+        // Tenta registry primeiro (baseado em type/kind)
+        const registryResult = compileWithRegistry(widget, baseSettings);
         if (registryResult) {
             return {
                 id: widgetId,
@@ -120,10 +123,11 @@ export class ElementorCompiler {
 
         // Fallback simples
         let widgetType: string = widget.type;
-        const settings: ElementorSettings = { ...widget.styles };
+        const settings: ElementorSettings = { ...baseSettings };
 
         switch (widget.type) {
             case 'heading':
+                widgetType = 'heading';
                 settings.title = widget.content || 'Heading';
                 break;
             case 'text':

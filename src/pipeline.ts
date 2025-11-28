@@ -1,4 +1,4 @@
-import { serializeNode, SerializedNode } from './utils/serialization_utils';
+﻿import { serializeNode, SerializedNode } from './utils/serialization_utils';
 import { getKey, getModel, API_BASE_URL, GeminiError } from './api_gemini';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
@@ -6,17 +6,14 @@ import { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipel
 import { ElementorJSON, WPConfig } from './types/elementor.types';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from './utils/validation';
 
-/**
- * Prompt para o schema de containers (Flexbox).
- */
 const PIPELINE_PROMPT_V3 = `
-Você é um organizador de árvore Figma para um schema de CONTAINERS flex.
+Voce e um organizador de arvore Figma para um schema de CONTAINERS flex.
 
 REGRAS:
-- NÃO ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se folha).
-- NÃO classifique por aparência. Se não souber, type = "custom".
-- NÃO invente grids, colunas extras ou imageBox/iconBox.
-- Preservar ordem dos filhos exatamente como a árvore original.
+- NAO ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se folha).
+- NAO classifique por aparencia. Se nao souber, type = "custom".
+- NAO invente grids, colunas extras ou imageBox/iconBox.
+- Preservar ordem dos filhos exatamente como a arvore original.
 - Mapear layoutMode: HORIZONTAL -> direction=row, VERTICAL -> direction=column, NONE -> column.
 - gap = itemSpacing (se houver).
 - padding = paddingTop/Right/Bottom/Left (se houver).
@@ -38,10 +35,8 @@ SCHEMA:
 }
 
 WIDGETS permitidos: heading | text | button | image | icon | custom
-
 styles: incluir sempre "sourceId" com id do node original.
-
-SAÍDA: JSON puro, sem markdown.
+SAIDA: JSON puro, sem markdown.
 `;
 
 interface PreprocessedData {
@@ -51,9 +46,6 @@ interface PreprocessedData {
     flatNodes: SerializedNode[];
 }
 
-/**
- * Pipeline de Conversão: Figma -> IA -> Schema -> Elementor (containers flex)
- */
 export interface PipelineDebugInfo {
     serializedTree: SerializedNode;
     flatNodes: SerializedNode[];
@@ -77,29 +69,19 @@ export class ConversionPipeline {
     async run(node: SceneNode, wpConfig: WPConfig = {}, options?: { debug?: boolean }): Promise<ElementorJSON | { elementorJson: ElementorJSON; debugInfo: PipelineDebugInfo }> {
         this.compiler.setWPConfig(wpConfig);
         this.imageUploader.setWPConfig(wpConfig);
-
         await this.loadConfig();
 
-        console.log('[Pipeline] 1. Pré-processando nó...');
         const preprocessed = this.preprocess(node);
-
-        console.log('[Pipeline] 2. Enviando para IA...');
         const intermediate = await this.processWithAI(preprocessed);
 
-        console.log('[Pipeline] 3. Validando schema...');
-        this.validateAndNormalize(intermediate);
+        this.validateAndNormalize(intermediate, preprocessed.serializedRoot);
         validatePipelineSchema(intermediate);
 
-        console.log('[Pipeline] 4. Reconciliando nodes...');
         this.reconcileWithSource(intermediate, preprocessed.flatNodes);
-
-        console.log('[Pipeline] 5. Resolvendo imagens...');
         await this.resolveImages(intermediate);
 
-        console.log('[Pipeline] 6. Compilando para Elementor...');
         const elementorJson = this.compiler.compile(intermediate);
         if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
-
         validateElementorJSON(elementorJson);
 
         if (options?.debug) {
@@ -120,8 +102,8 @@ export class ConversionPipeline {
     private async loadConfig(): Promise<void> {
         this.apiKey = await getKey();
         this.model = await getModel();
-        if (!this.apiKey) throw new Error("API Key não configurada. Por favor, configure na aba 'IA Gemini'.");
-        if (!this.model) throw new Error("Modelo do Gemini não configurado.");
+        if (!this.apiKey) throw new Error("API Key nao configurada. Configure na aba IA.");
+        if (!this.model) throw new Error('Modelo do Gemini nao configurado.');
     }
 
     private preprocess(node: SceneNode): PreprocessedData {
@@ -129,7 +111,7 @@ export class ConversionPipeline {
         const flatNodes = this.flatten(serializedRoot);
         const tokens = this.deriveTokens(serializedRoot);
         return {
-            pageTitle: serializedRoot.name || 'Página importada',
+            pageTitle: serializedRoot.name || 'Pagina importada',
             tokens,
             serializedRoot,
             flatNodes
@@ -164,7 +146,7 @@ export class ConversionPipeline {
     }
 
     private async processWithAI(pre: PreprocessedData): Promise<PipelineSchema> {
-        if (!this.apiKey || !this.model) throw new Error('Configuração de IA incompleta.');
+        if (!this.apiKey || !this.model) throw new Error('Configuracao de IA incompleta.');
 
         const endpoint = `${API_BASE_URL}${this.model}:generateContent?key=${this.apiKey}`;
         const inputPayload = {
@@ -213,11 +195,9 @@ export class ConversionPipeline {
             } catch (err) {
                 attempt++;
                 if (attempt > maxRetries) {
-                    console.error('[Pipeline] Erro no processamento de IA:', err);
                     throw err;
                 }
                 const delay = 1500 * attempt;
-                console.warn(`[Pipeline] Falha na IA (tentativa ${attempt}). Retentando em ${delay}ms...`);
                 await new Promise(res => setTimeout(res, delay));
             }
         }
@@ -225,20 +205,17 @@ export class ConversionPipeline {
         throw new Error('Falha ao processar IA.');
     }
 
-    private validateAndNormalize(schema: any): asserts schema is PipelineSchema {
-        if (!schema || typeof schema !== 'object') throw new Error('Schema inválido: não é um objeto.');
+    private validateAndNormalize(schema: any, root: SerializedNode): asserts schema is PipelineSchema {
+        if (!schema || typeof schema !== 'object') throw new Error('Schema invalido: nao e um objeto.');
 
-        if (!schema.page || typeof schema.page !== 'object') throw new Error("Schema inválido: campo 'page' ausente.");
-        if (typeof schema.page.title !== 'string') schema.page.title = String(schema.page.title || 'Página importada');
+        if (!schema.page || typeof schema.page !== 'object') schema.page = {};
+        if (typeof schema.page.title !== 'string') schema.page.title = String(schema.page.title || 'Pagina importada');
         if (!schema.page.tokens) schema.page.tokens = {};
         if (typeof schema.page.tokens.primaryColor !== 'string') schema.page.tokens.primaryColor = '#000000';
         if (typeof schema.page.tokens.secondaryColor !== 'string') schema.page.tokens.secondaryColor = '#FFFFFF';
 
-        if (!Array.isArray(schema.containers)) {
-            schema.containers = [];
-        }
-        if (schema.containers.length === 0) {
-            schema.containers.push(this.createDefaultContainer());
+        if (!Array.isArray(schema.containers) || schema.containers.length === 0) {
+            schema.containers = [this.createContainerFromSerialized(root, 0)];
         }
 
         schema.containers = schema.containers.map((container: any, index: number) =>
@@ -247,19 +224,23 @@ export class ConversionPipeline {
     }
 
     private normalizeContainer(container: any, index: number): PipelineContainer {
-        const normalizeWidget = (w: any): PipelineWidget => {
+        const normalizeWidget = (w: any, idx: number): PipelineWidget => {
             const allowed: PipelineWidget['type'][] = ['heading', 'text', 'button', 'image', 'icon', 'custom'];
             const type: PipelineWidget['type'] = allowed.includes(w?.type) ? w.type : 'custom';
             const content = (typeof w?.content === 'string' || w?.content === null) ? w.content : null;
             const imageId = (typeof w?.imageId === 'string' || w?.imageId === null) ? w.imageId : null;
-            const styles = (w && typeof w.styles === 'object' && !Array.isArray(w.styles)) ? w.styles : {};
-            return { type, content, imageId, styles };
+            const styles = (w && typeof w.styles === 'object' && !Array.isArray(w.styles)) ? { ...w.styles } : {};
+            if (!styles.sourceId && typeof w?.sourceId === 'string') styles.sourceId = w.sourceId;
+            if (!styles.sourceId) styles.sourceId = `widget-${index}-${idx}`;
+            return { type, content, imageId, styles, kind: w?.kind };
         };
 
         const direction: 'row' | 'column' = container?.direction === 'row' ? 'row' : 'column';
         const width: 'full' | 'boxed' = container?.width === 'boxed' ? 'boxed' : 'full';
-        const styles = (container && typeof container.styles === 'object' && !Array.isArray(container.styles)) ? container.styles : {};
-        const widgets = Array.isArray(container?.widgets) ? container.widgets.map(normalizeWidget) : [];
+        const styles = (container && typeof container.styles === 'object' && !Array.isArray(container.styles)) ? { ...container.styles } : {};
+        if (!styles.sourceId && typeof container?.id === 'string') styles.sourceId = container.id;
+
+        const widgets = Array.isArray(container?.widgets) ? container.widgets.map((w: any, idx: number) => normalizeWidget(w, idx)) : [];
         const children = Array.isArray(container?.children)
             ? container.children.map((c: any, i: number) => this.normalizeContainer(c, i))
             : [];
@@ -277,14 +258,19 @@ export class ConversionPipeline {
     private reconcileWithSource(schema: PipelineSchema, flatNodes: SerializedNode[]): void {
         const allSourceIds = new Set(flatNodes.map(n => n.id));
         const covered = new Set<string>();
+        const containerMap = new Map<string, PipelineContainer>();
 
         const markCoveredWidget = (widget: PipelineWidget) => {
             const sourceId = widget.styles?.sourceId;
             if (typeof sourceId === 'string') covered.add(sourceId);
-            if (typeof widget.imageId === 'string') covered.add(widget.imageId);
         };
 
         const walkContainer = (container: PipelineContainer) => {
+            const sourceId = container.styles?.sourceId;
+            if (typeof sourceId === 'string') {
+                covered.add(sourceId);
+                containerMap.set(sourceId, container);
+            }
             container.widgets.forEach(markCoveredWidget);
             container.children.forEach(walkContainer);
         };
@@ -294,24 +280,78 @@ export class ConversionPipeline {
         const missing = [...allSourceIds].filter(id => !covered.has(id));
         if (missing.length === 0) return;
 
-        if (!schema.containers.length) {
-            schema.containers.push(this.createDefaultContainer());
-        }
-        const target = schema.containers[0];
+        const rootContainer = schema.containers[0] || this.createContainerFromSerialized(flatNodes[0], 0);
+
+        const nodeById = new Map<string, SerializedNode>();
+        flatNodes.forEach(n => nodeById.set(n.id, n));
+
+        const ensureParentContainer = (parentId?: string | null): PipelineContainer => {
+            if (parentId && containerMap.has(parentId)) return containerMap.get(parentId)!;
+            return rootContainer;
+        };
+
+        const createWidgetFromNode = (node: SerializedNode): PipelineWidget => {
+            const map: Record<string, PipelineWidget['type']> = {
+                TEXT: 'text',
+                VECTOR: 'icon',
+                STAR: 'icon',
+                ELLIPSE: 'icon',
+                RECTANGLE: 'image',
+                LINE: 'icon'
+            };
+            const type = map[node.type] || 'custom';
+            const content = typeof (node as any).characters === 'string' ? (node as any).characters : null;
+            return {
+                type,
+                content,
+                imageId: node.id,
+                styles: {
+                    sourceId: node.id,
+                    sourceType: node.type,
+                    sourceName: node.name
+                },
+                kind: undefined
+            };
+        };
+
+        const createContainerFromNode = (node: SerializedNode): PipelineContainer => {
+            const direction: 'row' | 'column' = node.layoutMode === 'HORIZONTAL' || node.direction === 'row' ? 'row' : 'column';
+            const styles: Record<string, any> = {
+                sourceId: node.id,
+                sourceType: node.type,
+                sourceName: node.name,
+                gap: (node as any).itemSpacing,
+                paddingTop: (node as any).paddingTop,
+                paddingRight: (node as any).paddingRight,
+                paddingBottom: (node as any).paddingBottom,
+                paddingLeft: (node as any).paddingLeft,
+                primaryAxisAlignItems: (node as any).primaryAxisAlignItems,
+                counterAxisAlignItems: (node as any).counterAxisAlignItems
+            };
+            return {
+                id: `container-${node.id}`,
+                direction,
+                width: 'full',
+                styles,
+                widgets: [],
+                children: []
+            };
+        };
 
         missing.forEach(id => {
-            const sourceNode = flatNodes.find(n => n.id === id);
-            const widget: PipelineWidget = {
-                type: 'custom',
-                content: typeof sourceNode?.characters === 'string' ? sourceNode.characters : null,
-                imageId: null,
-                styles: {
-                    sourceId: id,
-                    sourceType: sourceNode?.type,
-                    sourceName: sourceNode?.name
-                }
-            };
-            target.widgets.push(widget);
+            const sourceNode = nodeById.get(id);
+            if (!sourceNode) return;
+            const parent = ensureParentContainer((sourceNode as any).parentId as string | undefined);
+            if (Array.isArray((sourceNode as any).children) && (sourceNode as any).children.length > 0) {
+                const newContainer = createContainerFromNode(sourceNode);
+                parent.children.push(newContainer);
+                containerMap.set(sourceNode.id, newContainer);
+                covered.add(sourceNode.id);
+            } else {
+                const widget = createWidgetFromNode(sourceNode);
+                parent.widgets.push(widget);
+                covered.add(sourceNode.id);
+            }
         });
     }
 
@@ -321,13 +361,10 @@ export class ConversionPipeline {
                 try {
                     const node = figma.getNodeById(widget.imageId);
                     if (node && (node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'RECTANGLE' || node.type === 'INSTANCE' || node.type === 'COMPONENT')) {
-                        console.log(`[Pipeline] Uploading image for widget ${widget.type} (${widget.imageId})...`);
                         const result = await this.imageUploader.uploadToWordPress(node as SceneNode);
                         if (result) {
                             widget.content = result.url;
                             widget.imageId = result.id.toString();
-                        } else {
-                            console.warn(`[Pipeline] Falha no upload da imagem ${widget.imageId}`);
                         }
                     }
                 } catch (e) {
@@ -350,14 +387,46 @@ export class ConversionPipeline {
         }
     }
 
-    private createDefaultContainer(): PipelineContainer {
+    private createContainerFromSerialized(node: SerializedNode, index: number): PipelineContainer {
+        const direction: 'row' | 'column' = (node as any).layoutMode === 'HORIZONTAL' || (node as any).direction === 'row' ? 'row' : 'column';
+        const styles: Record<string, any> = {
+            sourceId: node.id,
+            sourceType: node.type,
+            sourceName: node.name,
+            gap: (node as any).itemSpacing,
+            paddingTop: (node as any).paddingTop,
+            paddingRight: (node as any).paddingRight,
+            paddingBottom: (node as any).paddingBottom,
+            paddingLeft: (node as any).paddingLeft,
+            primaryAxisAlignItems: (node as any).primaryAxisAlignItems,
+            counterAxisAlignItems: (node as any).counterAxisAlignItems
+        };
+
+        const children: PipelineContainer[] = [];
+        const widgets: PipelineWidget[] = [];
+        if (Array.isArray((node as any).children)) {
+            (node as any).children.forEach((child: SerializedNode) => {
+                if ((child as any).children && (child as any).children.length > 0) {
+                    children.push(this.createContainerFromSerialized(child, children.length));
+                } else {
+                    const widget: PipelineWidget = {
+                        type: child.type === 'TEXT' ? 'text' : child.type === 'RECTANGLE' ? 'image' : 'custom',
+                        content: typeof (child as any).characters === 'string' ? (child as any).characters : null,
+                        imageId: child.type === 'RECTANGLE' ? child.id : null,
+                        styles: { sourceId: child.id, sourceType: child.type, sourceName: child.name }
+                    };
+                    widgets.push(widget);
+                }
+            });
+        }
+
         return {
-            id: 'container-1',
-            direction: 'column',
+            id: typeof node.id === 'string' ? node.id : `container-${index + 1}`,
+            direction,
             width: 'full',
-            styles: {},
-            widgets: [],
-            children: []
+            styles,
+            widgets,
+            children
         };
     }
 }

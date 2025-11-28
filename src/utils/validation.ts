@@ -1,4 +1,4 @@
-import { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
+﻿import { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
 import { ElementorJSON, ElementorElement } from '../types/elementor.types';
 
 export function validatePipelineSchema(schema: any): asserts schema is PipelineSchema {
@@ -46,6 +46,7 @@ function validateElement(el: ElementorElement) {
     if (!el.id || !el.elType) throw new Error('Elemento Elementor sem id ou elType.');
     if (!Array.isArray(el.elements)) throw new Error(`Elemento ${el.id} sem elements array.`);
     if (!el.settings) throw new Error(`Elemento ${el.id} sem settings.`);
+    if (el.elType !== 'container' && el.elType !== 'widget') throw new Error(`Elemento ${el.id} com elType inválido.`);
     el.elements.forEach(child => validateElement(child));
 }
 

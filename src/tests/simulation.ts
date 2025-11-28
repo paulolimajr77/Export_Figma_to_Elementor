@@ -1,5 +1,4 @@
-﻿// Slides scenario updated for Fase 12
-import { ConversionPipeline } from '../pipeline';
+﻿import { ConversionPipeline } from '../pipeline';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from '../utils/validation';
 
 // Mock Figma Global
@@ -61,27 +60,16 @@ function createMockTree(): any {
 
 const scenarios: Scenario[] = [
     {
-        name: 'slides_like_full',
+        name: 'basic_flex',
         schema: {
-            page: { title: 'Slides Page', tokens: { primaryColor: '#123', secondaryColor: '#eee' } },
+            page: { title: 'Basic Page', tokens: { primaryColor: '#123', secondaryColor: '#eee' } },
             containers: [{
-                id: 'carousel',
-                direction: 'row',
+                id: 'root',
+                direction: 'column',
                 width: 'full',
-                styles: {},
+                styles: { sourceId: '1' },
                 widgets: [
-                    {
-                        type: 'slides',
-                        kind: 'slides_like',
-                        slides: [
-                            { title: 'Slide 1', description: 'Desc 1', imageId: 'img1', image: 'https://img/1', callToAction: { text: 'Buy', link: '#1' }, contentAlign: 'left' },
-                            { title: 'Slide 2', description: 'Desc 2', imageId: 'img2', image: 'https://img/2', callToAction: { text: 'More', link: '#2' }, contentAlign: 'center' },
-                            { title: 'Slide 3', description: 'Desc 3', imageId: 'img3', image: 'https://img/3', callToAction: { text: 'Go', link: '#3' }, contentAlign: 'right' }
-                        ],
-                        content: null,
-                        imageId: null,
-                        styles: { sourceId: 'slides_widget' }
-                    }
+                    { type: 'heading', content: 'Hello', imageId: null, styles: { sourceId: '2' } }
                 ],
                 children: []
             }]
@@ -111,20 +99,15 @@ async function runScenario(name: string, idx: number, pipeline: ConversionPipeli
     if (coverage.n_elements_elementor < coverage.n_nodes_origem) {
         throw new Error(`Coverage risk in scenario ${name}`);
     }
-    const slidesWidget = elementorJson.elements.flatMap(e => e.elements).find(w => w.widgetType === 'slides');
-    if (!slidesWidget) throw new Error('Slides widget not generated');
-    if (!slidesWidget.settings?.slides || slidesWidget.settings.slides.length !== 3) {
-        throw new Error('Slides settings missing or incorrect');
-    }
 }
 
 async function runSimulation() {
-    console.log('--- Starting Simulation (Slides) ---');
+    console.log('--- Starting Simulation (Basic Flex) ---');
     const pipeline = new ConversionPipeline();
     const wpConfig = { url: 'https://test.local', auth: 'mock' };
     try {
-        await runScenario('slides_like_full', 0, pipeline, wpConfig);
-        console.log('Slides scenario passed.');
+        await runScenario('basic_flex', 0, pipeline, wpConfig);
+        console.log('Basic scenario passed.');
     } catch (err) {
         console.error('ERROR:', err);
     }

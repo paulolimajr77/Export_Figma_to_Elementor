@@ -1,53 +1,13 @@
-@import url('tokens.css');
+:root.dark {
+  --color-bg: #1d1d1f;
+  --color-panel: #2a2a2c;
+  --color-border: #3a3a3c;
 
-body.dark {
-  background: #1C1C1C;
-  color: #EDEDED;
+  --color-text: #eee;
+  --color-text-secondary: #bbb;
+
+  --color-primary: #3ea6ff;
+  --color-primary-hover: #1c8dd5;
+
+  --shadow-1: 0 1px 4px rgba(0,0,0,0.45);
 }
-
-body.dark .app { background: #1C1C1C; }
-body.dark .tab-bar { background: #2A2A2A; border-bottom-color: #3A3A3A; }
-body.dark .tab-btn { color: #BBBBBB; }
-body.dark .tab-btn.active { color: #3EA6FF; border-bottom-color: #53B2FF; }
-
-body.dark .panel {
-  background: #2A2A2A;
-  border-color: #3A3A3A;
-  color: #EDEDED;
-}
-
-body.dark .btn { background: #444; border-color: #3A3A3A; color: #EDEDED; }
-body.dark .btn.primary { background: #3EA6FF; border-color: #3EA6FF; color: #0b1d2a; }
-body.dark .btn.secondary { background: #333; }
-body.dark .btn:hover { filter: brightness(1.05); }
-
-body.dark input[type="text"],
-body.dark input[type="password"] {
-  background: #1C1C1C;
-  border-color: #3A3A3A;
-  color: #EDEDED;
-}
-
-body.dark #output {
-  background: #242424;
-  color: #EDEDED;
-  border-color: #3A3A3A;
-}
-
-body.dark .logs {
-  background: #242424;
-  color: #BBBBBB;
-  border-color: #3A3A3A;
-}
-
-body.dark .status { color: #BBBBBB; }
-body.dark .help-list { color: #BBBBBB; }
-
-/* Tabs animation respects dark mode */
-body.dark .tab-content {
-  transition: opacity var(--anim-fast), transform var(--anim-fast);
-}
-
-/* Scrollbars */
-body.dark *::-webkit-scrollbar-thumb { background: #3A3A3A; }
-body.dark *::-webkit-scrollbar-track { background: transparent; }

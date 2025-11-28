@@ -1,26 +1,20 @@
-// Tipos e Interfaces Centralizadas do Elementor
-// Centraliza todas as definições de tipos para melhor reutilização e manutenção
+﻿// Tipos e Interfaces Centralizadas do Elementor
+// Centraliza definicoes de tipos para melhor reutilizacao e manutencao
 
-/**
- * Configuração do WordPress para upload de mídia
- */
 export interface WPConfig {
     url?: string;
     user?: string;
-    password?: string;
+    password?: string; // legado
+    token?: string;    // senha de aplicacao / token
+    exportImages?: boolean;
+    autoPage?: boolean;
     autoMenu?: boolean;
 }
 
-/**
- * Settings de um elemento Elementor (propriedades CSS, conteúdo, etc)
- */
 export interface ElementorSettings {
     [key: string]: any;
 }
 
-/**
- * Elemento Elementor (container ou widget)
- */
 export interface ElementorElement {
     id: string;
     elType: string;
@@ -30,22 +24,16 @@ export interface ElementorElement {
     isInner?: boolean;
 }
 
-/**
- * Template completo do Elementor
- */
 export interface ElementorTemplate {
-    type: "elementor";
+    type: 'elementor';
     siteurl: string;
     elements: ElementorElement[];
-    version?: string; // Optional now
-    page_settings?: ElementorSettings; // Optional
+    version?: string;
+    page_settings?: ElementorSettings;
 }
 
 export type ElementorJSON = ElementorTemplate;
 
-/**
- * Tipos de nós do Figma que possuem propriedades geométricas
- */
 export type GeometryNode =
     | RectangleNode
     | EllipseNode
@@ -59,9 +47,6 @@ export type GeometryNode =
     | BooleanOperationNode
     | LineNode;
 
-/**
- * Resultado da exportação de imagem
- */
 export interface ImageExportResult {
     bytes: Uint8Array;
     mime: string;
@@ -69,33 +54,18 @@ export interface ImageExportResult {
     needsConversion?: boolean;
 }
 
-/**
- * Tipos de container Elementor
- */
 export type ContainerType = 'external' | 'inner' | 'normal';
 
-/**
- * Posição relativa para Image Box
- */
 export type RelativePosition = 'top' | 'left' | 'right';
 
-/**
- * Formatos de exportação de imagem
- */
 export type ImageFormat = 'WEBP' | 'PNG' | 'SVG' | 'JPG';
 
-/**
- * Item de menu de navegação
- */
 export interface NavMenuItem {
     id: string;
     name: string;
     items?: any[];
 }
 
-/**
- * Padrão de widget para análise estrutural
- */
 export interface WidgetPattern {
     name: string;
     tag: string;
@@ -127,9 +97,6 @@ export interface WidgetPattern {
     scoreFunction?: (node: SceneNode) => number;
 }
 
-/**
- * Resultado de match de widget
- */
 export interface WidgetMatch {
     pattern: WidgetPattern;
     score: number;
@@ -138,9 +105,6 @@ export interface WidgetMatch {
     reasoning?: string;
 }
 
-/**
- * Configuração para análise híbrida
- */
 export interface HybridConfig {
     structuralThreshold: number;
     useAIFallback: boolean;
@@ -149,12 +113,8 @@ export interface HybridConfig {
     model?: string;
 }
 
-/**
- * Resultado de análise híbrida
- */
 export interface HybridAnalysisResult {
     matches: WidgetMatch[];
     method: 'structural' | 'ai' | 'hybrid';
     processingTime: number;
 }
-
