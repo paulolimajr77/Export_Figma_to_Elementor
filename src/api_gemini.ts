@@ -1,25 +1,19 @@
-// Google Gemini API Integration using manual fetch
-// Análise inteligente de layouts e criação automática de frames otimizados
-
+﻿// Integração Gemini ajustada para containers flex
 /// <reference types="@figma/plugin-typings" />
 
 import { ANALYZE_RECREATE_PROMPT } from './config/prompts';
 import { repairJson } from './utils/serialization_utils';
 
-// Define os modelos disponíveis (baseado em https://ai.google.dev/gemini-api/docs/models?hl=pt-br)
 export type GeminiModel =
-    // Gemini 2.5
     | 'gemini-2.5-pro'
     | 'gemini-2.5-flash'
     | 'gemini-2.5-flash-lite'
-    // Gemini 2.0
     | 'gemini-2.0-flash'
     | 'gemini-2.0-flash-lite';
 
-export const GEMINI_MODEL: GeminiModel = "gemini-2.5-flash";
+export const GEMINI_MODEL: GeminiModel = 'gemini-2.5-flash';
 export const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
-
-// ==================== Custom Error Class ====================
+const DEFAULT_TIMEOUT_MS = 12000;
 
 export class GeminiError extends Error {
     constructor(message: string, public statusCode?: number, public details?: any) {
@@ -28,7 +22,16 @@ export class GeminiError extends Error {
     }
 }
 
-// ==================== Gerenciamento de API Key e Modelo ====================
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Response> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const resp = await fetch(url, { ...options, signal: controller.signal });
+        return resp;
+    } finally {
+        clearTimeout(id);
+    }
+}
 
 export async function saveKey(key: string): Promise<void> {
     await figma.clientStorage.setAsync('gemini_api_key', key);
@@ -47,47 +50,28 @@ export async function getModel(): Promise<GeminiModel> {
     return savedModel || GEMINI_MODEL;
 }
 
-// ==================== Funções da API ====================
-
+// ==================== Teste de conexão ====================
 export async function testConnection(): Promise<{ success: boolean; message: string }> {
     const apiKey = await getKey();
-    if (!apiKey) {
-        return { success: false, message: 'API Key não configurada' };
-    }
+    if (!apiKey) return { success: false, message: 'API Key não configurada' };
 
-    // Busca o modelo salvo ou usa o padrão
-    const model = await getModel();
-    console.log(`🧪 Testando conexão com modelo: ${model}`);
-
-    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
-
+    const endpoint = `${API_BASE_URL}?key=${apiKey}&pageSize=1`;
     try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: 'Olá' }]
-                }]
-            })
-        });
-
+        const response = await fetchWithTimeout(endpoint, { method: 'GET' });
         if (!response.ok) {
-            const errorData = await response.json();
-            const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
-            console.error('❌ Erro na resposta:', errorData);
-            throw new GeminiError(`Falha na conexão: ${errorMessage}`);
+            const errorData = await response.json().catch(() => ({}));
+            const message = errorData?.error?.message || `HTTP ${response.status}`;
+            throw new GeminiError(`Falha na conexão: ${message}`, response.status, errorData);
         }
-
-        return { success: true, message: `Conexão OK com ${model}!` };
+        return { success: true, message: 'Conexão com Gemini verificada.' };
     } catch (e: any) {
-        console.error('Erro de rede ao testar conexão:', e);
-        return { success: false, message: e.message || 'Erro desconhecido' };
+        const aborted = e?.name === 'AbortError';
+        const baseMessage = aborted ? 'Tempo limite ao testar conexão.' : (e?.message || 'Erro desconhecido');
+        return { success: false, message: baseMessage };
     }
 }
 
-
-
+// ==================== Geração (análise + recriação) ====================
 export async function analyzeAndRecreate(
     imageData: Uint8Array,
     availableImageIds: string[] = [],
@@ -95,39 +79,27 @@ export async function analyzeAndRecreate(
     promptType: 'full' | 'micro' = 'full'
 ): Promise<LayoutAnalysis> {
     const apiKey = await getKey();
-    if (!apiKey) {
-        throw new GeminiError('API Key não configurada. Configure em Settings.');
-    }
+    if (!apiKey) throw new GeminiError('API Key não configurada. Configure em Settings.');
 
     const model = await getModel();
     const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
 
-    // Para micro-prompts, usar apenas texto
+    // micro-prompt só texto
     if (promptType === 'micro' && nodeData?.prompt) {
         const requestBody = {
-            contents: [{
-                parts: [{ text: nodeData.prompt }]
-            }]
+            contents: [{ parts: [{ text: nodeData.prompt }] }]
         };
-
-        const response = await fetch(endpoint, {
+        const response = await fetchWithTimeout(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
-
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new GeminiError(
-                `Gemini API error: ${response.statusText}`,
-                response.status,
-                errorData
-            );
+            throw new GeminiError(`Gemini API error: ${response.statusText}`, response.status, errorData);
         }
-
         const data = await response.json();
         const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-
         try {
             return JSON.parse(textResponse);
         } catch {
@@ -135,29 +107,14 @@ export async function analyzeAndRecreate(
         }
     }
 
-    // Converte imagem para base64
     const base64Image = arrayBufferToBase64(imageData);
-
-    // Monta o prompt com os dados do node
     const width = nodeData ? nodeData.width : 1440;
     const height = nodeData ? nodeData.height : 900;
-    const halfHeight = nodeData ? Math.round(nodeData.height / 2) : 500;
-    const halfWidth = nodeData ? Math.round(nodeData.width * 0.5) : 800;
-    const thirdWidth = nodeData ? Math.round(nodeData.width * 0.3) : 400;
-    const thirdHeight = nodeData ? Math.round(nodeData.height * 0.3) : 300;
-    const firstImageId = availableImageIds[0] || 'ID_DA_IMAGEM_AQUI';
-
     const prompt = ANALYZE_RECREATE_PROMPT
-        .replace('\${availableImageIds}', availableImageIds.join(', '))
-        .replace('\${nodeData}', nodeData ? JSON.stringify(nodeData, null, 2) : 'No structural data available.')
+        .replace('${availableImageIds}', availableImageIds.join(', '))
+        .replace('${nodeData}', nodeData ? JSON.stringify(nodeData, null, 2) : 'Sem dados estruturais.')
         .replace(/\${width}/g, width.toString())
-        .replace(/\${height}/g, height.toString())
-        .replace(/\${halfHeight}/g, halfHeight.toString())
-        .replace(/\${halfWidth}/g, halfWidth.toString())
-        .replace(/\${thirdWidth}/g, thirdWidth.toString())
-        .replace(/\${thirdHeight}/g, thirdHeight.toString())
-        .replace('\${firstImageId}', firstImageId);
-
+        .replace(/\${height}/g, height.toString());
 
     const requestBody = {
         contents: [{
@@ -167,82 +124,139 @@ export async function analyzeAndRecreate(
             ]
         }],
         generationConfig: {
-            temperature: 0.4,
+            temperature: 0.3,
             maxOutputTokens: 8192,
-            response_mime_type: "application/json",
+            response_mime_type: 'application/json'
         }
     };
 
-    // Log da requisição (sem a imagem)
-    const requestLog = { ...requestBody, contents: [{ parts: [{ text: prompt }, { text: "[imagem omitida]" }] }] };
+    const requestLog = { ...requestBody, contents: [{ parts: [{ text: prompt }, { text: '[imagem omitida]' }] }] };
     figma.ui.postMessage({ type: 'add-gemini-log', data: `--- REQUISIÇÃO ---\n${JSON.stringify(requestLog, null, 2)}` });
 
     try {
-        const response = await fetch(endpoint, {
+        const response = await fetchWithTimeout(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
+            const errorData = await response.json().catch(() => ({}));
             const errorMessage = errorData?.error?.message || `Erro na API: ${response.status}`;
             throw new GeminiError(errorMessage, response.status, errorData);
         }
 
         const data = await response.json();
-
-        // Log da resposta
         figma.ui.postMessage({ type: 'add-gemini-log', data: `--- RESPOSTA ---\n${JSON.stringify(data, null, 2)}` });
 
-        // Valida se a resposta tem o formato esperado
         if (!data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
-            const errorMessage = data.error?.message || "A API retornou uma resposta vazia ou malformada.";
+            const errorMessage = data.error?.message || 'Resposta vazia ou malformada.';
             throw new GeminiError(errorMessage, undefined, data);
         }
 
         const candidate = data.candidates[0];
         if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
-            throw new GeminiError("A API retornou um conteúdo vazio.");
+            throw new GeminiError('Conteúdo vazio.');
         }
 
         let responseText = candidate.content.parts[0].text;
         const startIndex = responseText.indexOf('{');
-
-        if (startIndex === -1) {
-            throw new GeminiError("Nenhum objeto JSON encontrado na resposta.");
-        }
-
+        if (startIndex === -1) throw new GeminiError('Nenhum objeto JSON encontrado na resposta.');
         let endIndex = responseText.lastIndexOf('}');
-        if (endIndex === -1 || endIndex < startIndex) {
-            endIndex = responseText.length;
-        }
-
+        if (endIndex === -1 || endIndex < startIndex) endIndex = responseText.length;
         let jsonString = responseText.substring(startIndex, endIndex + 1);
 
         try {
-            const result: LayoutAnalysis = JSON.parse(jsonString);
-            return result;
+            return JSON.parse(jsonString);
         } catch (e) {
-            console.warn("JSON inválido detectado. Tentando reparar...", e);
             try {
                 const repairedJson = repairJson(jsonString);
-                const result: LayoutAnalysis = JSON.parse(repairedJson);
-                return result;
+                return JSON.parse(repairedJson);
             } catch (repairError) {
-                console.error("Falha ao reparar JSON:", repairError);
                 if (candidate.finishReason === 'MAX_TOKENS') {
-                    throw new GeminiError("A resposta foi cortada e não pôde ser recuperada. Tente simplificar o frame.", undefined, { finishReason: 'MAX_TOKENS' });
+                    throw new GeminiError('Resposta truncada; reduza o frame.', undefined, { finishReason: 'MAX_TOKENS' });
                 }
-                throw new GeminiError("Falha ao processar o JSON retornado pela IA.", undefined, repairError);
+                throw new GeminiError('Falha ao processar JSON retornado pela IA.', undefined, repairError);
             }
         }
     } catch (error: any) {
         figma.ui.postMessage({ type: 'add-gemini-log', data: `--- ERRO ---\n${error.message}` });
-        console.error('Erro na chamada fetch para o Gemini:', error);
         if (error instanceof GeminiError) throw error;
         throw new GeminiError(`Erro na API Gemini: ${error.message}`, undefined, error);
     }
+}
+
+export async function consolidateNodes(processedNodes: ProcessedNode[]): Promise<ConsolidationResult> {
+    const apiKey = await getKey();
+    if (!apiKey) throw new GeminiError('API Key não configurada.');
+
+    const model = await getModel();
+    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
+    const prompt = buildConsolidationPrompt(processedNodes);
+
+    const requestBody = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 8192,
+            response_mime_type: 'application/json'
+        }
+    };
+
+    try {
+        const response = await fetchWithTimeout(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new GeminiError(`Erro na consolidação: ${response.status}`, response.status, errorData);
+        }
+
+        const data = await response.json();
+        const candidate = data.candidates?.[0];
+        if (!candidate?.content?.parts?.[0]?.text) {
+            throw new GeminiError('Resposta vazia da consolidação.');
+        }
+
+        const responseText = candidate.content.parts[0].text;
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new GeminiError('JSON não encontrado na resposta de consolidação.');
+
+        let jsonString = jsonMatch[0];
+        try {
+            return JSON.parse(jsonString);
+        } catch (parseError) {
+            try {
+                const repairedJson = repairJson(jsonString);
+                return JSON.parse(repairedJson);
+            } catch (repairError) {
+                throw new GeminiError(`JSON malformado e não reparável: ${repairError}`);
+            }
+        }
+    } catch (error: any) {
+        throw new GeminiError(`Falha na consolidação: ${error.message}`);
+    }
+}
+
+function buildConsolidationPrompt(nodes: ProcessedNode[]): string {
+    return `
+CONSOLIDACAO FINAL - ELEMENTOR JSON (FLEX CONTAINERS)
+
+Voce recebeu ${nodes.length} nodes processados individualmente.
+Monte a hierarquia final usando elType "container" e widgets basicos (heading, text, button, image, icon, custom).
+
+REGRAS:
+- Nao crie sections/columns.
+- Use flex_direction row/column conforme direction.
+- Preserve todos os nodes: nenhum pode sumir.
+- IDs unicos.
+
+NODES:
+${JSON.stringify(nodes, null, 2)}
+`;
 }
 
 function arrayBufferToBase64(buffer: Uint8Array): string {
@@ -276,172 +290,31 @@ function arrayBufferToBase64(buffer: Uint8Array): string {
     return result;
 }
 
-
-// ==================== Fase 4: Consolidação ====================
-
-export async function consolidateNodes(processedNodes: ProcessedNode[]): Promise<ConsolidationResult> {
-    const apiKey = await getKey();
-    if (!apiKey) throw new GeminiError('API Key não configurada.');
-
-    const model = await getModel();
-    const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
-
-    const prompt = buildConsolidationPrompt(processedNodes);
-
-    const requestBody = {
-        contents: [{
-            parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-            temperature: 0.2, // Baixa temperatura para maior precisão estrutural
-            maxOutputTokens: 8192,
-            response_mime_type: "application/json",
-        }
-    };
-
-    try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new GeminiError(`Erro na consolidação: ${response.status}`, response.status, errorData);
-        }
-
-        const data = await response.json();
-        const candidate = data.candidates?.[0];
-
-        if (!candidate?.content?.parts?.[0]?.text) {
-            throw new GeminiError("Resposta vazia da consolidação.");
-        }
-
-        const responseText = candidate.content.parts[0].text;
-
-        // Extrair JSON da resposta (pode vir envolto em markdown)
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new GeminiError("JSON não encontrado na resposta de consolidação.");
-
-        let jsonString = jsonMatch[0];
-
-        // Tentar parsear o JSON
-        try {
-            return JSON.parse(jsonString);
-        } catch (parseError) {
-            console.warn('⚠️ JSON inválido detectado na consolidação. Tentando reparar...', parseError);
-            figma.ui.postMessage({ type: 'add-gemini-log', data: `⚠️ JSON malformado, tentando reparar...` });
-
-            try {
-                const repairedJson = repairJson(jsonString);
-                const result = JSON.parse(repairedJson);
-                figma.ui.postMessage({ type: 'add-gemini-log', data: `✅ JSON reparado com sucesso` });
-                return result;
-            } catch (repairError) {
-                console.error('❌ Falha ao reparar JSON:', repairError);
-                figma.ui.postMessage({ type: 'add-gemini-log', data: `❌ Falha ao reparar JSON: ${repairError}` });
-                throw new GeminiError(`JSON malformado e não reparável: ${repairError}`);
-            }
-        }
-
-    } catch (error: any) {
-        console.error('Erro na consolidação:', error);
-        throw new GeminiError(`Falha na consolidação: ${error.message}`);
-    }
-}
-
-function buildConsolidationPrompt(nodes: ProcessedNode[]): string {
-    return `
-CONSOLIDAÇÃO FINAL - ELEMENTOR JSON
-
-Você recebeu ${nodes.length} nodes processados individualmente.
-Sua tarefa é montar a hierarquia final e gerar um JSON válido para importação no Elementor.
-
-NODES PROCESSADOS:
-${JSON.stringify(nodes, null, 2)}
-
-TAREFA:
-1. Reconstrur a árvore hierárquica baseada nos parentIds e childrenIds.
-2. Validar se todos os widgets são válidos (w:container, w:heading, etc).
-3. Converter propriedades de estilo para o formato final do Elementor.
-4. Gerar relatório técnico.
-
-FORMATO DE SAÍDA (JSON):
-{
-  "elementorJSON": {
-    "version": "0.4",
-    "title": "Figma Import",
-    "type": "page",
-    "content": [
-      // Array de elementos raiz (Containers principais)
-      // Cada elemento deve ter "id", "elType" ("section", "column", "widget"), "settings", "elements"
-    ]
-  },
-  "report": {
-    "summary": {
-      "totalNodes": ${nodes.length},
-      "converted": 0, // Preencher
-      "custom": 0,    // Preencher
-      "warnings": 0   // Preencher
-    },
-    "mappings": [
-      { "nodeId": "...", "widget": "...", "status": "success|warning" }
-    ],
-    "warnings": [
-      "Aviso 1...",
-      "Aviso 2..."
-    ]
-  }
-}
-
-REGRAS CRÍTICAS:
-- O JSON deve seguir estritamente a estrutura do Elementor (sections > columns > widgets) OU Containers (preferencial).
-- "c:container", "c:inner", "section:nome", "column:nome", "w:container" -> DEVEM virar Container do Elementor ("elType": "container").
-- "w:image-box", "w:icon-box" -> DEVEM virar widgets compostos (image-box, icon-box).
-- MAPPING DE AUTO LAYOUT:
-  - direction: "row" -> settings: { "flex_direction": "row", "container_type": "flex" }
-  - direction: "vertical" -> settings: { "flex_direction": "column", "container_type": "flex" }
-  - primaryAlign: "MIN" -> justify_content: "flex-start" (ou start)
-  - primaryAlign: "CENTER" -> justify_content: "center"
-  - primaryAlign: "MAX" -> justify_content: "flex-end" (ou end)
-  - primaryAlign: "SPACE_BETWEEN" -> justify_content: "space-between"
-  - counterAlign: "MIN" -> align_items: "flex-start" (ou start)
-  - counterAlign: "CENTER" -> align_items: "center"
-  - counterAlign: "MAX" -> align_items: "flex-end" (ou end)
-- IDs devem ser únicos.
-`;
-}
-
-
-
-
-// ==================== Interfaces ====================
-
+// ==================== Tipos ====================
 export interface LayoutAnalysis {
     frameName: string;
     width: number;
     height: number;
     autoLayout?: AutoLayoutConfig;
     background?: string;
-    fills?: any[]; // Suporte a fills diretos (Figma JSON)
+    fills?: any[];
     children: ChildNode[];
     improvements?: string[];
-    type?: string; // FRAME, SECTION, etc.
+    type?: string;
 }
 
 export interface ChildNode {
-    type: 'container' | 'widget' | string; // 'string' para suportar tipos do Figma (FRAME, TEXT, etc.)
+    type: 'container' | 'widget' | string;
     name: string;
     widgetType?: string;
     content?: string;
-    characters?: string; // Alias para content (Figma JSON)
+    characters?: string;
     fontSize?: number;
     color?: string;
     width?: number;
     height?: number;
     background?: string;
-    fills?: any[]; // Suporte a fills diretos
+    fills?: any[];
     autoLayout?: AutoLayoutConfig;
     children?: ChildNode[];
     fontFamily?: string;
@@ -450,7 +323,7 @@ export interface ChildNode {
     textAlignHorizontal?: 'LEFT' | 'CENTER' | 'RIGHT' | 'JUSTIFIED';
     textAlignVertical?: 'TOP' | 'CENTER' | 'BOTTOM';
     textCase?: 'ORIGINAL' | 'UPPER' | 'LOWER' | 'TITLE';
-    style?: any; // Suporte a objeto de estilo do Figma
+    style?: any;
     cornerRadius?: number;
     border?: string | { color: string; width: number };
 }

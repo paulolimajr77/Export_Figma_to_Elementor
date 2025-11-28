@@ -11,6 +11,8 @@ figma.showUI(__html__, { width: 1024, height: 820, themeColors: true });
 const pipeline = new ConversionPipeline();
 let lastJSON: string | null = null;
 
+const DEFAULT_TIMEOUT_MS = 12000;
+
 function toBase64(value: string): string {
     if (typeof btoa === 'function') {
         return btoa(value);
@@ -18,6 +20,27 @@ function toBase64(value: string): string {
     // Fallback for environments without btoa
     // eslint-disable-next-line no-undef
     return Buffer.from(value, 'utf8').toString('base64');
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Response> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const resp = await fetch(url, { ...options, signal: controller.signal });
+        return resp;
+    } finally {
+        clearTimeout(id);
+    }
+}
+
+function normalizeWpUrl(raw: string): string {
+    if (!raw) return '';
+    let url = raw.trim();
+    if (!/^https?:\/\//i.test(url)) {
+        url = 'https://' + url;
+    }
+    url = url.replace(/\/+$/, '');
+    return url;
 }
 
 async function loadSetting<T>(key: string, defaultValue: T): Promise<T> {
@@ -179,8 +202,69 @@ figma.ui.onmessage = async (msg) => {
             }
             break;
 
-        case 'export-wp':
-            figma.ui.postMessage({ type: 'wp-status', success: false, message: 'Exportação WP não implementada neste build.' });
+                case 'export-wp':
+            try {
+                const incoming = msg.wpConfig as WPConfig | undefined;
+                const cfg = incoming && incoming.url ? incoming : await loadWPConfig();
+                const url = normalizeWpUrl(cfg?.url || '');
+                const user = (cfg as any)?.user || '';
+                const token = (cfg as any)?.token || '';
+                if (!lastJSON) {
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'Nenhum JSON gerado para exportar.' });
+                    break;
+                }
+                if (!url || !user || !token) {
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuário ou senha do app ausentes.' });
+                    break;
+                }
+
+                const auth = `Basic ${toBase64(`${user}:${token}`)}`;
+                const base = url.replace(/\/$/, '');
+                const meEndpoint = `${base}/wp-json/wp/v2/users/me`;
+                const meResp = await fetchWithTimeout(meEndpoint, { headers: { Authorization: auth } });
+                if (!meResp.ok) {
+                    const text = await meResp.text();
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha de autenticação (${meResp.status}): ${text}` });
+                    break;
+                }
+
+                const pageEndpoint = `${base}/wp-json/wp/v2/pages`;
+                const pageBody = {
+                    title: `FigToEL ${new Date().toISOString()}`,
+                    status: 'draft',
+                    meta: { _elementor_data: lastJSON },
+                    content: 'Gerado via FigToEL (Elementor JSON em _elementor_data).'
+                };
+
+                const pageResp = await fetchWithTimeout(pageEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: auth,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(pageBody)
+                });
+
+                if (!pageResp.ok) {
+                    const text = await pageResp.text();
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha ao criar página (${pageResp.status}): ${text}` });
+                    break;
+                }
+
+                const pageJson = await pageResp.json().catch(() => ({}));
+                await saveSetting('gptel_wp_url', url);
+                await saveSetting('gptel_wp_user', user);
+                await saveSetting('gptel_wp_token', token);
+                await saveSetting('gptel_export_images', !!(cfg as any).exportImages);
+                await saveSetting('gptel_auto_page', !!(cfg as any).autoPage);
+
+                const link = pageJson?.link || url;
+                figma.ui.postMessage({ type: 'wp-status', success: true, message: `Página enviada como rascunho. Link: ${link}` });
+            } catch (e: any) {
+                const aborted = e?.name === 'AbortError';
+                const msgErr = aborted ? 'Tempo limite ao exportar para WP.' : (e?.message || 'Erro desconhecido');
+                figma.ui.postMessage({ type: 'wp-status', success: false, message: msgErr });
+            }
             break;
 
         case 'test-gemini':
@@ -280,3 +364,8 @@ figma.ui.onmessage = async (msg) => {
 };
 
 sendStoredSettings();
+
+
+
+
+

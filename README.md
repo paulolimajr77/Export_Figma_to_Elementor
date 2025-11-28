@@ -54,12 +54,7 @@ Acoes de exportacao:
 - UI moderna com tema claro/escuro.
 
 ---
-
-## Notas de versao (backup recente)
-- Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
-- Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).
-- Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.
-
+\n## Notas de versao (backup recente)\n- Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).\n- Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).\n- Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.\n- Integracoes Gemini/WP alinhadas ao fluxo de containers flex; exportacao WP implementada com criacao de pagina rascunho e teste de credenciais.\n
 ---
 
 ## Capturas de Tela / GIFs
@@ -86,3 +81,4 @@ Acoes de exportacao:
 
 ## Aviso Legal / Licenciamento Comercial
 Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz parte da distribuicao publica. Uso nao autorizado, distribuicao ou engenharia reversa nao sao permitidos.
+
