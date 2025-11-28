@@ -556,22 +556,22 @@
     <header class="topbar">
       <div class="brand">
         <div class="brand-title">Figma to WP Elementor</div>
-        <div class="brand-subtitle">ConversÃ£o inteligente para Containers Flex</div>
+                <div class="brand-subtitle">Conversao inteligente para Containers Flex</div>
       </div>
       <div class="top-actions">
         <label class="switch" title="Alternar tema">
           <input type="checkbox" id="theme-toggle" />
           <span class="slider">
-            <span class="sun">â˜€</span>
-            <span class="moon">ðŸŒ™</span>
+            <span class="sun">&#9728;</span>
+            <span class="moon">&#127769;</span>
           </span>
         </label>
       </div>
     </header>
 
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="layout">Layout â†’ Elementor</button>
-      <button class="tab-btn" data-tab="ai">ConfiguraÃ§Ã£o da IA</button>
+      <button class="tab-btn active" data-tab="layout">Layout -> Elementor</button>
+      <button class="tab-btn" data-tab="ai">Configuracao da IA</button>
       <button class="tab-btn" data-tab="wp">WordPress</button>
       <button class="tab-btn" data-tab="help">Ajuda</button>
       <span class="tab-indicator"></span>
@@ -580,7 +580,7 @@
     <main class="tab-panels">
       <section class="tab-panel active" data-panel="layout">
         <div class="card">
-          <div class="card-title">AÃ§Ãµes rÃ¡pidas</div>
+          <div class="card-title">Acoes rapidas</div>
           <div class="actions">
             <button class="btn primary" data-action="inspect-layout">Inspecionar Layout</button>
             <button class="btn primary" data-action="generate-json">Gerar JSON</button>
@@ -591,12 +591,12 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-title">SaÃ­da / Logs</div>
+          <div class="card-title">Saida / Logs</div>
           <div id="progress" class="progress hidden">
             <div class="progress-bar"></div>
             <span class="progress-text">Processando pipeline...</span>
           </div>
-          <textarea id="output" placeholder="O JSON gerado aparecerÃ¡ aqui" readonly></textarea>
+          <textarea id="output" placeholder="O JSON gerado aparecera aqui" readonly></textarea>
           <div id="logs" class="logs"></div>
         </div>
       </section>
@@ -629,7 +629,7 @@
             <label class="input-label" for="gpt_api_key">OpenAI API Key</label>
             <input id="gpt_api_key" type="password" autocomplete="off" placeholder="Cole sua chave da OpenAI" />
             <div class="actions">
-              <button class="btn primary" data-action="test-gpt">Testar conexao</button>
+              <button class="btn primary" data-action="test-gpt">Testar Conexao</button>
             </div>
             <div id="gpt-status" class="status"></div>
           </div>
@@ -642,11 +642,11 @@
           <label class="input-label" for="wp_url">WP URL</label>
           <input id="wp_url" type="text" autocomplete="off" placeholder="https://site.com" />
 
-          <label class="input-label" for="wp_user">UsuÃ¡rio WP</label>
+          <label class="input-label" for="wp_user">Usuario WP</label>
           <input id="wp_user" type="text" autocomplete="username" placeholder="usuario" />
 
           <label class="input-label" for="wp_token">Senha do App (Token)</label>
-          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplicaÃ§Ã£o do WP" />
+          <input id="wp_token" type="password" autocomplete="current-password" placeholder="Senha de aplicacao do WP" />
 
           <label class="checkbox">
             <input id="wp_export_images" type="checkbox" />
@@ -654,11 +654,11 @@
           </label>
           <label class="checkbox">
             <input id="wp_create_page" type="checkbox" />
-            <span>Criar pÃ¡gina automaticamente</span>
+            <span>Criar pagina automaticamente</span>
           </label>
 
           <div class="actions">
-            <button class="btn primary" data-action="test-wp">Testar ConexÃ£o</button>
+            <button class="btn primary" data-action="test-wp">Testar Conexao</button>
             <button class="btn secondary" data-action="export-wp">Exportar WP</button>
           </div>
           <div id="wp-status" class="status"></div>
@@ -667,7 +667,7 @@
 
       <section class="tab-panel" data-panel="help">
         <div class="card">
-          <div class="card-title">Nomenclaturas e AÃ§Ãµes rÃ¡pidas</div>
+          <div class="card-title">Nomenclaturas e Acoes rapidas</div>
           <div class="help-grid">
             <div class="help-item"><span class="label">w:heading</span><button class="btn tiny"
                 data-rename="w:heading">Renomear layer</button></div>
@@ -906,7 +906,7 @@
           case 'generation-error':
             toggleProgress(false);
             toggleResultButtons(false);
-            alert(`Erro na geraÃ§Ã£o: ${msg.message}`);
+            alert(`Erro na geracao: ${msg.message}`);
             break;
           case 'generation-start':
             toggleProgress(true);
@@ -1013,6 +1013,13 @@
 </body>
 
 </html>
+
+
+
+
+
+
+
 
 
 
