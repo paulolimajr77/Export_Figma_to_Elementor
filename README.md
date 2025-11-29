@@ -124,7 +124,7 @@ Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz 
 - 28/11/2025 (tarde 2): feedback de reset na UI (limpa sa�da/logs) e build recompilado.
 - 28/11/2025 (noite): corre��o cr�tica na autentica��o WP (substitui��o da fun��o toBase64 quebrada por implementa��o robusta) e adi��o de User-Agent para evitar bloqueios de seguran�a; build atualizado.
 - 30/11/2025: UI garante que o JSON gerado (IA on/off) preenche o textarea figma-json-output e fica selecionado para copia; build recompilado.
-- 29/11/2025: Correção crítica para frames trancados (agora exportados como imagem única) e upload de imagens (respeitando checkbox da UI); suporte a NO-AI para frames trancados; proteção readonly no textarea de preview (#output).
+- 29/11/2025: Correção crítica para frames trancados (agora exportados como imagem única) e upload de imagens (respeitando checkbox da UI); suporte a NO-AI para frames trancados; proteção readonly no textarea de preview (#output); separação clara entre JSON de preview (Figma) e JSON final (Elementor).
 
 
 

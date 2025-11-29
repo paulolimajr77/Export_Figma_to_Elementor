@@ -989,17 +989,12 @@
         if (!msg) return;
         switch (msg.type) {
           case 'preview':
-            lastPayload = msg.payload || '';
-            if (output) output.value = lastPayload;
-            updateBridgeOutput(lastPayload, false);
-            if (msg.action === 'download' && msg.payload) {
-              downloadPayload(msg.payload);
-            }
+            // Preview = Figma JSON (readonly) -> #output
+            if (output) output.value = msg.payload || '';
             break;
           case 'generation-complete':
-            lastPayload = msg.payload || '';
-            if (output) output.value = msg.payload || '';
-            updateBridgeOutput(lastPayload, true);
+            // Generation = Elementor JSON (editable) -> #figma-json-output
+            updateBridgeOutput(msg.payload || '', true);
             addLog('JSON gerado.', 'info');
             toggleProgress(false);
             toggleResultButtons(true);
@@ -1019,7 +1014,7 @@
           case 'generation-start':
             toggleProgress(true);
             updateBridgeOutput('', false);
-            if (output) output.value = '';
+            // Não limpamos o #output (Figma JSON) pois o usuário pode querer consultá-lo
             toggleResultButtons(false);
             break;
           case 'gemini-status':
