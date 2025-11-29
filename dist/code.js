@@ -1134,12 +1134,13 @@ INSTRUCOES:
       }
     });
   }
-  var OPENAI_API_URL, DEFAULT_TIMEOUT_MS2, DEFAULT_MODEL, openaiProvider;
+  var OPENAI_API_URL, DEFAULT_TIMEOUT_MS2, DEFAULT_MODEL, JSON_SAFETY, openaiProvider;
   var init_api_openai = __esm({
     "src/api_openai.ts"() {
       OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
       DEFAULT_TIMEOUT_MS2 = 12e3;
       DEFAULT_MODEL = "gpt-4.1";
+      JSON_SAFETY = "Responda sempre em JSON (json) valido e completo.";
       openaiProvider = {
         id: "gpt",
         model: DEFAULT_MODEL,
@@ -1158,9 +1159,10 @@ INSTRUCOES:
             const requestBody = {
               model: this.model,
               messages: [
-                { role: "system", content: input.instructions },
+                { role: "system", content: `${input.instructions}
+${JSON_SAFETY}` },
                 { role: "user", content: input.prompt },
-                { role: "user", content: `SNAPSHOT:
+                { role: "user", content: `SNAPSHOT (json esperado):
 ${JSON.stringify(input.snapshot)}` }
               ],
               temperature: 0.2,
@@ -1215,7 +1217,8 @@ ${JSON.stringify(input.snapshot)}` }
             const requestBody = {
               model: this.model,
               messages: [
-                { role: "user", content: "ping" }
+                { role: "system", content: `${JSON_SAFETY} Retorne {"pong": true}.` },
+                { role: "user", content: "ping (json)" }
               ],
               temperature: 0,
               max_tokens: 16,

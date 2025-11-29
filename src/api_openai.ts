@@ -56,6 +56,8 @@ async function parseJsonResponse(rawContent: string): Promise<PipelineSchema> {
     }
 }
 
+const JSON_SAFETY = 'Responda sempre em JSON (json) valido e completo.';
+
 export const openaiProvider: SchemaProvider = {
     id: 'gpt',
     model: DEFAULT_MODEL,
@@ -74,9 +76,9 @@ export const openaiProvider: SchemaProvider = {
         const requestBody = {
             model: this.model,
             messages: [
-                { role: 'system', content: input.instructions },
+                { role: 'system', content: `${input.instructions}\n${JSON_SAFETY}` },
                 { role: 'user', content: input.prompt },
-                { role: 'user', content: `SNAPSHOT:\n${JSON.stringify(input.snapshot)}` }
+                { role: 'user', content: `SNAPSHOT (json esperado):\n${JSON.stringify(input.snapshot)}` }
             ],
             temperature: 0.2,
             max_tokens: 8192,
@@ -129,7 +131,8 @@ export const openaiProvider: SchemaProvider = {
         const requestBody = {
             model: this.model,
             messages: [
-                { role: 'user', content: 'ping' }
+                { role: 'system', content: `${JSON_SAFETY} Retorne {"pong": true}.` },
+                { role: 'user', content: 'ping (json)' }
             ],
             temperature: 0,
             max_tokens: 16,
