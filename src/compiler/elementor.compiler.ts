@@ -13,6 +13,19 @@ export class ElementorCompiler {
         this.wpConfig = config;
     }
 
+    private sanitizeColor(value: any): string | undefined {
+        if (!value) return undefined;
+        if (typeof value === 'string') return value;
+        if (typeof value === 'object' && value.r !== undefined && value.g !== undefined && value.b !== undefined) {
+            const r = Math.round((value.r || 0) * 255);
+            const g = Math.round((value.g || 0) * 255);
+            const b = Math.round((value.b || 0) * 255);
+            const a = value.a !== undefined ? value.a : 1;
+            return `rgba(${r}, ${g}, ${b}, ${a})`;
+        }
+        return undefined;
+    }
+
     public compile(schema: PipelineSchema): ElementorJSON {
         const elements = schema.containers.map(container => this.compileContainer(container, false));
         return {
@@ -75,9 +88,10 @@ export class ElementorCompiler {
 
         if (styles.background) {
             const bg = styles.background;
-            if (bg.color) {
+            const sanitizedColor = this.sanitizeColor(bg.color);
+            if (sanitizedColor) {
                 settings.background_background = 'classic';
-                settings.background_color = bg.color;
+                settings.background_color = sanitizedColor;
             }
             if (bg.image) {
                 settings.background_background = 'classic';
@@ -105,9 +119,22 @@ export class ElementorCompiler {
         return settings;
     }
 
+    private sanitizeSettings(raw: Record<string, any>): ElementorSettings {
+        const out: ElementorSettings = {};
+        Object.entries(raw).forEach(([k, v]) => {
+            if (k.toLowerCase().includes('color')) {
+                const sanitized = this.sanitizeColor(v);
+                if (sanitized) out[k as keyof ElementorSettings] = sanitized as any;
+            } else {
+                out[k as keyof ElementorSettings] = v as any;
+            }
+        });
+        return out;
+    }
+
     private compileWidget(widget: PipelineWidget): ElementorElement {
         const widgetId = generateGUID();
-        const baseSettings: ElementorSettings = { _element_id: widgetId, ...widget.styles };
+        const baseSettings: ElementorSettings = { _element_id: widgetId, ...this.sanitizeSettings(widget.styles || {}) };
 
         // Tenta registry primeiro (baseado em type/kind)
         const registryResult = compileWithRegistry(widget, baseSettings);

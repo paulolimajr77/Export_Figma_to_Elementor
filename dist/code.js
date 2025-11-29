@@ -486,6 +486,18 @@ ${JSON.stringify(input.snapshot)}` }
         setWPConfig(config) {
           this.wpConfig = config;
         }
+        sanitizeColor(value) {
+          if (!value) return void 0;
+          if (typeof value === "string") return value;
+          if (typeof value === "object" && value.r !== void 0 && value.g !== void 0 && value.b !== void 0) {
+            const r = Math.round((value.r || 0) * 255);
+            const g = Math.round((value.g || 0) * 255);
+            const b = Math.round((value.b || 0) * 255);
+            const a = value.a !== void 0 ? value.a : 1;
+            return `rgba(${r}, ${g}, ${b}, ${a})`;
+          }
+          return void 0;
+        }
         compile(schema) {
           const elements = schema.containers.map((container) => this.compileContainer(container, false));
           return {
@@ -535,9 +547,10 @@ ${JSON.stringify(input.snapshot)}` }
           }
           if (styles.background) {
             const bg = styles.background;
-            if (bg.color) {
+            const sanitizedColor = this.sanitizeColor(bg.color);
+            if (sanitizedColor) {
               settings.background_background = "classic";
-              settings.background_color = bg.color;
+              settings.background_color = sanitizedColor;
             }
             if (bg.image) {
               settings.background_background = "classic";
@@ -560,9 +573,21 @@ ${JSON.stringify(input.snapshot)}` }
           }
           return settings;
         }
+        sanitizeSettings(raw) {
+          const out = {};
+          Object.entries(raw).forEach(([k, v]) => {
+            if (k.toLowerCase().includes("color")) {
+              const sanitized = this.sanitizeColor(v);
+              if (sanitized) out[k] = sanitized;
+            } else {
+              out[k] = v;
+            }
+          });
+          return out;
+        }
         compileWidget(widget) {
           const widgetId = generateGUID();
-          const baseSettings = __spreadValues({ _element_id: widgetId }, widget.styles);
+          const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
           const registryResult = compileWithRegistry(widget, baseSettings);
           if (registryResult) {
             return {
@@ -1632,6 +1657,10 @@ ${JSON.stringify(input.snapshot)}` }
             try {
               const incoming = msg.wpConfig;
               const cfg = incoming && incoming.url ? incoming : yield loadWPConfig();
+              if (!cfg.autoPage) {
+                figma.ui.postMessage({ type: "wp-status", success: false, message: "Criar p\xE1gina automaticamente est\xE1 desativado." });
+                break;
+              }
               const url = normalizeWpUrl((cfg == null ? void 0 : cfg.url) || "");
               const userRaw = (cfg == null ? void 0 : cfg.user) || "";
               const tokenRaw = (cfg == null ? void 0 : cfg.token) || (cfg == null ? void 0 : cfg.password) || "";

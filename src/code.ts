@@ -356,6 +356,10 @@ figma.ui.onmessage = async (msg) => {
             try {
                 const incoming = msg.wpConfig as WPConfig | undefined;
                 const cfg = incoming && incoming.url ? incoming : await loadWPConfig();
+                if (!(cfg as any).autoPage) {
+                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'Criar p\u00e1gina automaticamente est\u00e1 desativado.' });
+                    break;
+                }
                 const url = normalizeWpUrl(cfg?.url || '');
                 const userRaw = (cfg as any)?.user || '';
                 const tokenRaw = (cfg as any)?.token || (cfg as any)?.password || '';
