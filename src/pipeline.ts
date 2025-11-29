@@ -195,13 +195,29 @@ export class ConversionPipeline {
             if (looksInvalidContainer) {
                 logWarn(`[AutoFix] Node ${c.id} (${node?.name || 'container'}) nao tem auto layout ou tipo invalido (${type}).`);
                 if (!this.autoFixLayout) {
-                    logWarn(`[AutoFix] Correção desativada. Ative "auto_fix_layout" para aplicar fallback de flex (direction=column).`);
+                    logWarn(`[AutoFix] Correção desativada. Ative "auto_fix_layout" para aplicar fallback.`);
                 } else {
-                    // fallback: manter como container flex simples, direction column
-                    c.direction = 'column';
-                    if (!Array.isArray(c.widgets)) c.widgets = [];
-                    if (!Array.isArray(c.children)) c.children = [];
-                    logWarn(`[AutoFix] Aplicado fallback: container ${c.id} forçado para flex column.`);
+                    if (!isFrameLike || type === 'RECTANGLE' || type === 'VECTOR' || type === 'TEXT') {
+                        // Converter para widget custom dentro do pai
+                        if (parent) {
+                            parent.widgets = parent.widgets || [];
+                            parent.widgets.push({
+                                type: 'custom',
+                                content: (node as any)?.characters || null,
+                                imageId: null,
+                                styles: { sourceId: c.id, sourceName: node?.name }
+                            });
+                            if (Array.isArray(c.widgets)) parent.widgets.push(...c.widgets);
+                            if (Array.isArray(c.children)) parent.children.push(...c.children);
+                            return null;
+                        }
+                        // se root, mantém mas como column
+                        c.direction = 'column';
+                    } else {
+                        // frame sem auto layout: aplica fallback flex column
+                        c.direction = 'column';
+                        logWarn(`[AutoFix] Aplicado fallback: container ${c.id} forçado para flex column.`);
+                    }
                 }
             }
 
@@ -209,6 +225,7 @@ export class ConversionPipeline {
                 c.direction = 'column';
                 logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
             }
+            if (!c.width) c.width = 'full';
             if (!Array.isArray(c.widgets)) c.widgets = [];
             if (!Array.isArray(c.children)) c.children = [];
             c.children = c.children.map(child => walk(child as any, c)).filter(Boolean) as PipelineContainer[];

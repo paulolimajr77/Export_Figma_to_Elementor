@@ -499,10 +499,11 @@ ${JSON.stringify(input.snapshot)}` }
           return void 0;
         }
         compile(schema) {
+          var _a;
           const elements = schema.containers.map((container) => this.compileContainer(container, false));
           return {
             type: "elementor",
-            siteurl: "",
+            siteurl: ((_a = this.wpConfig) == null ? void 0 : _a.url) || "",
             elements
           };
         }
@@ -514,12 +515,18 @@ ${JSON.stringify(input.snapshot)}` }
             content_width: container.width === "full" ? "full" : "boxed",
             flex_direction: container.direction === "row" ? "row" : "column"
           }, this.mapContainerStyles(container.styles));
+          if (!settings.flex_gap) {
+            settings.flex_gap = { unit: "px", column: 0, row: 0, isLinked: true };
+          }
+          if (!settings.justify_content) settings.justify_content = "start";
+          if (!settings.align_items) settings.align_items = "start";
           const widgetElements = container.widgets.map((w) => this.compileWidget(w));
           const childContainers = container.children.map((child) => this.compileContainer(child, true));
           return {
             id,
             elType: "container",
             isInner,
+            isLocked: false,
             settings,
             elements: [...widgetElements, ...childContainers]
           };
@@ -634,6 +641,7 @@ ${JSON.stringify(input.snapshot)}` }
             id: widgetId,
             elType: "widget",
             widgetType,
+            isLocked: false,
             settings,
             elements: []
           };
@@ -1132,18 +1140,33 @@ INSTRUCOES:
             if (looksInvalidContainer) {
               logWarn(`[AutoFix] Node ${c.id} (${(node == null ? void 0 : node.name) || "container"}) nao tem auto layout ou tipo invalido (${type}).`);
               if (!this.autoFixLayout) {
-                logWarn(`[AutoFix] Corre\xE7\xE3o desativada. Ative "auto_fix_layout" para aplicar fallback de flex (direction=column).`);
+                logWarn(`[AutoFix] Corre\xE7\xE3o desativada. Ative "auto_fix_layout" para aplicar fallback.`);
               } else {
-                c.direction = "column";
-                if (!Array.isArray(c.widgets)) c.widgets = [];
-                if (!Array.isArray(c.children)) c.children = [];
-                logWarn(`[AutoFix] Aplicado fallback: container ${c.id} for\xE7ado para flex column.`);
+                if (!isFrameLike || type === "RECTANGLE" || type === "VECTOR" || type === "TEXT") {
+                  if (parent) {
+                    parent.widgets = parent.widgets || [];
+                    parent.widgets.push({
+                      type: "custom",
+                      content: (node == null ? void 0 : node.characters) || null,
+                      imageId: null,
+                      styles: { sourceId: c.id, sourceName: node == null ? void 0 : node.name }
+                    });
+                    if (Array.isArray(c.widgets)) parent.widgets.push(...c.widgets);
+                    if (Array.isArray(c.children)) parent.children.push(...c.children);
+                    return null;
+                  }
+                  c.direction = "column";
+                } else {
+                  c.direction = "column";
+                  logWarn(`[AutoFix] Aplicado fallback: container ${c.id} for\xE7ado para flex column.`);
+                }
               }
             }
             if (c.direction !== "row" && c.direction !== "column") {
               c.direction = "column";
               logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
             }
+            if (!c.width) c.width = "full";
             if (!Array.isArray(c.widgets)) c.widgets = [];
             if (!Array.isArray(c.children)) c.children = [];
             c.children = c.children.map((child) => walk(child, c)).filter(Boolean);
