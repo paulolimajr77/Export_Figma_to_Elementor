@@ -18,3 +18,4 @@
 - 29/11/2025: Bridge de clipboard movido para UI (textarea + botao copiar), code.ts apenas envia copy-json; heuristicas NO-AI refinadas para colapsar wrappers de imagem/galeria/lista/box e evitar containers vazios; testes noai.spec.ts ajustados e passando.
 - 30/11/2025: Clipboard Bridge com fallback (navigator.clipboard + execCommand) na UI; copia automatica ou manual sem depender do sandbox.
 - 30/11/2025: Ajuste UX da cópia: textarea agora recebe foco/seleção após gerar JSON para facilitar Ctrl+C; fallback permanece ativo na UI.
+- 30/11/2025: JSON gerado (IA on/off) agora sempre preenche o textarea figma-json-output; eventos preview/copy-json sincronizam o campo e o botao 'Copiar JSON' usa fallback e selecao automatica.

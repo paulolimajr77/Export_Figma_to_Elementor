@@ -48,6 +48,9 @@ FigToEL e um plugin comercial que converte designs do Figma em paginas Elementor
 6. Clique em **Gerar JSON Elementor**.
 7. Copie ou exporte diretamente para o WordPress.
 
+Dica de saida:
+- O JSON final (com ou sem IA) aparece automaticamente no campo "JSON gerado..." (textarea figma-json-output) pronto para copiar/colar no Elementor.
+
 Acoes de exportacao:
 - **Copiar JSON**
 - **Baixar JSON**
@@ -120,6 +123,7 @@ Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz 
 - 28/11/2025 (noite): refatora��o completa do pipeline para "Naming Mode" (redu��o dr�stica de tokens, payload simplificado para IA, remo��o de modelos inv�lidos); build atualizado.
 - 28/11/2025 (tarde 2): feedback de reset na UI (limpa sa�da/logs) e build recompilado.
 - 28/11/2025 (noite): corre��o cr�tica na autentica��o WP (substitui��o da fun��o toBase64 quebrada por implementa��o robusta) e adi��o de User-Agent para evitar bloqueios de seguran�a; build atualizado.
+- 30/11/2025: UI garante que o JSON gerado (IA on/off) preenche o textarea figma-json-output e fica selecionado para copia; build recompilado.
 
 
 

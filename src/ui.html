@@ -732,6 +732,8 @@
       const btnExport = document.querySelector('[data-action="export-wp"]');
       const themeToggle = document.getElementById('theme-toggle');
       const darkSheet = document.getElementById('theme-dark');
+      const bridgeOutput = document.getElementById('figma-json-output');
+      const btnCopyManual = document.getElementById('copy-manual');
       let lastPayload = '';
 
       const fields = {
@@ -751,6 +753,16 @@
       const aiSettings = document.getElementById('ai_settings');
 
       const storage = null; // desativado para evitar SecurityError em sandbox
+      const updateBridgeOutput = (value, autoSelect = false) => {
+        if (!bridgeOutput) return;
+        bridgeOutput.value = value || '';
+        if (autoSelect) {
+          requestAnimationFrame(() => {
+            bridgeOutput.focus();
+            bridgeOutput.select();
+          });
+        }
+      };
 
       function debounce(fn, wait = 300) {
         let t;
@@ -946,6 +958,8 @@
                 if (output) output.value = '';
                 if (logs) logs.innerHTML = '';
                 if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
+                updateBridgeOutput('', false);
+                lastPayload = '';
                 toggleProgress(false);
                 toggleResultButtons(false);
                 addLog('Sessao reiniciada.', 'info');
@@ -971,7 +985,9 @@
         if (!msg) return;
         switch (msg.type) {
           case 'preview':
-            if (output) output.value = msg.payload || '';
+            lastPayload = msg.payload || '';
+            if (output) output.value = lastPayload;
+            updateBridgeOutput(lastPayload, false);
             if (msg.action === 'download' && msg.payload) {
               downloadPayload(msg.payload);
             }
@@ -979,10 +995,18 @@
           case 'generation-complete':
             lastPayload = msg.payload || '';
             if (output) output.value = msg.payload || '';
+            updateBridgeOutput(lastPayload, true);
             addLog('JSON gerado.', 'info');
             toggleProgress(false);
             toggleResultButtons(true);
             break;
+          case 'copy-json': {
+            const txt = msg.payload || '';
+            lastPayload = txt;
+            updateBridgeOutput(txt, true);
+            addLog('JSON pronto para copiar. Clique em "Copiar JSON" ou use Ctrl+C.', 'info');
+            break;
+          }
           case 'generation-error':
             toggleProgress(false);
             toggleResultButtons(false);
@@ -990,6 +1014,8 @@
             break;
           case 'generation-start':
             toggleProgress(true);
+            updateBridgeOutput('', false);
+            if (output) output.value = '';
             toggleResultButtons(false);
             break;
           case 'gemini-status':
@@ -1046,14 +1072,37 @@
         }
       }
 
-      async function copyToClipboard(text) {
+      async function copyWithFallback(text, label = 'JSON') {
         try {
           await navigator.clipboard.writeText(text);
-          addLog('JSON copiado.', 'success');
+          addLog(`${label} copiado.`, 'success');
+          return true;
         } catch (e) {
-          addLog('Falha ao copiar no navegador.', 'error');
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            const ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (ok) {
+              addLog(`${label} copiado (fallback).`, 'success');
+              return true;
+            }
+          } catch (_) { /* ignore */ }
+          if (bridgeOutput) {
+            bridgeOutput.focus();
+            bridgeOutput.select();
+          }
+          addLog('Falha ao copiar. Selecione o campo e pressione Ctrl+C.', 'warn');
+          return false;
         }
       }
+
+      const copyToClipboard = (text) => copyWithFallback(text, 'JSON');
 
       function downloadPayload(text) {
         const blob = new Blob([text], { type: 'application/json' });
@@ -1110,6 +1159,28 @@
           window.addEventListener('touchmove', onTouchMove);
           window.addEventListener('touchend', onTouchEnd);
         }, { passive: true });
+      }
+
+      if (btnCopyManual) {
+        btnCopyManual.addEventListener('click', async () => {
+          const txt = bridgeOutput?.value || lastPayload || '';
+          if (!txt) {
+            addLog('Nenhum JSON gerado para copiar ainda.', 'warn');
+            return;
+          }
+          if (bridgeOutput) {
+            bridgeOutput.focus();
+            bridgeOutput.select();
+          }
+          await copyWithFallback(txt, 'JSON');
+        });
+      }
+
+      if (bridgeOutput) {
+        bridgeOutput.addEventListener('click', () => {
+          bridgeOutput.focus();
+          bridgeOutput.select();
+        });
       }
     })();
   </script>
