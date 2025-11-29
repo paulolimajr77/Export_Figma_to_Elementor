@@ -7,3 +7,4 @@
 - 28/11/2025: Reaplicacao de acentuacao correta na UI (portugues BR) usando entidades HTML para evitar quebra de encoding.
 - 29/11/2025: Ajuste no provedor OpenAI para sempre mencionar "json" nas mensagens (conforme requisito do response_format), evitando erro ao testar conexao.
 - 29/11/2025: UI reforcada com seletor de provedor IA, modelos GPT detalhados e persistencia em aiProvider/gptApiKey/gptModel; test OpenAI mapeando 401/404/429; pipeline alterna Gemini/GPT conforme configuracao.
+- 29/11/2025: Fallback para containers sem auto layout/tipo invalido: mantidos como flex column quando auto_fix_layout estiver ativo, em vez de converter para custom.

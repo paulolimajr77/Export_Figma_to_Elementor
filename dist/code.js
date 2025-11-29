@@ -1103,27 +1103,12 @@ INSTRUCOES:
             if (looksInvalidContainer) {
               logWarn(`[AutoFix] Node ${c.id} (${(node == null ? void 0 : node.name) || "container"}) nao tem auto layout ou tipo invalido (${type}).`);
               if (!this.autoFixLayout) {
-                logWarn(`[AutoFix] Corre\xE7\xE3o desativada. Ative "auto_fix_layout" para converter em widget custom.`);
-                return c;
-              }
-              logWarn(`[AutoFix] Convertendo ${c.id} para w:custom e promovendo filhos.`);
-              const parentContainer = parent;
-              if (parentContainer) {
-                parentContainer.widgets = parentContainer.widgets || [];
-                parentContainer.children = parentContainer.children || [];
-                parentContainer.widgets.push({
-                  type: "custom",
-                  content: null,
-                  imageId: null,
-                  styles: { sourceId: c.id, sourceName: node == null ? void 0 : node.name }
-                });
-                if (Array.isArray(c.widgets)) parentContainer.widgets.push(...c.widgets);
-                if (Array.isArray(c.children)) parentContainer.children.push(...c.children);
-                return null;
+                logWarn(`[AutoFix] Corre\xE7\xE3o desativada. Ative "auto_fix_layout" para aplicar fallback de flex (direction=column).`);
               } else {
-                const promoted = [];
-                if (Array.isArray(c.children)) promoted.push(...c.children);
-                return __spreadProps(__spreadValues({}, c), { children: promoted, widgets: c.widgets || [] });
+                c.direction = "column";
+                if (!Array.isArray(c.widgets)) c.widgets = [];
+                if (!Array.isArray(c.children)) c.children = [];
+                logWarn(`[AutoFix] Aplicado fallback: container ${c.id} for\xE7ado para flex column.`);
               }
             }
             if (c.direction !== "row" && c.direction !== "column") {

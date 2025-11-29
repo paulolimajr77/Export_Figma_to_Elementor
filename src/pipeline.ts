@@ -26,6 +26,7 @@ export interface PipelineDebugInfo {
 export class ConversionPipeline {
     private compiler: ElementorCompiler;
     private imageUploader: ImageUploader;
+    private autoFixLayout: boolean = false;
 
     constructor() {
         this.compiler = new ElementorCompiler();
@@ -35,12 +36,13 @@ export class ConversionPipeline {
     async run(
         node: SceneNode,
         wpConfig: WPConfig = {},
-        options?: { debug?: boolean; provider?: SchemaProvider; apiKey?: string }
+        options?: { debug?: boolean; provider?: SchemaProvider; apiKey?: string; autoFixLayout?: boolean }
     ): Promise<ElementorJSON | { elementorJson: ElementorJSON; debugInfo: PipelineDebugInfo }> {
         this.compiler.setWPConfig(wpConfig);
         this.imageUploader.setWPConfig(wpConfig);
 
         const provider = options?.provider || geminiProvider;
+        this.autoFixLayout = !!options?.autoFixLayout;
 
         const preprocessed = this.preprocess(node);
         const schema = await this.generateSchema(preprocessed, provider, options?.apiKey);
@@ -186,26 +188,15 @@ export class ConversionPipeline {
             const looksInvalidContainer = !hasAutoLayout || !isFrameLike;
 
             if (looksInvalidContainer) {
-                // Converter para widget custom, preservando filhos
-                logWarn(`[AutoFix] Node ${c.id} (${node?.name || 'container'}) nao tem auto layout ou tipo invalido (${type}). Convertido para w:custom e filhos promovidos.`);
-                const parentContainer = parent;
-                if (parentContainer) {
-                    parentContainer.widgets = parentContainer.widgets || [];
-                    parentContainer.children = parentContainer.children || [];
-                    parentContainer.widgets.push({
-                        type: 'custom',
-                        content: null,
-                        imageId: null,
-                        styles: { sourceId: c.id, sourceName: node?.name }
-                    });
-                    if (Array.isArray(c.widgets)) parentContainer.widgets.push(...c.widgets);
-                    if (Array.isArray(c.children)) parentContainer.children.push(...c.children);
-                    return null;
+                logWarn(`[AutoFix] Node ${c.id} (${node?.name || 'container'}) nao tem auto layout ou tipo invalido (${type}).`);
+                if (!this.autoFixLayout) {
+                    logWarn(`[AutoFix] Correção desativada. Ative "auto_fix_layout" para aplicar fallback de flex (direction=column).`);
                 } else {
-                    // se for root, promovemos filhos para raiz
-                    const promoted: PipelineContainer[] = [];
-                    if (Array.isArray(c.children)) promoted.push(...c.children);
-                    return { ...c, children: promoted, widgets: c.widgets || [] };
+                    // fallback: manter como container flex simples, direction column
+                    c.direction = 'column';
+                    if (!Array.isArray(c.widgets)) c.widgets = [];
+                    if (!Array.isArray(c.children)) c.children = [];
+                    logWarn(`[AutoFix] Aplicado fallback: container ${c.id} forçado para flex column.`);
                 }
             }
 
