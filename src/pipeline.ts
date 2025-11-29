@@ -165,17 +165,29 @@ export class ConversionPipeline {
             }
         };
 
-        const walkContainer = async (container: PipelineContainer) => {
-            for (const widget of container.widgets) {
-                await processWidget(widget);
+        const uploadPromises: Promise<void>[] = [];
+
+        const collectUploads = (container: PipelineContainer) => {
+            if (container.widgets) {
+                for (const widget of container.widgets) {
+                    uploadPromises.push(processWidget(widget));
+                }
             }
-            for (const child of container.children) {
-                await walkContainer(child);
+            if (container.children) {
+                for (const child of container.children) {
+                    collectUploads(child);
+                }
             }
         };
 
-        for (const container of schema.containers) {
-            await walkContainer(container);
+        if (schema.containers) {
+            for (const container of schema.containers) {
+                collectUploads(container);
+            }
+        }
+
+        if (uploadPromises.length > 0) {
+            await Promise.all(uploadPromises);
         }
     }
 

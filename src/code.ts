@@ -2,7 +2,7 @@
 import type { WPConfig, ElementorJSON } from './types/elementor.types';
 import { serializeNode, SerializedNode } from './utils/serialization_utils';
 import { GEMINI_MODEL, geminiProvider } from './api_gemini';
-import { DEFAULT_GPT_MODEL, openaiProvider, testOpenAIConnection } from './api_openai';
+import { openaiProvider, testOpenAIConnection } from './api_openai';
 import { SchemaProvider } from './types/providers';
 import { analyzeTreeWithHeuristics, convertToFlexSchema } from './pipeline/noai.parser';
 import { ElementorCompiler } from './compiler/elementor.compiler';
@@ -271,31 +271,43 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
     const normalizedWP = { ...wpConfig, password: (wpConfig as any)?.password || (wpConfig as any)?.token };
     noaiUploader = new ImageUploader({});
     noaiUploader.setWPConfig(normalizedWP);
-    const uploadEnabled = !!(normalizedWP && normalizedWP.url && (normalizedWP as any).user && (normalizedWP as any).password);
-    const resolveImages = async (container: any) => {
-        for (const widget of container.widgets || []) {
-            if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon')) {
-                try {
-                    const node = figma.getNodeById(widget.imageId);
-                    if (node) {
-                        const format = widget.type === 'icon' ? 'SVG' : 'WEBP';
-                        const result = await noaiUploader.uploadToWordPress(node as SceneNode, format as any);
-                        if (result) {
-                            widget.content = result.url;
-                            widget.imageId = result.id.toString();
-                        }
+    const uploadEnabled = !!(normalizedWP && normalizedWP.url && (normalizedWP as any).user && (normalizedWP as any).password && (normalizedWP as any).exportImages);
+
+    const uploadPromises: Promise<void>[] = [];
+
+    const processWidget = async (widget: any) => {
+        if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon')) {
+            try {
+                const node = figma.getNodeById(widget.imageId);
+                if (node) {
+                    const format = widget.type === 'icon' ? 'SVG' : 'WEBP';
+                    const result = await noaiUploader.uploadToWordPress(node as SceneNode, format as any);
+                    if (result) {
+                        widget.content = result.url;
+                        widget.imageId = result.id.toString();
                     }
-                } catch (e) {
-                    console.error(`[NO-AI] Erro ao processar imagem ${widget.imageId}:`, e);
                 }
+            } catch (e) {
+                console.error(`[NO-AI] Erro ao processar imagem ${widget.imageId}:`, e);
             }
         }
+    };
+
+    const collectUploads = (container: any) => {
+        for (const widget of container.widgets || []) {
+            uploadPromises.push(processWidget(widget));
+        }
         for (const child of container.children || []) {
-            await resolveImages(child);
+            collectUploads(child);
         }
     };
+
     for (const container of schema.containers) {
-        await resolveImages(container);
+        collectUploads(container);
+    }
+
+    if (uploadPromises.length > 0) {
+        await Promise.all(uploadPromises);
     }
 
     const compiler = new ElementorCompiler();

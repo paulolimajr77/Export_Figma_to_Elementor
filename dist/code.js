@@ -1521,16 +1521,26 @@ INSTRU\xC7\xD5ES:
                 }
               }
             });
-            const walkContainer = (container) => __async(this, null, function* () {
-              for (const widget of container.widgets) {
-                yield processWidget(widget);
+            const uploadPromises = [];
+            const collectUploads = (container) => {
+              if (container.widgets) {
+                for (const widget of container.widgets) {
+                  uploadPromises.push(processWidget(widget));
+                }
               }
-              for (const child of container.children) {
-                yield walkContainer(child);
+              if (container.children) {
+                for (const child of container.children) {
+                  collectUploads(child);
+                }
               }
-            });
-            for (const container of schema.containers) {
-              yield walkContainer(container);
+            };
+            if (schema.containers) {
+              for (const container of schema.containers) {
+                collectUploads(container);
+              }
+            }
+            if (uploadPromises.length > 0) {
+              yield Promise.all(uploadPromises);
             }
           });
         }
@@ -2243,31 +2253,38 @@ ${JSON.stringify(input.snapshot)}` }
           const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token) });
           noaiUploader = new ImageUploader({});
           noaiUploader.setWPConfig(normalizedWP);
-          const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password);
-          const resolveImages = (container) => __async(null, null, function* () {
-            for (const widget of container.widgets || []) {
-              if (uploadEnabled && widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
-                try {
-                  const node = figma.getNodeById(widget.imageId);
-                  if (node) {
-                    const format = widget.type === "icon" ? "SVG" : "WEBP";
-                    const result = yield noaiUploader.uploadToWordPress(node, format);
-                    if (result) {
-                      widget.content = result.url;
-                      widget.imageId = result.id.toString();
-                    }
+          const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password && normalizedWP.exportImages);
+          const uploadPromises = [];
+          const processWidget = (widget) => __async(null, null, function* () {
+            if (uploadEnabled && widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
+              try {
+                const node = figma.getNodeById(widget.imageId);
+                if (node) {
+                  const format = widget.type === "icon" ? "SVG" : "WEBP";
+                  const result = yield noaiUploader.uploadToWordPress(node, format);
+                  if (result) {
+                    widget.content = result.url;
+                    widget.imageId = result.id.toString();
                   }
-                } catch (e) {
-                  console.error(`[NO-AI] Erro ao processar imagem ${widget.imageId}:`, e);
                 }
+              } catch (e) {
+                console.error(`[NO-AI] Erro ao processar imagem ${widget.imageId}:`, e);
               }
             }
-            for (const child of container.children || []) {
-              yield resolveImages(child);
-            }
           });
+          const collectUploads = (container) => {
+            for (const widget of container.widgets || []) {
+              uploadPromises.push(processWidget(widget));
+            }
+            for (const child of container.children || []) {
+              collectUploads(child);
+            }
+          };
           for (const container of schema.containers) {
-            yield resolveImages(container);
+            collectUploads(container);
+          }
+          if (uploadPromises.length > 0) {
+            yield Promise.all(uploadPromises);
           }
           const compiler = new ElementorCompiler();
           compiler.setWPConfig(normalizedWP);
