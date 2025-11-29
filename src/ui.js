@@ -10,9 +10,12 @@
   const btnExport = document.querySelector('[data-action="export-wp"]');
   const themeToggle = document.getElementById('theme-toggle');
   const darkSheet = document.getElementById('theme-dark');
+  const bridgeOutput = document.getElementById('figma-json-output');
+  const btnCopyManual = document.getElementById('copy-manual');
   let lastPayload = '';
 
  const fields = {
+    use_ai: document.getElementById('use_ai'),
     provider_ai: document.getElementById('provider_ai'),
     gemini_api_key: document.getElementById('gemini_api_key'),
     gemini_model: document.getElementById('gemini_model'),
@@ -25,6 +28,7 @@
     wp_export_images: document.getElementById('wp_export_images'),
     wp_create_page: document.getElementById('wp_create_page')
   };
+  const aiSettings = document.getElementById('ai_settings');
 
   const storage = null; // desativado para evitar SecurityError em sandbox
 
@@ -55,6 +59,13 @@
     const value = providerId === 'gpt' ? 'gpt' : 'gemini';
     document.body?.setAttribute('data-provider', value);
     if (fields.provider_ai) fields.provider_ai.value = value;
+  }
+
+  function toggleAIFields(enabled) {
+    document.body?.setAttribute('data-use-ai', enabled ? 'true' : 'false');
+    if (aiSettings) {
+      aiSettings.classList.toggle('ai-hidden', !enabled);
+    }
   }
 
   tabs.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
@@ -99,6 +110,12 @@
 
   function loadStoredSettings(payload) {
     if (!payload) return;
+    const useAI = payload.useAI;
+    if (fields.use_ai) {
+      const val = typeof useAI === 'boolean' ? useAI : true;
+      fields.use_ai.checked = val;
+      toggleAIFields(val);
+    }
     if (fields.provider_ai) setProvider(payload.providerAi || 'gemini');
     if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
     if (fields.gemini_model && payload.geminiModel) fields.gemini_model.value = payload.geminiModel;
@@ -116,6 +133,13 @@
 
   function watchInputs() {
     const saveText = (key, el) => debounce(() => send('save-setting', { key, value: el.value }));
+    if (fields.use_ai) {
+      fields.use_ai.addEventListener('change', () => {
+        const enabled = fields.use_ai.checked;
+        toggleAIFields(enabled);
+        send('save-setting', { key: 'gptel_use_ai', value: enabled });
+      });
+    }
     if (fields.provider_ai) {
       fields.provider_ai.addEventListener('change', () => {
         setProvider(fields.provider_ai.value);
@@ -134,7 +158,7 @@
     if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
   }
 
-    function bindActions() {
+  function bindActions() {
     document.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (btn.disabled && ['copy-json', 'download-json', 'export-wp'].includes(btn.getAttribute('data-action') || '')) {
@@ -145,6 +169,7 @@
           send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value });
         }
         const payload = {
+          useAI: fields.use_ai?.checked !== false,
           providerAi: fields.provider_ai?.value || 'gemini',
           wpConfig: {
             url: fields.wp_url?.value || '',
@@ -169,7 +194,7 @@
           case 'optimize-structure': send('optimize-structure', payload); break;
           case 'analyze-widgets': send('analyze-widgets', payload); break;
           case 'copy-json':
-            if (lastPayload) copyToClipboard(lastPayload); else send('copy-json');
+            if (lastPayload) copyWithFallback(lastPayload); else send('copy-json');
             break;
           case 'download-json':
             if (lastPayload) downloadPayload(lastPayload); else send('download-json');
@@ -209,17 +234,45 @@
         break;
       case 'generation-complete':
         lastPayload = msg.payload || '';
-        if (output) output.value = msg.payload || '';
+        if (output) {
+          // limpa o campo de preview/figma; JSON final fica apenas no bridgeOutput
+          output.value = '';
+        }
+        if (bridgeOutput) {
+          bridgeOutput.value = msg.payload || '';
+          requestAnimationFrame(() => {
+            bridgeOutput.focus();
+            bridgeOutput.select();
+          });
+        }
         addLog('JSON gerado.', 'info');
         toggleProgress(false);
         toggleResultButtons(true);
         break;
+      case 'copy-json': {
+        const txt = msg.payload || '';
+        lastPayload = txt;
+        const ensureSelection = () => {
+          if (bridgeOutput) {
+            bridgeOutput.value = txt;
+            bridgeOutput.focus();
+            bridgeOutput.select();
+          }
+        };
+        ensureSelection();
+        requestAnimationFrame(ensureSelection);
+        setTimeout(ensureSelection, 60);
+        addLog('JSON pronto para copiar. Clique em "Copiar JSON" ou use Ctrl+C.', 'info');
+        break;
+      }
       case 'generation-error':
         toggleProgress(false);
         toggleResultButtons(false);
         break;
       case 'generation-start':
         toggleProgress(true);
+        if (output) output.value = '';
+        if (bridgeOutput) bridgeOutput.value = '';
         toggleResultButtons(false);
         break;
       case 'gemini-status':
@@ -237,6 +290,44 @@
         const ws = document.getElementById('wp-status');
         if (ws) ws.textContent = msg.message;
         break;
+      case 'upload-image-request': {
+        const { id, name, mimeType, data } = msg;
+        const wpUrl = fields.wp_url?.value || '';
+        const wpUser = fields.wp_user?.value || '';
+        const wpToken = fields.wp_token?.value || '';
+        const endpoint = wpUrl ? wpUrl.replace(/\/+$/, '') + '/wp-json/wp/v2/media' : '';
+        const respond = (payload) => parent.postMessage({ pluginMessage: { type: 'upload-image-response', id, ...payload } }, '*');
+
+        if (!endpoint || !wpUser || !wpToken) {
+          respond({ success: false, error: 'WP config ausente' });
+          break;
+        }
+        try {
+          const bytes = new Uint8Array(data || []);
+          const blob = new Blob([bytes], { type: mimeType || 'image/webp' });
+          const form = new FormData();
+          form.append('file', blob, name || 'upload.webp');
+
+          const auth = btoa(`${wpUser}:${wpToken}`);
+          fetch(endpoint, {
+            method: 'POST',
+            headers: { Authorization: `Basic ${auth}` },
+            body: form
+          }).then(async (res) => {
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              respond({ success: false, error: body?.message || res.statusText });
+              return;
+            }
+            respond({ success: true, url: body?.source_url, wpId: body?.id });
+          }).catch(err => {
+            respond({ success: false, error: err?.message || 'Erro de rede' });
+          });
+        } catch (err) {
+          respond({ success: false, error: err?.message || 'Falha desconhecida no upload' });
+        }
+        break;
+      }
       case 'log':
         if (typeof msg.message === 'string' && msg.message.includes('Iniciando pipeline')) {
           toggleProgress(true);
@@ -263,6 +354,7 @@
   watchInputs();
   initTheme();
   setProvider(fields.provider_ai?.value || 'gemini');
+  toggleAIFields(fields.use_ai?.checked !== false);
   send('load-settings');
   setActiveTab('layout');
   if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
@@ -285,14 +377,41 @@
     }
   }
 
-  async function copyToClipboard(text) {
+  async function copyWithFallback(text, logLabel = 'JSON') {
     try {
       await navigator.clipboard.writeText(text);
-      addLog('JSON copiado.', 'success');
+      addLog(`${logLabel} copiado.`, 'success');
+      return true;
     } catch (e) {
-      addLog('Falha ao copiar no navegador.', 'error');
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) {
+          addLog(`${logLabel} copiado (fallback).`, 'success');
+          return true;
+        }
+      } catch (_) { /* ignore */ }
+      if (bridgeOutput) {
+        bridgeOutput.focus();
+        bridgeOutput.select();
+      }
+      addLog(`Falha ao copiar. Selecione o campo e pressione Ctrl+C.`, 'warn');
+      if (bridgeOutput) {
+        bridgeOutput.focus();
+        bridgeOutput.select();
+      }
+      return false;
     }
   }
+
+  const copyToClipboard = (text) => copyWithFallback(text);
 
   function downloadPayload(text) {
     const blob = new Blob([text], { type: 'application/json' });
@@ -350,5 +469,22 @@
       window.addEventListener('touchend', onTouchEnd);
     }, { passive: true });
   }
-})();
 
+  if (btnCopyManual) {
+    btnCopyManual.addEventListener('click', async () => {
+      const txt = bridgeOutput?.value || '';
+      if (bridgeOutput) {
+        bridgeOutput.focus();
+        bridgeOutput.select();
+      }
+      await copyWithFallback(txt, 'JSON');
+    });
+  }
+
+  if (bridgeOutput) {
+    bridgeOutput.addEventListener('click', () => {
+      bridgeOutput.focus();
+      bridgeOutput.select();
+    });
+  }
+})();

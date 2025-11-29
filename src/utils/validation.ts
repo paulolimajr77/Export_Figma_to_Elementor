@@ -1,4 +1,4 @@
-﻿import { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
+import { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
 import { ElementorJSON, ElementorElement } from '../types/elementor.types';
 
 export function validatePipelineSchema(schema: any): asserts schema is PipelineSchema {
@@ -30,9 +30,8 @@ function validateContainer(container: PipelineContainer) {
 }
 
 function validateWidget(widget: PipelineWidget) {
-    const allowed: PipelineWidget['type'][] = ['heading', 'text', 'button', 'image', 'icon', 'custom'];
-    if (!allowed.includes(widget.type)) {
-        throw new Error(`Widget com tipo inválido: ${widget.type}`);
+    if (!widget || typeof widget.type !== 'string' || widget.type.length === 0) {
+        throw new Error(`Widget com tipo inválido: ${widget?.type}`);
     }
 }
 

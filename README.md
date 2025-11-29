@@ -1,4 +1,4 @@
-﻿# FigToEL — Figma to Elementor Converter
+﻿# FigToEL � Figma to Elementor Converter
 
 ![Figma Compatible](https://img.shields.io/badge/Figma-Compatible-blue) ![Elementor Ready](https://img.shields.io/badge/Elementor-3.19%2B-brightgreen) ![WordPress](https://img.shields.io/badge/WordPress-REST%20API%20Ready-informational)
 
@@ -63,8 +63,26 @@ Acoes de exportacao:
 - Fallback inteligente para evitar perda de elementos.
 - UI moderna com tema claro/escuro.
 
+## Modo sem IA (NO-AI)
+- Como ativar/desativar: na aba "Configuração da IA", desmarque "Usar IA para conversão".
+- O que acontece: o pipeline usa heurísticas determinísticas (sem chamadas de IA) para mapear containers flex e widgets básicos (heading, text-editor, image, button, icon, image-box, icon-box, basic-gallery, icon-list) com fallback para w:custom.
+- Limitações: não expande widgets avançados (Pro/Woo/Loop) quando em modo NO-AI; se não reconhecer, retorna w:custom.
+- Fluxo completo: seleção do frame → Inspecionar Layout → Gerar JSON (com IA ligada ou desligada) → copiar/baixar/exportar WP.
+- Validação: JSON segue o schema flex; containers e widgets preservam ordem e ids; background/padding/gap alinhados ao layout.
+
 ---
-\n## Notas de versao (backup recente)\n- Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).\n- Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).\n- Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.\n- UI refeita com tabs, tema claro/escuro consistente e persistencia de Gemini/WP corrigida.\n- Integracoes Gemini/WP alinhadas ao fluxo de containers flex; exportacao WP implementada com criacao de pagina rascunho e teste de credenciais.\n
+
+## Notas de versao (backup recente)
+- Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
+- Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).
+- Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.
+- UI refeita com tabs, tema claro/escuro consistente e persistencia de Gemini/WP corrigida.
+- Integracoes Gemini/WP alinhadas ao fluxo de containers flex; exportacao WP implementada com criacao de pagina rascunho e teste de credenciais.
+- Bridge de clipboard movido para a UI (textarea + copiar) com postMessage `copy-json`; fallback manual garante colagem no Elementor.
+- Heuristicas NO-AI aprimoradas: agrupam wrappers de imagem/galeria/icon-list/image-box/icon-box em um unico widget evitando containers vazios.
+- Compiler ampliado para widgets basicos (video, divider, spacer, rating, tabs/accordions, galerias, nav-menu, maps, lottie) com defaults seguros e registry preparado para Pro/Woo/Loop/WordPress.
+- Modo "Usar IA" na UI (default ligado); possibilidade de desativar IA e acionar pipeline heuristico (em desenvolvimento).
+
 ---
 
 ## Capturas de Tela / GIFs
@@ -74,9 +92,9 @@ Acoes de exportacao:
 ---
 
 ## Planos e Assinatura
-- **Starter** — para freelancers iniciando no Elementor.
-- **Pro** — para agencias com multiplos projetos.
-- **Agency** — para equipes grandes e alto volume de exportacoes.
+- **Starter** � para freelancers iniciando no Elementor.
+- **Pro** � para agencias com multiplos projetos.
+- **Agency** � para equipes grandes e alto volume de exportacoes.
 
 [Escolha seu plano](https://figtoel.example.com/pricing) (link placeholder).
 
@@ -94,11 +112,14 @@ Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz 
 
 ---
 
-## Notas de manutenção (interno)
-- 28/11/2025: ajustes de UI (toggle sem localStorage em sandbox, handle de resize visível e icone atualizado), fallback de timeout sem AbortController e normalização de URL no teste WordPress; build atualizado.
-- 28/11/2025 (tarde): logs verbosos para teste/export WP (endpoint, usuário, tamanho do token) e normalização de token (remoção de espaços); build atualizado.
-- 28/11/2025 (noite): correção da UI (barra de progresso e seleção de modelo Gemini) substituindo script inline obsoleto pela lógica correta do ui.js; build atualizado.
-- 28/11/2025 (noite): melhorias de feedback (logs com timestamp, alertas de erro visíveis) e ajuste na API Gemini (modelos 2.0-flash-exp/1.5 e limite de tokens aumentado para 16k); build atualizado.
-- 28/11/2025 (noite): refatoração completa do pipeline para "Naming Mode" (redução drástica de tokens, payload simplificado para IA, remoção de modelos inválidos); build atualizado.
-- 28/11/2025 (tarde 2): feedback de reset na UI (limpa saída/logs) e build recompilado.
-- 28/11/2025 (noite): correção crítica na autenticação WP (substituição da função toBase64 quebrada por implementação robusta) e adição de User-Agent para evitar bloqueios de segurança; build atualizado.
+## Notas de manuten��o (interno)
+- 28/11/2025: ajustes de UI (toggle sem localStorage em sandbox, handle de resize vis�vel e icone atualizado), fallback de timeout sem AbortController e normaliza��o de URL no teste WordPress; build atualizado.
+- 28/11/2025 (tarde): logs verbosos para teste/export WP (endpoint, usu�rio, tamanho do token) e normaliza��o de token (remo��o de espa�os); build atualizado.
+- 28/11/2025 (noite): corre��o da UI (barra de progresso e sele��o de modelo Gemini) substituindo script inline obsoleto pela l�gica correta do ui.js; build atualizado.
+- 28/11/2025 (noite): melhorias de feedback (logs com timestamp, alertas de erro vis�veis) e ajuste na API Gemini (modelos 2.0-flash-exp/1.5 e limite de tokens aumentado para 16k); build atualizado.
+- 28/11/2025 (noite): refatora��o completa do pipeline para "Naming Mode" (redu��o dr�stica de tokens, payload simplificado para IA, remo��o de modelos inv�lidos); build atualizado.
+- 28/11/2025 (tarde 2): feedback de reset na UI (limpa sa�da/logs) e build recompilado.
+- 28/11/2025 (noite): corre��o cr�tica na autentica��o WP (substitui��o da fun��o toBase64 quebrada por implementa��o robusta) e adi��o de User-Agent para evitar bloqueios de seguran�a; build atualizado.
+
+
+

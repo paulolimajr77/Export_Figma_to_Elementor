@@ -15,3 +15,6 @@
 - 29/11/2025: UI recebe checkbox "Usar IA" (default on), esconde campos de IA quando desativado, persiste gptel_use_ai e envia valor ao pipeline; ajustes em ui.html/ui.js.
 - 29/11/2025: code.ts passa a despachar pipeline NO-AI quando useAI=false, com placeholders do noai.parser.ts (fase 3); configuraÃ§Ã£o useAI carregada/enviada nos settings.
 - 29/11/2025: NO-AI heurÃ­stico implementado (detecta containers, heading/text/button/image/icon, image-box, icon-box, basic-gallery, icon-list, fallback custom) gerando schema flex; testes automatizados adicionados em src/tests/noai.spec.ts.
+- 29/11/2025: Bridge de clipboard movido para UI (textarea + botao copiar), code.ts apenas envia copy-json; heuristicas NO-AI refinadas para colapsar wrappers de imagem/galeria/lista/box e evitar containers vazios; testes noai.spec.ts ajustados e passando.
+- 30/11/2025: Clipboard Bridge com fallback (navigator.clipboard + execCommand) na UI; copia automatica ou manual sem depender do sandbox.
+- 30/11/2025: Ajuste UX da cópia: textarea agora recebe foco/seleção após gerar JSON para facilitar Ctrl+C; fallback permanece ativo na UI.

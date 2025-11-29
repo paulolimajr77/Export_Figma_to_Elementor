@@ -1,14 +1,18 @@
 ﻿import { ConversionPipeline } from './pipeline';
 import type { WPConfig, ElementorJSON } from './types/elementor.types';
-import { serializeNode } from './utils/serialization_utils';
+import { serializeNode, SerializedNode } from './utils/serialization_utils';
 import { GEMINI_MODEL, geminiProvider } from './api_gemini';
 import { DEFAULT_GPT_MODEL, openaiProvider, testOpenAIConnection } from './api_openai';
 import { SchemaProvider } from './types/providers';
+import { analyzeTreeWithHeuristics, convertToFlexSchema } from './pipeline/noai.parser';
+import { ElementorCompiler } from './compiler/elementor.compiler';
+import { ImageUploader } from './media/uploader';
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 
 const pipeline = new ConversionPipeline();
 let lastJSON: string | null = null;
+let noaiUploader: ImageUploader | null = null;
 
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_PROVIDER = 'gemini';
@@ -221,6 +225,16 @@ function getSelectedNode(): SceneNode {
 async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug?: boolean): Promise<{ elementorJson: ElementorJSON; debugInfo?: any }> {
     const node = getSelectedNode();
     const wpConfig = customWP || await loadWPConfig();
+    const useAI = typeof aiPayload?.useAI === 'boolean' ? aiPayload.useAI : await loadSetting<boolean>('gptel_use_ai', true);
+    const serialized = serializeNode(node);
+
+    if (!useAI) {
+        log('Iniciando pipeline (NO-AI)...', 'info');
+        const elementorJson = await runPipelineWithoutAI(serialized, wpConfig);
+        log('Pipeline NO-AI concluido.', 'success');
+        return { elementorJson };
+    }
+
     const { provider, apiKey, providerId } = await resolveProviderConfig(aiPayload);
     const autoFixLayout = await loadSetting<boolean>('auto_fix_layout', false);
     log(`Iniciando pipeline (${providerId.toUpperCase()})...`, 'info');
@@ -240,24 +254,55 @@ async function deliverResult(json: ElementorJSON, debugInfo?: any) {
     const payload = JSON.stringify(json, null, 2);
     lastJSON = payload;
     figma.ui.postMessage({ type: 'generation-complete', payload, debug: debugInfo });
-    try {
-        const clip = (figma as any).clipboard;
-        if (clip && typeof clip.writeText === 'function') {
-            await clip.writeText(payload);
-            figma.notify('JSON Elementor gerado e copiado para a area de transferencia.');
-        } else {
-            figma.notify('JSON Elementor gerado. Copie manualmente pelo botão.', { timeout: 4000 });
-            log('Clipboard API indisponivel; use Copiar JSON.', 'warn');
-        }
-    } catch (err) {
-        figma.notify('JSON Elementor gerado. Nao foi possivel copiar automaticamente.', { timeout: 4000 });
-        log(`Falha ao copiar: ${err}`, 'warn');
-    }
+    // Bridge de copia: UI via navigator.clipboard ou fallback manual
+    figma.ui.postMessage({ type: 'copy-json', payload });
 }
 
 function sendPreview(data: any) {
     const payload = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     figma.ui.postMessage({ type: 'preview', payload });
+}
+
+async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WPConfig = {}): Promise<ElementorJSON> {
+    const analyzed = analyzeTreeWithHeuristics(serializedTree as any);
+    const schema = convertToFlexSchema(analyzed as any);
+
+    // Resolver imagens (upload para WP quando configurado)
+    const normalizedWP = { ...wpConfig, password: (wpConfig as any)?.password || (wpConfig as any)?.token };
+    noaiUploader = new ImageUploader({});
+    noaiUploader.setWPConfig(normalizedWP);
+    const uploadEnabled = !!(normalizedWP && normalizedWP.url && (normalizedWP as any).user && (normalizedWP as any).password);
+    const resolveImages = async (container: any) => {
+        for (const widget of container.widgets || []) {
+            if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon')) {
+                try {
+                    const node = figma.getNodeById(widget.imageId);
+                    if (node) {
+                        const format = widget.type === 'icon' ? 'SVG' : 'WEBP';
+                        const result = await noaiUploader.uploadToWordPress(node as SceneNode, format as any);
+                        if (result) {
+                            widget.content = result.url;
+                            widget.imageId = result.id.toString();
+                        }
+                    }
+                } catch (e) {
+                    console.error(`[NO-AI] Erro ao processar imagem ${widget.imageId}:`, e);
+                }
+            }
+        }
+        for (const child of container.children || []) {
+            await resolveImages(child);
+        }
+    };
+    for (const container of schema.containers) {
+        await resolveImages(container);
+    }
+
+    const compiler = new ElementorCompiler();
+    compiler.setWPConfig(normalizedWP);
+    const json = compiler.compile(schema);
+    if (normalizedWP.url) json.siteurl = normalizedWP.url;
+    return json;
 }
 
 async function sendStoredSettings() {
@@ -275,6 +320,7 @@ async function sendStoredSettings() {
     const exportImages = await loadSetting<boolean>('gptel_export_images', false);
     const autoPage = await loadSetting<boolean>('gptel_auto_page', false);
     const darkMode = await loadSetting<boolean>('gptel_dark_mode', false);
+    const useAI = await loadSetting<boolean>('gptel_use_ai', true);
 
     figma.ui.postMessage({
         type: 'load-settings',
@@ -289,7 +335,8 @@ async function sendStoredSettings() {
             wpToken,
             exportImages,
             autoPage,
-            darkMode
+            darkMode,
+            useAI
         }
     });
 }
@@ -322,7 +369,6 @@ figma.ui.onmessage = async (msg) => {
                 const debug = !!msg.debug;
                 const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug);
                 await deliverResult(elementorJson, debugInfo);
-                sendPreview(elementorJson);
             } catch (error: any) {
                 const message = error?.message || String(error);
                 log(`Erro: ${message}`, 'error');
@@ -333,14 +379,15 @@ figma.ui.onmessage = async (msg) => {
 
         case 'copy-json':
             if (lastJSON) {
-                try {
-                    await (figma as any).clipboard.writeText(lastJSON);
-                    log('JSON copiado.', 'success');
-                } catch (err) {
-                    log(`Falha ao copiar: ${err}`, 'warn');
-                }
+                figma.ui.postMessage({ type: 'copy-json', payload: lastJSON });
             } else {
                 log('Nenhum JSON para copiar.', 'warn');
+            }
+            break;
+        case 'upload-image-response':
+            pipeline.handleUploadResponse(msg.id, msg);
+            if (noaiUploader) {
+                noaiUploader.handleUploadResponse(msg.id, msg);
             }
             break;
 
@@ -548,3 +595,4 @@ figma.ui.onmessage = async (msg) => {
 };
 
 sendStoredSettings();
+

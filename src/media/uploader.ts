@@ -116,7 +116,11 @@ export class ImageUploader {
      * @param wpConfig Nova configuração
      */
     setWPConfig(wpConfig: WPConfig): void {
-        this.wpConfig = wpConfig;
+        // Compat: token pode vir em "token"; usamos "password" esperado pelo fluxo legado
+        this.wpConfig = {
+            ...wpConfig,
+            password: wpConfig?.password || (wpConfig as any)?.token
+        };
     }
 
     /**

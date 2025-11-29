@@ -4,10 +4,28 @@ export function hasImageFill(node: GeometryNode): boolean {
     return 'fills' in node && Array.isArray(node.fills) && node.fills.some(p => p.type === 'IMAGE');
 }
 
-export function detectWidgetType(node: SceneNode): 'heading' | 'text' | 'button' | 'image' | 'icon' | 'custom' {
+export type BasicDetect =
+    | 'heading'
+    | 'text'
+    | 'button'
+    | 'image'
+    | 'icon'
+    | 'icon-list'
+    | 'gallery'
+    | 'tabs'
+    | 'accordion'
+    | 'toggle'
+    | 'video'
+    | 'html'
+    | 'custom';
+
+export function detectWidgetType(node: SceneNode): BasicDetect {
     const lname = node.name.toLowerCase();
 
     if (node.type === 'TEXT') {
+        if (lname.includes('tab')) return 'tabs';
+        if (lname.includes('accordion')) return 'accordion';
+        if (lname.includes('toggle')) return 'toggle';
         return (lname.includes('heading') || lname.includes('title')) ? 'heading' : 'text';
     }
 
@@ -18,6 +36,10 @@ export function detectWidgetType(node: SceneNode): 'heading' | 'text' | 'button'
     if (vectorTypes.includes(node.type)) return 'icon';
 
     if (lname.includes('button') || lname.includes('btn')) return 'button';
+    if (lname.includes('icon-list') || lname.includes('icon list')) return 'icon-list';
+    if (lname.includes('gallery') || lname.includes('carousel')) return 'gallery';
+    if (lname.includes('video')) return 'video';
+    if (lname.includes('html') || lname.includes('code')) return 'html';
 
     return 'custom';
 }
@@ -37,8 +59,9 @@ export function suggestWidgetKind(node: SceneNode): string | undefined {
     if (hasIcon && hasText) return 'icon_box_like';
     if (hasIcon && !hasText && children.length > 1) return 'icon_list_like';
 
-    if (children.length >= 4 && children.every(c => hasImageFill(c as GeometryNode))) return 'gallery_like';
+    if (children.length >= 3 && children.every(c => hasImageFill(c as GeometryNode))) return 'gallery_like';
     if (children.length >= 3 && children.every(c => c.type === children[0].type)) return 'loop_like';
+    if (children.length >= 2 && hasText && children.some(c => hasImageFill(c as GeometryNode))) return 'image_box_like';
 
     return undefined;
 }

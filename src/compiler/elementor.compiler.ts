@@ -30,7 +30,7 @@ export class ElementorCompiler {
         const elements = schema.containers.map(container => this.compileContainer(container, false));
         return {
             type: 'elementor',
-            siteurl: '',
+            siteurl: this.wpConfig?.url || '',
             elements
         } as any;
     }
@@ -44,16 +44,23 @@ export class ElementorCompiler {
             flex_direction: container.direction === 'row' ? 'row' : 'column',
             ...this.mapContainerStyles(container.styles)
         };
+        if (!settings.flex_gap) {
+            settings.flex_gap = { unit: 'px', column: 0, row: 0, isLinked: true };
+        }
+        if (!settings.justify_content) settings.justify_content = 'start';
+        if (!settings.align_items) settings.align_items = 'start';
 
-        const widgetElements = container.widgets.map(w => this.compileWidget(w));
-        const childContainers = container.children.map(child => this.compileContainer(child, true));
+        const widgetElements = container.widgets.map(w => ({ order: (w.styles as any)?._order ?? 0, el: this.compileWidget(w) }));
+        const childContainers = container.children.map(child => ({ order: (child.styles as any)?._order ?? 0, el: this.compileContainer(child, true) }));
+        const merged = [...widgetElements, ...childContainers].sort((a, b) => a.order - b.order).map(i => i.el);
 
         return {
             id,
             elType: 'container',
             isInner,
+            isLocked: false,
             settings,
-            elements: [...widgetElements, ...childContainers]
+            elements: merged
         };
     }
 
@@ -143,6 +150,7 @@ export class ElementorCompiler {
                 id: widgetId,
                 elType: 'widget',
                 widgetType: registryResult.widgetType,
+                isLocked: false,
                 settings: registryResult.settings,
                 elements: []
             };
@@ -187,6 +195,7 @@ export class ElementorCompiler {
             id: widgetId,
             elType: 'widget',
             widgetType,
+            isLocked: false,
             settings,
             elements: []
         };

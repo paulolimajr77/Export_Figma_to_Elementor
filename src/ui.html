@@ -359,6 +359,10 @@
       display: block;
     }
 
+    .ai-hidden {
+      display: none !important;
+    }
+
     .help-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -596,20 +600,33 @@
             <div class="progress-bar"></div>
             <span class="progress-text">Processando pipeline...</span>
           </div>
-          <textarea id="output" placeholder="O JSON gerado aparecer&#225; aqui" readonly></textarea>
+          <textarea id="output" placeholder="O JSON gerado aparecer&#225; aqui"></textarea>
           <div id="logs" class="logs"></div>
+          <div style="margin-top:12px;">
+            <label style="display:block;font-size:12px;margin-bottom:6px;">JSON gerado (selecionamos automaticamente; se precisar use Ctrl+C):</label>
+            <textarea id="figma-json-output" style="width:100%;height:200px" placeholder="JSON para copiar/colar no Elementor"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+              <button class="btn secondary" id="copy-manual">Copiar JSON</button>
+              <span style="font-size:12px;color:#999;">Se o navegador bloquear, selecione o campo e pressione Ctrl+C.</span>
+            </div>
+          </div>
         </div>
       </section>
 
-                  <section class="tab-panel" data-panel="ai">
+      <section class="tab-panel" data-panel="ai">
         <div class="card">
           <div class="card-title">Configura&#231;&#227;o da IA</div>
+          <label class="checkbox">
+            <input id="use_ai" type="checkbox" checked />
+            <span>Usar IA para convers&#227;o</span>
+          </label>
           <label class="input-label" for="provider_ai">Provedor de IA</label>
           <select id="provider_ai">
             <option value="gemini">Gemini</option>
             <option value="gpt">GPT (OpenAI)</option>
           </select>
 
+          <div id="ai_settings">
           <div class="provider-block provider-gemini">
             <label class="input-label" for="gemini_api_key">Gemini API Key</label>
             <input id="gemini_api_key" type="password" autocomplete="off" placeholder="Cole sua API Key do Gemini" />
@@ -641,7 +658,7 @@
             </div>
             <div id="gpt-status" class="status"></div>
           </div>
-
+          </div>
           <label class="checkbox">
             <input id="auto_fix_layout" type="checkbox" />
             <span>Corre&#231;&#227;o autom&#225;tica de layout (fallback flex column)</span>
@@ -718,6 +735,7 @@
       let lastPayload = '';
 
       const fields = {
+        use_ai: document.getElementById('use_ai'),
         provider_ai: document.getElementById('provider_ai'),
         gemini_api_key: document.getElementById('gemini_api_key'),
         gemini_model: document.getElementById('gemini_model'),
@@ -730,6 +748,7 @@
         wp_export_images: document.getElementById('wp_export_images'),
         wp_create_page: document.getElementById('wp_create_page')
       };
+      const aiSettings = document.getElementById('ai_settings');
 
       const storage = null; // desativado para evitar SecurityError em sandbox
 
@@ -760,6 +779,13 @@
         const value = providerId === 'gpt' ? 'gpt' : 'gemini';
         document.body?.setAttribute('data-provider', value);
         if (fields.provider_ai) fields.provider_ai.value = value;
+      }
+
+      function toggleAIFields(enabled) {
+        document.body?.setAttribute('data-use-ai', enabled ? 'true' : 'false');
+        if (aiSettings) {
+          aiSettings.classList.toggle('ai-hidden', !enabled);
+        }
       }
 
       tabs.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
@@ -806,6 +832,12 @@
 
       function loadStoredSettings(payload) {
         if (!payload) return;
+        const useAI = payload.useAI;
+        if (fields.use_ai) {
+          const val = typeof useAI === 'boolean' ? useAI : true;
+          fields.use_ai.checked = val;
+          toggleAIFields(val);
+        }
         if (fields.provider_ai) setProvider(payload.providerAi || 'gemini');
         if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
         if (fields.gemini_model && payload.geminiModel) {
@@ -826,6 +858,13 @@
 
       function watchInputs() {
         const saveText = (key, el) => debounce(() => send('save-setting', { key, value: el.value }));
+        if (fields.use_ai) {
+          fields.use_ai.addEventListener('change', () => {
+            const enabled = fields.use_ai.checked;
+            toggleAIFields(enabled);
+            send('save-setting', { key: 'gptel_use_ai', value: enabled });
+          });
+        }
         if (fields.provider_ai) {
           fields.provider_ai.addEventListener('change', () => {
             setProvider(fields.provider_ai.value);
@@ -860,6 +899,7 @@
               send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value });
             }
             const payload = {
+              useAI: fields.use_ai?.checked !== false,
               providerAi: fields.provider_ai?.value || 'gemini',
               gptModel: fields.gpt_model?.value || '',
               wpConfig: {
@@ -983,6 +1023,7 @@
       watchInputs();
       initTheme();
       setProvider(fields.provider_ai?.value || 'gemini');
+      toggleAIFields(fields.use_ai?.checked !== false);
       send('load-settings');
       setActiveTab('layout');
       if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');

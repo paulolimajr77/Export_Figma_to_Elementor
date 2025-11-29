@@ -365,10 +365,24 @@ ${JSON.stringify(input.snapshot)}` }
   });
 
   // src/config/widget.registry.ts
+  function slugFromKey(key) {
+    if (!key) return "";
+    return key.replace(/^w:/i, "").replace(/^woo:/i, "").replace(/^loop:/i, "").replace(/:/g, "-");
+  }
+  function stubDefinition(key, family = "misc") {
+    const widgetType = slugFromKey(key);
+    return {
+      key,
+      widgetType,
+      family,
+      aliases: [widgetType],
+      compile: (_w, base) => ({ widgetType, settings: __spreadValues({}, base) })
+    };
+  }
   function findWidgetDefinition(type, kind) {
     const kindLower = kind ? kind.toLowerCase() : "";
     const typeLower = type.toLowerCase();
-    const direct = registry.find((r) => r.key === typeLower || r.widgetType === typeLower);
+    const direct = registry.find((r) => r.key.toLowerCase() === typeLower || r.widgetType.toLowerCase() === typeLower);
     if (direct) return direct;
     if (kindLower) {
       const byKind = registry.find((r) => (r.aliases || []).some((a) => a.toLowerCase() === kindLower));
@@ -381,7 +395,7 @@ ${JSON.stringify(input.snapshot)}` }
     if (!def) return null;
     return def.compile(widget, base);
   }
-  var registry;
+  var registry, basicWidgets, proWidgets, wooWidgets, loopWidgets, experimentalWidgets, wpWidgets;
   var init_widget_registry = __esm({
     "src/config/widget.registry.ts"() {
       registry = [
@@ -463,6 +477,215 @@ ${JSON.stringify(input.snapshot)}` }
           compile: (_w, base) => ({ widgetType: "icon-list", settings: __spreadValues({}, base) })
         },
         {
+          key: "video",
+          widgetType: "video",
+          family: "media",
+          compile: (w, base) => ({ widgetType: "video", settings: __spreadProps(__spreadValues({}, base), { link: w.content || "" }) })
+        },
+        {
+          key: "divider",
+          widgetType: "divider",
+          family: "misc",
+          compile: (_w, base) => ({ widgetType: "divider", settings: __spreadValues({}, base) })
+        },
+        {
+          key: "spacer",
+          widgetType: "spacer",
+          family: "misc",
+          compile: (_w, base) => {
+            var _a;
+            return { widgetType: "spacer", settings: __spreadProps(__spreadValues({}, base), { space: (_a = base.space) != null ? _a : 20 }) };
+          }
+        },
+        {
+          key: "star-rating",
+          widgetType: "star-rating",
+          family: "misc",
+          compile: (w, base) => ({ widgetType: "star-rating", settings: __spreadProps(__spreadValues({}, base), { rating: Number(w.content) || 5 }) })
+        },
+        {
+          key: "counter",
+          widgetType: "counter",
+          family: "misc",
+          compile: (w, base) => ({
+            widgetType: "counter",
+            settings: __spreadProps(__spreadValues({}, base), {
+              starting_number: 0,
+              ending_number: Number(w.content) || 100,
+              prefix: base.prefix,
+              suffix: base.suffix
+            })
+          })
+        },
+        {
+          key: "progress",
+          widgetType: "progress",
+          family: "misc",
+          compile: (w, base) => ({
+            widgetType: "progress",
+            settings: __spreadProps(__spreadValues({}, base), { title: w.content || base.title || "Progresso", percent: Number(base.percent) || 50 })
+          })
+        },
+        {
+          key: "tabs",
+          widgetType: "tabs",
+          family: "misc",
+          compile: (w, base) => ({
+            widgetType: "tabs",
+            settings: __spreadProps(__spreadValues({}, base), {
+              tabs: base.tabs || [{ _id: "tab1", tab_title: "Aba 1", tab_content: w.content || "Conte\xFAdo" }]
+            })
+          })
+        },
+        {
+          key: "accordion",
+          widgetType: "accordion",
+          family: "misc",
+          compile: (w, base) => ({
+            widgetType: "accordion",
+            settings: __spreadProps(__spreadValues({}, base), {
+              accordion: base.accordion || [{ _id: "acc1", title: "Item 1", content: w.content || "Conte\xFAdo" }]
+            })
+          })
+        },
+        {
+          key: "toggle",
+          widgetType: "toggle",
+          family: "misc",
+          compile: (w, base) => ({
+            widgetType: "toggle",
+            settings: __spreadProps(__spreadValues({}, base), {
+              toggle: base.toggle || [{ _id: "tog1", title: "Item 1", content: w.content || "Conte\xFAdo" }]
+            })
+          })
+        },
+        {
+          key: "alert",
+          widgetType: "alert",
+          family: "misc",
+          compile: (w, base) => ({
+            widgetType: "alert",
+            settings: __spreadProps(__spreadValues({}, base), { alert_type: base.alert_type || "info", title: w.content || base.title || "Alerta" })
+          })
+        },
+        {
+          key: "social-icons",
+          widgetType: "social-icons",
+          family: "misc",
+          compile: (_w, base) => ({
+            widgetType: "social-icons",
+            settings: __spreadProps(__spreadValues({}, base), {
+              social_icon_list: base.social_icon_list || [
+                { _id: "soc1", icon: { value: "fab fa-facebook", library: "fa-brands" }, link: { url: "" } }
+              ]
+            })
+          })
+        },
+        {
+          key: "soundcloud",
+          widgetType: "soundcloud",
+          family: "media",
+          compile: (w, base) => ({ widgetType: "soundcloud", settings: __spreadProps(__spreadValues({}, base), { url: w.content || base.url || "" }) })
+        },
+        {
+          key: "shortcode",
+          widgetType: "shortcode",
+          family: "misc",
+          compile: (w, base) => ({ widgetType: "shortcode", settings: __spreadProps(__spreadValues({}, base), { shortcode: w.content || base.shortcode || "" }) })
+        },
+        {
+          key: "menu-anchor",
+          widgetType: "menu-anchor",
+          family: "nav",
+          compile: (w, base) => ({ widgetType: "menu-anchor", settings: __spreadProps(__spreadValues({}, base), { anchor: w.content || base.anchor || "ancora" }) })
+        },
+        {
+          key: "sidebar",
+          widgetType: "sidebar",
+          family: "misc",
+          compile: (w, base) => ({ widgetType: "sidebar", settings: __spreadProps(__spreadValues({}, base), { sidebar: w.content || base.sidebar || "sidebar-1" }) })
+        },
+        {
+          key: "read-more",
+          widgetType: "read-more",
+          family: "action",
+          compile: (w, base) => ({ widgetType: "read-more", settings: __spreadProps(__spreadValues({}, base), { text: w.content || base.text || "Leia mais" }) })
+        },
+        {
+          key: "image-carousel",
+          widgetType: "image-carousel",
+          family: "media",
+          compile: (w, base) => ({
+            widgetType: "image-carousel",
+            settings: __spreadProps(__spreadValues({}, base), {
+              slides: base.slides || [
+                { id: w.imageId ? parseInt(w.imageId, 10) : 0, url: w.content || "", _id: "slide1" }
+              ]
+            })
+          })
+        },
+        {
+          key: "basic-gallery",
+          widgetType: "basic-gallery",
+          family: "media",
+          compile: (w, base) => ({
+            widgetType: "basic-gallery",
+            settings: __spreadProps(__spreadValues({}, base), {
+              gallery: base.gallery || [{ id: w.imageId ? parseInt(w.imageId, 10) : 0, url: w.content || "" }]
+            })
+          })
+        },
+        {
+          key: "gallery",
+          widgetType: "gallery",
+          family: "media",
+          compile: (w, base) => ({
+            widgetType: "gallery",
+            settings: __spreadProps(__spreadValues({}, base), {
+              gallery: base.gallery || [{ id: w.imageId ? parseInt(w.imageId, 10) : 0, url: w.content || "" }]
+            })
+          })
+        },
+        {
+          key: "nav-menu",
+          widgetType: "nav-menu",
+          family: "nav",
+          compile: (w, base) => ({ widgetType: "nav-menu", settings: __spreadProps(__spreadValues({}, base), { layout: base.layout || "horizontal", menu: w.content || base.menu }) })
+        },
+        {
+          key: "search-form",
+          widgetType: "search-form",
+          family: "misc",
+          compile: (_w, base) => ({ widgetType: "search-form", settings: __spreadValues({}, base) })
+        },
+        {
+          key: "google-maps",
+          widgetType: "google-maps",
+          family: "media",
+          compile: (w, base) => ({ widgetType: "google-maps", settings: __spreadProps(__spreadValues({}, base), { address: w.content || base.address || "" }) })
+        },
+        {
+          key: "testimonial",
+          widgetType: "testimonial",
+          family: "misc",
+          compile: (w, base) => ({
+            widgetType: "testimonial",
+            settings: __spreadProps(__spreadValues({}, base), { testimonial_content: w.content || base.testimonial_content || "Depoimento" })
+          })
+        },
+        {
+          key: "embed",
+          widgetType: "embed",
+          family: "media",
+          compile: (w, base) => ({ widgetType: "embed", settings: __spreadProps(__spreadValues({}, base), { embed_url: w.content || base.embed_url || "" }) })
+        },
+        {
+          key: "lottie",
+          widgetType: "lottie",
+          family: "media",
+          compile: (w, base) => ({ widgetType: "lottie", settings: __spreadProps(__spreadValues({}, base), { lottie_url: w.content || base.lottie_url || "" }) })
+        },
+        {
           key: "html",
           widgetType: "html",
           family: "misc",
@@ -470,6 +693,165 @@ ${JSON.stringify(input.snapshot)}` }
           compile: (w, base) => ({ widgetType: "html", settings: __spreadProps(__spreadValues({}, base), { html: w.content || "" }) })
         }
       ];
+      basicWidgets = [
+        "w:container",
+        "w:inner-container",
+        "w:video",
+        "w:divider",
+        "w:spacer",
+        "w:image-box",
+        "w:star-rating",
+        "w:counter",
+        "w:progress",
+        "w:tabs",
+        "w:accordion",
+        "w:toggle",
+        "w:alert",
+        "w:social-icons",
+        "w:soundcloud",
+        "w:shortcode",
+        "w:menu-anchor",
+        "w:sidebar",
+        "w:read-more",
+        "w:image-carousel",
+        "w:basic-gallery",
+        "w:gallery",
+        "w:icon-list",
+        "w:nav-menu",
+        "w:search-form",
+        "w:google-maps",
+        "w:testimonial",
+        "w:embed",
+        "w:lottie",
+        "loop:grid"
+      ];
+      proWidgets = [
+        "w:form",
+        "w:login",
+        "w:subscription",
+        "w:call-to-action",
+        "media:carousel",
+        "w:portfolio",
+        "w:gallery-pro",
+        "slider:slides",
+        "w:slideshow",
+        "w:flip-box",
+        "w:animated-headline",
+        "w:post-navigation",
+        "w:share-buttons",
+        "w:table-of-contents",
+        "w:countdown",
+        "w:blockquote",
+        "w:testimonial-carousel",
+        "w:review-box",
+        "w:hotspots",
+        "w:sitemap",
+        "w:author-box",
+        "w:price-table",
+        "w:price-list",
+        "w:progress-tracker",
+        "w:animated-text",
+        "w:nav-menu-pro",
+        "w:breadcrumb",
+        "w:facebook-button",
+        "w:facebook-comments",
+        "w:facebook-embed",
+        "w:facebook-page",
+        "loop:builder",
+        "loop:grid-advanced",
+        "loop:carousel",
+        "w:post-excerpt",
+        "w:post-content",
+        "w:post-title",
+        "w:post-info",
+        "w:post-featured-image",
+        "w:post-author",
+        "w:post-date",
+        "w:post-terms",
+        "w:archive-title",
+        "w:archive-description",
+        "w:site-logo",
+        "w:site-title",
+        "w:site-tagline",
+        "w:search-results",
+        "w:global-widget",
+        "w:video-playlist",
+        "w:video-gallery"
+      ];
+      wooWidgets = [
+        "woo:product-title",
+        "woo:product-image",
+        "woo:product-price",
+        "woo:product-add-to-cart",
+        "woo:product-data-tabs",
+        "woo:product-excerpt",
+        "woo:product-rating",
+        "woo:product-stock",
+        "woo:product-meta",
+        "woo:product-additional-information",
+        "woo:product-short-description",
+        "woo:product-related",
+        "woo:product-upsells",
+        "woo:product-tabs",
+        "woo:product-breadcrumb",
+        "woo:product-gallery",
+        "woo:products",
+        "woo:product-grid",
+        "woo:product-carousel",
+        "woo:product-loop-item",
+        "woo:loop-product-title",
+        "woo:loop-product-price",
+        "woo:loop-product-rating",
+        "woo:loop-product-image",
+        "woo:loop-product-button",
+        "woo:loop-product-meta",
+        "woo:cart",
+        "woo:checkout",
+        "woo:my-account",
+        "woo:purchase-summary",
+        "woo:order-tracking"
+      ];
+      loopWidgets = [
+        "loop:item",
+        "loop:image",
+        "loop:title",
+        "loop:meta",
+        "loop:terms",
+        "loop:rating",
+        "loop:price",
+        "loop:add-to-cart",
+        "loop:read-more",
+        "loop:featured-image"
+      ];
+      experimentalWidgets = [
+        "w:nested-tabs",
+        "w:mega-menu",
+        "w:scroll-snap",
+        "w:motion-effects",
+        "w:background-slideshow",
+        "w:css-transform",
+        "w:custom-position",
+        "w:dynamic-tags",
+        "w:ajax-pagination",
+        "loop:pagination",
+        "w:aspect-ratio-container"
+      ];
+      wpWidgets = [
+        "w:wp-search",
+        "w:wp-recent-posts",
+        "w:wp-recent-comments",
+        "w:wp-archives",
+        "w:wp-categories",
+        "w:wp-calendar",
+        "w:wp-tag-cloud",
+        "w:wp-custom-menu"
+      ];
+      basicWidgets.forEach((k) => registry.push(stubDefinition(k, "misc")));
+      proWidgets.forEach((k) => registry.push(stubDefinition(k, "pro")));
+      wooWidgets.forEach((k) => registry.push(stubDefinition(k, "woo")));
+      loopWidgets.forEach((k) => registry.push(stubDefinition(k, "loop")));
+      experimentalWidgets.forEach((k) => registry.push(stubDefinition(k, "misc")));
+      wpWidgets.forEach((k) => registry.push(stubDefinition(k, "wp")));
     }
   });
 
@@ -520,15 +902,22 @@ ${JSON.stringify(input.snapshot)}` }
           }
           if (!settings.justify_content) settings.justify_content = "start";
           if (!settings.align_items) settings.align_items = "start";
-          const widgetElements = container.widgets.map((w) => this.compileWidget(w));
-          const childContainers = container.children.map((child) => this.compileContainer(child, true));
+          const widgetElements = container.widgets.map((w) => {
+            var _a, _b;
+            return { order: (_b = (_a = w.styles) == null ? void 0 : _a._order) != null ? _b : 0, el: this.compileWidget(w) };
+          });
+          const childContainers = container.children.map((child) => {
+            var _a, _b;
+            return { order: (_b = (_a = child.styles) == null ? void 0 : _a._order) != null ? _b : 0, el: this.compileContainer(child, true) };
+          });
+          const merged = [...widgetElements, ...childContainers].sort((a, b) => a.order - b.order).map((i) => i.el);
           return {
             id,
             elType: "container",
             isInner,
             isLocked: false,
             settings,
-            elements: [...widgetElements, ...childContainers]
+            elements: merged
           };
         }
         mapContainerStyles(styles) {
@@ -601,6 +990,7 @@ ${JSON.stringify(input.snapshot)}` }
               id: widgetId,
               elType: "widget",
               widgetType: registryResult.widgetType,
+              isLocked: false,
               settings: registryResult.settings,
               elements: []
             };
@@ -859,7 +1249,9 @@ ${JSON.stringify(input.snapshot)}` }
          * @param wpConfig Nova configuração
          */
         setWPConfig(wpConfig) {
-          this.wpConfig = wpConfig;
+          this.wpConfig = __spreadProps(__spreadValues({}, wpConfig), {
+            password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token)
+          });
         }
         /**
          * Limpa o cache de hashes
@@ -900,9 +1292,8 @@ ${JSON.stringify(input.snapshot)}` }
     container.children.forEach(validateContainer);
   }
   function validateWidget(widget) {
-    const allowed = ["heading", "text", "button", "image", "icon", "custom"];
-    if (!allowed.includes(widget.type)) {
-      throw new Error(`Widget com tipo inv\xE1lido: ${widget.type}`);
+    if (!widget || typeof widget.type !== "string" || widget.type.length === 0) {
+      throw new Error(`Widget com tipo inv\xE1lido: ${widget == null ? void 0 : widget.type}`);
     }
   }
   function validateElementorJSON(json) {
@@ -945,17 +1336,25 @@ ${JSON.stringify(input.snapshot)}` }
   var init_prompts = __esm({
     "src/config/prompts.ts"() {
       ANALYZE_RECREATE_PROMPT = `
-Organize a arvore Figma em um schema de CONTAINERS FLEX simples.
+Organize a \xE1rvore Figma em um schema de CONTAINERS FLEX.
 
-REGRAS CRITICAS:
-- NAO ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se for folha).
-- NAO classifique por aparencia. Se nao souber, type = "custom".
-- NAO invente grids, sections/columns ou imageBox/iconBox.
+REGRAS CR\xCDTICAS:
+- N\xE3o ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se for folha).
+- N\xE3o classifique por apar\xEAncia. Se n\xE3o souber, type = "custom".
+- N\xE3o invente grids ou sections/columns legados.
 - Preserve a ordem original dos filhos.
-- Mapear auto-layout: HORIZONTAL -> direction=row; VERTICAL/NONE -> direction=column.
+- Auto layout: HORIZONTAL -> direction=row; VERTICAL/NONE -> direction=column.
 - gap = itemSpacing; padding = paddingTop/Right/Bottom/Left; background = fills/gradiente/imagem se houver.
-- Widgets permitidos: heading | text | button | image | icon | custom.
 - styles deve incluir sourceId com o id do node original.
+- Modo sem IA: se o usu\xE1rio desligar IA, siga o mesmo schema usando apenas heur\xEDsticas (n\xE3o invente texto).
+
+WIDGETS PERMITIDOS (use exatamente estes tipos; se n\xE3o se encaixar, use "custom"):
+- B\xE1sicos: heading, text, button, image, icon, video, divider, spacer, image-box, icon-box, star-rating, counter, progress, tabs, accordion, toggle, alert, social-icons, soundcloud, shortcode, html, menu-anchor, sidebar, read-more, image-carousel, basic-gallery, gallery, icon-list, nav-menu, search-form, google-maps, testimonial, embed, lottie, loop:grid.
+- Pro: form, login, subscription, call-to-action, media:carousel, portfolio, gallery-pro, slider:slides, slideshow, flip-box, animated-headline, post-navigation, share-buttons, table-of-contents, countdown, blockquote, testimonial-carousel, review-box, hotspots, sitemap, author-box, price-table, price-list, progress-tracker, animated-text, nav-menu-pro, breadcrumb, facebook-button, facebook-comments, facebook-embed, facebook-page, loop:builder, loop:grid-advanced, loop:carousel, post-excerpt, post-content, post-title, post-info, post-featured-image, post-author, post-date, post-terms, archive-title, archive-description, site-logo, site-title, site-tagline, search-results, global-widget, video-playlist, video-gallery.
+- WooCommerce: woo:product-title, woo:product-image, woo:product-price, woo:product-add-to-cart, woo:product-data-tabs, woo:product-excerpt, woo:product-rating, woo:product-stock, woo:product-meta, woo:product-additional-information, woo:product-short-description, woo:product-related, woo:product-upsells, woo:product-tabs, woo:product-breadcrumb, woo:product-gallery, woo:products, woo:product-grid, woo:product-carousel, woo:product-loop-item, woo:loop-product-title, woo:loop-product-price, woo:loop-product-rating, woo:loop-product-image, woo:loop-product-button, woo:loop-product-meta, woo:cart, woo:checkout, woo:my-account, woo:purchase-summary, woo:order-tracking.
+- Loop Builder: loop:item, loop:image, loop:title, loop:meta, loop:terms, loop:rating, loop:price, loop:add-to-cart, loop:read-more, loop:featured-image, loop:pagination.
+- Experimentais: w:nested-tabs, w:mega-menu, w:scroll-snap, w:motion-effects, w:background-slideshow, w:css-transform, w:custom-position, w:dynamic-tags, w:ajax-pagination, w:aspect-ratio-container.
+- WordPress: w:wp-search, w:wp-recent-posts, w:wp-recent-comments, w:wp-archives, w:wp-categories, w:wp-calendar, w:wp-tag-cloud, w:wp-custom-menu.
 
 SCHEMA ALVO:
 {
@@ -965,8 +1364,8 @@ SCHEMA ALVO:
       "id": "string",
       "direction": "row" | "column",
       "width": "full" | "boxed",
-      "styles": {},
-      "widgets": [ { "type": "heading|text|button|image|icon|custom", "content": "...", "imageId": null, "styles": {} } ],
+      "styles": { "sourceId": "id-original" },
+      "widgets": [ { "type": "um dos widgets acima ou custom", "content": "...", "imageId": null, "styles": { "sourceId": "id-do-node" } } ],
       "children": [ ... ]
     }
   ]
@@ -975,11 +1374,12 @@ SCHEMA ALVO:
 ENTRADA:
 \${nodeData}
 
-INSTRUCOES:
+INSTRU\xC7\xD5ES:
 - Mantenha textos e imagens exatamente como no original.
-- Nao agrupe nos diferentes em um unico widget.
-- Se o node tem filhos -> container; se nao tem -> widget simples.
-- width use "full" (padrao); direction derive do layoutMode.
+- N\xE3o agrupe n\xF3s diferentes em um \xFAnico widget.
+- Se o node tem filhos -> container; se n\xE3o tem -> widget simples.
+- width use "full" (padr\xE3o); direction derive do layoutMode.
+- Se n\xE3o reconhecer o widget, classifique como "custom".
 `;
     }
   });
@@ -1002,8 +1402,9 @@ INSTRUCOES:
         }
         run(_0) {
           return __async(this, arguments, function* (node, wpConfig = {}, options) {
-            this.compiler.setWPConfig(wpConfig);
-            this.imageUploader.setWPConfig(wpConfig);
+            const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token) });
+            this.compiler.setWPConfig(normalizedWP);
+            this.imageUploader.setWPConfig(normalizedWP);
             const provider = (options == null ? void 0 : options.provider) || geminiProvider;
             this.autoFixLayout = !!(options == null ? void 0 : options.autoFixLayout);
             const preprocessed = this.preprocess(node);
@@ -1027,6 +1428,9 @@ INSTRUCOES:
             }
             return elementorJson;
           });
+        }
+        handleUploadResponse(id, result) {
+          this.imageUploader.handleUploadResponse(id, result);
         }
         preprocess(node) {
           const serializedRoot = serializeNode(node);
@@ -1090,12 +1494,15 @@ INSTRUCOES:
         }
         resolveImages(schema) {
           return __async(this, null, function* () {
+            const uploadEnabled = !!(this.wpConfig && this.wpConfig.url && this.wpConfig.user && (this.wpConfig.password || this.wpConfig.token));
+            if (!uploadEnabled) return;
             const processWidget = (widget) => __async(this, null, function* () {
               if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
                 try {
                   const node = figma.getNodeById(widget.imageId);
                   if (node) {
-                    const result = yield this.imageUploader.uploadToWordPress(node);
+                    const format = widget.type === "icon" ? "SVG" : "WEBP";
+                    const result = yield this.imageUploader.uploadToWordPress(node, format);
                     if (result) {
                       widget.content = result.url;
                       widget.imageId = result.id.toString();
@@ -1354,6 +1761,235 @@ ${JSON.stringify(input.snapshot)}` }
     }
   });
 
+  // src/pipeline/noai.parser.ts
+  function isImageFill(node) {
+    const fills = node == null ? void 0 : node.fills;
+    if (!Array.isArray(fills)) return false;
+    return fills.some((f) => (f == null ? void 0 : f.type) === "IMAGE");
+  }
+  function findFirstImageId(node) {
+    if (!node) return null;
+    if (isImageFill(node)) return node.id || null;
+    const children = node.children;
+    if (Array.isArray(children)) {
+      for (const child of children) {
+        const found = findFirstImageId(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  function hasTextDeep(node) {
+    if (!node) return false;
+    if (node.type === "TEXT") return true;
+    const children = node.children;
+    if (Array.isArray(children)) {
+      return children.some((c) => hasTextDeep(c));
+    }
+    return false;
+  }
+  function isSolidColor(node) {
+    const fills = node == null ? void 0 : node.fills;
+    if (!Array.isArray(fills) || fills.length === 0) return void 0;
+    const solid = fills.find((f) => f.type === "SOLID" && f.color);
+    if (!solid) return void 0;
+    const { r, g, b, a = 1 } = solid.color || {};
+    const to255 = (v) => Math.round((v || 0) * 255);
+    return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
+  }
+  function detectWidget(node) {
+    var _a, _b;
+    const name = (node.name || "").toLowerCase();
+    const styles = {
+      sourceId: node.id,
+      sourceName: node.name
+    };
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const children = hasChildren ? node.children : [];
+    const firstImageDeep = findFirstImageId(node);
+    if (hasChildren) {
+      const childHasImage = children.some((c) => isImageFill(c) || findFirstImageId(c));
+      const childHasText = children.some((c) => hasTextDeep(c));
+      const childHasIcon = children.some((c) => vectorTypes.includes(c.type));
+      const allImages = children.length > 0 && children.every((c) => isImageFill(c) || Array.isArray(c.children) && c.children.every((gr) => isImageFill(gr)));
+      const firstImage = children.find(isImageFill) || children.find((c) => findFirstImageId(c));
+      const firstImageId = findFirstImageId(firstImage) || firstImageDeep;
+      const looksImageBox = name.includes("image") || name.includes("photo") || name.includes("box") || children.length <= 3;
+      const looksIconBox = name.includes("icon") || name.includes("box") || children.length <= 3;
+      if (childHasImage && childHasText && looksImageBox) {
+        const txt = children.find((c) => c.type === "TEXT");
+        return {
+          type: "image_box",
+          content: (txt == null ? void 0 : txt.characters) || node.name,
+          imageId: firstImageId || null,
+          styles
+        };
+      }
+      if (childHasIcon && childHasText && (children.length >= 3 || name.includes("list"))) {
+        return { type: "icon_list", content: node.name, imageId: null, styles };
+      }
+      if (childHasIcon && childHasText && looksIconBox) {
+        const txt = children.find((c) => c.type === "TEXT");
+        return {
+          type: "icon_box",
+          content: (txt == null ? void 0 : txt.characters) || node.name,
+          imageId: null,
+          styles
+        };
+      }
+      if (allImages) {
+        if (children.length >= 3) {
+          return { type: "basic-gallery", content: node.name, imageId: null, styles };
+        }
+        return { type: "image", content: null, imageId: firstImageId || node.id, styles };
+      }
+      if (childHasImage && !childHasText) {
+        return { type: "image", content: null, imageId: firstImageId || node.id || firstImageDeep, styles };
+      }
+    }
+    if (node.type === "TEXT") {
+      const isHeading = node.fontSize >= 26 || name.includes("heading") || name.includes("title");
+      if (name.includes("button") || name.includes("btn")) {
+        return { type: "button", content: node.characters || node.name, imageId: null, styles };
+      }
+      return {
+        type: isHeading ? "heading" : "text",
+        content: node.characters || node.name,
+        imageId: null,
+        styles
+      };
+    }
+    if (vectorTypes.includes(node.type)) {
+      return { type: "icon", content: node.name || "icon", imageId: node.id, styles };
+    }
+    if (isImageFill(node) || name.startsWith("w:image")) {
+      const nestedImageId = findFirstImageId(node);
+      return { type: "image", content: null, imageId: nestedImageId || node.id, styles };
+    }
+    if (name.includes("button") || name.includes("btn")) {
+      return { type: "button", content: node.name, imageId: null, styles };
+    }
+    if (hasChildren) {
+      const children2 = node.children;
+      const onlyImages = children2.length > 0 && children2.every((c) => isImageFill(c) || Array.isArray(c.children) && c.children.every((grand) => isImageFill(grand)));
+      if (onlyImages || name.startsWith("w:image")) {
+        const firstImage = children2.find(isImageFill) || ((_b = (_a = children2[0]) == null ? void 0 : _a.children) == null ? void 0 : _b.find((gr) => isImageFill(gr)));
+        const imageId = (firstImage == null ? void 0 : firstImage.id) || node.id;
+        return { type: "image", content: null, imageId, styles };
+      }
+      const childHasImage = children2.some(isImageFill);
+      const childHasText = children2.some((c) => c.type === "TEXT");
+      const childHasIcon = children2.some((c) => vectorTypes.includes(c.type));
+      const allImages = children2.length >= 3 && children2.every(isImageFill);
+      if (allImages) {
+        return { type: "basic-gallery", content: node.name, imageId: null, styles };
+      }
+      if (childHasIcon && childHasText && (children2.length >= 3 || name.includes("list"))) {
+        return { type: "icon_list", content: node.name, imageId: null, styles };
+      }
+      if (childHasImage && childHasText) {
+        const txt = children2.find((c) => c.type === "TEXT");
+        const img = children2.find(isImageFill);
+        return {
+          type: "image_box",
+          content: (txt == null ? void 0 : txt.characters) || node.name,
+          imageId: (img == null ? void 0 : img.id) || null,
+          styles
+        };
+      }
+      if (childHasIcon && childHasText) {
+        const txt = children2.find((c) => c.type === "TEXT");
+        return {
+          type: "icon_box",
+          content: (txt == null ? void 0 : txt.characters) || node.name,
+          imageId: null,
+          styles
+        };
+      }
+    }
+    return null;
+  }
+  function mapAlignment(primary, counter) {
+    const justifyMap = { MIN: "start", CENTER: "center", MAX: "end", SPACE_BETWEEN: "space-between" };
+    const alignMap = { MIN: "start", CENTER: "center", MAX: "end", STRETCH: "stretch" };
+    return {
+      justify_content: justifyMap[primary || ""] || void 0,
+      align_items: alignMap[counter || ""] || void 0
+    };
+  }
+  function toContainer(node) {
+    const direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
+    const styles = {
+      sourceId: node.id,
+      sourceName: node.name
+    };
+    if (typeof node.itemSpacing === "number") styles.gap = node.itemSpacing;
+    if (typeof node.paddingTop === "number" || typeof node.paddingRight === "number" || typeof node.paddingBottom === "number" || typeof node.paddingLeft === "number") {
+      styles.paddingTop = node.paddingTop || 0;
+      styles.paddingRight = node.paddingRight || 0;
+      styles.paddingBottom = node.paddingBottom || 0;
+      styles.paddingLeft = node.paddingLeft || 0;
+    }
+    const bg = isSolidColor(node);
+    if (bg) styles.background = { color: bg };
+    const align = mapAlignment(node.primaryAxisAlignItems, node.counterAxisAlignItems);
+    if (align.justify_content) styles.justify_content = align.justify_content;
+    if (align.align_items) styles.align_items = align.align_items;
+    const widgets = [];
+    const childrenContainers = [];
+    const childNodes = Array.isArray(node.children) ? node.children : [];
+    childNodes.forEach((child, idx) => {
+      const w = detectWidget(child);
+      const childHasChildren = Array.isArray(child.children) && child.children.length > 0;
+      const orderMark = idx;
+      if (w && !childHasChildren) {
+        w.styles = __spreadProps(__spreadValues({}, w.styles || {}), { _order: orderMark });
+        widgets.push(w);
+      } else if (w && childHasChildren && (w.type === "image_box" || w.type === "icon_box" || w.type === "basic-gallery" || w.type === "icon_list" || w.type === "image")) {
+        w.styles = __spreadProps(__spreadValues({}, w.styles || {}), { _order: orderMark });
+        widgets.push(w);
+      } else {
+        if (childHasChildren) {
+          const childContainer = toContainer(child);
+          childContainer.styles = __spreadProps(__spreadValues({}, childContainer.styles || {}), { _order: orderMark });
+          childrenContainers.push(childContainer);
+        } else {
+          widgets.push({
+            type: "custom",
+            content: child.name || "",
+            imageId: null,
+            styles: { sourceId: child.id, sourceName: child.name, _order: orderMark }
+          });
+        }
+      }
+    });
+    return {
+      id: node.id,
+      direction: direction === "row" ? "row" : "column",
+      width: "full",
+      styles,
+      widgets,
+      children: childrenContainers
+    };
+  }
+  function analyzeTreeWithHeuristics(tree) {
+    return tree;
+  }
+  function convertToFlexSchema(analyzedTree) {
+    const rootContainer = toContainer(analyzedTree);
+    const tokens = { primaryColor: "#000000", secondaryColor: "#FFFFFF" };
+    return {
+      page: { title: analyzedTree.name || "Layout importado", tokens },
+      containers: [rootContainer]
+    };
+  }
+  var vectorTypes;
+  var init_noai_parser = __esm({
+    "src/pipeline/noai.parser.ts"() {
+      vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE"];
+    }
+  });
+
   // src/code.ts
   var require_code = __commonJS({
     "src/code.ts"(exports) {
@@ -1361,9 +1997,13 @@ ${JSON.stringify(input.snapshot)}` }
       init_serialization_utils();
       init_api_gemini();
       init_api_openai();
+      init_noai_parser();
+      init_elementor_compiler();
+      init_uploader();
       figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
       var pipeline = new ConversionPipeline();
       var lastJSON = null;
+      var noaiUploader = null;
       var DEFAULT_TIMEOUT_MS3 = 12e3;
       var DEFAULT_PROVIDER = "gemini";
       var DEFAULT_GPT_MODEL2 = "gpt-4.1-mini";
@@ -1554,6 +2194,14 @@ ${JSON.stringify(input.snapshot)}` }
         return __async(this, null, function* () {
           const node = getSelectedNode();
           const wpConfig = customWP || (yield loadWPConfig());
+          const useAI = typeof (aiPayload == null ? void 0 : aiPayload.useAI) === "boolean" ? aiPayload.useAI : yield loadSetting("gptel_use_ai", true);
+          const serialized = serializeNode(node);
+          if (!useAI) {
+            log("Iniciando pipeline (NO-AI)...", "info");
+            const elementorJson = yield runPipelineWithoutAI(serialized, wpConfig);
+            log("Pipeline NO-AI concluido.", "success");
+            return { elementorJson };
+          }
           const { provider, apiKey, providerId } = yield resolveProviderConfig(aiPayload);
           const autoFixLayout = yield loadSetting("auto_fix_layout", false);
           log(`Iniciando pipeline (${providerId.toUpperCase()})...`, "info");
@@ -1573,24 +2221,52 @@ ${JSON.stringify(input.snapshot)}` }
           const payload = JSON.stringify(json, null, 2);
           lastJSON = payload;
           figma.ui.postMessage({ type: "generation-complete", payload, debug: debugInfo });
-          try {
-            const clip = figma.clipboard;
-            if (clip && typeof clip.writeText === "function") {
-              yield clip.writeText(payload);
-              figma.notify("JSON Elementor gerado e copiado para a area de transferencia.");
-            } else {
-              figma.notify("JSON Elementor gerado. Copie manualmente pelo bot\xE3o.", { timeout: 4e3 });
-              log("Clipboard API indisponivel; use Copiar JSON.", "warn");
-            }
-          } catch (err) {
-            figma.notify("JSON Elementor gerado. Nao foi possivel copiar automaticamente.", { timeout: 4e3 });
-            log(`Falha ao copiar: ${err}`, "warn");
-          }
+          figma.ui.postMessage({ type: "copy-json", payload });
         });
       }
       function sendPreview(data) {
         const payload = typeof data === "string" ? data : JSON.stringify(data, null, 2);
         figma.ui.postMessage({ type: "preview", payload });
+      }
+      function runPipelineWithoutAI(_0) {
+        return __async(this, arguments, function* (serializedTree, wpConfig = {}) {
+          const analyzed = analyzeTreeWithHeuristics(serializedTree);
+          const schema = convertToFlexSchema(analyzed);
+          const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token) });
+          noaiUploader = new ImageUploader({});
+          noaiUploader.setWPConfig(normalizedWP);
+          const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password);
+          const resolveImages = (container) => __async(null, null, function* () {
+            for (const widget of container.widgets || []) {
+              if (uploadEnabled && widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
+                try {
+                  const node = figma.getNodeById(widget.imageId);
+                  if (node) {
+                    const format = widget.type === "icon" ? "SVG" : "WEBP";
+                    const result = yield noaiUploader.uploadToWordPress(node, format);
+                    if (result) {
+                      widget.content = result.url;
+                      widget.imageId = result.id.toString();
+                    }
+                  }
+                } catch (e) {
+                  console.error(`[NO-AI] Erro ao processar imagem ${widget.imageId}:`, e);
+                }
+              }
+            }
+            for (const child of container.children || []) {
+              yield resolveImages(child);
+            }
+          });
+          for (const container of schema.containers) {
+            yield resolveImages(container);
+          }
+          const compiler = new ElementorCompiler();
+          compiler.setWPConfig(normalizedWP);
+          const json = compiler.compile(schema);
+          if (normalizedWP.url) json.siteurl = normalizedWP.url;
+          return json;
+        });
       }
       function sendStoredSettings() {
         return __async(this, null, function* () {
@@ -1608,6 +2284,7 @@ ${JSON.stringify(input.snapshot)}` }
           const exportImages = yield loadSetting("gptel_export_images", false);
           const autoPage = yield loadSetting("gptel_auto_page", false);
           const darkMode = yield loadSetting("gptel_dark_mode", false);
+          const useAI = yield loadSetting("gptel_use_ai", true);
           figma.ui.postMessage({
             type: "load-settings",
             payload: {
@@ -1621,7 +2298,8 @@ ${JSON.stringify(input.snapshot)}` }
               wpToken,
               exportImages,
               autoPage,
-              darkMode
+              darkMode,
+              useAI
             }
           });
         });
@@ -1653,7 +2331,6 @@ ${JSON.stringify(input.snapshot)}` }
               const debug = !!msg.debug;
               const { elementorJson, debugInfo } = yield generateElementorJSON(msg, wpConfig, debug);
               yield deliverResult(elementorJson, debugInfo);
-              sendPreview(elementorJson);
             } catch (error) {
               const message = (error == null ? void 0 : error.message) || String(error);
               log(`Erro: ${message}`, "error");
@@ -1663,14 +2340,15 @@ ${JSON.stringify(input.snapshot)}` }
             break;
           case "copy-json":
             if (lastJSON) {
-              try {
-                yield figma.clipboard.writeText(lastJSON);
-                log("JSON copiado.", "success");
-              } catch (err) {
-                log(`Falha ao copiar: ${err}`, "warn");
-              }
+              figma.ui.postMessage({ type: "copy-json", payload: lastJSON });
             } else {
               log("Nenhum JSON para copiar.", "warn");
+            }
+            break;
+          case "upload-image-response":
+            pipeline.handleUploadResponse(msg.id, msg);
+            if (noaiUploader) {
+              noaiUploader.handleUploadResponse(msg.id, msg);
             }
             break;
           case "download-json":

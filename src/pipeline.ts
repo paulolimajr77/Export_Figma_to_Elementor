@@ -38,8 +38,9 @@ export class ConversionPipeline {
         wpConfig: WPConfig = {},
         options?: { debug?: boolean; provider?: SchemaProvider; apiKey?: string; autoFixLayout?: boolean }
     ): Promise<ElementorJSON | { elementorJson: ElementorJSON; debugInfo: PipelineDebugInfo }> {
-        this.compiler.setWPConfig(wpConfig);
-        this.imageUploader.setWPConfig(wpConfig);
+        const normalizedWP = { ...wpConfig, password: (wpConfig as any)?.password || (wpConfig as any)?.token };
+        this.compiler.setWPConfig(normalizedWP);
+        this.imageUploader.setWPConfig(normalizedWP);
 
         const provider = options?.provider || geminiProvider;
         this.autoFixLayout = !!options?.autoFixLayout;
@@ -69,6 +70,10 @@ export class ConversionPipeline {
         }
 
         return elementorJson;
+    }
+
+    public handleUploadResponse(id: string, result: any) {
+        this.imageUploader.handleUploadResponse(id, result);
     }
 
     private preprocess(node: SceneNode): PreprocessedData {
@@ -139,12 +144,16 @@ export class ConversionPipeline {
     }
 
     private async resolveImages(schema: PipelineSchema): Promise<void> {
+        const uploadEnabled = !!(this.wpConfig && this.wpConfig.url && (this.wpConfig as any).user && ((this.wpConfig as any).password || (this.wpConfig as any).token));
+        if (!uploadEnabled) return;
+
         const processWidget = async (widget: PipelineWidget) => {
             if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon')) {
                 try {
                     const node = figma.getNodeById(widget.imageId);
                     if (node) {
-                        const result = await this.imageUploader.uploadToWordPress(node as SceneNode);
+                        const format = widget.type === 'icon' ? 'SVG' : 'WEBP';
+                        const result = await this.imageUploader.uploadToWordPress(node as SceneNode, format as any);
                         if (result) {
                             widget.content = result.url;
                             widget.imageId = result.id.toString();
