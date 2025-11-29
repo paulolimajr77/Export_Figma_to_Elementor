@@ -16,6 +16,8 @@
     gemini_api_key: document.getElementById('gemini_api_key'),
     gemini_model: document.getElementById('gemini_model'),
     gpt_api_key: document.getElementById('gpt_api_key'),
+    gpt_model: document.getElementById('gpt_model'),
+    auto_fix_layout: document.getElementById('auto_fix_layout'),
     wp_url: document.getElementById('wp_url'),
     wp_user: document.getElementById('wp_user'),
     wp_token: document.getElementById('wp_token'),
@@ -100,6 +102,8 @@
     if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
     if (fields.gemini_model && payload.geminiModel) fields.gemini_model.value = payload.geminiModel;
     if (fields.gpt_api_key) fields.gpt_api_key.value = payload.gptKey || '';
+    if (fields.gpt_model && payload.gptModel) fields.gpt_model.value = payload.gptModel;
+    if (fields.auto_fix_layout) fields.auto_fix_layout.checked = !!payload.autoFixLayout;
     if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
     if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
     if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
@@ -119,7 +123,9 @@
     }
     if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
     if (fields.gemini_model) fields.gemini_model.addEventListener('change', () => send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value }));
-    if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gpt_api_key', fields.gpt_api_key));
+    if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gptApiKey', fields.gpt_api_key));
+    if (fields.gpt_model) fields.gpt_model.addEventListener('change', () => send('save-setting', { key: 'gptModel', value: fields.gpt_model.value }));
+    if (fields.auto_fix_layout) fields.auto_fix_layout.addEventListener('change', () => send('save-setting', { key: 'auto_fix_layout', value: fields.auto_fix_layout.checked }));
     if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
     if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
     if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));

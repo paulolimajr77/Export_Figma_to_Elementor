@@ -1522,8 +1522,14 @@ ${JSON.stringify(input.snapshot)}` }
           lastJSON = payload;
           figma.ui.postMessage({ type: "generation-complete", payload, debug: debugInfo });
           try {
-            yield figma.clipboard.writeText(payload);
-            figma.notify("JSON Elementor gerado e copiado para a area de transferencia.");
+            const clip = figma.clipboard;
+            if (clip && typeof clip.writeText === "function") {
+              yield clip.writeText(payload);
+              figma.notify("JSON Elementor gerado e copiado para a area de transferencia.");
+            } else {
+              figma.notify("JSON Elementor gerado. Copie manualmente pelo bot\xE3o.", { timeout: 4e3 });
+              log("Clipboard API indisponivel; use Copiar JSON.", "warn");
+            }
           } catch (err) {
             figma.notify("JSON Elementor gerado. Nao foi possivel copiar automaticamente.", { timeout: 4e3 });
             log(`Falha ao copiar: ${err}`, "warn");

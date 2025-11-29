@@ -241,8 +241,14 @@ async function deliverResult(json: ElementorJSON, debugInfo?: any) {
     lastJSON = payload;
     figma.ui.postMessage({ type: 'generation-complete', payload, debug: debugInfo });
     try {
-        await (figma as any).clipboard.writeText(payload);
-        figma.notify('JSON Elementor gerado e copiado para a area de transferencia.');
+        const clip = (figma as any).clipboard;
+        if (clip && typeof clip.writeText === 'function') {
+            await clip.writeText(payload);
+            figma.notify('JSON Elementor gerado e copiado para a area de transferencia.');
+        } else {
+            figma.notify('JSON Elementor gerado. Copie manualmente pelo botão.', { timeout: 4000 });
+            log('Clipboard API indisponivel; use Copiar JSON.', 'warn');
+        }
     } catch (err) {
         figma.notify('JSON Elementor gerado. Nao foi possivel copiar automaticamente.', { timeout: 4000 });
         log(`Falha ao copiar: ${err}`, 'warn');
