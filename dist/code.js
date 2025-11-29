@@ -1051,7 +1051,7 @@ INSTRUCOES:
           if (!schema.page.tokens) schema.page.tokens = tokens;
           if (!schema.page.title) schema.page.title = root.name;
           if (!Array.isArray(schema.containers)) schema.containers = [];
-          this.normalizeContainers(schema.containers);
+          schema.containers = this.normalizeContainers(schema.containers);
         }
         resolveImages(schema) {
           return __async(this, null, function* () {
@@ -1091,16 +1091,44 @@ INSTRUCOES:
             } catch (e) {
             }
           };
-          const walk = (c) => {
+          const walk = (c, parent) => {
+            const node = figma.getNodeById(c.id);
+            const layoutMode = node == null ? void 0 : node.layoutMode;
+            const type = node == null ? void 0 : node.type;
+            const isFrameLike = type === "FRAME" || type === "GROUP" || type === "COMPONENT" || type === "INSTANCE";
+            const hasAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
+            const looksInvalidContainer = !hasAutoLayout || !isFrameLike;
+            if (looksInvalidContainer) {
+              logWarn(`[AutoFix] Node ${c.id} (${(node == null ? void 0 : node.name) || "container"}) nao tem auto layout ou tipo invalido (${type}). Convertido para w:custom e filhos promovidos.`);
+              const parentContainer = parent;
+              if (parentContainer) {
+                parentContainer.widgets = parentContainer.widgets || [];
+                parentContainer.children = parentContainer.children || [];
+                parentContainer.widgets.push({
+                  type: "custom",
+                  content: null,
+                  imageId: null,
+                  styles: { sourceId: c.id, sourceName: node == null ? void 0 : node.name }
+                });
+                if (Array.isArray(c.widgets)) parentContainer.widgets.push(...c.widgets);
+                if (Array.isArray(c.children)) parentContainer.children.push(...c.children);
+                return null;
+              } else {
+                const promoted = [];
+                if (Array.isArray(c.children)) promoted.push(...c.children);
+                return __spreadProps(__spreadValues({}, c), { children: promoted, widgets: c.widgets || [] });
+              }
+            }
             if (c.direction !== "row" && c.direction !== "column") {
               c.direction = "column";
               logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
             }
             if (!Array.isArray(c.widgets)) c.widgets = [];
             if (!Array.isArray(c.children)) c.children = [];
-            c.children.forEach((child) => walk(child));
+            c.children = c.children.map((child) => walk(child, c)).filter(Boolean);
+            return c;
           };
-          containers.forEach((c) => walk(c));
+          return containers.map((c) => walk(c, null)).filter(Boolean);
         }
       };
     }

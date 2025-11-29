@@ -133,7 +133,7 @@ export class ConversionPipeline {
         if (!schema.page.tokens) schema.page.tokens = tokens;
         if (!schema.page.title) schema.page.title = root.name;
         if (!Array.isArray(schema.containers)) schema.containers = [];
-        this.normalizeContainers(schema.containers);
+        schema.containers = this.normalizeContainers(schema.containers);
     }
 
     private async resolveImages(schema: PipelineSchema): Promise<void> {
@@ -168,7 +168,7 @@ export class ConversionPipeline {
         }
     }
 
-    private normalizeContainers(containers: PipelineContainer[]): void {
+    private normalizeContainers(containers: PipelineContainer[]): PipelineContainer[] {
         const logWarn = (message: string) => {
             try {
                 figma.ui.postMessage({ type: 'log', level: 'warn', message });
@@ -177,16 +177,48 @@ export class ConversionPipeline {
             }
         };
 
-        const walk = (c: PipelineContainer) => {
+        const walk = (c: PipelineContainer, parent: PipelineContainer | null): PipelineContainer | null => {
+            const node = figma.getNodeById(c.id) as any;
+            const layoutMode = node?.layoutMode;
+            const type = node?.type;
+            const isFrameLike = type === 'FRAME' || type === 'GROUP' || type === 'COMPONENT' || type === 'INSTANCE';
+            const hasAutoLayout = layoutMode === 'HORIZONTAL' || layoutMode === 'VERTICAL';
+            const looksInvalidContainer = !hasAutoLayout || !isFrameLike;
+
+            if (looksInvalidContainer) {
+                // Converter para widget custom, preservando filhos
+                logWarn(`[AutoFix] Node ${c.id} (${node?.name || 'container'}) nao tem auto layout ou tipo invalido (${type}). Convertido para w:custom e filhos promovidos.`);
+                const parentContainer = parent;
+                if (parentContainer) {
+                    parentContainer.widgets = parentContainer.widgets || [];
+                    parentContainer.children = parentContainer.children || [];
+                    parentContainer.widgets.push({
+                        type: 'custom',
+                        content: null,
+                        imageId: null,
+                        styles: { sourceId: c.id, sourceName: node?.name }
+                    });
+                    if (Array.isArray(c.widgets)) parentContainer.widgets.push(...c.widgets);
+                    if (Array.isArray(c.children)) parentContainer.children.push(...c.children);
+                    return null;
+                } else {
+                    // se for root, promovemos filhos para raiz
+                    const promoted: PipelineContainer[] = [];
+                    if (Array.isArray(c.children)) promoted.push(...c.children);
+                    return { ...c, children: promoted, widgets: c.widgets || [] };
+                }
+            }
+
             if (c.direction !== 'row' && c.direction !== 'column') {
                 c.direction = 'column';
                 logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
             }
             if (!Array.isArray(c.widgets)) c.widgets = [];
             if (!Array.isArray(c.children)) c.children = [];
-            c.children.forEach(child => walk(child));
+            c.children = c.children.map(child => walk(child as any, c)).filter(Boolean) as PipelineContainer[];
+            return c;
         };
 
-        containers.forEach(c => walk(c));
+        return containers.map(c => walk(c, null)).filter(Boolean) as PipelineContainer[];
     }
 }
