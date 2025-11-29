@@ -1298,6 +1298,22 @@ ${JSON.stringify(input.snapshot)}` }
       function getActiveProvider(providerId) {
         return providerId === "gpt" ? openaiProvider : geminiProvider;
       }
+      function collectLayoutWarnings(node) {
+        const warnings = [];
+        const hasAutoLayout = node.layoutMode === "HORIZONTAL" || node.layoutMode === "VERTICAL";
+        const nameLower = (node.name || "").toLowerCase();
+        const looksLikeContainer = nameLower.startsWith("c:") || nameLower.includes("container");
+        if (looksLikeContainer && !hasAutoLayout) {
+          warnings.push(`Node ${node.id} (${node.name}) sem auto layout; pode gerar container com direction invalido. Ajuste para HORIZONTAL/VERTICAL ou trate como widget.`);
+        }
+        if (node.type && node.type !== "FRAME" && node.type !== "GROUP" && looksLikeContainer) {
+          warnings.push(`Node ${node.id} (${node.name}) e do tipo ${node.type}; nao deve ser container. Considere w:icon ou w:custom.`);
+        }
+        if (Array.isArray(node.children)) {
+          node.children.forEach((child) => warnings.push(...collectLayoutWarnings(child)));
+        }
+        return warnings;
+      }
       function toBase64(str) {
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let output = "";
@@ -1511,6 +1527,12 @@ ${JSON.stringify(input.snapshot)}` }
               const node = getSelectedNode();
               const serialized = serializeNode(node);
               sendPreview(serialized);
+              const warns = collectLayoutWarnings(serialized);
+              if (warns.length > 0) {
+                warns.forEach((w) => log(w, "warn"));
+              } else {
+                log("Inspecao: nenhum problema de auto layout detectado.", "info");
+              }
               log("Arvore inspecionada.", "info");
             } catch (error) {
               log((error == null ? void 0 : error.message) || String(error), "error");
