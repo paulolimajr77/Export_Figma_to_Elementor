@@ -10,6 +10,7 @@
   const btnExport = document.querySelector('[data-action="export-wp"]');
   const themeToggle = document.getElementById('theme-toggle');
   const darkSheet = document.getElementById('theme-dark');
+  let lastPayload = '';
 
  const fields = {
     provider_ai: document.getElementById('provider_ai'),
@@ -167,8 +168,12 @@
             break;
           case 'optimize-structure': send('optimize-structure', payload); break;
           case 'analyze-widgets': send('analyze-widgets', payload); break;
-          case 'copy-json': send('copy-json'); break;
-          case 'download-json': send('download-json'); break;
+          case 'copy-json':
+            if (lastPayload) copyToClipboard(lastPayload); else send('copy-json');
+            break;
+          case 'download-json':
+            if (lastPayload) downloadPayload(lastPayload); else send('download-json');
+            break;
           case 'export-wp': send('export-wp', payload); break;
           case 'reset':
             if (output) output.value = '';
@@ -200,8 +205,10 @@
     switch (msg.type) {
       case 'preview':
         if (output) output.value = msg.payload || '';
+        if (msg.action === 'download' && msg.payload) downloadPayload(msg.payload);
         break;
       case 'generation-complete':
+        lastPayload = msg.payload || '';
         if (output) output.value = msg.payload || '';
         addLog('JSON gerado.', 'info');
         toggleProgress(false);
@@ -276,6 +283,28 @@
       progress.classList.add('hidden');
       progress.style.display = 'none';
     }
+  }
+
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      addLog('JSON copiado.', 'success');
+    } catch (e) {
+      addLog('Falha ao copiar no navegador.', 'error');
+    }
+  }
+
+  function downloadPayload(text) {
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'elementor.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    addLog('Download iniciado.', 'info');
   }
 
   // Resizer handle (drag to resize the plugin window)
