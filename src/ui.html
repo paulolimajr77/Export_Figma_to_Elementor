@@ -984,6 +984,47 @@
           });
         });
       }
+
+      async function uploadImage(msg) {
+        const { id, name, mimeType, data } = msg;
+        const url = (fields.wp_url.value || '').replace(/\/$/, '');
+        const user = fields.wp_user.value;
+        const token = fields.wp_token.value;
+
+        if (!url || !user || !token) {
+          send('upload-image-response', { id, success: false, error: 'Credenciais WP ausentes na UI' });
+          return;
+        }
+
+        try {
+          const blob = new Blob([new Uint8Array(data)], { type: mimeType });
+          const formData = new FormData();
+          formData.append('file', blob, name);
+          formData.append('title', name.split('.')[0]);
+          formData.append('caption', 'Exported via FigToEL');
+
+          const auth = btoa(`${user}:${token}`);
+          const resp = await fetch(`${url}/wp-json/wp/v2/media`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${auth}`
+            },
+            body: formData
+          });
+
+          if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error(`HTTP ${resp.status}: ${errText}`);
+          }
+
+          const json = await resp.json();
+          send('upload-image-response', { id, success: true, url: json.source_url, wpId: json.id });
+
+        } catch (e) {
+          send('upload-image-response', { id, success: false, error: e.message });
+        }
+      }
+
       window.onmessage = (event) => {
         const msg = (event.data || {}).pluginMessage;
         if (!msg) return;
@@ -1040,6 +1081,9 @@
             break;
           case 'load-settings':
             loadStoredSettings(msg.payload);
+            break;
+          case 'upload-image-request':
+            uploadImage(msg);
             break;
         }
       };
