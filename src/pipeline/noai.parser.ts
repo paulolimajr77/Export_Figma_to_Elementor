@@ -124,7 +124,7 @@ function detectWidget(node: SerializedNode): MaybeWidget {
     }
 
     // Image
-    if (isImageFill(node) || name.startsWith('w:image')) {
+    if (isImageFill(node) || name.startsWith('w:image') || node.type === 'IMAGE') {
         const nestedImageId = findFirstImageId(node);
         return { type: 'image', content: null, imageId: nestedImageId || node.id, styles };
     }

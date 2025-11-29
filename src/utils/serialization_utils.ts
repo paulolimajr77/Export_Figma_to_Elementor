@@ -19,7 +19,7 @@ export function serializeNode(node: SceneNode, parentId?: string): SerializedNod
     const data: SerializedNode = {
         id: node.id,
         name: node.name,
-        type: node.type,
+        type: node.locked ? 'IMAGE' : node.type,
         width: node.width,
         height: node.height,
         x: node.x,
@@ -28,6 +28,10 @@ export function serializeNode(node: SceneNode, parentId?: string): SerializedNod
         locked: node.locked,
         parentId: parentId || null
     };
+
+    if (node.locked) {
+        (data as any).isLockedImage = true;
+    }
 
     // Opacity & Blend Mode
     if ('opacity' in node) data.opacity = (node as any).opacity;
@@ -140,13 +144,16 @@ export function serializeNode(node: SceneNode, parentId?: string): SerializedNod
 
     // Children
     if ('children' in node) {
-        data.children = node.children.map(child => serializeNode(child, node.id));
+        if (node.locked) {
+            data.children = [];
+        } else {
+            data.children = node.children.map(child => serializeNode(child, node.id));
+        }
     }
 
     return data;
 }
 
-// Função para normalizar JSON do Figma (API/Plugin) para o formato LayoutAnalysis
 export function normalizeFigmaJSON(json: any): LayoutAnalysis {
     // 1. Desembrulha 'document' ou 'children' se for a raiz
     let root = json;

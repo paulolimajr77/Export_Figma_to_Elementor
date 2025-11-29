@@ -51,7 +51,7 @@ export class ConversionPipeline {
         this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
         validatePipelineSchema(schema);
 
-        await this.resolveImages(schema);
+        await this.resolveImages(schema, normalizedWP);
 
         const elementorJson = this.compiler.compile(schema);
         if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
@@ -143,8 +143,8 @@ export class ConversionPipeline {
         schema.containers = this.normalizeContainers(schema.containers);
     }
 
-    private async resolveImages(schema: PipelineSchema): Promise<void> {
-        const uploadEnabled = !!(this.wpConfig && this.wpConfig.url && (this.wpConfig as any).user && ((this.wpConfig as any).password || (this.wpConfig as any).token));
+    private async resolveImages(schema: PipelineSchema, wpConfig: WPConfig): Promise<void> {
+        const uploadEnabled = !!(wpConfig && wpConfig.url && (wpConfig as any).user && ((wpConfig as any).password || (wpConfig as any).token) && (wpConfig as any).exportImages);
         if (!uploadEnabled) return;
 
         const processWidget = async (widget: PipelineWidget) => {

@@ -43,4 +43,5 @@ INSTRUÇÕES:
 - Se o node tem filhos -> container; se não tem -> widget simples.
 - width use "full" (padrão); direction derive do layoutMode.
 - Se não reconhecer o widget, classifique como "custom".
+- IMPORTANTE: Se um node tiver type="IMAGE" (mesmo que pareça container), trate como w:image e use seu ID como imageId.
 `;

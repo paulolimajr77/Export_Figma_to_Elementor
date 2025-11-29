@@ -57,7 +57,7 @@
     const data = {
       id: node.id,
       name: node.name,
-      type: node.type,
+      type: node.locked ? "IMAGE" : node.type,
       width: node.width,
       height: node.height,
       x: node.x,
@@ -66,6 +66,9 @@
       locked: node.locked,
       parentId: parentId || null
     };
+    if (node.locked) {
+      data.isLockedImage = true;
+    }
     if ("opacity" in node) data.opacity = node.opacity;
     if ("blendMode" in node) data.blendMode = node.blendMode;
     if ("fills" in node && node.fills !== figma.mixed) {
@@ -158,7 +161,11 @@
       }
     }
     if ("children" in node) {
-      data.children = node.children.map((child) => serializeNode(child, node.id));
+      if (node.locked) {
+        data.children = [];
+      } else {
+        data.children = node.children.map((child) => serializeNode(child, node.id));
+      }
     }
     return data;
   }
@@ -1380,6 +1387,7 @@ INSTRU\xC7\xD5ES:
 - Se o node tem filhos -> container; se n\xE3o tem -> widget simples.
 - width use "full" (padr\xE3o); direction derive do layoutMode.
 - Se n\xE3o reconhecer o widget, classifique como "custom".
+- IMPORTANTE: Se um node tiver type="IMAGE" (mesmo que pare\xE7a container), trate como w:image e use seu ID como imageId.
 `;
     }
   });
@@ -1411,7 +1419,7 @@ INSTRU\xC7\xD5ES:
             const schema = yield this.generateSchema(preprocessed, provider, options == null ? void 0 : options.apiKey);
             this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
             validatePipelineSchema(schema);
-            yield this.resolveImages(schema);
+            yield this.resolveImages(schema, normalizedWP);
             const elementorJson = this.compiler.compile(schema);
             if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
             validateElementorJSON(elementorJson);
@@ -1492,9 +1500,9 @@ INSTRU\xC7\xD5ES:
           if (!Array.isArray(schema.containers)) schema.containers = [];
           schema.containers = this.normalizeContainers(schema.containers);
         }
-        resolveImages(schema) {
+        resolveImages(schema, wpConfig) {
           return __async(this, null, function* () {
-            const uploadEnabled = !!(this.wpConfig && this.wpConfig.url && this.wpConfig.user && (this.wpConfig.password || this.wpConfig.token));
+            const uploadEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token) && wpConfig.exportImages);
             if (!uploadEnabled) return;
             const processWidget = (widget) => __async(this, null, function* () {
               if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
@@ -1862,7 +1870,7 @@ ${JSON.stringify(input.snapshot)}` }
     if (vectorTypes.includes(node.type)) {
       return { type: "icon", content: node.name || "icon", imageId: node.id, styles };
     }
-    if (isImageFill(node) || name.startsWith("w:image")) {
+    if (isImageFill(node) || name.startsWith("w:image") || node.type === "IMAGE") {
       const nestedImageId = findFirstImageId(node);
       return { type: "image", content: null, imageId: nestedImageId || node.id, styles };
     }
