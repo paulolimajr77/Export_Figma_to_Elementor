@@ -44,6 +44,32 @@ function isSolidColor(node: any): string | undefined {
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
 }
 
+function buildHtmlFromSegments(node: SerializedNode): string {
+    if (!node.styledTextSegments || node.styledTextSegments.length === 0) return node.characters || '';
+
+    return node.styledTextSegments.map(seg => {
+        let style = '';
+        // Color
+        if (seg.fills && Array.isArray(seg.fills) && seg.fills.length > 0) {
+            const solid = seg.fills.find(f => f.type === 'SOLID');
+            if (solid && solid.color) {
+                const { r, g, b } = solid.color;
+                const a = solid.opacity !== undefined ? solid.opacity : 1;
+                style += `color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a});`;
+            }
+        }
+        // Font Size
+        if (seg.fontSize) style += `font-size: ${seg.fontSize}px;`;
+        // Font Weight
+        if (seg.fontWeight) style += `font-weight: ${seg.fontWeight};`;
+        // Decoration
+        if (seg.textDecoration === 'UNDERLINE') style += 'text-decoration: underline;';
+        if (seg.textDecoration === 'STRIKETHROUGH') style += 'text-decoration: line-through;';
+
+        return `<span style="${style}">${seg.characters}</span>`;
+    }).join('').replace(/\n/g, '<br>');
+}
+
 function detectWidget(node: SerializedNode): MaybeWidget {
     const name = (node.name || '').toLowerCase();
     const styles: Record<string, any> = {
@@ -112,15 +138,15 @@ function detectWidget(node: SerializedNode): MaybeWidget {
         }
         return {
             type: isHeading ? 'heading' : 'text',
-            content: (node as any).characters || node.name,
+            content: (node.styledTextSegments && node.styledTextSegments.length > 1) ? buildHtmlFromSegments(node) : ((node as any).characters || node.name),
             imageId: null,
             styles
         };
     }
 
-    // Icon
+    // Icon -> Treat as Image to ensure visual fidelity (SVG export)
     if (vectorTypes.includes(node.type)) {
-        return { type: 'icon', content: node.name || 'icon', imageId: node.id, styles };
+        return { type: 'image', content: null, imageId: node.id, styles };
     }
 
     // Image
@@ -207,6 +233,23 @@ function toContainer(node: SerializedNode): PipelineContainer {
     }
     const bg = isSolidColor(node);
     if (bg) styles.background = { color: bg };
+
+    // Borders
+    if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
+        const stroke = node.strokes.find((s: any) => s.type === 'SOLID' && s.visible !== false);
+        if (stroke) {
+            const { r, g, b } = stroke.color;
+            const a = stroke.opacity !== undefined ? stroke.opacity : 1;
+            styles.border = {
+                type: 'solid',
+                width: node.strokeWeight,
+                color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`,
+                radius: typeof node.cornerRadius === 'number' ? node.cornerRadius : 0
+            };
+        }
+    } else if (typeof node.cornerRadius === 'number' && node.cornerRadius > 0) {
+        styles.border = { radius: node.cornerRadius };
+    }
 
     const align = mapAlignment((node as any).primaryAxisAlignItems, (node as any).counterAxisAlignItems);
     if (align.justify_content) styles.justify_content = align.justify_content;

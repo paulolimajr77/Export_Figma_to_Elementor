@@ -13,6 +13,20 @@ export interface SerializedNode {
     visible: boolean;
     locked: boolean;
     [key: string]: any; // Allow other properties for flexibility
+    styledTextSegments?: Array<{
+        characters: string;
+        start: number;
+        end: number;
+        fontSize: number;
+        fontName: FontName;
+        fontWeight: number;
+        textDecoration: TextDecoration;
+        textCase: TextCase;
+        lineHeight: LineHeight;
+        letterSpacing: LetterSpacing;
+        fills: Paint[];
+        fillStyleId: string | typeof figma.mixed;
+    }>;
 }
 
 export function serializeNode(node: SceneNode, parentId?: string): SerializedNode {
@@ -121,6 +135,13 @@ export function serializeNode(node: SceneNode, parentId?: string): SerializedNod
 
         if ((node as any).fills !== figma.mixed && (node as any).fills.length > 0 && (node as any).fills[0].type === 'SOLID') {
             data.color = ((node as any).fills[0] as SolidPaint).color;
+        }
+
+        // Capture styled segments for multi-color/style text
+        try {
+            data.styledTextSegments = (node as any).getStyledTextSegments(['fontSize', 'fontName', 'fontWeight', 'textDecoration', 'textCase', 'lineHeight', 'letterSpacing', 'fills', 'fillStyleId']);
+        } catch (e) {
+            console.warn('Error getting styled text segments', e);
         }
     }
 

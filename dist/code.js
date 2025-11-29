@@ -143,6 +143,11 @@
       if (node.fills !== figma.mixed && node.fills.length > 0 && node.fills[0].type === "SOLID") {
         data.color = node.fills[0].color;
       }
+      try {
+        data.styledTextSegments = node.getStyledTextSegments(["fontSize", "fontName", "fontWeight", "textDecoration", "textCase", "lineHeight", "letterSpacing", "fills", "fillStyleId"]);
+      } catch (e) {
+        console.warn("Error getting styled text segments", e);
+      }
     }
     if ("layoutMode" in node) {
       data.layoutMode = node.layoutMode;
@@ -922,7 +927,6 @@ ${JSON.stringify(input.snapshot)}` }
             id,
             elType: "container",
             isInner,
-            isLocked: false,
             settings,
             elements: merged
           };
@@ -974,11 +978,35 @@ ${JSON.stringify(input.snapshot)}` }
             const map = { MIN: "start", CENTER: "center", MAX: "end", STRETCH: "stretch" };
             settings.align_items = map[styles.counterAxisAlignItems] || "start";
           }
+          if (styles.border) {
+            const b = styles.border;
+            if (b.type) settings.border_border = b.type;
+            if (b.width) settings.border_width = { unit: "px", top: b.width, right: b.width, bottom: b.width, left: b.width, isLinked: true };
+            if (b.color) settings.border_color = b.color;
+            if (b.radius) settings.border_radius = { unit: "px", top: b.radius, right: b.radius, bottom: b.radius, left: b.radius, isLinked: true };
+          } else if (styles.cornerRadius) {
+            settings.border_radius = { unit: "px", top: styles.cornerRadius, right: styles.cornerRadius, bottom: styles.cornerRadius, left: styles.cornerRadius, isLinked: true };
+          }
           return settings;
+        }
+        mapTypography(styles, prefix = "typography") {
+          const s = {};
+          if (styles.fontName) {
+            s[`${prefix}_typography`] = "custom";
+            s[`${prefix}_font_family`] = styles.fontName.family;
+            s[`${prefix}_font_weight`] = styles.fontWeight || 400;
+          }
+          if (styles.fontSize) s[`${prefix}_font_size`] = { unit: "px", size: styles.fontSize };
+          if (styles.lineHeight && styles.lineHeight.unit !== "AUTO") s[`${prefix}_line_height`] = { unit: "px", size: styles.lineHeight.value };
+          if (styles.letterSpacing && styles.letterSpacing.value !== 0) s[`${prefix}_letter_spacing`] = { unit: "px", size: styles.letterSpacing.value };
+          if (styles.textDecoration) s[`${prefix}_text_decoration`] = styles.textDecoration.toLowerCase();
+          if (styles.textCase) s[`${prefix}_text_transform`] = styles.textCase === "UPPER" ? "uppercase" : styles.textCase === "LOWER" ? "lowercase" : "none";
+          return s;
         }
         sanitizeSettings(raw) {
           const out = {};
-          Object.entries(raw).forEach(([k, v]) => {
+          Object.keys(raw).forEach((k) => {
+            const v = raw[k];
             if (k.toLowerCase().includes("color")) {
               const sanitized = this.sanitizeColor(v);
               if (sanitized) out[k] = sanitized;
@@ -989,6 +1017,7 @@ ${JSON.stringify(input.snapshot)}` }
           return out;
         }
         compileWidget(widget) {
+          var _a, _b;
           const widgetId = generateGUID();
           const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
           const registryResult = compileWithRegistry(widget, baseSettings);
@@ -997,7 +1026,6 @@ ${JSON.stringify(input.snapshot)}` }
               id: widgetId,
               elType: "widget",
               widgetType: registryResult.widgetType,
-              isLocked: false,
               settings: registryResult.settings,
               elements: []
             };
@@ -1008,14 +1036,19 @@ ${JSON.stringify(input.snapshot)}` }
             case "heading":
               widgetType = "heading";
               settings.title = widget.content || "Heading";
+              if ((_a = widget.styles) == null ? void 0 : _a.color) settings.title_color = this.sanitizeColor(widget.styles.color);
+              Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
               break;
             case "text":
               widgetType = "text-editor";
               settings.editor = widget.content || "Text";
+              if ((_b = widget.styles) == null ? void 0 : _b.color) settings.text_color = this.sanitizeColor(widget.styles.color);
+              Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
               break;
             case "button":
               widgetType = "button";
               settings.text = widget.content || "Button";
+              Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
               break;
             case "image":
               widgetType = "image";
@@ -1038,7 +1071,6 @@ ${JSON.stringify(input.snapshot)}` }
             id: widgetId,
             elType: "widget",
             widgetType,
-            isLocked: false,
             settings,
             elements: []
           };
@@ -1815,6 +1847,25 @@ ${JSON.stringify(input.snapshot)}` }
     const to255 = (v) => Math.round((v || 0) * 255);
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
   }
+  function buildHtmlFromSegments(node) {
+    if (!node.styledTextSegments || node.styledTextSegments.length === 0) return node.characters || "";
+    return node.styledTextSegments.map((seg) => {
+      let style = "";
+      if (seg.fills && Array.isArray(seg.fills) && seg.fills.length > 0) {
+        const solid = seg.fills.find((f) => f.type === "SOLID");
+        if (solid && solid.color) {
+          const { r, g, b } = solid.color;
+          const a = solid.opacity !== void 0 ? solid.opacity : 1;
+          style += `color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a});`;
+        }
+      }
+      if (seg.fontSize) style += `font-size: ${seg.fontSize}px;`;
+      if (seg.fontWeight) style += `font-weight: ${seg.fontWeight};`;
+      if (seg.textDecoration === "UNDERLINE") style += "text-decoration: underline;";
+      if (seg.textDecoration === "STRIKETHROUGH") style += "text-decoration: line-through;";
+      return `<span style="${style}">${seg.characters}</span>`;
+    }).join("").replace(/\n/g, "<br>");
+  }
   function detectWidget(node) {
     var _a, _b;
     const name = (node.name || "").toLowerCase();
@@ -1872,13 +1923,13 @@ ${JSON.stringify(input.snapshot)}` }
       }
       return {
         type: isHeading ? "heading" : "text",
-        content: node.characters || node.name,
+        content: node.styledTextSegments && node.styledTextSegments.length > 1 ? buildHtmlFromSegments(node) : node.characters || node.name,
         imageId: null,
         styles
       };
     }
     if (vectorTypes.includes(node.type)) {
-      return { type: "icon", content: node.name || "icon", imageId: node.id, styles };
+      return { type: "image", content: null, imageId: node.id, styles };
     }
     if (isImageFill(node) || name.startsWith("w:image") || node.type === "IMAGE") {
       const nestedImageId = findFirstImageId(node);
@@ -1950,6 +2001,21 @@ ${JSON.stringify(input.snapshot)}` }
     }
     const bg = isSolidColor(node);
     if (bg) styles.background = { color: bg };
+    if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
+      const stroke = node.strokes.find((s) => s.type === "SOLID" && s.visible !== false);
+      if (stroke) {
+        const { r, g, b } = stroke.color;
+        const a = stroke.opacity !== void 0 ? stroke.opacity : 1;
+        styles.border = {
+          type: "solid",
+          width: node.strokeWeight,
+          color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`,
+          radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 0
+        };
+      }
+    } else if (typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
+      styles.border = { radius: node.cornerRadius };
+    }
     const align = mapAlignment(node.primaryAxisAlignItems, node.counterAxisAlignItems);
     if (align.justify_content) styles.justify_content = align.justify_content;
     if (align.align_items) styles.align_items = align.align_items;

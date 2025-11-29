@@ -58,7 +58,6 @@ export class ElementorCompiler {
             id,
             elType: 'container',
             isInner,
-            isLocked: false,
             settings,
             elements: merged
         };
@@ -123,12 +122,38 @@ export class ElementorCompiler {
             settings.align_items = map[styles.counterAxisAlignItems] || 'start';
         }
 
+        if (styles.border) {
+            const b = styles.border;
+            if (b.type) settings.border_border = b.type;
+            if (b.width) settings.border_width = { unit: 'px', top: b.width, right: b.width, bottom: b.width, left: b.width, isLinked: true };
+            if (b.color) settings.border_color = b.color;
+            if (b.radius) settings.border_radius = { unit: 'px', top: b.radius, right: b.radius, bottom: b.radius, left: b.radius, isLinked: true };
+        } else if (styles.cornerRadius) {
+            settings.border_radius = { unit: 'px', top: styles.cornerRadius, right: styles.cornerRadius, bottom: styles.cornerRadius, left: styles.cornerRadius, isLinked: true };
+        }
+
         return settings;
+    }
+
+    private mapTypography(styles: Record<string, any>, prefix: string = 'typography'): ElementorSettings {
+        const s: ElementorSettings = {};
+        if (styles.fontName) {
+            s[`${prefix}_typography`] = 'custom';
+            s[`${prefix}_font_family`] = styles.fontName.family;
+            s[`${prefix}_font_weight`] = styles.fontWeight || 400;
+        }
+        if (styles.fontSize) s[`${prefix}_font_size`] = { unit: 'px', size: styles.fontSize };
+        if (styles.lineHeight && styles.lineHeight.unit !== 'AUTO') s[`${prefix}_line_height`] = { unit: 'px', size: styles.lineHeight.value };
+        if (styles.letterSpacing && styles.letterSpacing.value !== 0) s[`${prefix}_letter_spacing`] = { unit: 'px', size: styles.letterSpacing.value };
+        if (styles.textDecoration) s[`${prefix}_text_decoration`] = styles.textDecoration.toLowerCase();
+        if (styles.textCase) s[`${prefix}_text_transform`] = styles.textCase === 'UPPER' ? 'uppercase' : (styles.textCase === 'LOWER' ? 'lowercase' : 'none');
+        return s;
     }
 
     private sanitizeSettings(raw: Record<string, any>): ElementorSettings {
         const out: ElementorSettings = {};
-        Object.entries(raw).forEach(([k, v]) => {
+        Object.keys(raw).forEach(k => {
+            const v = raw[k];
             if (k.toLowerCase().includes('color')) {
                 const sanitized = this.sanitizeColor(v);
                 if (sanitized) out[k as keyof ElementorSettings] = sanitized as any;
@@ -150,7 +175,6 @@ export class ElementorCompiler {
                 id: widgetId,
                 elType: 'widget',
                 widgetType: registryResult.widgetType,
-                isLocked: false,
                 settings: registryResult.settings,
                 elements: []
             };
@@ -164,14 +188,19 @@ export class ElementorCompiler {
             case 'heading':
                 widgetType = 'heading';
                 settings.title = widget.content || 'Heading';
+                if (widget.styles?.color) settings.title_color = this.sanitizeColor(widget.styles.color);
+                Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
                 break;
             case 'text':
                 widgetType = 'text-editor';
                 settings.editor = widget.content || 'Text';
+                if (widget.styles?.color) settings.text_color = this.sanitizeColor(widget.styles.color);
+                Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
                 break;
             case 'button':
                 widgetType = 'button';
                 settings.text = widget.content || 'Button';
+                Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
                 break;
             case 'image':
                 widgetType = 'image';
@@ -195,7 +224,6 @@ export class ElementorCompiler {
             id: widgetId,
             elType: 'widget',
             widgetType,
-            isLocked: false,
             settings,
             elements: []
         };
