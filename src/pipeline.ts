@@ -180,12 +180,17 @@ export class ConversionPipeline {
         };
 
         const walk = (c: PipelineContainer, parent: PipelineContainer | null): PipelineContainer | null => {
+            if (!c.id) {
+                logWarn('[AutoFix] Container sem id detectado. Ignorado para evitar quebra.');
+                return null;
+            }
+
             const node = figma.getNodeById(c.id) as any;
             const layoutMode = node?.layoutMode;
             const type = node?.type;
             const isFrameLike = type === 'FRAME' || type === 'GROUP' || type === 'COMPONENT' || type === 'INSTANCE';
             const hasAutoLayout = layoutMode === 'HORIZONTAL' || layoutMode === 'VERTICAL';
-            const looksInvalidContainer = !hasAutoLayout || !isFrameLike;
+            const looksInvalidContainer = (!hasAutoLayout && node) || (!isFrameLike && node);
 
             if (looksInvalidContainer) {
                 logWarn(`[AutoFix] Node ${c.id} (${node?.name || 'container'}) nao tem auto layout ou tipo invalido (${type}).`);

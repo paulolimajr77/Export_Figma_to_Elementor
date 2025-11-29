@@ -1119,12 +1119,16 @@ INSTRUCOES:
             }
           };
           const walk = (c, parent) => {
+            if (!c.id) {
+              logWarn("[AutoFix] Container sem id detectado. Ignorado para evitar quebra.");
+              return null;
+            }
             const node = figma.getNodeById(c.id);
             const layoutMode = node == null ? void 0 : node.layoutMode;
             const type = node == null ? void 0 : node.type;
             const isFrameLike = type === "FRAME" || type === "GROUP" || type === "COMPONENT" || type === "INSTANCE";
             const hasAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
-            const looksInvalidContainer = !hasAutoLayout || !isFrameLike;
+            const looksInvalidContainer = !hasAutoLayout && node || !isFrameLike && node;
             if (looksInvalidContainer) {
               logWarn(`[AutoFix] Node ${c.id} (${(node == null ? void 0 : node.name) || "container"}) nao tem auto layout ou tipo invalido (${type}).`);
               if (!this.autoFixLayout) {
