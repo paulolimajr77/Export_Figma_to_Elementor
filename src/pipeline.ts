@@ -133,6 +133,7 @@ export class ConversionPipeline {
         if (!schema.page.tokens) schema.page.tokens = tokens;
         if (!schema.page.title) schema.page.title = root.name;
         if (!Array.isArray(schema.containers)) schema.containers = [];
+        this.normalizeContainers(schema.containers);
     }
 
     private async resolveImages(schema: PipelineSchema): Promise<void> {
@@ -165,5 +166,27 @@ export class ConversionPipeline {
         for (const container of schema.containers) {
             await walkContainer(container);
         }
+    }
+
+    private normalizeContainers(containers: PipelineContainer[]): void {
+        const logWarn = (message: string) => {
+            try {
+                figma.ui.postMessage({ type: 'log', level: 'warn', message });
+            } catch {
+                // ignore logging failures in pipeline
+            }
+        };
+
+        const walk = (c: PipelineContainer) => {
+            if (c.direction !== 'row' && c.direction !== 'column') {
+                c.direction = 'column';
+                logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
+            }
+            if (!Array.isArray(c.widgets)) c.widgets = [];
+            if (!Array.isArray(c.children)) c.children = [];
+            c.children.forEach(child => walk(child));
+        };
+
+        containers.forEach(c => walk(c));
     }
 }

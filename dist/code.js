@@ -1051,6 +1051,7 @@ INSTRUCOES:
           if (!schema.page.tokens) schema.page.tokens = tokens;
           if (!schema.page.title) schema.page.title = root.name;
           if (!Array.isArray(schema.containers)) schema.containers = [];
+          this.normalizeContainers(schema.containers);
         }
         resolveImages(schema) {
           return __async(this, null, function* () {
@@ -1082,6 +1083,24 @@ INSTRUCOES:
               yield walkContainer(container);
             }
           });
+        }
+        normalizeContainers(containers) {
+          const logWarn = (message) => {
+            try {
+              figma.ui.postMessage({ type: "log", level: "warn", message });
+            } catch (e) {
+            }
+          };
+          const walk = (c) => {
+            if (c.direction !== "row" && c.direction !== "column") {
+              c.direction = "column";
+              logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
+            }
+            if (!Array.isArray(c.widgets)) c.widgets = [];
+            if (!Array.isArray(c.children)) c.children = [];
+            c.children.forEach((child) => walk(child));
+          };
+          containers.forEach((c) => walk(c));
         }
       };
     }
