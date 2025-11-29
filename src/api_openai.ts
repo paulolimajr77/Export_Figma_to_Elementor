@@ -1,11 +1,16 @@
 import { GenerateSchemaInput, SchemaProvider, SchemaResponse } from './types/providers';
 import { PipelineSchema } from './types/pipeline.schema';
 
-export type OpenAIModel = 'gpt-4.1' | 'gpt-o1' | 'gpt-mini';
+export type OpenAIModel =
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1'
+    | 'gpt-4.1-preview'
+    | 'gpt-o1'
+    | 'gpt-o3-mini';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_TIMEOUT_MS = 12000;
-const DEFAULT_MODEL: OpenAIModel = 'gpt-4.1';
+export const DEFAULT_GPT_MODEL: OpenAIModel = 'gpt-4.1-mini';
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Response> {
     const AC: any = (typeof AbortController === 'function') ? AbortController : null;
@@ -39,8 +44,8 @@ export async function saveOpenAIModel(model: OpenAIModel): Promise<void> {
 }
 
 export async function getOpenAIModel(): Promise<OpenAIModel> {
-    const saved = await figma.clientStorage.getAsync('gpt_model');
-    return saved || DEFAULT_MODEL;
+    const saved = await figma.clientStorage.getAsync('gptModel') || await figma.clientStorage.getAsync('gpt_model');
+    return saved || DEFAULT_GPT_MODEL;
 }
 
 function cleanJson(content: string): string {
@@ -58,33 +63,26 @@ async function parseJsonResponse(rawContent: string): Promise<PipelineSchema> {
 
 const JSON_SAFETY = 'Responda sempre em JSON (json) valido e completo.';
 
-export const openaiProvider: SchemaProvider = {
-    id: 'gpt',
-    model: DEFAULT_MODEL,
+function mapStatusError(status: number, parsed: any): string {
+    const base = (parsed as any)?.error?.message;
+    if (status === 401) return 'API Key invalida (401).';
+    if (status === 404) return 'Modelo nao encontrado (404).';
+    if (status === 429) return 'Quota excedida (429).';
+    if (status >= 500) return 'Erro interno da OpenAI (5xx).';
+    return base || `HTTP ${status}`;
+}
 
-    setModel(model: string) {
-        this.model = model;
-        saveOpenAIModel(model as OpenAIModel).catch(() => { /* best effort */ });
-    },
+async function callOpenAI(apiKey: string, model: OpenAIModel, messages: any[], maxTokens = 8192, retries = 3): Promise<SchemaResponse> {
+    const requestBody = {
+        model,
+        messages,
+        temperature: 0.2,
+        max_tokens: maxTokens,
+        response_format: { type: 'json_object' }
+    };
 
-    async generateSchema(input: GenerateSchemaInput): Promise<SchemaResponse> {
-        const apiKey = input.apiKey || await getOpenAIKey();
-        if (!apiKey) {
-            return { ok: false, message: 'API Key do OpenAI nao configurada.' };
-        }
-
-        const requestBody = {
-            model: this.model,
-            messages: [
-                { role: 'system', content: `${input.instructions}\n${JSON_SAFETY}` },
-                { role: 'user', content: input.prompt },
-                { role: 'user', content: `SNAPSHOT (json esperado):\n${JSON.stringify(input.snapshot)}` }
-            ],
-            temperature: 0.2,
-            max_tokens: 8192,
-            response_format: { type: 'json_object' }
-        };
-
+    let attempt = 0;
+    while (attempt < retries) {
         try {
             const response = await fetchWithTimeout(OPENAI_API_URL, {
                 method: 'POST',
@@ -99,80 +97,82 @@ export const openaiProvider: SchemaProvider = {
                 const rawText = await response.text();
                 let parsed: any = null;
                 try { parsed = JSON.parse(rawText); } catch { parsed = rawText; }
-                const message = (parsed as any)?.error?.message || `HTTP ${response.status}`;
-                return { ok: false, message: `Falha na API OpenAI: ${message}`, raw: parsed };
+                const error = mapStatusError(response.status, parsed);
+                if (response.status >= 400 && response.status < 500) {
+                    return { ok: false, error, raw: parsed };
+                }
+                attempt++;
+                if (attempt >= retries) return { ok: false, error, raw: parsed };
+                await new Promise(res => setTimeout(res, 500 * attempt));
+                continue;
             }
 
             const data = await response.json();
             const content = data?.choices?.[0]?.message?.content;
             if (!content) {
-                return { ok: false, message: 'Resposta vazia da OpenAI.', raw: data };
+                return { ok: false, error: 'Resposta vazia da OpenAI.', raw: data };
             }
-
             try {
                 const schema = await parseJsonResponse(content);
-                return { ok: true, schema, raw: data };
+                return { ok: true, data: schema, schema, raw: data };
             } catch (err: any) {
-                return { ok: false, message: err?.message || 'Resposta nao JSON', raw: content };
+                return { ok: false, error: err?.message || 'Resposta nao JSON', raw: content };
             }
         } catch (err: any) {
-            const aborted = err?.name === 'AbortError';
-            const message = aborted ? 'Timeout na chamada OpenAI.' : (err?.message || 'Erro desconhecido ao chamar OpenAI.');
-            return { ok: false, message, raw: err };
+            attempt++;
+            if (attempt >= retries) {
+                const aborted = err?.name === 'AbortError';
+                const message = aborted ? 'Timeout na chamada OpenAI.' : (err?.message || 'Erro desconhecido ao chamar OpenAI.');
+                return { ok: false, error: message, raw: err };
+            }
+            await new Promise(res => setTimeout(res, 500 * attempt));
         }
+    }
+    return { ok: false, error: 'Falha ao chamar OpenAI apos retries.' };
+}
+
+export async function testOpenAIConnection(apiKey: string, model: OpenAIModel): Promise<{ ok: boolean; error?: string; data?: any }> {
+    const messages = [
+        { role: 'system', content: `${JSON_SAFETY} Retorne {"pong": true}.` },
+        { role: 'user', content: 'ping (json)' }
+    ];
+    const resp = await callOpenAI(apiKey, model, messages, 64, 1);
+    return { ok: resp.ok, error: resp.error, data: resp.raw };
+}
+
+export const openaiProvider: SchemaProvider = {
+    id: 'gpt',
+    model: DEFAULT_GPT_MODEL,
+
+    setModel(model: string) {
+        this.model = model;
+        saveOpenAIModel(model as OpenAIModel).catch(() => { /* best effort */ });
     },
 
-    async testConnection(apiKey?: string): Promise<{ ok: boolean; message: string; raw?: any }> {
+    async generateSchema(input: GenerateSchemaInput): Promise<SchemaResponse> {
+        const apiKey = input.apiKey || await getOpenAIKey();
+        if (!apiKey) {
+            return { ok: false, error: 'API Key do OpenAI nao configurada.' };
+        }
+
+        const model = this.model as OpenAIModel;
+        const messages = [
+            { role: 'system', content: `${input.instructions}\n${JSON_SAFETY}` },
+            { role: 'user', content: input.prompt },
+            { role: 'user', content: `SNAPSHOT (json esperado):\n${JSON.stringify(input.snapshot)}` }
+        ];
+
+        const resp = await callOpenAI(apiKey, model, messages);
+        if (!resp.ok) return resp;
+        return { ok: true, schema: resp.schema, data: resp.data, raw: resp.raw };
+    },
+
+    async testConnection(apiKey?: string): Promise<{ ok: boolean; error?: string; data?: any }> {
         const keyToTest = apiKey || await getOpenAIKey();
+        const model = this.model as OpenAIModel;
         if (!keyToTest) {
-            return { ok: false, message: 'API Key do OpenAI nao configurada.' };
+            return { ok: false, error: 'API Key do OpenAI nao configurada.' };
         }
-
-        const requestBody = {
-            model: this.model,
-            messages: [
-                { role: 'system', content: `${JSON_SAFETY} Retorne {"pong": true}.` },
-                { role: 'user', content: 'ping (json)' }
-            ],
-            temperature: 0,
-            max_tokens: 16,
-            response_format: { type: 'json_object' }
-        };
-
-        try {
-            const response = await fetchWithTimeout(OPENAI_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${keyToTest}`
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                const rawText = await response.text();
-                let parsed: any = null;
-                try { parsed = JSON.parse(rawText); } catch { parsed = rawText; }
-                const message = (parsed as any)?.error?.message || `HTTP ${response.status}`;
-                return { ok: false, message: `Falha ao testar OpenAI: ${message}`, raw: parsed };
-            }
-
-            const data = await response.json();
-            const content = data?.choices?.[0]?.message?.content;
-            if (!content) {
-                return { ok: false, message: 'Resposta vazia.', raw: data };
-            }
-
-            try {
-                await parseJsonResponse(content);
-                return { ok: true, message: 'Conexao com OpenAI verificada.', raw: data };
-            } catch {
-                return { ok: false, message: 'Resposta nao JSON ao testar OpenAI.', raw: content };
-            }
-        } catch (err: any) {
-            const aborted = err?.name === 'AbortError';
-            const message = aborted ? 'Timeout ao testar conexao OpenAI.' : (err?.message || 'Erro desconhecido ao testar OpenAI.');
-            return { ok: false, message, raw: err };
-        }
+        return await testOpenAIConnection(keyToTest, model);
     }
 };

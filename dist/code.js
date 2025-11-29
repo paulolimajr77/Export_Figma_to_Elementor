@@ -1134,16 +1134,97 @@ INSTRUCOES:
       }
     });
   }
-  var OPENAI_API_URL, DEFAULT_TIMEOUT_MS2, DEFAULT_MODEL, JSON_SAFETY, openaiProvider;
+  function mapStatusError(status, parsed) {
+    var _a;
+    const base = (_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message;
+    if (status === 401) return "API Key invalida (401).";
+    if (status === 404) return "Modelo nao encontrado (404).";
+    if (status === 429) return "Quota excedida (429).";
+    if (status >= 500) return "Erro interno da OpenAI (5xx).";
+    return base || `HTTP ${status}`;
+  }
+  function callOpenAI(apiKey, model, messages, maxTokens = 8192, retries = 3) {
+    return __async(this, null, function* () {
+      var _a, _b, _c;
+      const requestBody = {
+        model,
+        messages,
+        temperature: 0.2,
+        max_tokens: maxTokens,
+        response_format: { type: "json_object" }
+      };
+      let attempt = 0;
+      while (attempt < retries) {
+        try {
+          const response = yield fetchWithTimeout2(OPENAI_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(requestBody)
+          });
+          if (!response.ok) {
+            const rawText = yield response.text();
+            let parsed = null;
+            try {
+              parsed = JSON.parse(rawText);
+            } catch (e) {
+              parsed = rawText;
+            }
+            const error = mapStatusError(response.status, parsed);
+            if (response.status >= 400 && response.status < 500) {
+              return { ok: false, error, raw: parsed };
+            }
+            attempt++;
+            if (attempt >= retries) return { ok: false, error, raw: parsed };
+            yield new Promise((res) => setTimeout(res, 500 * attempt));
+            continue;
+          }
+          const data = yield response.json();
+          const content = (_c = (_b = (_a = data == null ? void 0 : data.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content;
+          if (!content) {
+            return { ok: false, error: "Resposta vazia da OpenAI.", raw: data };
+          }
+          try {
+            const schema = yield parseJsonResponse(content);
+            return { ok: true, data: schema, schema, raw: data };
+          } catch (err) {
+            return { ok: false, error: (err == null ? void 0 : err.message) || "Resposta nao JSON", raw: content };
+          }
+        } catch (err) {
+          attempt++;
+          if (attempt >= retries) {
+            const aborted = (err == null ? void 0 : err.name) === "AbortError";
+            const message = aborted ? "Timeout na chamada OpenAI." : (err == null ? void 0 : err.message) || "Erro desconhecido ao chamar OpenAI.";
+            return { ok: false, error: message, raw: err };
+          }
+          yield new Promise((res) => setTimeout(res, 500 * attempt));
+        }
+      }
+      return { ok: false, error: "Falha ao chamar OpenAI apos retries." };
+    });
+  }
+  function testOpenAIConnection(apiKey, model) {
+    return __async(this, null, function* () {
+      const messages = [
+        { role: "system", content: `${JSON_SAFETY} Retorne {"pong": true}.` },
+        { role: "user", content: "ping (json)" }
+      ];
+      const resp = yield callOpenAI(apiKey, model, messages, 64, 1);
+      return { ok: resp.ok, error: resp.error, data: resp.raw };
+    });
+  }
+  var OPENAI_API_URL, DEFAULT_TIMEOUT_MS2, DEFAULT_GPT_MODEL, JSON_SAFETY, openaiProvider;
   var init_api_openai = __esm({
     "src/api_openai.ts"() {
       OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
       DEFAULT_TIMEOUT_MS2 = 12e3;
-      DEFAULT_MODEL = "gpt-4.1";
+      DEFAULT_GPT_MODEL = "gpt-4.1-mini";
       JSON_SAFETY = "Responda sempre em JSON (json) valido e completo.";
       openaiProvider = {
         id: "gpt",
-        model: DEFAULT_MODEL,
+        model: DEFAULT_GPT_MODEL,
         setModel(model) {
           this.model = model;
           saveOpenAIModel(model).catch(() => {
@@ -1151,115 +1232,31 @@ INSTRUCOES:
         },
         generateSchema(input) {
           return __async(this, null, function* () {
-            var _a, _b, _c, _d;
             const apiKey = input.apiKey || (yield getOpenAIKey());
             if (!apiKey) {
-              return { ok: false, message: "API Key do OpenAI nao configurada." };
+              return { ok: false, error: "API Key do OpenAI nao configurada." };
             }
-            const requestBody = {
-              model: this.model,
-              messages: [
-                { role: "system", content: `${input.instructions}
+            const model = this.model;
+            const messages = [
+              { role: "system", content: `${input.instructions}
 ${JSON_SAFETY}` },
-                { role: "user", content: input.prompt },
-                { role: "user", content: `SNAPSHOT (json esperado):
+              { role: "user", content: input.prompt },
+              { role: "user", content: `SNAPSHOT (json esperado):
 ${JSON.stringify(input.snapshot)}` }
-              ],
-              temperature: 0.2,
-              max_tokens: 8192,
-              response_format: { type: "json_object" }
-            };
-            try {
-              const response = yield fetchWithTimeout2(OPENAI_API_URL, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${apiKey}`
-                },
-                body: JSON.stringify(requestBody)
-              });
-              if (!response.ok) {
-                const rawText = yield response.text();
-                let parsed = null;
-                try {
-                  parsed = JSON.parse(rawText);
-                } catch (e) {
-                  parsed = rawText;
-                }
-                const message = ((_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
-                return { ok: false, message: `Falha na API OpenAI: ${message}`, raw: parsed };
-              }
-              const data = yield response.json();
-              const content = (_d = (_c = (_b = data == null ? void 0 : data.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content;
-              if (!content) {
-                return { ok: false, message: "Resposta vazia da OpenAI.", raw: data };
-              }
-              try {
-                const schema = yield parseJsonResponse(content);
-                return { ok: true, schema, raw: data };
-              } catch (err) {
-                return { ok: false, message: (err == null ? void 0 : err.message) || "Resposta nao JSON", raw: content };
-              }
-            } catch (err) {
-              const aborted = (err == null ? void 0 : err.name) === "AbortError";
-              const message = aborted ? "Timeout na chamada OpenAI." : (err == null ? void 0 : err.message) || "Erro desconhecido ao chamar OpenAI.";
-              return { ok: false, message, raw: err };
-            }
+            ];
+            const resp = yield callOpenAI(apiKey, model, messages);
+            if (!resp.ok) return resp;
+            return { ok: true, schema: resp.schema, data: resp.data, raw: resp.raw };
           });
         },
         testConnection(apiKey) {
           return __async(this, null, function* () {
-            var _a, _b, _c, _d;
             const keyToTest = apiKey || (yield getOpenAIKey());
+            const model = this.model;
             if (!keyToTest) {
-              return { ok: false, message: "API Key do OpenAI nao configurada." };
+              return { ok: false, error: "API Key do OpenAI nao configurada." };
             }
-            const requestBody = {
-              model: this.model,
-              messages: [
-                { role: "system", content: `${JSON_SAFETY} Retorne {"pong": true}.` },
-                { role: "user", content: "ping (json)" }
-              ],
-              temperature: 0,
-              max_tokens: 16,
-              response_format: { type: "json_object" }
-            };
-            try {
-              const response = yield fetchWithTimeout2(OPENAI_API_URL, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${keyToTest}`
-                },
-                body: JSON.stringify(requestBody)
-              });
-              if (!response.ok) {
-                const rawText = yield response.text();
-                let parsed = null;
-                try {
-                  parsed = JSON.parse(rawText);
-                } catch (e) {
-                  parsed = rawText;
-                }
-                const message = ((_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
-                return { ok: false, message: `Falha ao testar OpenAI: ${message}`, raw: parsed };
-              }
-              const data = yield response.json();
-              const content = (_d = (_c = (_b = data == null ? void 0 : data.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content;
-              if (!content) {
-                return { ok: false, message: "Resposta vazia.", raw: data };
-              }
-              try {
-                yield parseJsonResponse(content);
-                return { ok: true, message: "Conexao com OpenAI verificada.", raw: data };
-              } catch (e) {
-                return { ok: false, message: "Resposta nao JSON ao testar OpenAI.", raw: content };
-              }
-            } catch (err) {
-              const aborted = (err == null ? void 0 : err.name) === "AbortError";
-              const message = aborted ? "Timeout ao testar conexao OpenAI." : (err == null ? void 0 : err.message) || "Erro desconhecido ao testar OpenAI.";
-              return { ok: false, message, raw: err };
-            }
+            return yield testOpenAIConnection(keyToTest, model);
           });
         }
       };
@@ -1278,6 +1275,7 @@ ${JSON.stringify(input.snapshot)}` }
       var lastJSON = null;
       var DEFAULT_TIMEOUT_MS3 = 12e3;
       var DEFAULT_PROVIDER = "gemini";
+      var DEFAULT_GPT_MODEL2 = "gpt-4.1-mini";
       function getActiveProvider(providerId) {
         return providerId === "gpt" ? openaiProvider : geminiProvider;
       }
@@ -1370,18 +1368,24 @@ ${JSON.stringify(input.snapshot)}` }
       }
       function resolveProviderConfig(msg) {
         return __async(this, null, function* () {
-          const incomingProvider = (msg == null ? void 0 : msg.providerAi) || (yield loadSetting("provider_ai", DEFAULT_PROVIDER));
+          const incomingProvider = (msg == null ? void 0 : msg.providerAi) || (yield loadSetting("aiProvider", DEFAULT_PROVIDER)) || (yield loadSetting("provider_ai", DEFAULT_PROVIDER));
           const providerId = incomingProvider === "gpt" ? "gpt" : DEFAULT_PROVIDER;
+          yield saveSetting("aiProvider", providerId);
           yield saveSetting("provider_ai", providerId);
           const provider = getActiveProvider(providerId);
           if (providerId === "gpt") {
             const inlineKey2 = msg == null ? void 0 : msg.gptApiKey;
-            let key2 = inlineKey2 || (yield loadSetting("gpt_api_key", ""));
+            let key2 = inlineKey2 || (yield loadSetting("gptApiKey", "")) || (yield loadSetting("gpt_api_key", ""));
             if (inlineKey2) {
+              yield saveSetting("gptApiKey", inlineKey2);
               yield saveSetting("gpt_api_key", inlineKey2);
             }
-            const storedModel = yield loadSetting("gpt_model", openaiProvider.model);
-            openaiProvider.setModel(storedModel || openaiProvider.model);
+            const storedModel = (msg == null ? void 0 : msg.gptModel) || (yield loadSetting("gptModel", DEFAULT_GPT_MODEL2)) || (yield loadSetting("gpt_model", openaiProvider.model));
+            if (storedModel) {
+              yield saveSetting("gptModel", storedModel);
+              yield saveSetting("gpt_model", storedModel);
+              openaiProvider.setModel(storedModel);
+            }
             if (!key2) throw new Error("OpenAI API Key nao configurada.");
             return { provider, apiKey: key2, providerId };
           }
@@ -1452,9 +1456,9 @@ ${JSON.stringify(input.snapshot)}` }
             geminiKey = yield loadSetting("gemini_api_key", "");
           }
           const geminiModel = yield loadSetting("gemini_model", GEMINI_MODEL);
-          const providerAi = yield loadSetting("provider_ai", DEFAULT_PROVIDER);
-          const gptKey = yield loadSetting("gpt_api_key", "");
-          const gptModel = yield loadSetting("gpt_model", openaiProvider.model);
+          const providerAi = (yield loadSetting("aiProvider", DEFAULT_PROVIDER)) || (yield loadSetting("provider_ai", DEFAULT_PROVIDER));
+          const gptKey = (yield loadSetting("gptApiKey", "")) || (yield loadSetting("gpt_api_key", ""));
+          const gptModel = (yield loadSetting("gptModel", DEFAULT_GPT_MODEL2)) || (yield loadSetting("gpt_model", openaiProvider.model));
           const wpUrl = yield loadSetting("gptel_wp_url", "");
           const wpUser = yield loadSetting("gptel_wp_user", "");
           const wpToken = yield loadSetting("gptel_wp_token", "");
@@ -1614,10 +1618,18 @@ ${JSON.stringify(input.snapshot)}` }
             try {
               const inlineKey = msg.apiKey || msg.gptApiKey || "";
               if (inlineKey) {
+                yield saveSetting("gptApiKey", inlineKey);
                 yield saveSetting("gpt_api_key", inlineKey);
               }
-              const res = yield openaiProvider.testConnection(inlineKey || void 0);
-              figma.ui.postMessage({ type: "gpt-status", success: res.ok, message: res.message });
+              const model = msg.model || (yield loadSetting("gptModel", DEFAULT_GPT_MODEL2)) || (yield loadSetting("gpt_model", DEFAULT_GPT_MODEL2));
+              if (model) {
+                yield saveSetting("gptModel", model);
+                yield saveSetting("gpt_model", model);
+                openaiProvider.setModel(model);
+              }
+              const keyToUse = inlineKey || (yield loadSetting("gptApiKey", "")) || (yield loadSetting("gpt_api_key", ""));
+              const res = yield testOpenAIConnection(keyToUse, model || openaiProvider.model);
+              figma.ui.postMessage({ type: "gpt-status", success: res.ok, message: res.error || "Conexao com GPT verificada." });
             } catch (e) {
               figma.ui.postMessage({ type: "gpt-status", success: false, message: `Erro: ${(e == null ? void 0 : e.message) || e}` });
             }

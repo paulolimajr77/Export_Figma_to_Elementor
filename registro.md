@@ -6,3 +6,4 @@
 - 28/11/2025: Correcoes de texto da UI para remover caracteres corrompidos (acentos/emoji) mantendo labels legiveis no Figma.
 - 28/11/2025: Reaplicacao de acentuacao correta na UI (portugues BR) usando entidades HTML para evitar quebra de encoding.
 - 29/11/2025: Ajuste no provedor OpenAI para sempre mencionar "json" nas mensagens (conforme requisito do response_format), evitando erro ao testar conexao.
+- 29/11/2025: UI reforcada com seletor de provedor IA, modelos GPT detalhados e persistencia em aiProvider/gptApiKey/gptModel; test OpenAI mapeando 401/404/429; pipeline alterna Gemini/GPT conforme configuracao.

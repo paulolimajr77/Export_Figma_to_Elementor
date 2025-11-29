@@ -628,8 +628,16 @@
           <div class="provider-block provider-gpt">
             <label class="input-label" for="gpt_api_key">OpenAI API Key</label>
             <input id="gpt_api_key" type="password" autocomplete="off" placeholder="Cole sua chave da OpenAI" />
+            <label class="input-label" for="gpt_model">Modelo GPT</label>
+            <select id="gpt_model">
+              <option value="gpt-4.1-mini">gpt-4.1-mini (recomendado)</option>
+              <option value="gpt-4.1">gpt-4.1</option>
+              <option value="gpt-4.1-preview">gpt-4.1-preview</option>
+              <option value="gpt-o1">gpt-o1</option>
+              <option value="gpt-o3-mini">gpt-o3-mini</option>
+            </select>
             <div class="actions">
-              <button class="btn primary" data-action="test-gpt">Testar conex&#227;o</button>
+              <button class="btn primary" data-action="test-gpt">Testar conex&#227;o GPT</button>
             </div>
             <div id="gpt-status" class="status"></div>
           </div>
@@ -708,6 +716,7 @@
         gemini_api_key: document.getElementById('gemini_api_key'),
         gemini_model: document.getElementById('gemini_model'),
         gpt_api_key: document.getElementById('gpt_api_key'),
+        gpt_model: document.getElementById('gpt_model'),
         wp_url: document.getElementById('wp_url'),
         wp_user: document.getElementById('wp_user'),
         wp_token: document.getElementById('wp_token'),
@@ -797,6 +806,7 @@
           addLog(`Modelo carregado: ${payload.geminiModel}`, 'info');
         }
         if (fields.gpt_api_key) fields.gpt_api_key.value = payload.gptKey || '';
+        if (fields.gpt_model && payload.gptModel) fields.gpt_model.value = payload.gptModel;
         if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
         if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
         if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
@@ -811,7 +821,7 @@
         if (fields.provider_ai) {
           fields.provider_ai.addEventListener('change', () => {
             setProvider(fields.provider_ai.value);
-            send('save-setting', { key: 'provider_ai', value: fields.provider_ai.value });
+            send('save-setting', { key: 'aiProvider', value: fields.provider_ai.value });
           });
         }
         if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
@@ -821,7 +831,8 @@
             addLog(`Modelo alterado para: ${fields.gemini_model.value}`, 'info');
           });
         }
-        if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gpt_api_key', fields.gpt_api_key));
+        if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gptApiKey', fields.gpt_api_key));
+        if (fields.gpt_model) fields.gpt_model.addEventListener('change', () => send('save-setting', { key: 'gptModel', value: fields.gpt_model.value }));
         if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
         if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
         if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
@@ -841,6 +852,7 @@
             }
             const payload = {
               providerAi: fields.provider_ai?.value || 'gemini',
+              gptModel: fields.gpt_model?.value || '',
               wpConfig: {
                 url: fields.wp_url?.value || '',
                 user: fields.wp_user?.value || '',
@@ -854,6 +866,9 @@
             };
             if (payload.geminiModel) {
               send('save-setting', { key: 'gemini_model', value: payload.geminiModel });
+            }
+            if (payload.gptModel) {
+              send('save-setting', { key: 'gptModel', value: payload.gptModel });
             }
             switch (action) {
               case 'inspect-layout': send('inspect'); break;
@@ -876,7 +891,7 @@
                 send('reset');
                 break;
               case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
-              case 'test-gpt': send('test-gpt', { apiKey: payload.gptApiKey }); break;
+              case 'test-gpt': send('test-gpt', { apiKey: payload.gptApiKey, model: payload.gptModel || fields.gpt_model?.value }); break;
               case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
               case 'resize-ui': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
               default: send(action || 'noop', payload);

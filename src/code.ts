@@ -2,7 +2,7 @@
 import type { WPConfig, ElementorJSON } from './types/elementor.types';
 import { serializeNode } from './utils/serialization_utils';
 import { GEMINI_MODEL, geminiProvider } from './api_gemini';
-import { openaiProvider } from './api_openai';
+import { DEFAULT_GPT_MODEL, openaiProvider, testOpenAIConnection } from './api_openai';
 import { SchemaProvider } from './types/providers';
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
@@ -12,6 +12,7 @@ let lastJSON: string | null = null;
 
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_PROVIDER = 'gemini';
+const DEFAULT_GPT_MODEL = 'gpt-4.1-mini';
 
 function getActiveProvider(providerId?: string): SchemaProvider {
     return providerId === 'gpt' ? openaiProvider : geminiProvider;
@@ -112,19 +113,25 @@ async function loadWPConfig(): Promise<WPConfig> {
 }
 
 async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvider; apiKey: string; providerId: string }> {
-    const incomingProvider = (msg?.providerAi as string) || await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
+    const incomingProvider = (msg?.providerAi as string) || await loadSetting<string>('aiProvider', DEFAULT_PROVIDER) || await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
     const providerId = incomingProvider === 'gpt' ? 'gpt' : DEFAULT_PROVIDER;
+    await saveSetting('aiProvider', providerId);
     await saveSetting('provider_ai', providerId);
     const provider = getActiveProvider(providerId);
 
     if (providerId === 'gpt') {
         const inlineKey = msg?.gptApiKey as string | undefined;
-        let key = inlineKey || await loadSetting<string>('gpt_api_key', '');
+        let key = inlineKey || await loadSetting<string>('gptApiKey', '') || await loadSetting<string>('gpt_api_key', '');
         if (inlineKey) {
+            await saveSetting('gptApiKey', inlineKey);
             await saveSetting('gpt_api_key', inlineKey);
         }
-        const storedModel = await loadSetting<string>('gpt_model', openaiProvider.model);
-        openaiProvider.setModel(storedModel || openaiProvider.model);
+        const storedModel = (msg?.gptModel as string) || await loadSetting<string>('gptModel', DEFAULT_GPT_MODEL) || await loadSetting<string>('gpt_model', openaiProvider.model);
+        if (storedModel) {
+            await saveSetting('gptModel', storedModel);
+            await saveSetting('gpt_model', storedModel);
+            openaiProvider.setModel(storedModel);
+        }
         if (!key) throw new Error('OpenAI API Key nao configurada.');
         return { provider, apiKey: key, providerId };
     }
@@ -198,9 +205,9 @@ async function sendStoredSettings() {
         geminiKey = await loadSetting<string>('gemini_api_key', '');
     }
     const geminiModel = await loadSetting<string>('gemini_model', GEMINI_MODEL);
-    const providerAi = await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
-    const gptKey = await loadSetting<string>('gpt_api_key', '');
-    const gptModel = await loadSetting<string>('gpt_model', openaiProvider.model);
+    const providerAi = await loadSetting<string>('aiProvider', DEFAULT_PROVIDER) || await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
+    const gptKey = await loadSetting<string>('gptApiKey', '') || await loadSetting<string>('gpt_api_key', '');
+    const gptModel = await loadSetting<string>('gptModel', DEFAULT_GPT_MODEL) || await loadSetting<string>('gpt_model', openaiProvider.model);
     const wpUrl = await loadSetting<string>('gptel_wp_url', '');
     const wpUser = await loadSetting<string>('gptel_wp_user', '');
     const wpToken = await loadSetting<string>('gptel_wp_token', '');
@@ -373,10 +380,18 @@ figma.ui.onmessage = async (msg) => {
             try {
                 const inlineKey = (msg.apiKey as string) || (msg.gptApiKey as string) || '';
                 if (inlineKey) {
+                    await saveSetting('gptApiKey', inlineKey);
                     await saveSetting('gpt_api_key', inlineKey);
                 }
-                const res = await openaiProvider.testConnection(inlineKey || undefined);
-                figma.ui.postMessage({ type: 'gpt-status', success: res.ok, message: res.message });
+                const model = (msg.model as string) || await loadSetting<string>('gptModel', DEFAULT_GPT_MODEL) || await loadSetting<string>('gpt_model', DEFAULT_GPT_MODEL);
+                if (model) {
+                    await saveSetting('gptModel', model);
+                    await saveSetting('gpt_model', model);
+                    openaiProvider.setModel(model);
+                }
+                const keyToUse = inlineKey || await loadSetting<string>('gptApiKey', '') || await loadSetting<string>('gpt_api_key', '');
+                const res = await testOpenAIConnection(keyToUse, model || openaiProvider.model as any);
+                figma.ui.postMessage({ type: 'gpt-status', success: res.ok, message: res.error || 'Conexao com GPT verificada.' });
             } catch (e: any) {
                 figma.ui.postMessage({ type: 'gpt-status', success: false, message: `Erro: ${e?.message || e}` });
             }

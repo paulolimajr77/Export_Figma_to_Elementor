@@ -10,7 +10,9 @@ export interface GenerateSchemaInput {
 export interface SchemaResponse {
     ok: boolean;
     schema?: PipelineSchema;
+    data?: any;
     message?: string;
+    error?: string;
     raw?: any;
 }
 
