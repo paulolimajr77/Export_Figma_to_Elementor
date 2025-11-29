@@ -9,3 +9,4 @@
 - 29/11/2025: UI reforcada com seletor de provedor IA, modelos GPT detalhados e persistencia em aiProvider/gptApiKey/gptModel; test OpenAI mapeando 401/404/429; pipeline alterna Gemini/GPT conforme configuracao.
 - 29/11/2025: Fallback para containers sem auto layout/tipo invalido: mantidos como flex column quando auto_fix_layout estiver ativo, em vez de converter para custom.
 - 29/11/2025: Checkbox na UI para habilitar auto_fix_layout persistente e protecao da copia (clipboard opcional).
+- 29/11/2025: Ajuste de compatibilidade de paste: siteurl preenchido, flex_gap default, alinhamentos default e isLocked=false nos containers/widgets.
