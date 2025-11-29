@@ -47,13 +47,33 @@
   };
 
   // src/utils/image_utils.ts
+  function rgbToHex(rgb) {
+    const toHex = (c) => {
+      const hex = Math.round(c * 255).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    };
+    return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+  }
   var init_image_utils = __esm({
     "src/utils/image_utils.ts"() {
     }
   });
 
   // src/utils/serialization_utils.ts
+  function getFontWeight(style) {
+    style = (style || "").toLowerCase();
+    if (style.includes("thin")) return 100;
+    if (style.includes("extra light") || style.includes("extralight")) return 200;
+    if (style.includes("light")) return 300;
+    if (style.includes("medium")) return 500;
+    if (style.includes("semi bold") || style.includes("semibold")) return 600;
+    if (style.includes("bold")) return 700;
+    if (style.includes("extra bold") || style.includes("extrabold")) return 800;
+    if (style.includes("black") || style.includes("heavy")) return 900;
+    return 400;
+  }
   function serializeNode(node, parentId) {
+    var _a;
     const data = {
       id: node.id,
       name: node.name,
@@ -132,7 +152,7 @@
       data.characters = node.characters;
       data.fontSize = node.fontSize;
       data.fontName = node.fontName;
-      data.fontWeight = node.fontWeight;
+      data.fontWeight = getFontWeight((_a = node.fontName) == null ? void 0 : _a.style);
       data.textAlignHorizontal = node.textAlignHorizontal;
       data.textAlignVertical = node.textAlignVertical;
       data.textAutoResize = node.textAutoResize;
@@ -217,6 +237,134 @@
   var init_serialization_utils = __esm({
     "src/utils/serialization_utils.ts"() {
       init_image_utils();
+    }
+  });
+
+  // src/utils/style_utils.ts
+  function buildHtmlFromSegments(node) {
+    if (!node.styledTextSegments || node.styledTextSegments.length === 0) return { html: node.characters || "", css: "" };
+    const cssRules = /* @__PURE__ */ new Set();
+    const baseFontSize = node.fontSize;
+    const baseFontWeight = node.fontWeight;
+    const baseTextDecoration = node.textDecoration;
+    let baseColorHex = "";
+    if (node.fills && Array.isArray(node.fills) && node.fills.length > 0) {
+      const solid = node.fills.find((f) => f.type === "SOLID");
+      if (solid && solid.color) {
+        baseColorHex = rgbToHex(solid.color).replace("#", "").toLowerCase();
+      }
+    }
+    const html = node.styledTextSegments.map((seg) => {
+      const classes = [];
+      let inlineStyle = "";
+      let segColorHex = "";
+      let segColorObj = null;
+      if (seg.fills && Array.isArray(seg.fills) && seg.fills.length > 0) {
+        const solid = seg.fills.find((f) => f.type === "SOLID");
+        if (solid && solid.color) {
+          segColorObj = solid;
+          segColorHex = rgbToHex(solid.color).replace("#", "").toLowerCase();
+        }
+      }
+      if (segColorHex && segColorHex !== baseColorHex) {
+        const { r, g, b } = segColorObj.color;
+        const a = segColorObj.opacity !== void 0 ? segColorObj.opacity : 1;
+        const className = `color-${segColorHex}`;
+        classes.push(className);
+        cssRules.add(`.${className} { color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a}); }`);
+      }
+      if (seg.fontSize && seg.fontSize !== baseFontSize) {
+        inlineStyle += `font-size: ${seg.fontSize}px;`;
+      }
+      if (seg.fontWeight && seg.fontWeight !== baseFontWeight) {
+        inlineStyle += `font-weight: ${seg.fontWeight};`;
+      }
+      if (seg.textDecoration !== baseTextDecoration) {
+        if (seg.textDecoration === "UNDERLINE") inlineStyle += "text-decoration: underline;";
+        if (seg.textDecoration === "STRIKETHROUGH") inlineStyle += "text-decoration: line-through;";
+      }
+      if (classes.length === 0 && !inlineStyle) {
+        return seg.characters;
+      }
+      const classAttr = classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
+      const styleAttr = inlineStyle ? ` style="${inlineStyle}"` : "";
+      return `<span${classAttr}${styleAttr}>${seg.characters}</span>`;
+    }).join("").replace(/\n/g, "<br>");
+    return { html, css: Array.from(cssRules).join("\n") };
+  }
+  function extractWidgetStyles(node) {
+    const styles = {
+      sourceId: node.id,
+      sourceName: node.name
+    };
+    if (node.fontSize) styles.fontSize = node.fontSize;
+    if (node.fontName) styles.fontName = node.fontName;
+    if (node.fontWeight) styles.fontWeight = node.fontWeight;
+    if (node.textDecoration) styles.textDecoration = node.textDecoration;
+    if (node.textCase) styles.textCase = node.textCase;
+    if (node.lineHeight) styles.lineHeight = node.lineHeight;
+    if (node.letterSpacing) styles.letterSpacing = node.letterSpacing;
+    if (node.textAlignHorizontal) {
+      const map = { LEFT: "left", CENTER: "center", RIGHT: "right", JUSTIFIED: "justify" };
+      styles.align = map[node.textAlignHorizontal] || "left";
+    }
+    if (node.fills && Array.isArray(node.fills)) {
+      const solid = node.fills.find((f) => f.type === "SOLID");
+      if (solid && solid.color) {
+        styles.color = solid.color;
+      }
+    }
+    if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+      const rich = buildHtmlFromSegments(node);
+      styles.customCss = rich.css;
+    }
+    return styles;
+  }
+  function extractContainerStyles(node) {
+    const styles = {
+      sourceId: node.id,
+      sourceName: node.name
+    };
+    if (typeof node.itemSpacing === "number") styles.gap = node.itemSpacing;
+    if (typeof node.paddingTop === "number" || typeof node.paddingRight === "number" || typeof node.paddingBottom === "number" || typeof node.paddingLeft === "number") {
+      styles.paddingTop = node.paddingTop || 0;
+      styles.paddingRight = node.paddingRight || 0;
+      styles.paddingBottom = node.paddingBottom || 0;
+      styles.paddingLeft = node.paddingLeft || 0;
+    }
+    const fills = node.fills;
+    if (Array.isArray(fills) && fills.length > 0) {
+      const solid = fills.find((f) => f.type === "SOLID" && f.color);
+      if (solid) {
+        const { r, g, b } = solid.color;
+        const a = solid.opacity !== void 0 ? solid.opacity : 1;
+        styles.background = { color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})` };
+      }
+    }
+    if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
+      const stroke = node.strokes.find((s) => s.type === "SOLID" && s.visible !== false);
+      if (stroke) {
+        const { r, g, b } = stroke.color;
+        const a = stroke.opacity !== void 0 ? stroke.opacity : 1;
+        styles.border = {
+          type: "solid",
+          width: node.strokeWeight,
+          color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`,
+          radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 0
+        };
+      }
+    } else if (typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
+      styles.border = { radius: node.cornerRadius };
+    }
+    const justifyMap = { MIN: "start", CENTER: "center", MAX: "end", SPACE_BETWEEN: "space-between" };
+    const alignMap = { MIN: "start", CENTER: "center", MAX: "end", STRETCH: "stretch" };
+    if (node.primaryAxisAlignItems) styles.justify_content = justifyMap[node.primaryAxisAlignItems] || void 0;
+    if (node.counterAxisAlignItems) styles.align_items = alignMap[node.counterAxisAlignItems] || void 0;
+    return styles;
+  }
+  var init_style_utils = __esm({
+    "src/utils/style_utils.ts"() {
+      init_serialization_utils();
     }
   });
 
@@ -1017,9 +1165,15 @@ ${JSON.stringify(input.snapshot)}` }
           return out;
         }
         compileWidget(widget) {
-          var _a, _b;
+          var _a, _b, _c, _d;
           const widgetId = generateGUID();
           const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
+          if ((_a = widget.styles) == null ? void 0 : _a.customCss) {
+            baseSettings.custom_css = widget.styles.customCss;
+          }
+          if ((_b = widget.styles) == null ? void 0 : _b.align) {
+            baseSettings.align = widget.styles.align;
+          }
           const registryResult = compileWithRegistry(widget, baseSettings);
           if (registryResult) {
             return {
@@ -1036,13 +1190,13 @@ ${JSON.stringify(input.snapshot)}` }
             case "heading":
               widgetType = "heading";
               settings.title = widget.content || "Heading";
-              if ((_a = widget.styles) == null ? void 0 : _a.color) settings.title_color = this.sanitizeColor(widget.styles.color);
+              if ((_c = widget.styles) == null ? void 0 : _c.color) settings.title_color = this.sanitizeColor(widget.styles.color);
               Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
               break;
             case "text":
               widgetType = "text-editor";
               settings.editor = widget.content || "Text";
-              if ((_b = widget.styles) == null ? void 0 : _b.color) settings.text_color = this.sanitizeColor(widget.styles.color);
+              if ((_d = widget.styles) == null ? void 0 : _d.color) settings.text_color = this.sanitizeColor(widget.styles.color);
               Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
               break;
             case "button":
@@ -1429,6 +1583,7 @@ INSTRU\xC7\xD5ES:
   var init_pipeline = __esm({
     "src/pipeline.ts"() {
       init_serialization_utils();
+      init_style_utils();
       init_api_gemini();
       init_elementor_compiler();
       init_uploader();
@@ -1452,6 +1607,7 @@ INSTRU\xC7\xD5ES:
             this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
             validatePipelineSchema(schema);
             yield this.resolveImages(schema, normalizedWP);
+            this.hydrateStyles(schema, preprocessed.flatNodes);
             const elementorJson = this.compiler.compile(schema);
             if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
             validateElementorJSON(elementorJson);
@@ -1501,7 +1657,7 @@ INSTRU\xC7\xD5ES:
             const solidFill = fills.find((f) => f.type === "SOLID");
             if (solidFill == null ? void 0 : solidFill.color) {
               const { r, g, b } = solidFill.color;
-              const toHex = (c) => Math.round(c * 255).toString(16).padStart(2, "0");
+              const toHex = (c) => ("0" + Math.round(c * 255).toString(16)).slice(-2);
               const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
               return { primaryColor: hex, secondaryColor: "#FFFFFF" };
             }
@@ -1575,6 +1731,54 @@ INSTRU\xC7\xD5ES:
               yield Promise.all(uploadPromises);
             }
           });
+        }
+        hydrateStyles(schema, flatNodes) {
+          const nodeMap = new Map(flatNodes.map((n) => [n.id, n]));
+          const processContainer = (container) => {
+            var _a, _b;
+            if ((_a = container.styles) == null ? void 0 : _a.sourceId) {
+              const node = nodeMap.get(container.styles.sourceId);
+              if (node) {
+                const realStyles = extractContainerStyles(node);
+                container.styles = __spreadValues(__spreadValues({}, container.styles), realStyles);
+                if (realStyles.paddingTop !== void 0) container.styles.paddingTop = realStyles.paddingTop;
+                if (realStyles.paddingRight !== void 0) container.styles.paddingRight = realStyles.paddingRight;
+                if (realStyles.paddingBottom !== void 0) container.styles.paddingBottom = realStyles.paddingBottom;
+                if (realStyles.paddingLeft !== void 0) container.styles.paddingLeft = realStyles.paddingLeft;
+                if (realStyles.gap !== void 0) container.styles.gap = realStyles.gap;
+              }
+            }
+            if (container.widgets) {
+              for (const widget of container.widgets) {
+                if ((_b = widget.styles) == null ? void 0 : _b.sourceId) {
+                  const node = nodeMap.get(widget.styles.sourceId);
+                  if (node) {
+                    const realStyles = extractWidgetStyles(node);
+                    widget.styles = __spreadValues(__spreadValues({}, widget.styles), realStyles);
+                    if (node.type === "TEXT" && (widget.type === "heading" || widget.type === "text")) {
+                      if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+                        const rich = buildHtmlFromSegments(node);
+                        widget.content = rich.html;
+                        widget.styles.customCss = rich.css;
+                      } else {
+                        widget.content = node.characters || node.name;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            if (container.children) {
+              for (const child of container.children) {
+                processContainer(child);
+              }
+            }
+          };
+          if (schema.containers) {
+            for (const c of schema.containers) {
+              processContainer(c);
+            }
+          }
         }
         normalizeContainers(containers) {
           const logWarn = (message) => {
@@ -1838,34 +2042,6 @@ ${JSON.stringify(input.snapshot)}` }
     }
     return false;
   }
-  function isSolidColor(node) {
-    const fills = node == null ? void 0 : node.fills;
-    if (!Array.isArray(fills) || fills.length === 0) return void 0;
-    const solid = fills.find((f) => f.type === "SOLID" && f.color);
-    if (!solid) return void 0;
-    const { r, g, b, a = 1 } = solid.color || {};
-    const to255 = (v) => Math.round((v || 0) * 255);
-    return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
-  }
-  function buildHtmlFromSegments(node) {
-    if (!node.styledTextSegments || node.styledTextSegments.length === 0) return node.characters || "";
-    return node.styledTextSegments.map((seg) => {
-      let style = "";
-      if (seg.fills && Array.isArray(seg.fills) && seg.fills.length > 0) {
-        const solid = seg.fills.find((f) => f.type === "SOLID");
-        if (solid && solid.color) {
-          const { r, g, b } = solid.color;
-          const a = solid.opacity !== void 0 ? solid.opacity : 1;
-          style += `color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a});`;
-        }
-      }
-      if (seg.fontSize) style += `font-size: ${seg.fontSize}px;`;
-      if (seg.fontWeight) style += `font-weight: ${seg.fontWeight};`;
-      if (seg.textDecoration === "UNDERLINE") style += "text-decoration: underline;";
-      if (seg.textDecoration === "STRIKETHROUGH") style += "text-decoration: line-through;";
-      return `<span style="${style}">${seg.characters}</span>`;
-    }).join("").replace(/\n/g, "<br>");
-  }
   function detectWidget(node) {
     var _a, _b;
     const name = (node.name || "").toLowerCase();
@@ -1917,13 +2093,33 @@ ${JSON.stringify(input.snapshot)}` }
       }
     }
     if (node.type === "TEXT") {
-      const isHeading = node.fontSize >= 26 || name.includes("heading") || name.includes("title");
+      const charCount = (node.characters || "").length;
+      const hasNewLines = (node.characters || "").includes("\n");
+      const isExplicitText = name.includes("text") || name.includes("paragraph") || name.includes("desc");
+      const isExplicitHeading = name.includes("heading") || name.includes("title");
+      let isHeading = true;
+      if (isExplicitText) {
+        isHeading = false;
+      } else if (isExplicitHeading) {
+        isHeading = true;
+      } else {
+        if (charCount > 200 || hasNewLines && charCount > 60) {
+          isHeading = false;
+        }
+      }
       if (name.includes("button") || name.includes("btn")) {
         return { type: "button", content: node.characters || node.name, imageId: null, styles };
       }
+      const extractedStyles = extractWidgetStyles(node);
+      Object.assign(styles, extractedStyles);
+      let content = node.characters || node.name;
+      if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+        const rich = buildHtmlFromSegments(node);
+        content = rich.html;
+      }
       return {
         type: isHeading ? "heading" : "text",
-        content: node.styledTextSegments && node.styledTextSegments.length > 1 ? buildHtmlFromSegments(node) : node.characters || node.name,
+        content,
         imageId: null,
         styles
       };
@@ -1978,47 +2174,9 @@ ${JSON.stringify(input.snapshot)}` }
     }
     return null;
   }
-  function mapAlignment(primary, counter) {
-    const justifyMap = { MIN: "start", CENTER: "center", MAX: "end", SPACE_BETWEEN: "space-between" };
-    const alignMap = { MIN: "start", CENTER: "center", MAX: "end", STRETCH: "stretch" };
-    return {
-      justify_content: justifyMap[primary || ""] || void 0,
-      align_items: alignMap[counter || ""] || void 0
-    };
-  }
   function toContainer(node) {
     const direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
-    const styles = {
-      sourceId: node.id,
-      sourceName: node.name
-    };
-    if (typeof node.itemSpacing === "number") styles.gap = node.itemSpacing;
-    if (typeof node.paddingTop === "number" || typeof node.paddingRight === "number" || typeof node.paddingBottom === "number" || typeof node.paddingLeft === "number") {
-      styles.paddingTop = node.paddingTop || 0;
-      styles.paddingRight = node.paddingRight || 0;
-      styles.paddingBottom = node.paddingBottom || 0;
-      styles.paddingLeft = node.paddingLeft || 0;
-    }
-    const bg = isSolidColor(node);
-    if (bg) styles.background = { color: bg };
-    if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
-      const stroke = node.strokes.find((s) => s.type === "SOLID" && s.visible !== false);
-      if (stroke) {
-        const { r, g, b } = stroke.color;
-        const a = stroke.opacity !== void 0 ? stroke.opacity : 1;
-        styles.border = {
-          type: "solid",
-          width: node.strokeWeight,
-          color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`,
-          radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 0
-        };
-      }
-    } else if (typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
-      styles.border = { radius: node.cornerRadius };
-    }
-    const align = mapAlignment(node.primaryAxisAlignItems, node.counterAxisAlignItems);
-    if (align.justify_content) styles.justify_content = align.justify_content;
-    if (align.align_items) styles.align_items = align.align_items;
+    const styles = extractContainerStyles(node);
     const widgets = [];
     const childrenContainers = [];
     const childNodes = Array.isArray(node.children) ? node.children : [];
@@ -2070,6 +2228,7 @@ ${JSON.stringify(input.snapshot)}` }
   var vectorTypes;
   var init_noai_parser = __esm({
     "src/pipeline/noai.parser.ts"() {
+      init_style_utils();
       vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE"];
     }
   });

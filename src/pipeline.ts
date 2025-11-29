@@ -1,4 +1,5 @@
 import { serializeNode, SerializedNode } from './utils/serialization_utils';
+import { extractWidgetStyles, extractContainerStyles, buildHtmlFromSegments } from './utils/style_utils';
 import { geminiProvider } from './api_gemini';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
@@ -52,6 +53,7 @@ export class ConversionPipeline {
         validatePipelineSchema(schema);
 
         await this.resolveImages(schema, normalizedWP);
+        this.hydrateStyles(schema, preprocessed.flatNodes);
 
         const elementorJson = this.compiler.compile(schema);
         if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
@@ -108,7 +110,7 @@ export class ConversionPipeline {
             const solidFill = fills.find((f: any) => f.type === 'SOLID');
             if (solidFill?.color) {
                 const { r, g, b } = solidFill.color;
-                const toHex = (c: number) => Math.round(c * 255).toString(16).padStart(2, '0');
+                const toHex = (c: number) => ('0' + Math.round(c * 255).toString(16)).slice(-2);
                 const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
                 return { primaryColor: hex, secondaryColor: '#FFFFFF' };
             }
@@ -188,6 +190,72 @@ export class ConversionPipeline {
 
         if (uploadPromises.length > 0) {
             await Promise.all(uploadPromises);
+        }
+    }
+
+    private hydrateStyles(schema: PipelineSchema, flatNodes: SerializedNode[]): void {
+        const nodeMap = new Map(flatNodes.map(n => [n.id, n]));
+
+        const processContainer = (container: PipelineContainer) => {
+            // Hydrate Container Styles
+            if (container.styles?.sourceId) {
+                const node = nodeMap.get(container.styles.sourceId);
+                if (node) {
+                    const realStyles = extractContainerStyles(node);
+                    // Merge: AI styles override real styles? No, real styles should be truth for visual properties.
+                    // But AI might have set layout direction.
+                    // Let's merge realStyles INTO container.styles, preserving existing keys if they are structural,
+                    // but ensuring visual fidelity.
+                    container.styles = { ...container.styles, ...realStyles };
+
+                    // Also enforce direction/gap if needed, but AI usually handles structure. 
+                    // Let's trust AI for structure (direction) but enforce visual (border, background, padding).
+                    if (realStyles.paddingTop !== undefined) container.styles.paddingTop = realStyles.paddingTop;
+                    if (realStyles.paddingRight !== undefined) container.styles.paddingRight = realStyles.paddingRight;
+                    if (realStyles.paddingBottom !== undefined) container.styles.paddingBottom = realStyles.paddingBottom;
+                    if (realStyles.paddingLeft !== undefined) container.styles.paddingLeft = realStyles.paddingLeft;
+                    if (realStyles.gap !== undefined) container.styles.gap = realStyles.gap;
+                }
+            }
+
+            // Process Widgets
+            if (container.widgets) {
+                for (const widget of container.widgets) {
+                    if (widget.styles?.sourceId) {
+                        const node = nodeMap.get(widget.styles.sourceId);
+                        if (node) {
+                            const realStyles = extractWidgetStyles(node);
+                            widget.styles = { ...widget.styles, ...realStyles };
+
+                            // Rich Text / Custom CSS override
+                            if (node.type === 'TEXT' && (widget.type === 'heading' || widget.type === 'text')) {
+                                if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+                                    const rich = buildHtmlFromSegments(node);
+                                    widget.content = rich.html;
+                                    widget.styles.customCss = rich.css;
+                                } else {
+                                    // Ensure content is up to date with node if it's simple text
+                                    // (Optional, AI might have summarized it, but usually we want exact text)
+                                    widget.content = (node as any).characters || node.name;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Recurse
+            if (container.children) {
+                for (const child of container.children) {
+                    processContainer(child);
+                }
+            }
+        };
+
+        if (schema.containers) {
+            for (const c of schema.containers) {
+                processContainer(c);
+            }
         }
     }
 

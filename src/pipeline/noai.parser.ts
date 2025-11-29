@@ -1,4 +1,5 @@
-import type { SerializedNode } from '../utils/serialization_utils';
+import { SerializedNode, rgbToHex } from '../utils/serialization_utils';
+import { extractWidgetStyles, extractContainerStyles, buildHtmlFromSegments } from '../utils/style_utils';
 import type { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
 
 type MaybeWidget = PipelineWidget | null;
@@ -44,31 +45,6 @@ function isSolidColor(node: any): string | undefined {
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
 }
 
-function buildHtmlFromSegments(node: SerializedNode): string {
-    if (!node.styledTextSegments || node.styledTextSegments.length === 0) return node.characters || '';
-
-    return node.styledTextSegments.map(seg => {
-        let style = '';
-        // Color
-        if (seg.fills && Array.isArray(seg.fills) && seg.fills.length > 0) {
-            const solid = seg.fills.find(f => f.type === 'SOLID');
-            if (solid && solid.color) {
-                const { r, g, b } = solid.color;
-                const a = solid.opacity !== undefined ? solid.opacity : 1;
-                style += `color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a});`;
-            }
-        }
-        // Font Size
-        if (seg.fontSize) style += `font-size: ${seg.fontSize}px;`;
-        // Font Weight
-        if (seg.fontWeight) style += `font-weight: ${seg.fontWeight};`;
-        // Decoration
-        if (seg.textDecoration === 'UNDERLINE') style += 'text-decoration: underline;';
-        if (seg.textDecoration === 'STRIKETHROUGH') style += 'text-decoration: line-through;';
-
-        return `<span style="${style}">${seg.characters}</span>`;
-    }).join('').replace(/\n/g, '<br>');
-}
 
 function detectWidget(node: SerializedNode): MaybeWidget {
     const name = (node.name || '').toLowerCase();
@@ -132,13 +108,47 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
     // Text
     if (node.type === 'TEXT') {
-        const isHeading = (node as any).fontSize >= 26 || name.includes('heading') || name.includes('title');
+        // Prioritize Heading for short text (titles, labels) unless explicitly named otherwise
+        // Use Text Editor for long text or multiple paragraphs
+        const charCount = (node.characters || '').length;
+        const hasNewLines = (node.characters || '').includes('\n');
+
+        // Heuristic: If it's short (< 200 chars) and doesn't have many newlines, treat as Heading.
+        // Unless it's explicitly named "text" or "paragraph".
+        const isExplicitText = name.includes('text') || name.includes('paragraph') || name.includes('desc');
+        const isExplicitHeading = name.includes('heading') || name.includes('title');
+
+        let isHeading = true; // Default to heading for better Elementor performance/SEO usually
+
+        if (isExplicitText) {
+            isHeading = false;
+        } else if (isExplicitHeading) {
+            isHeading = true;
+        } else {
+            // Auto-detect
+            if (charCount > 200 || (hasNewLines && charCount > 60)) {
+                isHeading = false;
+            }
+        }
+
         if (name.includes('button') || name.includes('btn')) {
             return { type: 'button', content: node.characters || node.name, imageId: null, styles };
         }
+        // Populate styles with text properties
+        const extractedStyles = extractWidgetStyles(node);
+        Object.assign(styles, extractedStyles);
+
+        let content = (node as any).characters || node.name;
+
+        if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+            const rich = buildHtmlFromSegments(node);
+            content = rich.html;
+            // customCss already in extractedStyles
+        }
+
         return {
             type: isHeading ? 'heading' : 'text',
-            content: (node.styledTextSegments && node.styledTextSegments.length > 1) ? buildHtmlFromSegments(node) : ((node as any).characters || node.name),
+            content,
             imageId: null,
             styles
         };
@@ -204,56 +214,11 @@ function detectWidget(node: SerializedNode): MaybeWidget {
     return null;
 }
 
-function mapAlignment(primary?: string, counter?: string) {
-    const justifyMap: Record<string, string> = { MIN: 'start', CENTER: 'center', MAX: 'end', SPACE_BETWEEN: 'space-between' };
-    const alignMap: Record<string, string> = { MIN: 'start', CENTER: 'center', MAX: 'end', STRETCH: 'stretch' };
-    return {
-        justify_content: justifyMap[primary || ''] || undefined,
-        align_items: alignMap[counter || ''] || undefined
-    };
-}
+
 
 function toContainer(node: SerializedNode): PipelineContainer {
     const direction = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
-    const styles: Record<string, any> = {
-        sourceId: node.id,
-        sourceName: node.name
-    };
-    if (typeof node.itemSpacing === 'number') styles.gap = node.itemSpacing;
-    if (
-        typeof node.paddingTop === 'number' ||
-        typeof node.paddingRight === 'number' ||
-        typeof node.paddingBottom === 'number' ||
-        typeof node.paddingLeft === 'number'
-    ) {
-        styles.paddingTop = node.paddingTop || 0;
-        styles.paddingRight = node.paddingRight || 0;
-        styles.paddingBottom = node.paddingBottom || 0;
-        styles.paddingLeft = node.paddingLeft || 0;
-    }
-    const bg = isSolidColor(node);
-    if (bg) styles.background = { color: bg };
-
-    // Borders
-    if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
-        const stroke = node.strokes.find((s: any) => s.type === 'SOLID' && s.visible !== false);
-        if (stroke) {
-            const { r, g, b } = stroke.color;
-            const a = stroke.opacity !== undefined ? stroke.opacity : 1;
-            styles.border = {
-                type: 'solid',
-                width: node.strokeWeight,
-                color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`,
-                radius: typeof node.cornerRadius === 'number' ? node.cornerRadius : 0
-            };
-        }
-    } else if (typeof node.cornerRadius === 'number' && node.cornerRadius > 0) {
-        styles.border = { radius: node.cornerRadius };
-    }
-
-    const align = mapAlignment((node as any).primaryAxisAlignItems, (node as any).counterAxisAlignItems);
-    if (align.justify_content) styles.justify_content = align.justify_content;
-    if (align.align_items) styles.align_items = align.align_items;
+    const styles = extractContainerStyles(node);
 
     const widgets: PipelineWidget[] = [];
     const childrenContainers: PipelineContainer[] = [];

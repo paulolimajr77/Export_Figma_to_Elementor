@@ -1,6 +1,20 @@
 /// <reference types="@figma/plugin-typings" />
 import type { LayoutAnalysis, ChildNode } from '../api_gemini';
 import { rgbToHex } from './image_utils';
+export { rgbToHex };
+
+function getFontWeight(style: string): number {
+    style = (style || '').toLowerCase();
+    if (style.includes('thin')) return 100;
+    if (style.includes('extra light') || style.includes('extralight')) return 200;
+    if (style.includes('light')) return 300;
+    if (style.includes('medium')) return 500;
+    if (style.includes('semi bold') || style.includes('semibold')) return 600;
+    if (style.includes('bold')) return 700;
+    if (style.includes('extra bold') || style.includes('extrabold')) return 800;
+    if (style.includes('black') || style.includes('heavy')) return 900;
+    return 400;
+}
 
 export interface SerializedNode {
     id: string;
@@ -124,7 +138,7 @@ export function serializeNode(node: SceneNode, parentId?: string): SerializedNod
         data.characters = (node as any).characters;
         data.fontSize = (node as any).fontSize;
         data.fontName = (node as any).fontName;
-        data.fontWeight = (node as any).fontWeight;
+        data.fontWeight = getFontWeight((node as any).fontName?.style);
         data.textAlignHorizontal = (node as any).textAlignHorizontal;
         data.textAlignVertical = (node as any).textAlignVertical;
         data.textAutoResize = (node as any).textAutoResize;

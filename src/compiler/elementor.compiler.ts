@@ -168,6 +168,14 @@ export class ElementorCompiler {
         const widgetId = generateGUID();
         const baseSettings: ElementorSettings = { _element_id: widgetId, ...this.sanitizeSettings(widget.styles || {}) };
 
+        if (widget.styles?.customCss) {
+            baseSettings.custom_css = widget.styles.customCss;
+        }
+
+        if (widget.styles?.align) {
+            baseSettings.align = widget.styles.align;
+        }
+
         // Tenta registry primeiro (baseado em type/kind)
         const registryResult = compileWithRegistry(widget, baseSettings);
         if (registryResult) {
