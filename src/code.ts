@@ -24,23 +24,7 @@ function getActiveProvider(providerId?: string): SchemaProvider {
 
 function collectLayoutWarnings(node: any): string[] {
     const warnings: string[] = [];
-    const hasAutoLayout = node.layoutMode === 'HORIZONTAL' || node.layoutMode === 'VERTICAL';
-    const nameLower = (node.name || '').toLowerCase();
-    const looksLikeContainer = nameLower.startsWith('c:') || nameLower.includes('container');
-
-    if (looksLikeContainer && !hasAutoLayout) {
-        const snippet = typeof node.characters === 'string' ? ` Texto: "${node.characters.slice(0, 80)}"` : '';
-        warnings.push(`Node ${node.id} (${node.name}) sem auto layout; pode gerar container com direction invalido.${snippet}`);
-        focusNode(node.id);
-        sendLayoutWarning(node, `Node ${node.id} (${node.name}) sem auto layout; pode gerar container invalido.${snippet}`);
-    }
-
-    if (node.type && node.type !== 'FRAME' && node.type !== 'GROUP' && looksLikeContainer) {
-        const snippet = typeof node.characters === 'string' ? ` Texto: "${node.characters.slice(0, 80)}"` : '';
-        warnings.push(`Node ${node.id} (${node.name}) e do tipo ${node.type}; nao deve ser container. Considere w:icon ou w:custom.${snippet}`);
-        focusNode(node.id);
-        sendLayoutWarning(node, `Node ${node.id} (${node.name}) tipo ${node.type} pode ser widget, nao container.${snippet}`);
-    }
+    // Auto Layout validation removed as per user request.
 
     if (Array.isArray((node as any).children)) {
         (node as any).children.forEach((child: any) => warnings.push(...collectLayoutWarnings(child)));
@@ -276,14 +260,39 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
     const uploadPromises: Promise<void>[] = [];
 
     const processWidget = async (widget: any) => {
-        if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon')) {
+        if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box')) {
             try {
                 const node = figma.getNodeById(widget.imageId);
                 if (node) {
-                    const format = widget.type === 'icon' ? 'SVG' : 'WEBP';
+                    let format = (widget.type === 'icon' || widget.type === 'icon-box') ? 'SVG' : 'WEBP';
+
+                    // Smart Format Detection (Mirroring Pipeline logic)
+                    const isVectorNode = (n: SceneNode) =>
+                        n.type === 'VECTOR' || n.type === 'STAR' || n.type === 'ELLIPSE' ||
+                        n.type === 'POLYGON' || n.type === 'BOOLEAN_OPERATION' || n.type === 'LINE';
+
+                    const hasVectorChildren = (n: SceneNode): boolean => {
+                        if (isVectorNode(n)) return true;
+                        if ('children' in n) {
+                            return n.children.some(c => hasVectorChildren(c));
+                        }
+                        return false;
+                    };
+
+                    if (('locked' in node && node.locked) || hasVectorChildren(node as SceneNode)) {
+                        format = 'SVG';
+                    }
                     const result = await noaiUploader.uploadToWordPress(node as SceneNode, format as any);
                     if (result) {
-                        widget.content = result.url;
+                        if (widget.type === 'image-box') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.image_url = result.url;
+                        } else if (widget.type === 'icon-box') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.selected_icon = { value: result.url, library: 'svg' };
+                        } else {
+                            widget.content = result.url;
+                        }
                         widget.imageId = result.id.toString();
                     }
                 }

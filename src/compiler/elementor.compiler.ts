@@ -137,8 +137,10 @@ export class ElementorCompiler {
 
     private mapTypography(styles: Record<string, any>, prefix: string = 'typography'): ElementorSettings {
         const s: ElementorSettings = {};
-        if (styles.fontName) {
+        if (styles.fontName || styles.fontSize || styles.fontWeight || styles.lineHeight || styles.letterSpacing) {
             s[`${prefix}_typography`] = 'custom';
+        }
+        if (styles.fontName) {
             s[`${prefix}_font_family`] = styles.fontName.family;
             s[`${prefix}_font_weight`] = styles.fontWeight || 400;
         }
@@ -167,6 +169,7 @@ export class ElementorCompiler {
     private compileWidget(widget: PipelineWidget): ElementorElement {
         const widgetId = generateGUID();
         const baseSettings: ElementorSettings = { _element_id: widgetId, ...this.sanitizeSettings(widget.styles || {}) };
+        Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
 
         if (widget.styles?.customCss) {
             baseSettings.custom_css = widget.styles.customCss;
@@ -196,14 +199,12 @@ export class ElementorCompiler {
             case 'heading':
                 widgetType = 'heading';
                 settings.title = widget.content || 'Heading';
-                if (widget.styles?.color) settings.title_color = this.sanitizeColor(widget.styles.color);
-                Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
+                if (baseSettings.color) settings.title_color = baseSettings.color;
                 break;
             case 'text':
                 widgetType = 'text-editor';
-                settings.editor = widget.content || 'Text';
-                if (widget.styles?.color) settings.text_color = this.sanitizeColor(widget.styles.color);
-                Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
+                settings.editor = widget.content || '';
+                if (baseSettings.color) settings.text_color = baseSettings.color;
                 break;
             case 'button':
                 widgetType = 'button';

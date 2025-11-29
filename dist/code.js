@@ -88,6 +88,10 @@
     };
     if (node.locked) {
       data.isLockedImage = true;
+      if ("children" in node) {
+        data.children = [];
+      }
+      return data;
     }
     if ("opacity" in node) data.opacity = node.opacity;
     if ("blendMode" in node) data.blendMode = node.blendMode;
@@ -1139,8 +1143,10 @@ ${JSON.stringify(input.snapshot)}` }
         }
         mapTypography(styles, prefix = "typography") {
           const s = {};
-          if (styles.fontName) {
+          if (styles.fontName || styles.fontSize || styles.fontWeight || styles.lineHeight || styles.letterSpacing) {
             s[`${prefix}_typography`] = "custom";
+          }
+          if (styles.fontName) {
             s[`${prefix}_font_family`] = styles.fontName.family;
             s[`${prefix}_font_weight`] = styles.fontWeight || 400;
           }
@@ -1165,9 +1171,10 @@ ${JSON.stringify(input.snapshot)}` }
           return out;
         }
         compileWidget(widget) {
-          var _a, _b, _c, _d;
+          var _a, _b;
           const widgetId = generateGUID();
           const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
+          Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
           if ((_a = widget.styles) == null ? void 0 : _a.customCss) {
             baseSettings.custom_css = widget.styles.customCss;
           }
@@ -1190,14 +1197,12 @@ ${JSON.stringify(input.snapshot)}` }
             case "heading":
               widgetType = "heading";
               settings.title = widget.content || "Heading";
-              if ((_c = widget.styles) == null ? void 0 : _c.color) settings.title_color = this.sanitizeColor(widget.styles.color);
-              Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
+              if (baseSettings.color) settings.title_color = baseSettings.color;
               break;
             case "text":
               widgetType = "text-editor";
-              settings.editor = widget.content || "Text";
-              if ((_d = widget.styles) == null ? void 0 : _d.color) settings.text_color = this.sanitizeColor(widget.styles.color);
-              Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
+              settings.editor = widget.content || "";
+              if (baseSettings.color) settings.text_color = baseSettings.color;
               break;
             case "button":
               widgetType = "button";
@@ -1525,56 +1530,470 @@ ${JSON.stringify(input.snapshot)}` }
   });
 
   // src/config/prompts.ts
-  var ANALYZE_RECREATE_PROMPT;
+  var OPTIMIZE_SCHEMA_PROMPT;
   var init_prompts = __esm({
     "src/config/prompts.ts"() {
-      ANALYZE_RECREATE_PROMPT = `
-Organize a \xE1rvore Figma em um schema de CONTAINERS FLEX.
-
-REGRAS CR\xCDTICAS:
-- N\xE3o ignore nenhum node. Cada node vira container (se tiver filhos) ou widget (se for folha).
-- N\xE3o classifique por apar\xEAncia. Se n\xE3o souber, type = "custom".
-- N\xE3o invente grids ou sections/columns legados.
-- Preserve a ordem original dos filhos.
-- Auto layout: HORIZONTAL -> direction=row; VERTICAL/NONE -> direction=column.
-- gap = itemSpacing; padding = paddingTop/Right/Bottom/Left; background = fills/gradiente/imagem se houver.
-- styles deve incluir sourceId com o id do node original.
-- Modo sem IA: se o usu\xE1rio desligar IA, siga o mesmo schema usando apenas heur\xEDsticas (n\xE3o invente texto).
-
-WIDGETS PERMITIDOS (use exatamente estes tipos; se n\xE3o se encaixar, use "custom"):
-- B\xE1sicos: heading, text, button, image, icon, video, divider, spacer, image-box, icon-box, star-rating, counter, progress, tabs, accordion, toggle, alert, social-icons, soundcloud, shortcode, html, menu-anchor, sidebar, read-more, image-carousel, basic-gallery, gallery, icon-list, nav-menu, search-form, google-maps, testimonial, embed, lottie, loop:grid.
-- Pro: form, login, subscription, call-to-action, media:carousel, portfolio, gallery-pro, slider:slides, slideshow, flip-box, animated-headline, post-navigation, share-buttons, table-of-contents, countdown, blockquote, testimonial-carousel, review-box, hotspots, sitemap, author-box, price-table, price-list, progress-tracker, animated-text, nav-menu-pro, breadcrumb, facebook-button, facebook-comments, facebook-embed, facebook-page, loop:builder, loop:grid-advanced, loop:carousel, post-excerpt, post-content, post-title, post-info, post-featured-image, post-author, post-date, post-terms, archive-title, archive-description, site-logo, site-title, site-tagline, search-results, global-widget, video-playlist, video-gallery.
-- WooCommerce: woo:product-title, woo:product-image, woo:product-price, woo:product-add-to-cart, woo:product-data-tabs, woo:product-excerpt, woo:product-rating, woo:product-stock, woo:product-meta, woo:product-additional-information, woo:product-short-description, woo:product-related, woo:product-upsells, woo:product-tabs, woo:product-breadcrumb, woo:product-gallery, woo:products, woo:product-grid, woo:product-carousel, woo:product-loop-item, woo:loop-product-title, woo:loop-product-price, woo:loop-product-rating, woo:loop-product-image, woo:loop-product-button, woo:loop-product-meta, woo:cart, woo:checkout, woo:my-account, woo:purchase-summary, woo:order-tracking.
-- Loop Builder: loop:item, loop:image, loop:title, loop:meta, loop:terms, loop:rating, loop:price, loop:add-to-cart, loop:read-more, loop:featured-image, loop:pagination.
-- Experimentais: w:nested-tabs, w:mega-menu, w:scroll-snap, w:motion-effects, w:background-slideshow, w:css-transform, w:custom-position, w:dynamic-tags, w:ajax-pagination, w:aspect-ratio-container.
-- WordPress: w:wp-search, w:wp-recent-posts, w:wp-recent-comments, w:wp-archives, w:wp-categories, w:wp-calendar, w:wp-tag-cloud, w:wp-custom-menu.
-
-SCHEMA ALVO:
-{
-  "page": { "title": "...", "tokens": { "primaryColor": "...", "secondaryColor": "..." } },
-  "containers": [
-    {
-      "id": "string",
-      "direction": "row" | "column",
-      "width": "full" | "boxed",
-      "styles": { "sourceId": "id-original" },
-      "widgets": [ { "type": "um dos widgets acima ou custom", "content": "...", "imageId": null, "styles": { "sourceId": "id-do-node" } } ],
-      "children": [ ... ]
-    }
-  ]
-}
+      OPTIMIZE_SCHEMA_PROMPT = `
+Voc\xEA \xE9 um especialista em Elementor e Otimiza\xE7\xE3o Sem\xE2ntica.
+Sua tarefa \xE9 analisar um SCHEMA JSON existente (gerado por um algoritmo) e melhor\xE1-lo semanticamente.
 
 ENTRADA:
-\${nodeData}
+Um JSON representando uma estrutura de containers e widgets b\xE1sicos.
 
-INSTRU\xC7\xD5ES:
-- Mantenha textos e imagens exatamente como no original.
-- N\xE3o agrupe n\xF3s diferentes em um \xFAnico widget.
-- Se o node tem filhos -> container; se n\xE3o tem -> widget simples.
-- width use "full" (padr\xE3o); direction derive do layoutMode.
-- Se n\xE3o reconhecer o widget, classifique como "custom".
-- IMPORTANTE: Se um node tiver type="IMAGE" (mesmo que pare\xE7a container), trate como w:image e use seu ID como imageId.
+OBJETIVO:
+Identificar padr\xF5es visuais que correspondam a widgets Elementor mais ricos e substituir a estrutura b\xE1sica por esses widgets, MANTENDO OS DADOS E IDs.
+
+REGRAS CR\xCDTICAS (N\xC3O QUEBRE O SCHEMA):
+1.  **N\xC3O REMOVA IDs**: Os IDs (sourceId, id) s\xE3o fundamentais para o link com o Figma. Mantenha-os.
+2.  **N\xC3O ALTERE IMAGENS**: Se o input tem um widget type="image" com um imageId, MANTENHA-O. N\xE3o transforme em HTML ou Texto.
+3.  **N\xC3O ALTERE TEXTOS**: Mantenha o conte\xFAdo dos textos exato.
+
+TRANSFORMA\xC7\xD5ES DESEJADAS:
+-   **Icon List**: Se vir uma lista de containers onde cada um tem um \xCDcone + Texto -> Converta para widget "icon-list".
+-   **Image Box**: Se vir Container com Imagem + T\xEDtulo + Texto -> Converta para widget "image-box".
+-   **Icon Box**: Se vir Container com \xCDcone + T\xEDtulo + Texto -> Converta para widget "icon-box".
+-   **Gallery**: Se vir um Grid de Imagens -> Converta para "gallery" ou "basic-gallery".
+-   **Button**: Se vir um Container com Texto centralizado e cor de fundo -> Converta para "button".
+
+SA\xCDDA:
+Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 `;
+    }
+  });
+
+  // src/pipeline/noai.parser.ts
+  function isImageFill(node) {
+    const fills = node == null ? void 0 : node.fills;
+    if (!Array.isArray(fills)) return false;
+    return fills.some((f) => (f == null ? void 0 : f.type) === "IMAGE");
+  }
+  function findFirstImageId(node) {
+    if (!node) return null;
+    if (isImageFill(node)) return node.id || null;
+    const children = node.children;
+    if (Array.isArray(children)) {
+      for (const child of children) {
+        const found = findFirstImageId(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  function hasTextDeep(node) {
+    if (!node) return false;
+    if (node.type === "TEXT") return true;
+    const children = node.children;
+    if (Array.isArray(children)) {
+      return children.some((c) => hasTextDeep(c));
+    }
+    return false;
+  }
+  function hasIconDeep(node) {
+    if (!node) return false;
+    if (vectorTypes.includes(node.type)) return true;
+    const children = node.children;
+    if (Array.isArray(children)) {
+      return children.some((c) => hasIconDeep(c));
+    }
+    return false;
+  }
+  function isSolidColor(node) {
+    const fills = node == null ? void 0 : node.fills;
+    if (!Array.isArray(fills) || fills.length === 0) return void 0;
+    const solid = fills.find((f) => f.type === "SOLID" && f.color);
+    if (!solid) return void 0;
+    const { r, g, b, a = 1 } = solid.color || {};
+    const to255 = (v) => Math.round((v || 0) * 255);
+    return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
+  }
+  function calculateWidgetScore(node) {
+    const scores = [];
+    const name = (node.name || "").toLowerCase();
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const children = hasChildren ? node.children : [];
+    const hasImage = children.some((c) => isImageFill(c) || findFirstImageId(c));
+    const hasText = children.some((c) => hasTextDeep(c));
+    const hasIcon = children.some((c) => hasIconDeep(c));
+    const allImages = children.length > 0 && children.every((c) => isImageFill(c) || Array.isArray(c.children) && c.children.every((gr) => isImageFill(gr)));
+    const allIcons = children.length > 0 && children.every((c) => vectorTypes.includes(c.type));
+    const isHorizontal = node.layoutMode === "HORIZONTAL";
+    const isVertical = node.layoutMode === "VERTICAL";
+    const isGenericName = name.includes("container") || name.includes("frame") || name.includes("group") || name.includes("section") || name === "div";
+    const hasComplexChildren = children.some((c) => c.children && c.children.length > 1);
+    let imageBoxScore = 0;
+    if (hasImage) imageBoxScore += 30;
+    if (hasText) imageBoxScore += 20;
+    if (children.length <= 4) imageBoxScore += 10;
+    if (isVertical) imageBoxScore += 10;
+    if (name.includes("image") && name.includes("box")) imageBoxScore += 50;
+    if (isGenericName) imageBoxScore -= 30;
+    if (hasComplexChildren) imageBoxScore -= 30;
+    if (imageBoxScore > 0) scores.push({ type: "image-box", score: imageBoxScore, matchedFeatures: ["image", "text"] });
+    let iconBoxScore = 0;
+    if (hasIcon) iconBoxScore += 30;
+    if (hasText) iconBoxScore += 20;
+    if (children.length <= 4) iconBoxScore += 10;
+    if (name.includes("icon") && name.includes("box")) iconBoxScore += 50;
+    if (isGenericName) iconBoxScore -= 30;
+    if (hasComplexChildren) iconBoxScore -= 30;
+    if (iconBoxScore > 0) scores.push({ type: "icon-box", score: iconBoxScore, matchedFeatures: ["icon", "text"] });
+    let buttonScore = 0;
+    const bg = isSolidColor(node);
+    if (bg) buttonScore += 20;
+    if (children.length === 1 && children[0].type === "TEXT") buttonScore += 20;
+    if (children.length === 2 && hasText && hasIcon) buttonScore += 40;
+    if (node.primaryAxisAlignItems === "CENTER" && node.counterAxisAlignItems === "CENTER") buttonScore += 10;
+    if (name.includes("btn") || name.includes("button") || name.includes("link")) buttonScore += 50;
+    if (!hasImage && !hasIcon && !hasText) buttonScore = 0;
+    if (buttonScore > 0) scores.push({ type: "button", score: buttonScore, matchedFeatures: ["background", "text-icon"] });
+    let starScore = 0;
+    if (allIcons && children.length >= 3 && children.length <= 5) starScore += 30;
+    if (isHorizontal) starScore += 10;
+    if (name.includes("star") || name.includes("rating")) starScore += 50;
+    if (starScore > 0) scores.push({ type: "star-rating", score: starScore, matchedFeatures: ["icons", "horizontal"] });
+    let socialScore = 0;
+    if (isHorizontal) socialScore += 20;
+    if (allIcons || children.every((c) => c.type === "FRAME" || c.type === "GROUP")) socialScore += 20;
+    if (name.includes("social")) socialScore += 50;
+    if (socialScore > 0) scores.push({ type: "social-icons", score: socialScore, matchedFeatures: ["horizontal", "icons"] });
+    let testimonialScore = 0;
+    if (hasImage) testimonialScore += 20;
+    if (hasText) testimonialScore += 20;
+    if (name.includes("testimonial") || name.includes("review")) testimonialScore += 50;
+    if (testimonialScore > 0) scores.push({ type: "testimonial", score: testimonialScore, matchedFeatures: ["image", "text"] });
+    let galleryScore = 0;
+    if (allImages && children.length >= 3) galleryScore += 60;
+    if (name.includes("gallery")) galleryScore += 40;
+    if (galleryScore > 0) scores.push({ type: "basic-gallery", score: galleryScore, matchedFeatures: ["all-images"] });
+    let iconListScore = 0;
+    if (hasIcon && hasText && (children.length >= 3 || name.includes("list"))) iconListScore += 40;
+    if (name.includes("icon") && name.includes("list")) iconListScore += 40;
+    if (iconListScore > 0) scores.push({ type: "icon_list", score: iconListScore, matchedFeatures: ["icon", "text", "list"] });
+    let videoScore = 0;
+    if (name.includes("video") || name.includes("player")) videoScore += 40;
+    if (hasImage && children.some((c) => (c.name || "").toLowerCase().includes("play"))) videoScore += 40;
+    if (videoScore > 0) scores.push({ type: "video", score: videoScore, matchedFeatures: ["name", "play-icon"] });
+    let mapScore = 0;
+    if (name.includes("map") || name.includes("location")) mapScore += 50;
+    if (hasImage && name.includes("map")) mapScore += 20;
+    if (mapScore > 0) scores.push({ type: "google_maps", score: mapScore, matchedFeatures: ["name"] });
+    let dividerScore = 0;
+    if (name.includes("divider") || name.includes("separator") || name.includes("line")) dividerScore += 40;
+    if (!hasChildren && (node.type === "LINE" || node.type === "VECTOR" || node.type === "RECTANGLE") && (node.height <= 2 || node.width <= 2)) dividerScore += 30;
+    if (dividerScore > 0) scores.push({ type: "divider", score: dividerScore, matchedFeatures: ["name", "shape"] });
+    let spacerScore = 0;
+    if (name.includes("spacer") || name.includes("gap")) spacerScore += 50;
+    if (!hasChildren && !isImageFill(node) && !isSolidColor(node)) spacerScore += 20;
+    if (spacerScore > 0) scores.push({ type: "spacer", score: spacerScore, matchedFeatures: ["name", "empty"] });
+    let formScore = 0;
+    if (name.includes("form") && !name.includes("search")) formScore += 40;
+    const inputLike = children.filter((c) => (c.name || "").toLowerCase().includes("input") || (c.name || "").toLowerCase().includes("field"));
+    if (inputLike.length >= 1) formScore += 30;
+    if (children.some((c) => (c.name || "").toLowerCase().includes("submit") || (c.name || "").toLowerCase().includes("button"))) formScore += 20;
+    if (formScore > 0) scores.push({ type: "form", score: formScore, matchedFeatures: ["name", "inputs"] });
+    let loginScore = 0;
+    if (name.includes("login") || name.includes("signin")) loginScore += 50;
+    if (loginScore > 0) scores.push({ type: "login", score: loginScore, matchedFeatures: ["name"] });
+    let priceTableScore = 0;
+    if (name.includes("price") && name.includes("table")) priceTableScore += 60;
+    if (name.includes("pricing")) priceTableScore += 40;
+    if (hasText && children.some((c) => (c.name || "").toLowerCase().includes("price"))) priceTableScore += 20;
+    if (priceTableScore > 0) scores.push({ type: "price-table", score: priceTableScore, matchedFeatures: ["name"] });
+    let flipScore = 0;
+    if (name.includes("flip") && name.includes("box")) flipScore += 60;
+    if (flipScore > 0) scores.push({ type: "flip-box", score: flipScore, matchedFeatures: ["name"] });
+    let ctaScore = 0;
+    if (name.includes("cta") || name.includes("call to action")) ctaScore += 50;
+    if (hasImage && hasText && children.some((c) => (c.name || "").toLowerCase().includes("button"))) ctaScore += 20;
+    if (ctaScore > 0) scores.push({ type: "call-to-action", score: ctaScore, matchedFeatures: ["name", "structure"] });
+    let countdownScore = 0;
+    if (name.includes("countdown") || name.includes("timer")) countdownScore += 60;
+    if (countdownScore > 0) scores.push({ type: "countdown", score: countdownScore, matchedFeatures: ["name"] });
+    let wooTitleScore = 0;
+    if (name.includes("product") && name.includes("title")) wooTitleScore += 60;
+    if (wooTitleScore > 0) scores.push({ type: "woo:product-title", score: wooTitleScore, matchedFeatures: ["name"] });
+    let wooPriceScore = 0;
+    if (name.includes("product") && name.includes("price")) wooPriceScore += 60;
+    if (wooPriceScore > 0) scores.push({ type: "woo:product-price", score: wooPriceScore, matchedFeatures: ["name"] });
+    let wooCartScore = 0;
+    if (name.includes("add to cart") || name.includes("product") && name.includes("button")) wooCartScore += 60;
+    if (wooCartScore > 0) scores.push({ type: "woo:product-add-to-cart", score: wooCartScore, matchedFeatures: ["name"] });
+    let wooImageScore = 0;
+    if (name.includes("product") && name.includes("image")) wooImageScore += 60;
+    if (wooImageScore > 0) scores.push({ type: "woo:product-image", score: wooImageScore, matchedFeatures: ["name"] });
+    return scores.sort((a, b) => b.score - a.score);
+  }
+  function detectWidget(node) {
+    var _a, _b;
+    const name = (node.name || "").toLowerCase();
+    const styles = {
+      sourceId: node.id,
+      sourceName: node.name
+    };
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const children = hasChildren ? node.children : [];
+    const firstImageDeep = findFirstImageId(node);
+    if (name.startsWith("w:")) {
+      const boxContent = extractBoxContent(node);
+      if (name.includes("image-box")) {
+        return {
+          type: "image-box",
+          content: boxContent.title || node.name,
+          imageId: boxContent.imageId || findFirstImageId(node) || null,
+          styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+        };
+      }
+      if (name.includes("icon-box")) {
+        return {
+          type: "icon-box",
+          content: boxContent.title || node.name,
+          imageId: boxContent.imageId || findFirstImageId(node) || null,
+          styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+        };
+      }
+      if (name.includes("button")) {
+        return {
+          type: "button",
+          content: boxContent.title || node.name,
+          imageId: null,
+          styles
+        };
+      }
+      if (name.includes("video")) return { type: "video", content: "", imageId: null, styles };
+    }
+    if (hasChildren || node.type === "LINE" || node.type === "VECTOR" || node.type === "RECTANGLE") {
+      const scores = calculateWidgetScore(node);
+      const bestMatch = scores[0];
+      if (bestMatch && bestMatch.score >= 60) {
+        switch (bestMatch.type) {
+          case "image-box": {
+            const boxContent = extractBoxContent(node);
+            if (!boxContent.title) break;
+            return {
+              type: "image-box",
+              content: boxContent.title,
+              imageId: boxContent.imageId || findFirstImageId(node) || null,
+              styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+            };
+          }
+          case "icon-box": {
+            const boxContent = extractBoxContent(node);
+            if (!boxContent.title) break;
+            return {
+              type: "icon-box",
+              content: boxContent.title,
+              imageId: boxContent.imageId || findFirstImageId(node) || null,
+              styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+            };
+          }
+          case "button": {
+            const boxContent = extractBoxContent(node);
+            if (!boxContent.title && hasTextDeep(node)) break;
+            return { type: "button", content: boxContent.title || node.name, imageId: null, styles };
+          }
+          case "star-rating":
+            return { type: "star-rating", content: "5", imageId: null, styles };
+          case "social-icons":
+            return { type: "social-icons", content: "", imageId: null, styles };
+          case "testimonial":
+            return { type: "testimonial", content: "", imageId: null, styles };
+          case "basic-gallery":
+            return { type: "basic-gallery", content: node.name, imageId: null, styles };
+          case "icon_list":
+            return { type: "icon_list", content: node.name, imageId: null, styles };
+          // New Widgets
+          case "video":
+            return { type: "video", content: "", imageId: null, styles };
+          case "google_maps":
+            return { type: "google_maps", content: "", imageId: null, styles };
+          case "divider":
+            return { type: "divider", content: "", imageId: null, styles };
+          case "spacer":
+            return { type: "spacer", content: "", imageId: null, styles };
+          case "form":
+            return { type: "form", content: "", imageId: null, styles };
+          case "login":
+            return { type: "login", content: "", imageId: null, styles };
+          case "price-table":
+            return { type: "price-table", content: "", imageId: null, styles };
+          case "flip-box":
+            return { type: "flip-box", content: "", imageId: null, styles };
+          case "call-to-action":
+            return { type: "call-to-action", content: "", imageId: null, styles };
+          case "countdown":
+            return { type: "countdown", content: "", imageId: null, styles };
+          // WooCommerce
+          case "woo:product-title":
+            return { type: "woo:product-title", content: "", imageId: null, styles };
+          case "woo:product-price":
+            return { type: "woo:product-price", content: "", imageId: null, styles };
+          case "woo:product-add-to-cart":
+            return { type: "woo:product-add-to-cart", content: "", imageId: null, styles };
+          case "woo:product-image":
+            return { type: "woo:product-image", content: "", imageId: null, styles };
+        }
+      }
+      if (children.length > 0 && children.every((c) => isImageFill(c) || Array.isArray(c.children) && c.children.every((gr) => isImageFill(gr)))) {
+        if (children.length >= 3) {
+          return { type: "basic-gallery", content: node.name, imageId: null, styles };
+        }
+        const firstImage = children.find(isImageFill) || ((_b = (_a = children[0]) == null ? void 0 : _a.children) == null ? void 0 : _b.find((gr) => isImageFill(gr)));
+        const imageId = (firstImage == null ? void 0 : firstImage.id) || node.id;
+        return { type: "image", content: null, imageId, styles };
+      }
+      if (children.some(isImageFill) && !children.some((c) => hasTextDeep(c))) {
+        const firstImage = children.find(isImageFill);
+        return { type: "image", content: null, imageId: (firstImage == null ? void 0 : firstImage.id) || node.id, styles };
+      }
+    }
+    if (node.type === "TEXT") {
+      const charCount = (node.characters || "").length;
+      const hasNewLines = (node.characters || "").includes("\n");
+      const isExplicitText = name.includes("text") || name.includes("paragraph") || name.includes("desc");
+      const isExplicitHeading = name.includes("heading") || name.includes("title");
+      let isHeading = true;
+      if (isExplicitText) {
+        isHeading = false;
+      } else if (isExplicitHeading) {
+        isHeading = true;
+      } else {
+        if (charCount > 500) {
+          isHeading = false;
+        }
+      }
+      if (name.includes("button") || name.includes("btn")) {
+        return { type: "button", content: node.characters || node.name, imageId: null, styles };
+      }
+      const extractedStyles = extractWidgetStyles(node);
+      Object.assign(styles, extractedStyles);
+      let content = node.characters || node.name;
+      if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+        const rich = buildHtmlFromSegments(node);
+        content = rich.html;
+      }
+      return {
+        type: isHeading ? "heading" : "text",
+        content,
+        imageId: null,
+        styles
+      };
+    }
+    if (vectorTypes.includes(node.type)) {
+      return { type: "image", content: null, imageId: node.id, styles };
+    }
+    if (isImageFill(node) || name.startsWith("w:image") || node.type === "IMAGE") {
+      const nestedImageId = findFirstImageId(node);
+      return { type: "image", content: null, imageId: nestedImageId || node.id, styles };
+    }
+    if (name.includes("button") || name.includes("btn")) {
+      return { type: "button", content: node.name, imageId: null, styles };
+    }
+    return null;
+  }
+  function toContainer(node) {
+    const direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
+    const styles = extractContainerStyles(node);
+    const widgets = [];
+    const childrenContainers = [];
+    const childNodes = Array.isArray(node.children) ? [...node.children] : [];
+    if (node.layoutMode !== "HORIZONTAL" && node.layoutMode !== "VERTICAL") {
+      childNodes.sort((a, b) => {
+        const yDiff = (a.y || 0) - (b.y || 0);
+        if (Math.abs(yDiff) > 5) return yDiff;
+        return (a.x || 0) - (b.x || 0);
+      });
+    }
+    childNodes.forEach((child, idx) => {
+      const w = detectWidget(child);
+      const childHasChildren = Array.isArray(child.children) && child.children.length > 0;
+      const orderMark = idx;
+      if (w) {
+        w.styles = __spreadProps(__spreadValues({}, w.styles || {}), { _order: orderMark });
+        widgets.push(w);
+      } else {
+        if (childHasChildren) {
+          const childContainer = toContainer(child);
+          childContainer.styles = __spreadProps(__spreadValues({}, childContainer.styles || {}), { _order: orderMark });
+          childrenContainers.push(childContainer);
+        } else {
+          widgets.push({
+            type: "custom",
+            content: child.name || "",
+            imageId: null,
+            styles: { sourceId: child.id, sourceName: child.name, _order: orderMark }
+          });
+        }
+      }
+    });
+    return {
+      id: node.id,
+      direction: direction === "row" ? "row" : "column",
+      width: "full",
+      styles,
+      widgets,
+      children: childrenContainers
+    };
+  }
+  function analyzeTreeWithHeuristics(tree) {
+    return tree;
+  }
+  function convertToFlexSchema(analyzedTree) {
+    const rootContainer = toContainer(analyzedTree);
+    const tokens = { primaryColor: "#000000", secondaryColor: "#FFFFFF" };
+    return {
+      page: { title: analyzedTree.name || "Layout importado", tokens },
+      containers: [rootContainer]
+    };
+  }
+  function extractBoxContent(node) {
+    const children = node.children || [];
+    let imageId = null;
+    let title = "";
+    let description = "";
+    const imgNode = children.find((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
+    if (imgNode) {
+      imageId = imgNode.id;
+    } else {
+      for (const child of children) {
+        if (child.children) {
+          const deepImg = child.children.find((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
+          if (deepImg) {
+            imageId = deepImg.id;
+            break;
+          }
+        }
+      }
+    }
+    const textNodes = [];
+    function collectTexts(n) {
+      if (n.type === "TEXT") {
+        textNodes.push(n);
+        return;
+      }
+      if (n.children) {
+        for (const child of n.children) {
+          collectTexts(child);
+          if (textNodes.length >= 2) return;
+        }
+      }
+    }
+    for (const child of children) {
+      collectTexts(child);
+      if (textNodes.length >= 2) break;
+    }
+    if (textNodes.length > 0) {
+      title = textNodes[0].characters || textNodes[0].name;
+    }
+    if (textNodes.length > 1) {
+      description = textNodes[1].characters || textNodes[1].name;
+    }
+    return { imageId, title, description };
+  }
+  var vectorTypes;
+  var init_noai_parser = __esm({
+    "src/pipeline/noai.parser.ts"() {
+      init_style_utils();
+      vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE", "RECTANGLE"];
     }
   });
 
@@ -1589,6 +2008,7 @@ INSTRU\xC7\xD5ES:
       init_uploader();
       init_validation();
       init_prompts();
+      init_noai_parser();
       ConversionPipeline = class {
         constructor() {
           this.autoFixLayout = false;
@@ -1606,8 +2026,8 @@ INSTRU\xC7\xD5ES:
             const schema = yield this.generateSchema(preprocessed, provider, options == null ? void 0 : options.apiKey);
             this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
             validatePipelineSchema(schema);
-            yield this.resolveImages(schema, normalizedWP);
             this.hydrateStyles(schema, preprocessed.flatNodes);
+            yield this.resolveImages(schema, normalizedWP);
             const elementorJson = this.compiler.compile(schema);
             if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
             validateElementorJSON(elementorJson);
@@ -1666,18 +2086,31 @@ INSTRU\xC7\xD5ES:
         }
         generateSchema(pre, provider, apiKey) {
           return __async(this, null, function* () {
-            const prompt = ANALYZE_RECREATE_PROMPT.replace("${nodeData}", JSON.stringify(pre.serializedRoot, null, 2));
-            const instructions = "Gere o schema Flex do Elementor sem ignorar nenhum node. Preserve ordem, ids e preencha styles.sourceId.";
-            const response = yield provider.generateSchema({
-              prompt,
-              snapshot: pre.serializedRoot,
-              instructions,
-              apiKey
-            });
-            if (!response.ok || !response.schema) {
-              throw new Error(response.message || "IA nao retornou schema.");
+            console.log("Generating Base Schema (Algorithm)...");
+            const baseSchema = convertToFlexSchema(pre.serializedRoot);
+            console.log("Optimizing Schema (AI)...");
+            const prompt = `${OPTIMIZE_SCHEMA_PROMPT}
+
+SCHEMA BASE:
+${JSON.stringify(baseSchema, null, 2)}
+`;
+            try {
+              const response = yield provider.generateSchema({
+                prompt,
+                snapshot: pre.serializedRoot,
+                instructions: "Otimize o schema JSON fornecido mantendo IDs e dados.",
+                apiKey
+              });
+              if (!response.ok || !response.schema) {
+                console.warn("AI returned invalid response. Falling back to base schema.", response.message);
+                return baseSchema;
+              }
+              return response.schema;
+            } catch (error) {
+              console.error("AI Optimization failed:", error);
+              console.warn("Falling back to Base Schema.");
+              return baseSchema;
             }
-            return response.schema;
           });
         }
         validateAndNormalize(schema, root, tokens) {
@@ -1693,14 +2126,33 @@ INSTRU\xC7\xD5ES:
             const uploadEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token) && wpConfig.exportImages);
             if (!uploadEnabled) return;
             const processWidget = (widget) => __async(this, null, function* () {
-              if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
+              if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box")) {
                 try {
                   const node = figma.getNodeById(widget.imageId);
                   if (node) {
-                    const format = widget.type === "icon" ? "SVG" : "WEBP";
+                    let format = widget.type === "icon" || widget.type === "icon-box" ? "SVG" : "WEBP";
+                    const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
+                    const hasVectorChildren = (n) => {
+                      if (isVectorNode(n)) return true;
+                      if ("children" in n) {
+                        return n.children.some((c) => hasVectorChildren(c));
+                      }
+                      return false;
+                    };
+                    if ("locked" in node && node.locked || hasVectorChildren(node)) {
+                      format = "SVG";
+                    }
                     const result = yield this.imageUploader.uploadToWordPress(node, format);
                     if (result) {
-                      widget.content = result.url;
+                      if (widget.type === "image-box") {
+                        if (!widget.styles) widget.styles = {};
+                        widget.styles.image_url = result.url;
+                      } else if (widget.type === "icon-box") {
+                        if (!widget.styles) widget.styles = {};
+                        widget.styles.selected_icon = { value: result.url, library: "svg" };
+                      } else {
+                        widget.content = result.url;
+                      }
                       widget.imageId = result.id.toString();
                     }
                   }
@@ -1735,7 +2187,7 @@ INSTRU\xC7\xD5ES:
         hydrateStyles(schema, flatNodes) {
           const nodeMap = new Map(flatNodes.map((n) => [n.id, n]));
           const processContainer = (container) => {
-            var _a, _b;
+            var _a, _b, _c;
             if ((_a = container.styles) == null ? void 0 : _a.sourceId) {
               const node = nodeMap.get(container.styles.sourceId);
               if (node) {
@@ -1755,6 +2207,18 @@ INSTRU\xC7\xD5ES:
                   if (node) {
                     const realStyles = extractWidgetStyles(node);
                     widget.styles = __spreadValues(__spreadValues({}, widget.styles), realStyles);
+                    if (node.type === "VECTOR" || node.type === "STAR" || node.type === "POLYGON" || node.type === "ELLIPSE") {
+                      if (widget.type !== "icon" && widget.type !== "image") {
+                        widget.type = "icon";
+                        widget.imageId = node.id;
+                      }
+                    } else if (node.type === "RECTANGLE" || node.type === "FRAME") {
+                      const hasImage = (_c = node.fills) == null ? void 0 : _c.some((f) => f.type === "IMAGE");
+                      if (hasImage && widget.type !== "image") {
+                        widget.type = "image";
+                        widget.imageId = node.id;
+                      }
+                    }
                     if (node.type === "TEXT" && (widget.type === "heading" || widget.type === "text")) {
                       if (node.styledTextSegments && node.styledTextSegments.length > 1) {
                         const rich = buildHtmlFromSegments(node);
@@ -2015,224 +2479,6 @@ ${JSON.stringify(input.snapshot)}` }
     }
   });
 
-  // src/pipeline/noai.parser.ts
-  function isImageFill(node) {
-    const fills = node == null ? void 0 : node.fills;
-    if (!Array.isArray(fills)) return false;
-    return fills.some((f) => (f == null ? void 0 : f.type) === "IMAGE");
-  }
-  function findFirstImageId(node) {
-    if (!node) return null;
-    if (isImageFill(node)) return node.id || null;
-    const children = node.children;
-    if (Array.isArray(children)) {
-      for (const child of children) {
-        const found = findFirstImageId(child);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-  function hasTextDeep(node) {
-    if (!node) return false;
-    if (node.type === "TEXT") return true;
-    const children = node.children;
-    if (Array.isArray(children)) {
-      return children.some((c) => hasTextDeep(c));
-    }
-    return false;
-  }
-  function detectWidget(node) {
-    var _a, _b;
-    const name = (node.name || "").toLowerCase();
-    const styles = {
-      sourceId: node.id,
-      sourceName: node.name
-    };
-    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
-    const children = hasChildren ? node.children : [];
-    const firstImageDeep = findFirstImageId(node);
-    if (hasChildren) {
-      const childHasImage = children.some((c) => isImageFill(c) || findFirstImageId(c));
-      const childHasText = children.some((c) => hasTextDeep(c));
-      const childHasIcon = children.some((c) => vectorTypes.includes(c.type));
-      const allImages = children.length > 0 && children.every((c) => isImageFill(c) || Array.isArray(c.children) && c.children.every((gr) => isImageFill(gr)));
-      const firstImage = children.find(isImageFill) || children.find((c) => findFirstImageId(c));
-      const firstImageId = findFirstImageId(firstImage) || firstImageDeep;
-      const looksImageBox = name.includes("image") || name.includes("photo") || name.includes("box") || children.length <= 3;
-      const looksIconBox = name.includes("icon") || name.includes("box") || children.length <= 3;
-      if (childHasImage && childHasText && looksImageBox) {
-        const txt = children.find((c) => c.type === "TEXT");
-        return {
-          type: "image_box",
-          content: (txt == null ? void 0 : txt.characters) || node.name,
-          imageId: firstImageId || null,
-          styles
-        };
-      }
-      if (childHasIcon && childHasText && (children.length >= 3 || name.includes("list"))) {
-        return { type: "icon_list", content: node.name, imageId: null, styles };
-      }
-      if (childHasIcon && childHasText && looksIconBox) {
-        const txt = children.find((c) => c.type === "TEXT");
-        return {
-          type: "icon_box",
-          content: (txt == null ? void 0 : txt.characters) || node.name,
-          imageId: null,
-          styles
-        };
-      }
-      if (allImages) {
-        if (children.length >= 3) {
-          return { type: "basic-gallery", content: node.name, imageId: null, styles };
-        }
-        return { type: "image", content: null, imageId: firstImageId || node.id, styles };
-      }
-      if (childHasImage && !childHasText) {
-        return { type: "image", content: null, imageId: firstImageId || node.id || firstImageDeep, styles };
-      }
-    }
-    if (node.type === "TEXT") {
-      const charCount = (node.characters || "").length;
-      const hasNewLines = (node.characters || "").includes("\n");
-      const isExplicitText = name.includes("text") || name.includes("paragraph") || name.includes("desc");
-      const isExplicitHeading = name.includes("heading") || name.includes("title");
-      let isHeading = true;
-      if (isExplicitText) {
-        isHeading = false;
-      } else if (isExplicitHeading) {
-        isHeading = true;
-      } else {
-        if (charCount > 200 || hasNewLines && charCount > 60) {
-          isHeading = false;
-        }
-      }
-      if (name.includes("button") || name.includes("btn")) {
-        return { type: "button", content: node.characters || node.name, imageId: null, styles };
-      }
-      const extractedStyles = extractWidgetStyles(node);
-      Object.assign(styles, extractedStyles);
-      let content = node.characters || node.name;
-      if (node.styledTextSegments && node.styledTextSegments.length > 1) {
-        const rich = buildHtmlFromSegments(node);
-        content = rich.html;
-      }
-      return {
-        type: isHeading ? "heading" : "text",
-        content,
-        imageId: null,
-        styles
-      };
-    }
-    if (vectorTypes.includes(node.type)) {
-      return { type: "image", content: null, imageId: node.id, styles };
-    }
-    if (isImageFill(node) || name.startsWith("w:image") || node.type === "IMAGE") {
-      const nestedImageId = findFirstImageId(node);
-      return { type: "image", content: null, imageId: nestedImageId || node.id, styles };
-    }
-    if (name.includes("button") || name.includes("btn")) {
-      return { type: "button", content: node.name, imageId: null, styles };
-    }
-    if (hasChildren) {
-      const children2 = node.children;
-      const onlyImages = children2.length > 0 && children2.every((c) => isImageFill(c) || Array.isArray(c.children) && c.children.every((grand) => isImageFill(grand)));
-      if (onlyImages || name.startsWith("w:image")) {
-        const firstImage = children2.find(isImageFill) || ((_b = (_a = children2[0]) == null ? void 0 : _a.children) == null ? void 0 : _b.find((gr) => isImageFill(gr)));
-        const imageId = (firstImage == null ? void 0 : firstImage.id) || node.id;
-        return { type: "image", content: null, imageId, styles };
-      }
-      const childHasImage = children2.some(isImageFill);
-      const childHasText = children2.some((c) => c.type === "TEXT");
-      const childHasIcon = children2.some((c) => vectorTypes.includes(c.type));
-      const allImages = children2.length >= 3 && children2.every(isImageFill);
-      if (allImages) {
-        return { type: "basic-gallery", content: node.name, imageId: null, styles };
-      }
-      if (childHasIcon && childHasText && (children2.length >= 3 || name.includes("list"))) {
-        return { type: "icon_list", content: node.name, imageId: null, styles };
-      }
-      if (childHasImage && childHasText) {
-        const txt = children2.find((c) => c.type === "TEXT");
-        const img = children2.find(isImageFill);
-        return {
-          type: "image_box",
-          content: (txt == null ? void 0 : txt.characters) || node.name,
-          imageId: (img == null ? void 0 : img.id) || null,
-          styles
-        };
-      }
-      if (childHasIcon && childHasText) {
-        const txt = children2.find((c) => c.type === "TEXT");
-        return {
-          type: "icon_box",
-          content: (txt == null ? void 0 : txt.characters) || node.name,
-          imageId: null,
-          styles
-        };
-      }
-    }
-    return null;
-  }
-  function toContainer(node) {
-    const direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
-    const styles = extractContainerStyles(node);
-    const widgets = [];
-    const childrenContainers = [];
-    const childNodes = Array.isArray(node.children) ? node.children : [];
-    childNodes.forEach((child, idx) => {
-      const w = detectWidget(child);
-      const childHasChildren = Array.isArray(child.children) && child.children.length > 0;
-      const orderMark = idx;
-      if (w && !childHasChildren) {
-        w.styles = __spreadProps(__spreadValues({}, w.styles || {}), { _order: orderMark });
-        widgets.push(w);
-      } else if (w && childHasChildren && (w.type === "image_box" || w.type === "icon_box" || w.type === "basic-gallery" || w.type === "icon_list" || w.type === "image")) {
-        w.styles = __spreadProps(__spreadValues({}, w.styles || {}), { _order: orderMark });
-        widgets.push(w);
-      } else {
-        if (childHasChildren) {
-          const childContainer = toContainer(child);
-          childContainer.styles = __spreadProps(__spreadValues({}, childContainer.styles || {}), { _order: orderMark });
-          childrenContainers.push(childContainer);
-        } else {
-          widgets.push({
-            type: "custom",
-            content: child.name || "",
-            imageId: null,
-            styles: { sourceId: child.id, sourceName: child.name, _order: orderMark }
-          });
-        }
-      }
-    });
-    return {
-      id: node.id,
-      direction: direction === "row" ? "row" : "column",
-      width: "full",
-      styles,
-      widgets,
-      children: childrenContainers
-    };
-  }
-  function analyzeTreeWithHeuristics(tree) {
-    return tree;
-  }
-  function convertToFlexSchema(analyzedTree) {
-    const rootContainer = toContainer(analyzedTree);
-    const tokens = { primaryColor: "#000000", secondaryColor: "#FFFFFF" };
-    return {
-      page: { title: analyzedTree.name || "Layout importado", tokens },
-      containers: [rootContainer]
-    };
-  }
-  var vectorTypes;
-  var init_noai_parser = __esm({
-    "src/pipeline/noai.parser.ts"() {
-      init_style_utils();
-      vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE"];
-    }
-  });
-
   // src/code.ts
   var require_code = __commonJS({
     "src/code.ts"(exports) {
@@ -2255,48 +2501,10 @@ ${JSON.stringify(input.snapshot)}` }
       }
       function collectLayoutWarnings(node) {
         const warnings = [];
-        const hasAutoLayout = node.layoutMode === "HORIZONTAL" || node.layoutMode === "VERTICAL";
-        const nameLower = (node.name || "").toLowerCase();
-        const looksLikeContainer = nameLower.startsWith("c:") || nameLower.includes("container");
-        if (looksLikeContainer && !hasAutoLayout) {
-          const snippet = typeof node.characters === "string" ? ` Texto: "${node.characters.slice(0, 80)}"` : "";
-          warnings.push(`Node ${node.id} (${node.name}) sem auto layout; pode gerar container com direction invalido.${snippet}`);
-          focusNode(node.id);
-          sendLayoutWarning(node, `Node ${node.id} (${node.name}) sem auto layout; pode gerar container invalido.${snippet}`);
-        }
-        if (node.type && node.type !== "FRAME" && node.type !== "GROUP" && looksLikeContainer) {
-          const snippet = typeof node.characters === "string" ? ` Texto: "${node.characters.slice(0, 80)}"` : "";
-          warnings.push(`Node ${node.id} (${node.name}) e do tipo ${node.type}; nao deve ser container. Considere w:icon ou w:custom.${snippet}`);
-          focusNode(node.id);
-          sendLayoutWarning(node, `Node ${node.id} (${node.name}) tipo ${node.type} pode ser widget, nao container.${snippet}`);
-        }
         if (Array.isArray(node.children)) {
           node.children.forEach((child) => warnings.push(...collectLayoutWarnings(child)));
         }
         return warnings;
-      }
-      function focusNode(nodeId) {
-        try {
-          const n = figma.getNodeById(nodeId);
-          if (n) {
-            figma.currentPage.selection = [n];
-            figma.viewport.scrollAndZoomIntoView([n]);
-          }
-        } catch (e) {
-        }
-      }
-      function sendLayoutWarning(node, message) {
-        try {
-          const textSnippet = typeof node.characters === "string" ? node.characters.slice(0, 200) : "";
-          figma.ui.postMessage({
-            type: "layout-warning",
-            nodeId: node.id,
-            name: node.name,
-            text: textSnippet,
-            message
-          });
-        } catch (e) {
-        }
       }
       function toBase64(str) {
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -2481,14 +2689,33 @@ ${JSON.stringify(input.snapshot)}` }
           const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password && normalizedWP.exportImages);
           const uploadPromises = [];
           const processWidget = (widget) => __async(null, null, function* () {
-            if (uploadEnabled && widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon")) {
+            if (uploadEnabled && widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box")) {
               try {
                 const node = figma.getNodeById(widget.imageId);
                 if (node) {
-                  const format = widget.type === "icon" ? "SVG" : "WEBP";
+                  let format = widget.type === "icon" || widget.type === "icon-box" ? "SVG" : "WEBP";
+                  const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
+                  const hasVectorChildren = (n) => {
+                    if (isVectorNode(n)) return true;
+                    if ("children" in n) {
+                      return n.children.some((c) => hasVectorChildren(c));
+                    }
+                    return false;
+                  };
+                  if ("locked" in node && node.locked || hasVectorChildren(node)) {
+                    format = "SVG";
+                  }
                   const result = yield noaiUploader.uploadToWordPress(node, format);
                   if (result) {
-                    widget.content = result.url;
+                    if (widget.type === "image-box") {
+                      if (!widget.styles) widget.styles = {};
+                      widget.styles.image_url = result.url;
+                    } else if (widget.type === "icon-box") {
+                      if (!widget.styles) widget.styles = {};
+                      widget.styles.selected_icon = { value: result.url, library: "svg" };
+                    } else {
+                      widget.content = result.url;
+                    }
                     widget.imageId = result.id.toString();
                   }
                 }

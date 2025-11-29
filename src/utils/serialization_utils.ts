@@ -59,6 +59,11 @@ export function serializeNode(node: SceneNode, parentId?: string): SerializedNod
 
     if (node.locked) {
         (data as any).isLockedImage = true;
+        // Clear children to prevent AI/Algorithm from seeing inside
+        if ('children' in node) {
+            data.children = [];
+        }
+        return data; // Return early for locked nodes (treated as leaf images)
     }
 
     // Opacity & Blend Mode

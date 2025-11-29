@@ -7,7 +7,8 @@ import { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipel
 import { ElementorJSON, WPConfig } from './types/elementor.types';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from './utils/validation';
 import { SchemaProvider } from './types/providers';
-import { ANALYZE_RECREATE_PROMPT } from './config/prompts';
+import { ANALYZE_RECREATE_PROMPT, OPTIMIZE_SCHEMA_PROMPT } from './config/prompts';
+import { convertToFlexSchema } from './pipeline/noai.parser';
 
 interface PreprocessedData {
     pageTitle: string;
@@ -52,8 +53,8 @@ export class ConversionPipeline {
         this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
         validatePipelineSchema(schema);
 
-        await this.resolveImages(schema, normalizedWP);
         this.hydrateStyles(schema, preprocessed.flatNodes);
+        await this.resolveImages(schema, normalizedWP);
 
         const elementorJson = this.compiler.compile(schema);
         if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
@@ -119,21 +120,37 @@ export class ConversionPipeline {
     }
 
     private async generateSchema(pre: PreprocessedData, provider: SchemaProvider, apiKey?: string): Promise<PipelineSchema> {
-        const prompt = ANALYZE_RECREATE_PROMPT.replace('${nodeData}', JSON.stringify(pre.serializedRoot, null, 2));
-        const instructions = 'Gere o schema Flex do Elementor sem ignorar nenhum node. Preserve ordem, ids e preencha styles.sourceId.';
+        // 1. Generate Base Schema using Deterministic Algorithm (No-AI)
+        console.log('Generating Base Schema (Algorithm)...');
+        const baseSchema = convertToFlexSchema(pre.serializedRoot);
 
-        const response = await provider.generateSchema({
-            prompt,
-            snapshot: pre.serializedRoot,
-            instructions,
-            apiKey
-        });
+        // 2. Optimize Schema using AI
+        console.log('Optimizing Schema (AI)...');
+        const prompt = `${OPTIMIZE_SCHEMA_PROMPT}
 
-        if (!response.ok || !response.schema) {
-            throw new Error(response.message || 'IA nao retornou schema.');
+SCHEMA BASE:
+${JSON.stringify(baseSchema, null, 2)}
+`;
+
+        try {
+            const response = await provider.generateSchema({
+                prompt,
+                snapshot: pre.serializedRoot,
+                instructions: 'Otimize o schema JSON fornecido mantendo IDs e dados.',
+                apiKey
+            });
+
+            if (!response.ok || !response.schema) {
+                console.warn('AI returned invalid response. Falling back to base schema.', response.message);
+                return baseSchema;
+            }
+
+            return response.schema;
+        } catch (error) {
+            console.error('AI Optimization failed:', error);
+            console.warn('Falling back to Base Schema.');
+            return baseSchema;
         }
-
-        return response.schema;
     }
 
     private validateAndNormalize(schema: any, root: SerializedNode, tokens: { primaryColor: string; secondaryColor: string }): asserts schema is PipelineSchema {
@@ -150,14 +167,42 @@ export class ConversionPipeline {
         if (!uploadEnabled) return;
 
         const processWidget = async (widget: PipelineWidget) => {
-            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon')) {
+            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box')) {
                 try {
                     const node = figma.getNodeById(widget.imageId);
                     if (node) {
-                        const format = widget.type === 'icon' ? 'SVG' : 'WEBP';
+                        let format = (widget.type === 'icon' || widget.type === 'icon-box') ? 'SVG' : 'WEBP';
+
+                        // Smart Format Detection:
+                        // If it's a locked frame/group OR contains vectors, prefer SVG for sharpness
+                        const isVectorNode = (n: SceneNode) =>
+                            n.type === 'VECTOR' || n.type === 'STAR' || n.type === 'ELLIPSE' ||
+                            n.type === 'POLYGON' || n.type === 'BOOLEAN_OPERATION' || n.type === 'LINE';
+
+                        const hasVectorChildren = (n: SceneNode): boolean => {
+                            if (isVectorNode(n)) return true;
+                            if ('children' in n) {
+                                return n.children.some(c => hasVectorChildren(c));
+                            }
+                            return false;
+                        };
+
+                        if (('locked' in node && node.locked) || hasVectorChildren(node as SceneNode)) {
+                            format = 'SVG';
+                        }
                         const result = await this.imageUploader.uploadToWordPress(node as SceneNode, format as any);
                         if (result) {
-                            widget.content = result.url;
+                            if (widget.type === 'image-box') {
+                                if (!widget.styles) widget.styles = {};
+                                widget.styles.image_url = result.url;
+                                // Keep widget.content as Title
+                            } else if (widget.type === 'icon-box') {
+                                if (!widget.styles) widget.styles = {};
+                                widget.styles.selected_icon = { value: result.url, library: 'svg' };
+                                // Keep widget.content as Title
+                            } else {
+                                widget.content = result.url;
+                            }
                             widget.imageId = result.id.toString();
                         }
                     }
@@ -226,6 +271,21 @@ export class ConversionPipeline {
                         if (node) {
                             const realStyles = extractWidgetStyles(node);
                             widget.styles = { ...widget.styles, ...realStyles };
+
+                            // Force correct type for Images and Icons if AI hallucinated HTML/Text
+                            if (node.type === 'VECTOR' || node.type === 'STAR' || node.type === 'POLYGON' || node.type === 'ELLIPSE') {
+                                if (widget.type !== 'icon' && widget.type !== 'image') {
+                                    widget.type = 'icon';
+                                    widget.imageId = node.id; // Ensure ID is set for uploader
+                                }
+                            } else if (node.type === 'RECTANGLE' || node.type === 'FRAME') {
+                                // Check for image fills
+                                const hasImage = (node as any).fills?.some((f: any) => f.type === 'IMAGE');
+                                if (hasImage && widget.type !== 'image') {
+                                    widget.type = 'image';
+                                    widget.imageId = node.id;
+                                }
+                            }
 
                             // Rich Text / Custom CSS override
                             if (node.type === 'TEXT' && (widget.type === 'heading' || widget.type === 'text')) {

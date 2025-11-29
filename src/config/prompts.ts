@@ -45,3 +45,29 @@ INSTRUÇÕES:
 - Se não reconhecer o widget, classifique como "custom".
 - IMPORTANTE: Se um node tiver type="IMAGE" (mesmo que pareça container), trate como w:image e use seu ID como imageId.
 `;
+
+export const OPTIMIZE_SCHEMA_PROMPT = `
+Você é um especialista em Elementor e Otimização Semântica.
+Sua tarefa é analisar um SCHEMA JSON existente (gerado por um algoritmo) e melhorá-lo semanticamente.
+
+ENTRADA:
+Um JSON representando uma estrutura de containers e widgets básicos.
+
+OBJETIVO:
+Identificar padrões visuais que correspondam a widgets Elementor mais ricos e substituir a estrutura básica por esses widgets, MANTENDO OS DADOS E IDs.
+
+REGRAS CRÍTICAS (NÃO QUEBRE O SCHEMA):
+1.  **NÃO REMOVA IDs**: Os IDs (sourceId, id) são fundamentais para o link com o Figma. Mantenha-os.
+2.  **NÃO ALTERE IMAGENS**: Se o input tem um widget type="image" com um imageId, MANTENHA-O. Não transforme em HTML ou Texto.
+3.  **NÃO ALTERE TEXTOS**: Mantenha o conteúdo dos textos exato.
+
+TRANSFORMAÇÕES DESEJADAS:
+-   **Icon List**: Se vir uma lista de containers onde cada um tem um Ícone + Texto -> Converta para widget "icon-list".
+-   **Image Box**: Se vir Container com Imagem + Título + Texto -> Converta para widget "image-box".
+-   **Icon Box**: Se vir Container com Ícone + Título + Texto -> Converta para widget "icon-box".
+-   **Gallery**: Se vir um Grid de Imagens -> Converta para "gallery" ou "basic-gallery".
+-   **Button**: Se vir um Container com Texto centralizado e cor de fundo -> Converta para "button".
+
+SAÍDA:
+Retorne APENAS o JSON otimizado. Sem markdown, sem explicações.
+`;

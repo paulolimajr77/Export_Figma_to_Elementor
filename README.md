@@ -79,6 +79,13 @@ Acoes de exportacao:
 - Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
 - Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).
 - Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.
+- **Unificação de Estilos:** Lógica de extração de estilos centralizada em `style_utils.ts` para consistência entre modos AI e NO-AI.
+- **Correção de Widgets de Caixa:** Melhorada a detecção de conteúdo para `image-box`, `icon-box` e `button`, extraindo título, descrição e imagem/ícone dos filhos recursivamente.
+- **Suporte a Formas e Ícones Compostos:** Retângulos, Linhas, Estrelas e Frames Trancados agora são tratados automaticamente como Ícones/Imagens (SVG), preservando a fidelidade visual.
+- **Refinamento de Scoring (NO-AI):** Penalidades para nomes genéricos e filhos complexos em `image_box` e `icon_box`.
+- **Exportação Inteligente de SVG:** Força SVG para frames trancados ou nós com vetores, preservando qualidade.
+- **Correção de Upload para Widgets Compostos:** `image-box` e `icon-box` agora têm suas imagens/ícones processados corretamente, sem sobrescrever o título.
+- **Padronização de Tipos:** Unificação dos nomes de widgets para usar hífens (`image-box`, `icon-box`) em todo o sistema.
 - UI refeita com tabs, tema claro/escuro consistente e persistencia de Gemini/WP corrigida.
 - Integracoes Gemini/WP alinhadas ao fluxo de containers flex; exportacao WP implementada com criacao de pagina rascunho e teste de credenciais.
 - Bridge de clipboard movido para a UI (textarea + copiar) com postMessage `copy-json`; fallback manual garante colagem no Elementor.

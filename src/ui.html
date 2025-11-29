@@ -451,8 +451,107 @@
       color: #f5f5f5;
     }
 
-    body.dark .card-title {
-      color: #f5f5f5;
+    /* Estilos para Grid Compacto e Busca */
+    .help-grid.compact {
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+    }
+
+    .help-item.compact {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 8px;
+      gap: 8px;
+    }
+
+    .help-item.compact .item-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      margin-bottom: 2px;
+    }
+
+    .help-item.compact .item-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+      opacity: 0.8;
+    }
+
+    .help-item.compact .label {
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .help-item.compact .btn {
+      width: 100%;
+      justify-content: center;
+      padding: 4px;
+      font-size: 10px;
+      height: 24px;
+    }
+
+    .card.compact {
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-title.small {
+      font-size: 12px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.8;
+    }
+
+    .search-box {
+      margin-bottom: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--color-bg);
+      padding-bottom: 8px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 12px 8px 32px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-size: 13px;
+      background: var(--color-panel);
+      color: var(--color-text);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 10px center;
+    }
+
+    .search-status {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+
+    .empty-state {
+      padding: 20px;
+      text-align: center;
+      color: var(--color-text-secondary);
+      font-size: 13px;
+      background: var(--color-panel);
+      border-radius: var(--radius);
+      border: 1px dashed var(--color-border);
+    }
+
+    body.dark .search-input {
+      background-color: #2a2a2e;
+      border-color: #3a3a3e;
+      color: #eee;
     }
 
     * {
@@ -700,24 +799,11 @@
       </section>
 
       <section class="tab-panel" data-panel="help">
-        <div class="card">
-          <div class="card-title">Nomenclaturas e A&#231;&#245;es r&#225;pidas</div>
-          <div class="help-grid">
-            <div class="help-item"><span class="label">w:heading</span><button class="btn tiny"
-                data-rename="w:heading">Renomear layer</button></div>
-            <div class="help-item"><span class="label">w:text</span><button class="btn tiny"
-                data-rename="w:text">Renomear layer</button></div>
-            <div class="help-item"><span class="label">w:button</span><button class="btn tiny"
-                data-rename="w:button">Renomear layer</button></div>
-            <div class="help-item"><span class="label">w:image</span><button class="btn tiny"
-                data-rename="w:image">Renomear layer</button></div>
-            <div class="help-item"><span class="label">w:icon</span><button class="btn tiny"
-                data-rename="w:icon">Renomear layer</button></div>
-            <div class="help-item"><span class="label">c:container</span><button class="btn tiny"
-                data-rename="c:container">Renomear layer</button></div>
-          </div>
-          <p class="muted">Clique para renomear a layer selecionada no Figma com a nomenclatura adequada.</p>
+        <div class="search-box">
+          <input type="text" id="widget-search" class="search-input"
+            placeholder="Buscar widget (ex: button, woo, pro)..." autocomplete="off" />
         </div>
+        <div id="widget-list-container"></div>
       </section>
     </main>
   </div>
@@ -1225,6 +1311,152 @@
           bridgeOutput.select();
         });
       }
+      // Icones SVG otimizados
+      const ICONS = {
+        text: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>`,
+        image: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+        button: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="2"/><line x1="12" y1="12" x2="12" y2="12"/></svg>`,
+        container: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>`,
+        woo: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`,
+        star: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+        video: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`,
+        menu: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`,
+        form: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+        default: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`
+      };
+
+      function getWidgetIcon(name) {
+        if (name.includes('image') || name.includes('gallery') || name.includes('thumb')) return ICONS.image;
+        if (name.includes('text') || name.includes('heading') || name.includes('title')) return ICONS.text;
+        if (name.includes('button') || name.includes('btn') || name.includes('link')) return ICONS.button;
+        if (name.includes('container') || name.includes('section') || name.includes('div')) return ICONS.container;
+        if (name.includes('woo') || name.includes('product') || name.includes('cart')) return ICONS.woo;
+        if (name.includes('star') || name.includes('rating') || name.includes('review')) return ICONS.star;
+        if (name.includes('video') || name.includes('youtube')) return ICONS.video;
+        if (name.includes('menu') || name.includes('nav')) return ICONS.menu;
+        if (name.includes('form') || name.includes('input')) return ICONS.form;
+        return ICONS.default;
+      }
+
+      // Dados dos widgets para geracao dinamica
+      const WIDGET_DATA = {
+        'Basicos': [
+          'heading', 'text', 'button', 'image', 'icon', 'video', 'divider', 'spacer', 'image-box', 'icon-box',
+          'star-rating', 'counter', 'progress', 'tabs', 'accordion', 'toggle', 'alert', 'social-icons',
+          'soundcloud', 'shortcode', 'html', 'menu-anchor', 'sidebar', 'read-more', 'image-carousel',
+          'basic-gallery', 'gallery', 'icon-list', 'nav-menu', 'search-form', 'google-maps', 'testimonial',
+          'embed', 'lottie', 'loop:grid'
+        ],
+        'Pro': [
+          'form', 'login', 'subscription', 'call-to-action', 'media:carousel', 'portfolio', 'gallery-pro',
+          'slider:slides', 'slideshow', 'flip-box', 'animated-headline', 'post-navigation', 'share-buttons',
+          'table-of-contents', 'countdown', 'blockquote', 'testimonial-carousel', 'review-box', 'hotspots',
+          'sitemap', 'author-box', 'price-table', 'price-list', 'progress-tracker', 'animated-text',
+          'nav-menu-pro', 'breadcrumb', 'facebook-button', 'facebook-comments', 'facebook-embed',
+          'facebook-page', 'loop:builder', 'loop:grid-advanced', 'loop:carousel', 'post-excerpt',
+          'post-content', 'post-title', 'post-info', 'post-featured-image', 'post-author', 'post-date',
+          'post-terms', 'archive-title', 'archive-description', 'site-logo', 'site-title', 'site-tagline',
+          'search-results', 'global-widget', 'video-playlist', 'video-gallery'
+        ],
+        'WooCommerce': [
+          'woo:product-title', 'woo:product-image', 'woo:product-price', 'woo:product-add-to-cart',
+          'woo:product-data-tabs', 'woo:product-excerpt', 'woo:product-rating', 'woo:product-stock',
+          'woo:product-meta', 'woo:product-additional-information', 'woo:product-short-description',
+          'woo:product-related', 'woo:product-upsells', 'woo:product-tabs', 'woo:product-breadcrumb',
+          'woo:product-gallery', 'woo:products', 'woo:product-grid', 'woo:product-carousel',
+          'woo:product-loop-item', 'woo:loop-product-title', 'woo:loop-product-price',
+          'woo:loop-product-rating', 'woo:loop-product-image', 'woo:loop-product-button',
+          'woo:loop-product-meta', 'woo:cart', 'woo:checkout', 'woo:my-account', 'woo:purchase-summary',
+          'woo:order-tracking'
+        ],
+        'Loop Builder': [
+          'loop:item', 'loop:image', 'loop:title', 'loop:meta', 'loop:terms', 'loop:rating', 'loop:price',
+          'loop:add-to-cart', 'loop:read-more', 'loop:featured-image', 'loop:pagination'
+        ],
+        'Experimentais': [
+          'w:nested-tabs', 'w:mega-menu', 'w:scroll-snap', 'w:motion-effects', 'w:background-slideshow',
+          'w:css-transform', 'w:custom-position', 'w:dynamic-tags', 'w:ajax-pagination',
+          'w:aspect-ratio-container'
+        ],
+        'WordPress': [
+          'w:wp-search', 'w:wp-recent-posts', 'w:wp-recent-comments', 'w:wp-archives', 'w:wp-categories',
+          'w:wp-calendar', 'w:wp-tag-cloud', 'w:wp-custom-menu'
+        ]
+      };
+
+      function renderWidgetList(filterText = '') {
+        const container = document.getElementById('widget-list-container');
+        if (!container) return;
+
+        const search = filterText.toLowerCase().trim();
+        let html = '';
+
+        // Se tiver busca, adiciona header de resultados
+        if (search) {
+          html += `<div class="search-status">Filtrando por: "<strong>${search}</strong>"</div>`;
+        }
+
+        let hasResults = false;
+
+        for (const [category, items] of Object.entries(WIDGET_DATA)) {
+          // Filtra itens
+          const filteredItems = items.filter(item => {
+            if (!search) return true;
+            return item.toLowerCase().includes(search);
+          });
+
+          if (filteredItems.length === 0) continue;
+          hasResults = true;
+
+          html += `<div class="card compact"><div class="card-title small">${category}</div><div class="help-grid compact">`;
+
+          filteredItems.forEach(item => {
+            let fullName = item;
+            if (!item.includes(':') && !item.startsWith('w:')) {
+              fullName = 'w:' + item;
+            }
+            const icon = getWidgetIcon(fullName);
+
+            html += `
+              <div class="help-item compact" title="${fullName}">
+                <div class="item-header">
+                  <span class="item-icon">${icon}</span>
+                  <span class="label">${fullName}</span>
+                </div>
+                <button class="btn tiny ghost full-width" data-rename="${fullName}">Aplicar</button>
+              </div>`;
+          });
+
+          html += `</div></div>`;
+        }
+
+        if (!hasResults) {
+          html = `<div class="empty-state">Nenhum widget encontrado para "${search}"</div>`;
+        }
+
+        container.innerHTML = html;
+      }
+
+      // Inicializa a lista
+      renderWidgetList();
+
+      // Listener de busca
+      const searchInput = document.getElementById('widget-search');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          renderWidgetList(e.target.value);
+        });
+      }
+
+      // Event delegation para botoes de renomear
+      document.body.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-rename]');
+        if (btn) {
+          const name = btn.getAttribute('data-rename');
+          send('rename-layer', { name });
+        }
+      });
+
     })();
   </script>
 </body>
