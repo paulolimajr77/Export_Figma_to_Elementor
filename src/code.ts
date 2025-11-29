@@ -25,11 +25,17 @@ function collectLayoutWarnings(node: any): string[] {
     const looksLikeContainer = nameLower.startsWith('c:') || nameLower.includes('container');
 
     if (looksLikeContainer && !hasAutoLayout) {
-        warnings.push(`Node ${node.id} (${node.name}) sem auto layout; pode gerar container com direction invalido. Ajuste para HORIZONTAL/VERTICAL ou trate como widget.`);
+        const snippet = typeof node.characters === 'string' ? ` Texto: "${node.characters.slice(0, 80)}"` : '';
+        warnings.push(`Node ${node.id} (${node.name}) sem auto layout; pode gerar container com direction invalido.${snippet}`);
+        focusNode(node.id);
+        sendLayoutWarning(node, `Node ${node.id} (${node.name}) sem auto layout; pode gerar container invalido.${snippet}`);
     }
 
     if (node.type && node.type !== 'FRAME' && node.type !== 'GROUP' && looksLikeContainer) {
-        warnings.push(`Node ${node.id} (${node.name}) e do tipo ${node.type}; nao deve ser container. Considere w:icon ou w:custom.`);
+        const snippet = typeof node.characters === 'string' ? ` Texto: "${node.characters.slice(0, 80)}"` : '';
+        warnings.push(`Node ${node.id} (${node.name}) e do tipo ${node.type}; nao deve ser container. Considere w:icon ou w:custom.${snippet}`);
+        focusNode(node.id);
+        sendLayoutWarning(node, `Node ${node.id} (${node.name}) tipo ${node.type} pode ser widget, nao container.${snippet}`);
     }
 
     if (Array.isArray((node as any).children)) {
@@ -37,6 +43,33 @@ function collectLayoutWarnings(node: any): string[] {
     }
 
     return warnings;
+}
+
+function focusNode(nodeId: string) {
+    try {
+        const n = figma.getNodeById(nodeId);
+        if (n) {
+            figma.currentPage.selection = [n as SceneNode];
+            figma.viewport.scrollAndZoomIntoView([n as SceneNode]);
+        }
+    } catch {
+        // ignore focus errors
+    }
+}
+
+function sendLayoutWarning(node: any, message: string) {
+    try {
+        const textSnippet = typeof node.characters === 'string' ? node.characters.slice(0, 200) : '';
+        figma.ui.postMessage({
+            type: 'layout-warning',
+            nodeId: node.id,
+            name: node.name,
+            text: textSnippet,
+            message
+        });
+    } catch {
+        // ignore
+    }
 }
 
 function toBase64(str: string): string {
@@ -189,8 +222,9 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
     const node = getSelectedNode();
     const wpConfig = customWP || await loadWPConfig();
     const { provider, apiKey, providerId } = await resolveProviderConfig(aiPayload);
+    const autoFixLayout = await loadSetting<boolean>('auto_fix_layout', false);
     log(`Iniciando pipeline (${providerId.toUpperCase()})...`, 'info');
-    const result = await pipeline.run(node, wpConfig, { debug, provider, apiKey }) as any;
+    const result = await pipeline.run(node, wpConfig, { debug, provider, apiKey, autoFixLayout }) as any;
     log('Pipeline concluido.', 'success');
     if (debug && result.elementorJson) {
         return result;

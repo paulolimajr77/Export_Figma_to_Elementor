@@ -230,6 +230,16 @@
         }
         addLog(msg.message, msg.level);
         break;
+      case 'layout-warning':
+        addLog(msg.message || 'Aviso de layout', 'warn');
+        const shouldFix = confirm(`Aviso: ${msg.message || 'problema de layout'}\nNode: ${msg.nodeId} (${msg.name || ''})\nTexto: ${msg.text || '(sem texto)'}\n\nDeseja ativar correção automática para esses casos?`);
+        if (shouldFix) {
+          send('save-setting', { key: 'auto_fix_layout', value: true });
+          addLog('Correção automática habilitada (auto_fix_layout=true).', 'info');
+        } else {
+          addLog('Correção automática não habilitada.', 'warn');
+        }
+        break;
       case 'load-settings':
         loadStoredSettings(msg.payload);
         break;

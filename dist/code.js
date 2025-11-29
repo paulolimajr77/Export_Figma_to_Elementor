@@ -963,6 +963,7 @@ INSTRUCOES:
       init_prompts();
       ConversionPipeline = class {
         constructor() {
+          this.autoFixLayout = false;
           this.compiler = new ElementorCompiler();
           this.imageUploader = new ImageUploader({});
         }
@@ -971,6 +972,7 @@ INSTRUCOES:
             this.compiler.setWPConfig(wpConfig);
             this.imageUploader.setWPConfig(wpConfig);
             const provider = (options == null ? void 0 : options.provider) || geminiProvider;
+            this.autoFixLayout = !!(options == null ? void 0 : options.autoFixLayout);
             const preprocessed = this.preprocess(node);
             const schema = yield this.generateSchema(preprocessed, provider, options == null ? void 0 : options.apiKey);
             this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
@@ -1099,7 +1101,12 @@ INSTRUCOES:
             const hasAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
             const looksInvalidContainer = !hasAutoLayout || !isFrameLike;
             if (looksInvalidContainer) {
-              logWarn(`[AutoFix] Node ${c.id} (${(node == null ? void 0 : node.name) || "container"}) nao tem auto layout ou tipo invalido (${type}). Convertido para w:custom e filhos promovidos.`);
+              logWarn(`[AutoFix] Node ${c.id} (${(node == null ? void 0 : node.name) || "container"}) nao tem auto layout ou tipo invalido (${type}).`);
+              if (!this.autoFixLayout) {
+                logWarn(`[AutoFix] Corre\xE7\xE3o desativada. Ative "auto_fix_layout" para converter em widget custom.`);
+                return c;
+              }
+              logWarn(`[AutoFix] Convertendo ${c.id} para w:custom e promovendo filhos.`);
               const parentContainer = parent;
               if (parentContainer) {
                 parentContainer.widgets = parentContainer.widgets || [];
@@ -1332,15 +1339,44 @@ ${JSON.stringify(input.snapshot)}` }
         const nameLower = (node.name || "").toLowerCase();
         const looksLikeContainer = nameLower.startsWith("c:") || nameLower.includes("container");
         if (looksLikeContainer && !hasAutoLayout) {
-          warnings.push(`Node ${node.id} (${node.name}) sem auto layout; pode gerar container com direction invalido. Ajuste para HORIZONTAL/VERTICAL ou trate como widget.`);
+          const snippet = typeof node.characters === "string" ? ` Texto: "${node.characters.slice(0, 80)}"` : "";
+          warnings.push(`Node ${node.id} (${node.name}) sem auto layout; pode gerar container com direction invalido.${snippet}`);
+          focusNode(node.id);
+          sendLayoutWarning(node, `Node ${node.id} (${node.name}) sem auto layout; pode gerar container invalido.${snippet}`);
         }
         if (node.type && node.type !== "FRAME" && node.type !== "GROUP" && looksLikeContainer) {
-          warnings.push(`Node ${node.id} (${node.name}) e do tipo ${node.type}; nao deve ser container. Considere w:icon ou w:custom.`);
+          const snippet = typeof node.characters === "string" ? ` Texto: "${node.characters.slice(0, 80)}"` : "";
+          warnings.push(`Node ${node.id} (${node.name}) e do tipo ${node.type}; nao deve ser container. Considere w:icon ou w:custom.${snippet}`);
+          focusNode(node.id);
+          sendLayoutWarning(node, `Node ${node.id} (${node.name}) tipo ${node.type} pode ser widget, nao container.${snippet}`);
         }
         if (Array.isArray(node.children)) {
           node.children.forEach((child) => warnings.push(...collectLayoutWarnings(child)));
         }
         return warnings;
+      }
+      function focusNode(nodeId) {
+        try {
+          const n = figma.getNodeById(nodeId);
+          if (n) {
+            figma.currentPage.selection = [n];
+            figma.viewport.scrollAndZoomIntoView([n]);
+          }
+        } catch (e) {
+        }
+      }
+      function sendLayoutWarning(node, message) {
+        try {
+          const textSnippet = typeof node.characters === "string" ? node.characters.slice(0, 200) : "";
+          figma.ui.postMessage({
+            type: "layout-warning",
+            nodeId: node.id,
+            name: node.name,
+            text: textSnippet,
+            message
+          });
+        } catch (e) {
+        }
       }
       function toBase64(str) {
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1482,8 +1518,9 @@ ${JSON.stringify(input.snapshot)}` }
           const node = getSelectedNode();
           const wpConfig = customWP || (yield loadWPConfig());
           const { provider, apiKey, providerId } = yield resolveProviderConfig(aiPayload);
+          const autoFixLayout = yield loadSetting("auto_fix_layout", false);
           log(`Iniciando pipeline (${providerId.toUpperCase()})...`, "info");
-          const result = yield pipeline.run(node, wpConfig, { debug, provider, apiKey });
+          const result = yield pipeline.run(node, wpConfig, { debug, provider, apiKey, autoFixLayout });
           log("Pipeline concluido.", "success");
           if (debug && result.elementorJson) {
             return result;
