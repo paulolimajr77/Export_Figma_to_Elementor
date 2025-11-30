@@ -1869,6 +1869,9 @@ REGRAS CR\xCDTICAS (N\xC3O QUEBRE O SCHEMA):
 2.  **N\xC3O ALTERE IMAGENS**: Se o input tem um widget type="image" com um imageId, MANTENHA-O. N\xE3o transforme em HTML ou Texto.
 3.  **N\xC3O ALTERE TEXTOS**: Mantenha o conte\xFAdo dos textos exato.
 
+4.  **N\xC3O DUPLIQUE NENHUM NODE**: para cada container ou widget do SCHEMA BASE (identificado por id e/ou styles.sourceId), mantenha no m\xE1ximo UMA inst\xE2ncia correspondente no schema otimizado. \xC9 proibido gerar dois containers/widgets diferentes com o mesmo id ou styles.sourceId.
+5.  **N\xC3O CRIE NODES NOVOS**: n\xE3o invente containers ou widgets para nodes que n\xE3o existam no SCHEMA BASE. Se precisar agrupar logicamente, use apenas estruturas j\xE1 existentes, sem adicionar novos IDs.
+
 TRANSFORMA\xC7\xD5ES DESEJADAS:
 -   **Icon List**: Se vir uma lista de containers onde cada um tem um \xCDcone + Texto -> Converta para widget "icon-list".
 -   **Image Box**: Se vir Container com Imagem + T\xEDtulo + Texto -> Converta para widget "image-box".

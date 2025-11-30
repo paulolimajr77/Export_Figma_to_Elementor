@@ -11,6 +11,8 @@ REGRAS CRÍTICAS:
 - styles deve incluir sourceId com o id do node original.
 - Modo sem IA: se o usuário desligar IA, siga o mesmo schema usando apenas heurísticas (não invente texto).
 
+- **N�O DUPLIQUE NENHUM NODE**: para cada node Figma de entrada (id ou sourceId), crie no m�ximo UM container ou widget correspondente no schema. Nunca crie dois containers ou widgets diferentes apontando para o mesmo id/sourceId.
+
 WIDGETS PERMITIDOS (use exatamente estes tipos; se não se encaixar, use "custom"):
 - Básicos: heading, text, button, image, icon, video, divider, spacer, image-box, icon-box, star-rating, counter, progress, tabs, accordion, toggle, alert, social-icons, soundcloud, shortcode, html, menu-anchor, sidebar, read-more, image-carousel, basic-gallery, gallery, icon-list, nav-menu, search-form, google-maps, testimonial, embed, lottie, loop:grid.
 - Pro: form, login, subscription, call-to-action, media:carousel, portfolio, gallery-pro, slider:slides, slideshow, flip-box, animated-headline, post-navigation, share-buttons, table-of-contents, countdown, blockquote, testimonial-carousel, review-box, hotspots, sitemap, author-box, price-table, price-list, progress-tracker, animated-text, nav-menu-pro, breadcrumb, facebook-button, facebook-comments, facebook-embed, facebook-page, loop:builder, loop:grid-advanced, loop:carousel, post-excerpt, post-content, post-title, post-info, post-featured-image, post-author, post-date, post-terms, archive-title, archive-description, site-logo, site-title, site-tagline, search-results, global-widget, video-playlist, video-gallery.
@@ -24,11 +26,11 @@ SCHEMA ALVO:
   "page": { "title": "...", "tokens": { "primaryColor": "...", "secondaryColor": "..." } },
   "containers": [
     {
-      "id": "string",
+      "id": "DEVE_SER_O_ID_DO_NODE_FIGMA",
       "direction": "row" | "column",
       "width": "full" | "boxed",
-      "styles": { "sourceId": "id-original" },
-      "widgets": [ { "type": "um dos widgets acima ou custom", "content": "...", "imageId": null, "styles": { "sourceId": "id-do-node" } } ],
+      "styles": { "sourceId": "DEVE_SER_O_ID_DO_NODE_FIGMA" },
+      "widgets": [ { "type": "...", "content": "...", "imageId": null, "styles": { "sourceId": "DEVE_SER_O_ID_DO_NODE_FIGMA" } } ],
       "children": [ ... ]
     }
   ]
@@ -39,6 +41,7 @@ ENTRADA:
 
 INSTRUÇÕES:
 - Mantenha textos e imagens exatamente como no original.
+- **CRÍTICO: O campo "id" e "styles.sourceId" DEVE ser preenchido com o ID real do node Figma (ex: "123:456"). NÃO GERE IDs ALEATÓRIOS.**
 - Não agrupe nós diferentes em um único widget.
 - Se o node tem filhos -> container; se não tem -> widget simples.
 - width use "full" (padrão); direction derive do layoutMode.
@@ -60,6 +63,9 @@ REGRAS CRÍTICAS (NÃO QUEBRE O SCHEMA):
 1.  **NÃO REMOVA IDs**: Os IDs (sourceId, id) são fundamentais para o link com o Figma. Mantenha-os.
 2.  **NÃO ALTERE IMAGENS**: Se o input tem um widget type="image" com um imageId, MANTENHA-O. Não transforme em HTML ou Texto.
 3.  **NÃO ALTERE TEXTOS**: Mantenha o conteúdo dos textos exato.
+
+4.  **NÃO DUPLIQUE NENHUM NODE**: para cada container ou widget do SCHEMA BASE (identificado por id e/ou styles.sourceId), mantenha no máximo UMA instância correspondente no schema otimizado. É proibido gerar dois containers/widgets diferentes com o mesmo id ou styles.sourceId.
+5.  **NÃO CRIE NODES NOVOS**: não invente containers ou widgets para nodes que não existam no SCHEMA BASE. Se precisar agrupar logicamente, use apenas estruturas já existentes, sem adicionar novos IDs.
 
 TRANSFORMAÇÕES DESEJADAS:
 -   **Icon List**: Se vir uma lista de containers onde cada um tem um Ícone + Texto -> Converta para widget "icon-list".
