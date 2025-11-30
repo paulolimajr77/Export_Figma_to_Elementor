@@ -20,15 +20,32 @@ export interface ElementorElement {
     elType: string;
     widgetType?: string;
     settings: ElementorSettings;
+    defaultEditSettings?: any;
     elements: ElementorElement[];
     isInner?: boolean;
+    isLocked?: boolean;
 }
 
 export interface ElementorTemplate {
-    type: 'elementor';
-    siteurl: string;
-    elements: ElementorElement[];
+    type: 'elementor' | 'page';
+    /**
+     * URL do site de origem (usada pelo Elementor para validacao de copia entre sites).
+     */
+    siteurl?: string;
+    /**
+     * Titulo do template/pagina exportada.
+     */
+    title?: string;
+    /**
+     * Versao do schema Elementor (ex.: "0.4").
+     */
     version?: string;
+    /**
+     * Conteudo raiz do template. O Elementor espera o array em `content`,
+     * mas mantemos `elements` por compatibilidade interna.
+     */
+    content?: ElementorElement[];
+    elements?: ElementorElement[];
     page_settings?: ElementorSettings;
 }
 

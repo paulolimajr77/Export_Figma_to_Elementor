@@ -3,13 +3,13 @@ import { ElementorJSON, ElementorElement } from '../types/elementor.types';
 
 export function validatePipelineSchema(schema: any): asserts schema is PipelineSchema {
     if (!schema || typeof schema !== 'object') {
-        throw new Error('Schema inválido: não é objeto.');
+        throw new Error('Schema invalido: nao e um objeto.');
     }
     if (!schema.page || typeof schema.page !== 'object') {
-        throw new Error('Schema inválido: campo page ausente.');
+        throw new Error('Schema invalido: campo page ausente.');
     }
     if (!Array.isArray(schema.containers)) {
-        throw new Error('Schema inválido: containers deve ser array.');
+        throw new Error('Schema invalido: containers deve ser array.');
     }
     schema.containers.forEach(validateContainer);
 }
@@ -17,10 +17,10 @@ export function validatePipelineSchema(schema: any): asserts schema is PipelineS
 function validateContainer(container: PipelineContainer) {
     if (typeof container.id !== 'string') throw new Error('Container sem id.');
     if (container.direction !== 'row' && container.direction !== 'column') {
-        throw new Error(`Container ${container.id} com direction inválido.`);
+        throw new Error(`Container ${container.id} com direction invalido.`);
     }
     if (container.width !== 'full' && container.width !== 'boxed') {
-        throw new Error(`Container ${container.id} com width inválido.`);
+        throw new Error(`Container ${container.id} com width invalido.`);
     }
     if (!Array.isArray(container.widgets) || !Array.isArray(container.children)) {
         throw new Error(`Container ${container.id} sem widgets/children array.`);
@@ -31,21 +31,27 @@ function validateContainer(container: PipelineContainer) {
 
 function validateWidget(widget: PipelineWidget) {
     if (!widget || typeof widget.type !== 'string' || widget.type.length === 0) {
-        throw new Error(`Widget com tipo inválido: ${widget?.type}`);
+        throw new Error(`Widget com tipo invalido: ${widget?.type}`);
     }
 }
 
 export function validateElementorJSON(json: any): asserts json is ElementorJSON {
-    if (!json || typeof json !== 'object') throw new Error('Elementor JSON inválido: não é objeto.');
-    if (!Array.isArray(json.elements)) throw new Error('Elementor JSON inválido: elements deve ser array.');
-    json.elements.forEach(el => validateElement(el));
+    if (!json || typeof json !== 'object') throw new Error('Elementor JSON invalido: nao e um objeto.');
+    const content = json.content || json.elements;
+    if (!Array.isArray(content)) throw new Error('Elementor JSON invalido: content/elements deve ser array.');
+
+    // Normalizacao para manter compatibilidade interna
+    if (!json.elements) json.elements = content;
+    if (!json.content) json.content = content;
+
+    content.forEach(el => validateElement(el));
 }
 
 function validateElement(el: ElementorElement) {
     if (!el.id || !el.elType) throw new Error('Elemento Elementor sem id ou elType.');
     if (!Array.isArray(el.elements)) throw new Error(`Elemento ${el.id} sem elements array.`);
     if (!el.settings) throw new Error(`Elemento ${el.id} sem settings.`);
-    if (el.elType !== 'container' && el.elType !== 'widget') throw new Error(`Elemento ${el.id} com elType inválido.`);
+    if (el.elType !== 'container' && el.elType !== 'widget') throw new Error(`Elemento ${el.id} com elType invalido.`);
     el.elements.forEach(child => validateElement(child));
 }
 
@@ -73,7 +79,7 @@ export function computeCoverage(serializedFlat: any[], schema: PipelineSchema, e
         n_elements_elementor++;
         el.elements.forEach(walkEl);
     };
-    elementor.elements.forEach(walkEl);
+    elementor.elements?.forEach(walkEl);
 
     return { n_nodes_origem, n_widgets_schema, n_containers_schema, n_elements_elementor };
 }

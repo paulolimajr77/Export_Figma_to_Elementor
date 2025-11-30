@@ -76,6 +76,7 @@ Acoes de exportacao:
 ---
 
 ## Notas de versao (backup recente)
+- Normalizacao do JSON Elementor para colagem/importacao: raiz agora inclui `version` 0.4, `content` e `title`, e o bridge de copia envia sempre o array de `content`.
 - Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
 - Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).
 - Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.
@@ -92,6 +93,15 @@ Acoes de exportacao:
 - Heuristicas NO-AI aprimoradas: agrupam wrappers de imagem/galeria/icon-list/image-box/icon-box em um unico widget evitando containers vazios.
 - Compiler ampliado para widgets basicos (video, divider, spacer, rating, tabs/accordions, galerias, nav-menu, maps, lottie) com defaults seguros e registry preparado para Pro/Woo/Loop/WordPress.
 - Modo "Usar IA" na UI (default ligado); possibilidade de desativar IA e acionar pipeline heuristico (em desenvolvimento).
+- **Correção de Colagem no Elementor:** O botão "Copiar JSON" agora copia apenas a lista de elementos (array), formato exigido pelo Elementor para colagem direta. O botão "Baixar JSON" continua fornecendo o arquivo completo para importação de templates.
+- **Correção de Detecção de Containers:** Corrigido bug onde containers com fundo de imagem eram incorretamente identificados como widgets de imagem.
+- **Correção de Erro de Estilos Mistos:** Corrigido erro `styles.textDecoration.toLowerCase is not a function` ao processar textos com múltiplos estilos (mixed), garantindo que propriedades mistas sejam tratadas com segurança.
+- **Correção de Text Decoration**: Normalização de `textDecoration` para lowercase para compatibilidade com Elementor.
+- **Formato de Exportação Elementor**: Ajuste para garantir conformidade estrita com o modelo Elementor:
+    - IDs hexadecimais de 7 caracteres.
+    - `flex_gap` com valores de string e campo `size`.
+    - IDs de imagem seguros (`""` em vez de `null` ou `0`) em todos os widgets de mídia.
+    - Inclusão de `isLocked` e `defaultEditSettings`.
 
 ---
 
@@ -132,6 +142,5 @@ Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz 
 - 28/11/2025 (noite): corre��o cr�tica na autentica��o WP (substitui��o da fun��o toBase64 quebrada por implementa��o robusta) e adi��o de User-Agent para evitar bloqueios de seguran�a; build atualizado.
 - 30/11/2025: UI garante que o JSON gerado (IA on/off) preenche o textarea figma-json-output e fica selecionado para copia; build recompilado.
 - 29/11/2025: Correção crítica para frames trancados (agora exportados como imagem única) e upload de imagens (respeitando checkbox da UI); suporte a NO-AI para frames trancados; proteção readonly no textarea de preview (#output); separação clara entre JSON de preview (Figma) e JSON final (Elementor); otimização de performance com uploads de imagem em paralelo; correção de falha no upload (handler restaurado na UI); melhoria no suporte a estilos (ícones SVG, tipografia completa, bordas, texto rico/HTML) com lógica unificada para AI e NO-AI.
-
 
 

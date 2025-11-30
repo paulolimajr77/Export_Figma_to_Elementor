@@ -28,11 +28,16 @@ export class ElementorCompiler {
 
     public compile(schema: PipelineSchema): ElementorJSON {
         const elements = schema.containers.map(container => this.compileContainer(container, false));
-        return {
-            type: 'elementor',
+        const template: ElementorJSON = {
+            type: 'page',
+            version: '0.4',
+            title: schema?.page?.title || 'Pagina importada',
             siteurl: this.wpConfig?.url || '',
+            page_settings: {},
+            content: elements,
             elements
-        } as any;
+        };
+        return template as any;
     }
 
     private compileContainer(container: PipelineContainer, isInner: boolean): ElementorElement {
@@ -45,7 +50,7 @@ export class ElementorCompiler {
             ...this.mapContainerStyles(container.styles)
         };
         if (!settings.flex_gap) {
-            settings.flex_gap = { unit: 'px', column: 0, row: 0, isLinked: true };
+            settings.flex_gap = { unit: 'px', size: 0, column: '0', row: '0', isLinked: true };
         }
         if (!settings.justify_content) settings.justify_content = 'start';
         if (!settings.align_items) settings.align_items = 'start';
@@ -58,7 +63,9 @@ export class ElementorCompiler {
             id,
             elType: 'container',
             isInner,
+            isLocked: false,
             settings,
+            defaultEditSettings: { defaultEditRoute: 'content' },
             elements: merged
         };
     }
@@ -70,8 +77,9 @@ export class ElementorCompiler {
         if (styles.gap !== undefined) {
             settings.flex_gap = {
                 unit: 'px',
-                column: styles.gap,
-                row: styles.gap,
+                size: styles.gap,
+                column: String(styles.gap),
+                row: String(styles.gap),
                 isLinked: true
             };
         }
@@ -154,7 +162,19 @@ export class ElementorCompiler {
 
     private sanitizeSettings(raw: Record<string, any>): ElementorSettings {
         const out: ElementorSettings = {};
+        const ignoredKeys = [
+            'fontName', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+            'textDecoration', 'textCase', 'paragraphIndent', 'paragraphSpacing',
+            'fills', 'strokes', 'effects', 'layoutMode', 'primaryAxisAlignItems',
+            'counterAxisAlignItems', 'primaryAxisSizingMode', 'counterAxisSizingMode',
+            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'itemSpacing',
+            'gap', 'background', 'border', 'cornerRadius', 'width', 'height',
+            'sourceId', 'sourceName', '_order'
+        ];
+
         Object.keys(raw).forEach(k => {
+            if (ignoredKeys.includes(k)) return;
+
             const v = raw[k];
             if (k.toLowerCase().includes('color')) {
                 const sanitized = this.sanitizeColor(v);
@@ -185,8 +205,10 @@ export class ElementorCompiler {
             return {
                 id: widgetId,
                 elType: 'widget',
+                isLocked: false,
                 widgetType: registryResult.widgetType,
                 settings: registryResult.settings,
+                defaultEditSettings: { defaultEditRoute: 'content' },
                 elements: []
             };
         }
@@ -213,9 +235,12 @@ export class ElementorCompiler {
                 break;
             case 'image':
                 widgetType = 'image';
+                const imgId = widget.imageId ? parseInt(widget.imageId, 10) : 0;
+                const finalId = isNaN(imgId) ? '' : imgId;
+
                 settings.image = {
                     url: widget.content || '',
-                    id: widget.imageId ? parseInt(widget.imageId, 10) : 0
+                    id: finalId
                 };
                 break;
             case 'icon':
@@ -232,8 +257,10 @@ export class ElementorCompiler {
         return {
             id: widgetId,
             elType: 'widget',
+            isLocked: false,
             widgetType,
             settings,
+            defaultEditSettings: { defaultEditRoute: 'content' },
             elements: []
         };
     }

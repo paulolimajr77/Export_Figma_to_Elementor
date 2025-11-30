@@ -1,5 +1,6 @@
 # Registro de Alterações
 
+- 30/11/2025: Ajustado formato raiz do JSON Elementor (version 0.4, content/elements normalizados) e bridge de cópia para compatibilidade de colagem; validação atualizada.
 - 28/11/2025: Suporte ao provedor GPT (OpenAI) adicionado com fallback e seleção automática.
 - 28/11/2025: Correção na autenticação WP (base64) e adição de User-Agent.
 - 30/11/2025: JSON gerado (IA on/off) agora sempre preenche o textarea de saída.

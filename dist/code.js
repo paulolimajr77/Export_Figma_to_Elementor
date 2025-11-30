@@ -154,16 +154,16 @@
     }
     if (node.type === "TEXT") {
       data.characters = node.characters;
-      data.fontSize = node.fontSize;
-      data.fontName = node.fontName;
-      data.fontWeight = getFontWeight((_a = node.fontName) == null ? void 0 : _a.style);
+      data.fontSize = node.fontSize !== figma.mixed ? node.fontSize : void 0;
+      data.fontName = node.fontName !== figma.mixed ? node.fontName : void 0;
+      data.fontWeight = node.fontName !== figma.mixed ? getFontWeight((_a = node.fontName) == null ? void 0 : _a.style) : 400;
       data.textAlignHorizontal = node.textAlignHorizontal;
       data.textAlignVertical = node.textAlignVertical;
       data.textAutoResize = node.textAutoResize;
-      data.letterSpacing = node.letterSpacing;
-      data.lineHeight = node.lineHeight;
-      data.textCase = node.textCase;
-      data.textDecoration = node.textDecoration;
+      data.letterSpacing = node.letterSpacing !== figma.mixed ? node.letterSpacing : void 0;
+      data.lineHeight = node.lineHeight !== figma.mixed ? node.lineHeight : void 0;
+      data.textCase = node.textCase !== figma.mixed ? node.textCase : void 0;
+      data.textDecoration = node.textDecoration !== figma.mixed ? node.textDecoration : void 0;
       if (node.fills !== figma.mixed && node.fills.length > 0 && node.fills[0].type === "SOLID") {
         data.color = node.fills[0].color;
       }
@@ -521,7 +521,8 @@ ${JSON.stringify(input.snapshot)}` }
 
   // src/utils/guid.ts
   function generateGUID() {
-    return Math.random().toString(36).substring(2, 9);
+    const hex = Math.floor(Math.random() * 268435455).toString(16);
+    return ("0000000" + hex).slice(-7);
   }
   var init_guid = __esm({
     "src/utils/guid.ts"() {
@@ -585,15 +586,18 @@ ${JSON.stringify(input.snapshot)}` }
           key: "image",
           widgetType: "image",
           family: "media",
-          compile: (w, base) => ({
-            widgetType: "image",
-            settings: __spreadProps(__spreadValues({}, base), {
-              image: {
-                url: w.content || "",
-                id: w.imageId ? parseInt(w.imageId, 10) : 0
-              }
-            })
-          })
+          compile: (w, base) => {
+            const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
+            return {
+              widgetType: "image",
+              settings: __spreadProps(__spreadValues({}, base), {
+                image: {
+                  url: w.content || "",
+                  id: isNaN(imgId) ? "" : imgId
+                }
+              })
+            };
+          }
         },
         {
           key: "icon",
@@ -610,14 +614,17 @@ ${JSON.stringify(input.snapshot)}` }
           widgetType: "image-box",
           family: "media",
           aliases: ["image_box_like"],
-          compile: (w, base) => ({
-            widgetType: "image-box",
-            settings: __spreadProps(__spreadValues({}, base), {
-              image: { url: base.image_url || "", id: w.imageId ? parseInt(w.imageId, 10) : 0 },
-              title_text: w.content || base.title_text || "Title",
-              description_text: base.description_text || ""
-            })
-          })
+          compile: (w, base) => {
+            const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
+            return {
+              widgetType: "image-box",
+              settings: __spreadProps(__spreadValues({}, base), {
+                image: { url: base.image_url || "", id: isNaN(imgId) ? "" : imgId },
+                title_text: w.content || base.title_text || "Title",
+                description_text: base.description_text || ""
+              })
+            };
+          }
         },
         {
           key: "icon_box",
@@ -783,7 +790,11 @@ ${JSON.stringify(input.snapshot)}` }
             widgetType: "image-carousel",
             settings: __spreadProps(__spreadValues({}, base), {
               slides: base.slides || [
-                { id: w.imageId ? parseInt(w.imageId, 10) : 0, url: w.content || "", _id: "slide1" }
+                {
+                  id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+                  url: w.content || "",
+                  _id: "slide1"
+                }
               ]
             })
           })
@@ -795,7 +806,10 @@ ${JSON.stringify(input.snapshot)}` }
           compile: (w, base) => ({
             widgetType: "basic-gallery",
             settings: __spreadProps(__spreadValues({}, base), {
-              gallery: base.gallery || [{ id: w.imageId ? parseInt(w.imageId, 10) : 0, url: w.content || "" }]
+              gallery: base.gallery || [{
+                id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+                url: w.content || ""
+              }]
             })
           })
         },
@@ -806,7 +820,10 @@ ${JSON.stringify(input.snapshot)}` }
           compile: (w, base) => ({
             widgetType: "gallery",
             settings: __spreadProps(__spreadValues({}, base), {
-              gallery: base.gallery || [{ id: w.imageId ? parseInt(w.imageId, 10) : 0, url: w.content || "" }]
+              gallery: base.gallery || [{
+                id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+                url: w.content || ""
+              }]
             })
           })
         },
@@ -1045,13 +1062,18 @@ ${JSON.stringify(input.snapshot)}` }
           return void 0;
         }
         compile(schema) {
-          var _a;
+          var _a, _b;
           const elements = schema.containers.map((container) => this.compileContainer(container, false));
-          return {
-            type: "elementor",
-            siteurl: ((_a = this.wpConfig) == null ? void 0 : _a.url) || "",
+          const template = {
+            type: "page",
+            version: "0.4",
+            title: ((_a = schema == null ? void 0 : schema.page) == null ? void 0 : _a.title) || "Pagina importada",
+            siteurl: ((_b = this.wpConfig) == null ? void 0 : _b.url) || "",
+            page_settings: {},
+            content: elements,
             elements
           };
+          return template;
         }
         compileContainer(container, isInner) {
           const id = generateGUID();
@@ -1062,7 +1084,7 @@ ${JSON.stringify(input.snapshot)}` }
             flex_direction: container.direction === "row" ? "row" : "column"
           }, this.mapContainerStyles(container.styles));
           if (!settings.flex_gap) {
-            settings.flex_gap = { unit: "px", column: 0, row: 0, isLinked: true };
+            settings.flex_gap = { unit: "px", size: 0, column: "0", row: "0", isLinked: true };
           }
           if (!settings.justify_content) settings.justify_content = "start";
           if (!settings.align_items) settings.align_items = "start";
@@ -1079,7 +1101,9 @@ ${JSON.stringify(input.snapshot)}` }
             id,
             elType: "container",
             isInner,
+            isLocked: false,
             settings,
+            defaultEditSettings: { defaultEditRoute: "content" },
             elements: merged
           };
         }
@@ -1089,8 +1113,9 @@ ${JSON.stringify(input.snapshot)}` }
           if (styles.gap !== void 0) {
             settings.flex_gap = {
               unit: "px",
-              column: styles.gap,
-              row: styles.gap,
+              size: styles.gap,
+              column: String(styles.gap),
+              row: String(styles.gap),
               isLinked: true
             };
           }
@@ -1159,7 +1184,41 @@ ${JSON.stringify(input.snapshot)}` }
         }
         sanitizeSettings(raw) {
           const out = {};
+          const ignoredKeys = [
+            "fontName",
+            "fontSize",
+            "fontWeight",
+            "lineHeight",
+            "letterSpacing",
+            "textDecoration",
+            "textCase",
+            "paragraphIndent",
+            "paragraphSpacing",
+            "fills",
+            "strokes",
+            "effects",
+            "layoutMode",
+            "primaryAxisAlignItems",
+            "counterAxisAlignItems",
+            "primaryAxisSizingMode",
+            "counterAxisSizingMode",
+            "paddingTop",
+            "paddingRight",
+            "paddingBottom",
+            "paddingLeft",
+            "itemSpacing",
+            "gap",
+            "background",
+            "border",
+            "cornerRadius",
+            "width",
+            "height",
+            "sourceId",
+            "sourceName",
+            "_order"
+          ];
           Object.keys(raw).forEach((k) => {
+            if (ignoredKeys.includes(k)) return;
             const v = raw[k];
             if (k.toLowerCase().includes("color")) {
               const sanitized = this.sanitizeColor(v);
@@ -1186,8 +1245,10 @@ ${JSON.stringify(input.snapshot)}` }
             return {
               id: widgetId,
               elType: "widget",
+              isLocked: false,
               widgetType: registryResult.widgetType,
               settings: registryResult.settings,
+              defaultEditSettings: { defaultEditRoute: "content" },
               elements: []
             };
           }
@@ -1211,9 +1272,11 @@ ${JSON.stringify(input.snapshot)}` }
               break;
             case "image":
               widgetType = "image";
+              const imgId = widget.imageId ? parseInt(widget.imageId, 10) : 0;
+              const finalId = isNaN(imgId) ? "" : imgId;
               settings.image = {
                 url: widget.content || "",
-                id: widget.imageId ? parseInt(widget.imageId, 10) : 0
+                id: finalId
               };
               break;
             case "icon":
@@ -1229,8 +1292,10 @@ ${JSON.stringify(input.snapshot)}` }
           return {
             id: widgetId,
             elType: "widget",
+            isLocked: false,
             widgetType,
             settings,
+            defaultEditSettings: { defaultEditRoute: "content" },
             elements: []
           };
         }
@@ -1465,23 +1530,23 @@ ${JSON.stringify(input.snapshot)}` }
   // src/utils/validation.ts
   function validatePipelineSchema(schema) {
     if (!schema || typeof schema !== "object") {
-      throw new Error("Schema inv\xE1lido: n\xE3o \xE9 objeto.");
+      throw new Error("Schema invalido: nao e um objeto.");
     }
     if (!schema.page || typeof schema.page !== "object") {
-      throw new Error("Schema inv\xE1lido: campo page ausente.");
+      throw new Error("Schema invalido: campo page ausente.");
     }
     if (!Array.isArray(schema.containers)) {
-      throw new Error("Schema inv\xE1lido: containers deve ser array.");
+      throw new Error("Schema invalido: containers deve ser array.");
     }
     schema.containers.forEach(validateContainer);
   }
   function validateContainer(container) {
     if (typeof container.id !== "string") throw new Error("Container sem id.");
     if (container.direction !== "row" && container.direction !== "column") {
-      throw new Error(`Container ${container.id} com direction inv\xE1lido.`);
+      throw new Error(`Container ${container.id} com direction invalido.`);
     }
     if (container.width !== "full" && container.width !== "boxed") {
-      throw new Error(`Container ${container.id} com width inv\xE1lido.`);
+      throw new Error(`Container ${container.id} com width invalido.`);
     }
     if (!Array.isArray(container.widgets) || !Array.isArray(container.children)) {
       throw new Error(`Container ${container.id} sem widgets/children array.`);
@@ -1491,22 +1556,26 @@ ${JSON.stringify(input.snapshot)}` }
   }
   function validateWidget(widget) {
     if (!widget || typeof widget.type !== "string" || widget.type.length === 0) {
-      throw new Error(`Widget com tipo inv\xE1lido: ${widget == null ? void 0 : widget.type}`);
+      throw new Error(`Widget com tipo invalido: ${widget == null ? void 0 : widget.type}`);
     }
   }
   function validateElementorJSON(json) {
-    if (!json || typeof json !== "object") throw new Error("Elementor JSON inv\xE1lido: n\xE3o \xE9 objeto.");
-    if (!Array.isArray(json.elements)) throw new Error("Elementor JSON inv\xE1lido: elements deve ser array.");
-    json.elements.forEach((el) => validateElement(el));
+    if (!json || typeof json !== "object") throw new Error("Elementor JSON invalido: nao e um objeto.");
+    const content = json.content || json.elements;
+    if (!Array.isArray(content)) throw new Error("Elementor JSON invalido: content/elements deve ser array.");
+    if (!json.elements) json.elements = content;
+    if (!json.content) json.content = content;
+    content.forEach((el) => validateElement(el));
   }
   function validateElement(el) {
     if (!el.id || !el.elType) throw new Error("Elemento Elementor sem id ou elType.");
     if (!Array.isArray(el.elements)) throw new Error(`Elemento ${el.id} sem elements array.`);
     if (!el.settings) throw new Error(`Elemento ${el.id} sem settings.`);
-    if (el.elType !== "container" && el.elType !== "widget") throw new Error(`Elemento ${el.id} com elType inv\xE1lido.`);
+    if (el.elType !== "container" && el.elType !== "widget") throw new Error(`Elemento ${el.id} com elType invalido.`);
     el.elements.forEach((child) => validateElement(child));
   }
   function computeCoverage(serializedFlat, schema, elementor) {
+    var _a;
     const n_nodes_origem = serializedFlat.length;
     let n_widgets_schema = 0;
     let n_containers_schema = 0;
@@ -1521,7 +1590,7 @@ ${JSON.stringify(input.snapshot)}` }
       n_elements_elementor++;
       el.elements.forEach(walkEl);
     };
-    elementor.elements.forEach(walkEl);
+    (_a = elementor.elements) == null ? void 0 : _a.forEach(walkEl);
     return { n_nodes_origem, n_widgets_schema, n_containers_schema, n_elements_elementor };
   }
   var init_validation = __esm({
@@ -1726,6 +1795,9 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
   function detectWidget(node) {
     var _a, _b;
     const name = (node.name || "").toLowerCase();
+    if (name.startsWith("c:container") || name.startsWith("w:container")) {
+      return null;
+    }
     const styles = {
       sourceId: node.id,
       sourceName: node.name
@@ -2669,10 +2741,13 @@ ${JSON.stringify(input.snapshot)}` }
       }
       function deliverResult(json, debugInfo) {
         return __async(this, null, function* () {
-          const payload = JSON.stringify(json, null, 2);
+          const elementsForPaste = json.content || json.elements || [];
+          const normalizedJson = __spreadProps(__spreadValues({}, json), { content: elementsForPaste, elements: elementsForPaste });
+          const payload = JSON.stringify(normalizedJson, null, 2);
+          const pastePayload = JSON.stringify(elementsForPaste, null, 2);
           lastJSON = payload;
-          figma.ui.postMessage({ type: "generation-complete", payload, debug: debugInfo });
-          figma.ui.postMessage({ type: "copy-json", payload });
+          figma.ui.postMessage({ type: "generation-complete", payload, pastePayload, debug: debugInfo });
+          figma.ui.postMessage({ type: "copy-json", payload: pastePayload });
         });
       }
       function sendPreview(data) {

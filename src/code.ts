@@ -235,11 +235,14 @@ function log(message: string, level: 'info' | 'warn' | 'error' | 'success' = 'in
 }
 
 async function deliverResult(json: ElementorJSON, debugInfo?: any) {
-    const payload = JSON.stringify(json, null, 2);
+    const elementsForPaste = (json as any).content || (json as any).elements || [];
+    const normalizedJson: ElementorJSON = { ...(json as any), content: elementsForPaste, elements: elementsForPaste };
+    const payload = JSON.stringify(normalizedJson, null, 2);
+    const pastePayload = JSON.stringify(elementsForPaste, null, 2);
     lastJSON = payload;
-    figma.ui.postMessage({ type: 'generation-complete', payload, debug: debugInfo });
+    figma.ui.postMessage({ type: 'generation-complete', payload, pastePayload, debug: debugInfo });
     // Bridge de copia: UI via navigator.clipboard ou fallback manual
-    figma.ui.postMessage({ type: 'copy-json', payload });
+    figma.ui.postMessage({ type: 'copy-json', payload: pastePayload });
 }
 
 function sendPreview(data: any) {
