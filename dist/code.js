@@ -1062,15 +1062,12 @@ ${JSON.stringify(input.snapshot)}` }
           return void 0;
         }
         compile(schema) {
-          var _a, _b;
+          var _a;
           const elements = schema.containers.map((container) => this.compileContainer(container, false));
           const template = {
-            type: "page",
+            type: "elementor",
             version: "0.4",
-            title: ((_a = schema == null ? void 0 : schema.page) == null ? void 0 : _a.title) || "Pagina importada",
-            siteurl: ((_b = this.wpConfig) == null ? void 0 : _b.url) || "",
-            page_settings: {},
-            content: elements,
+            siteurl: ((_a = this.wpConfig) == null ? void 0 : _a.url) || "",
             elements
           };
           return template;
@@ -2741,10 +2738,16 @@ ${JSON.stringify(input.snapshot)}` }
       }
       function deliverResult(json, debugInfo) {
         return __async(this, null, function* () {
-          const elementsForPaste = json.content || json.elements || [];
-          const normalizedJson = __spreadProps(__spreadValues({}, json), { content: elementsForPaste, elements: elementsForPaste });
+          var _a;
+          const normalizedElements = json.elements || json.content || [];
+          const normalizedJson = {
+            type: json.type || "elementor",
+            siteurl: json.siteurl || ((_a = this == null ? void 0 : this.wpConfig) == null ? void 0 : _a.url) || "",
+            version: json.version || "0.4",
+            elements: normalizedElements
+          };
           const payload = JSON.stringify(normalizedJson, null, 2);
-          const pastePayload = JSON.stringify(elementsForPaste, null, 2);
+          const pastePayload = payload;
           lastJSON = payload;
           figma.ui.postMessage({ type: "generation-complete", payload, pastePayload, debug: debugInfo });
           figma.ui.postMessage({ type: "copy-json", payload: pastePayload });

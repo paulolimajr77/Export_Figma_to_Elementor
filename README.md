@@ -76,7 +76,7 @@ Acoes de exportacao:
 ---
 
 ## Notas de versao (backup recente)
-- Normalizacao do JSON Elementor para colagem/importacao: raiz agora inclui `version` 0.4, `content` e `title`, e o bridge de copia envia sempre o array de `content`.
+- Normalizacao do JSON Elementor para colagem/importacao: raiz agora inclui `type: elementor`, `version` 0.4 e `elements`, e o bridge de copia envia o objeto completo pronto para colar.
 - Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
 - Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).
 - Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.
@@ -142,5 +142,4 @@ Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz 
 - 28/11/2025 (noite): corre��o cr�tica na autentica��o WP (substitui��o da fun��o toBase64 quebrada por implementa��o robusta) e adi��o de User-Agent para evitar bloqueios de seguran�a; build atualizado.
 - 30/11/2025: UI garante que o JSON gerado (IA on/off) preenche o textarea figma-json-output e fica selecionado para copia; build recompilado.
 - 29/11/2025: Correção crítica para frames trancados (agora exportados como imagem única) e upload de imagens (respeitando checkbox da UI); suporte a NO-AI para frames trancados; proteção readonly no textarea de preview (#output); separação clara entre JSON de preview (Figma) e JSON final (Elementor); otimização de performance com uploads de imagem em paralelo; correção de falha no upload (handler restaurado na UI); melhoria no suporte a estilos (ícones SVG, tipografia completa, bordas, texto rico/HTML) com lógica unificada para AI e NO-AI.
-
 

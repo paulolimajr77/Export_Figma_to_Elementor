@@ -29,12 +29,9 @@ export class ElementorCompiler {
     public compile(schema: PipelineSchema): ElementorJSON {
         const elements = schema.containers.map(container => this.compileContainer(container, false));
         const template: ElementorJSON = {
-            type: 'page',
+            type: 'elementor',
             version: '0.4',
-            title: schema?.page?.title || 'Pagina importada',
             siteurl: this.wpConfig?.url || '',
-            page_settings: {},
-            content: elements,
             elements
         };
         return template as any;

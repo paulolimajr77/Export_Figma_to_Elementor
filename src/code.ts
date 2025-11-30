@@ -235,10 +235,16 @@ function log(message: string, level: 'info' | 'warn' | 'error' | 'success' = 'in
 }
 
 async function deliverResult(json: ElementorJSON, debugInfo?: any) {
-    const elementsForPaste = (json as any).content || (json as any).elements || [];
-    const normalizedJson: ElementorJSON = { ...(json as any), content: elementsForPaste, elements: elementsForPaste };
+    const normalizedElements = (json as any).elements || (json as any).content || [];
+    const normalizedJson: ElementorJSON = {
+        type: (json as any).type || 'elementor',
+        siteurl: (json as any).siteurl || (this as any)?.wpConfig?.url || '',
+        version: (json as any).version || '0.4',
+        elements: normalizedElements
+    } as any;
+
     const payload = JSON.stringify(normalizedJson, null, 2);
-    const pastePayload = JSON.stringify(elementsForPaste, null, 2);
+    const pastePayload = payload;
     lastJSON = payload;
     figma.ui.postMessage({ type: 'generation-complete', payload, pastePayload, debug: debugInfo });
     // Bridge de copia: UI via navigator.clipboard ou fallback manual
