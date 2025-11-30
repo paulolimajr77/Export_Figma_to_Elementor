@@ -2684,6 +2684,9 @@ ${JSON.stringify(baseSchema, null, 2)}
             if (!Array.isArray(c.widgets)) c.widgets = [];
             if (!Array.isArray(c.children)) c.children = [];
             c.children = c.children.map((child) => walk(child, c)).filter(Boolean);
+            if (c.children && c.children.length > 0) {
+              c.children = this.deduplicateContainers(c.children);
+            }
             return c;
           };
           return containers.map((c) => walk(c, null)).filter(Boolean);

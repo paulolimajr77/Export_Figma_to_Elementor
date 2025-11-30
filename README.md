@@ -88,6 +88,7 @@ Acoes de exportacao:
 - Compat extra Elementor: `flex_justify_content`/`flex_align_items` e flags `flex__is_row`/`flex__is_column` passam a ser preenchidas para refletir alinhamentos na UI do Elementor.
 - Normalizacao do JSON Elementor para colagem/importacao: raiz agora inclui `type: elementor`, `version` 0.4 e `elements`, e o bridge de copia envia o objeto completo pronto para colar.
 - Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
+- 01/12/2025: Duplicacoes causadas pela IA foram resolvidas: o pipeline reexecuta a deduplicacao apos o resgate de nodes faltantes, garantindo que cada node do Figma apareca apenas uma vez no JSON final.
 - Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).
 - Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.
 - **Unificação de Estilos:** Lógica de extração de estilos centralizada em `style_utils.ts` para consistência entre modos AI e NO-AI.
