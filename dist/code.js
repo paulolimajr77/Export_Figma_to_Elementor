@@ -3785,24 +3785,34 @@ ${JSON.stringify(baseSchema, null, 2)}
         deduplicateContainers(containers) {
           const map = /* @__PURE__ */ new Map();
           const order = [];
+          const resolveKey = (container) => {
+            var _a;
+            return ((_a = container.styles) == null ? void 0 : _a.sourceId) || container.id;
+          };
           for (const c of containers) {
             if (!c.id) {
               continue;
             }
-            if (!map.has(c.id)) {
+            const key = resolveKey(c);
+            if (!key) {
               map.set(c.id, __spreadProps(__spreadValues({}, c), { widgets: [...c.widgets || []], children: [...c.children || []] }));
               order.push(c.id);
-            } else {
-              const existing = map.get(c.id);
-              if (c.widgets && c.widgets.length > 0) {
-                existing.widgets = (existing.widgets || []).concat(c.widgets);
-              }
-              if (c.children && c.children.length > 0) {
-                existing.children = (existing.children || []).concat(c.children);
-              }
-              if (c.styles) {
-                existing.styles = __spreadValues(__spreadValues({}, existing.styles), c.styles);
-              }
+              continue;
+            }
+            if (!map.has(key)) {
+              map.set(key, __spreadProps(__spreadValues({}, c), { widgets: [...c.widgets || []], children: [...c.children || []] }));
+              order.push(key);
+              continue;
+            }
+            const existing = map.get(key);
+            if (c.widgets && c.widgets.length > 0) {
+              existing.widgets = (existing.widgets || []).concat(c.widgets);
+            }
+            if (c.children && c.children.length > 0) {
+              existing.children = (existing.children || []).concat(c.children);
+            }
+            if (c.styles) {
+              existing.styles = __spreadValues(__spreadValues({}, existing.styles), c.styles);
             }
           }
           return order.map((id) => map.get(id));

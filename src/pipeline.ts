@@ -688,36 +688,35 @@ ${JSON.stringify(baseSchema, null, 2)}
         const map = new Map<string, PipelineContainer>();
         const order: string[] = [];
 
+        const resolveKey = (container: PipelineContainer) => container.styles?.sourceId || container.id;
+
         for (const c of containers) {
             if (!c.id) {
-                // If no ID, we can't deduplicate reliably, but we should keep it?
-                // normalizeContainers filters out no-id later, but let's keep them for now to be safe
-                // or generate a temp ID?
-                // Let's just push them to a separate list or treat them as unique?
-                // Actually, normalizeContainers will drop them anyway.
                 continue;
             }
 
-            if (!map.has(c.id)) {
-                // Clone to avoid mutating original if needed, but here we modify in place mostly
+            const key = resolveKey(c);
+            if (!key) {
                 map.set(c.id, { ...c, widgets: [...(c.widgets || [])], children: [...(c.children || [])] });
                 order.push(c.id);
-            } else {
-                const existing = map.get(c.id)!;
-                // Merge widgets
-                if (c.widgets && c.widgets.length > 0) {
-                    existing.widgets = (existing.widgets || []).concat(c.widgets);
-                }
-                // Merge children
-                if (c.children && c.children.length > 0) {
-                    existing.children = (existing.children || []).concat(c.children);
-                }
-                // Merge styles (shallow merge, later overwrites earlier)
-                if (c.styles) {
-                    existing.styles = { ...existing.styles, ...c.styles };
-                }
-                // We keep the first occurrence's structural properties (direction, width)
-                // assuming the first one is the "main" definition.
+                continue;
+            }
+
+            if (!map.has(key)) {
+                map.set(key, { ...c, widgets: [...(c.widgets || [])], children: [...(c.children || [])] });
+                order.push(key);
+                continue;
+            }
+
+            const existing = map.get(key)!;
+            if (c.widgets && c.widgets.length > 0) {
+                existing.widgets = (existing.widgets || []).concat(c.widgets);
+            }
+            if (c.children && c.children.length > 0) {
+                existing.children = (existing.children || []).concat(c.children);
+            }
+            if (c.styles) {
+                existing.styles = { ...existing.styles, ...c.styles };
             }
         }
 

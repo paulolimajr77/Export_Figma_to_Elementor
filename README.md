@@ -90,6 +90,7 @@ Acoes de exportacao:
 - Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
 - 01/12/2025: Duplicacoes causadas pela IA foram resolvidas: o pipeline reexecuta a deduplicacao apos o resgate de nodes faltantes, garantindo que cada node do Figma apareca apenas uma vez no JSON final.
 - 02/12/2025: Corrigido erro runtime (`this.deduplicateContainers is not a function`) recompilando o dist e expondo novamente o método, garantindo que o pipeline normalize containers sem falhar.
+- 03/12/2025: O deduplicador agora agrupa containers por `styles.sourceId` (quando presente) antes de gerar o JSON Elementor, eliminando duplicatas do mesmo node geradas pela IA.
 - Registry simplificado para widgets basicos e hints leves; tipos legados removidos (sections/columns/imageBox/iconBox).
 - Validacao forte de schema e JSON Elementor para manter apenas containers e widgets permitidos.
 - **Unificação de Estilos:** Lógica de extração de estilos centralizada em `style_utils.ts` para consistência entre modos AI e NO-AI.

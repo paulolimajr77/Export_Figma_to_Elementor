@@ -1,6 +1,7 @@
--# Registro de Alteracoes
--
-- 02/12/2025: Evita erro `this.deduplicateContainers is not a function` garantindo que o mÃ©todo exista no bundle (dist/code.js) antes de chamar a deduplicacao.
+# Registro de Alteracoes
+
+- 03/12/2025: O deduplicador agora agrupa containers pelo `styles.sourceId` quando disponivel, eliminando duplicatas que diferem apenas no ID gerado pela IA.
+- 02/12/2025: Evita erro `this.deduplicateContainers is not a function` garantindo que o método exista no bundle (dist/code.js) antes de chamar a deduplicacao.
 - 01/12/2025: Evita duplicacao de containers apos o uso da IA ao reexecutar a deduplicacao depois do resgate de nodes, mantendo cada node do Figma apenas uma vez no JSON final.
 - 30/11/2025: Normalizacao de slides dos carrosseis (`image-carousel`, `media:carousel`, `slider:slides`, `w:slideshow`) agora converte IDs para numericos e replica URL/objeto `image`, garantindo que as imagens aparecam na UI do Elementor.
 - 30/11/2025: `selected_icon` agora segue o formato oficial do Elementor (`{ value: { url, id }, library: 'svg' }`) usando o ID de midia quando presente, evitando icones SVG que apareciam em branco.
