@@ -433,21 +433,34 @@
         },
         generateSchema(input) {
           return __async(this, null, function* () {
-            var _a, _b, _c, _d, _e, _f;
+            var _a, _b, _c, _d, _e, _f, _g;
             const apiKey = input.apiKey || (yield getKey());
             if (!apiKey) {
               return { ok: false, message: "API Key do Gemini nao configurada." };
             }
             const model = this.model || GEMINI_MODEL;
             const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
-            const contents = [{
-              parts: [
-                { text: input.instructions },
-                { text: input.prompt },
-                { text: `SNAPSHOT:
+            const parts = [
+              { text: input.instructions },
+              { text: input.prompt },
+              { text: `SNAPSHOT:
 ${JSON.stringify(input.snapshot)}` }
-              ]
-            }];
+            ];
+            if (input.references && input.references.length > 0) {
+              const refText = input.references.map((ref) => `### ${ref.name}
+${ref.content}`).join("\n\n");
+              parts.push({ text: `REFERENCIAS:
+${refText}` });
+            }
+            if ((_a = input.image) == null ? void 0 : _a.data) {
+              parts.push({
+                inlineData: {
+                  data: input.image.data,
+                  mimeType: input.image.mimeType || "image/png"
+                }
+              });
+            }
+            const contents = [{ parts }];
             const requestBody = {
               contents,
               generationConfig: {
@@ -470,11 +483,11 @@ ${JSON.stringify(input.snapshot)}` }
                 } catch (e) {
                   parsed = rawText;
                 }
-                const message = ((_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
+                const message = ((_b = parsed == null ? void 0 : parsed.error) == null ? void 0 : _b.message) || `HTTP ${response.status}`;
                 return { ok: false, message: `Falha na API Gemini: ${message}`, raw: parsed };
               }
               const data = yield response.json();
-              const text = (_f = (_e = (_d = (_c = (_b = data == null ? void 0 : data.candidates) == null ? void 0 : _b[0]) == null ? void 0 : _c.content) == null ? void 0 : _d.parts) == null ? void 0 : _e[0]) == null ? void 0 : _f.text;
+              const text = (_g = (_f = (_e = (_d = (_c = data == null ? void 0 : data.candidates) == null ? void 0 : _c[0]) == null ? void 0 : _d.content) == null ? void 0 : _e.parts) == null ? void 0 : _f[0]) == null ? void 0 : _g.text;
               if (!text) {
                 return { ok: false, message: "Resposta vazia da Gemini.", raw: data };
               }
@@ -1785,7 +1798,7 @@ ${JSON.stringify(input.snapshot)}` }
       throw new Error(`Container ${container.id} com direction invalido.`);
     }
     if (container.width !== "full" && container.width !== "boxed") {
-      throw new Error(`Container ${container.id} com width invalido.`);
+      throw new Error(`Container ${container.id} com width invalido: ${JSON.stringify(container.width)}`);
     }
     if (!Array.isArray(container.widgets) || !Array.isArray(container.children)) {
       throw new Error(`Container ${container.id} sem widgets/children array.`);
@@ -2365,6 +2378,880 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     }
   });
 
+  // markdown-elementor/elementor-widgets-html-structure.md
+  var elementor_widgets_html_structure_default;
+  var init_elementor_widgets_html_structure = __esm({
+    "markdown-elementor/elementor-widgets-html-structure.md"() {
+      elementor_widgets_html_structure_default = '# Estrutura HTML dos Componentes WordPress Elementor\n\nDocumenta\xE7\xE3o detalhada com tags HTML e classes de todos os widgets Elementor Free, Pro, WooCommerce, Loop Builder, Carros\xE9is, Experimentais e WordPress.\n\n---\n\n## WIDGETS B\xC1SICOS (ELEMENTOR FREE)\n\n### w:container\n```html\n<div class="elementor-container">\n  <div class="elementor-row">\n    <!-- Inner content -->\n  </div>\n</div>\n```\n\n### w:inner-container\n```html\n<div class="elementor-inner-container">\n  <!-- Child elements -->\n</div>\n```\n\n### w:heading\n```html\n<div class="elementor-widget elementor-widget-heading">\n  <div class="elementor-widget-container">\n    <h1 class="elementor-heading-title elementor-size-default">\n      Heading Text\n    </h1>\n  </div>\n</div>\n```\n\n### w:text-editor\n```html\n<div class="elementor-widget elementor-widget-text-editor">\n  <div class="elementor-widget-container">\n    <div class="elementor-text-editor elementor-clearfix">\n      <p>Text content here</p>\n    </div>\n  </div>\n</div>\n```\n\n### w:image\n```html\n<div class="elementor-widget elementor-widget-image">\n  <div class="elementor-widget-container">\n    <img src="image-url.jpg" class="attachment-full" alt="Image Alt Text">\n  </div>\n</div>\n```\n\n### w:video\n```html\n<div class="elementor-widget elementor-widget-video">\n  <div class="elementor-widget-container">\n    <div class="elementor-video-container">\n      <iframe src="video-url" \n              title="Video"\n              frameborder="0"\n              allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture">\n      </iframe>\n    </div>\n  </div>\n</div>\n```\n\n### w:button\n```html\n<div class="elementor-widget elementor-widget-button">\n  <div class="elementor-widget-container">\n    <div class="elementor-button-wrapper">\n      <a href="#" class="elementor-button elementor-button-link elementor-size-md">\n        <span class="elementor-button-content-wrapper">\n          <span class="elementor-button-text">Button Text</span>\n        </span>\n      </a>\n    </div>\n  </div>\n</div>\n```\n\n### w:divider\n```html\n<div class="elementor-widget elementor-widget-divider">\n  <div class="elementor-widget-container">\n    <div class="elementor-divider">\n      <span class="elementor-divider-separator"></span>\n    </div>\n  </div>\n</div>\n```\n\n### w:spacer\n```html\n<div class="elementor-widget elementor-widget-spacer">\n  <div class="elementor-widget-container">\n    <div class="elementor-spacer" style="height: 20px;"></div>\n  </div>\n</div>\n```\n\n### w:icon\n```html\n<div class="elementor-widget elementor-widget-icon">\n  <div class="elementor-widget-container">\n    <div class="elementor-icon-wrapper">\n      <div class="elementor-icon">\n        <i class="fas fa-star"></i>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:icon-box\n```html\n<div class="elementor-widget elementor-widget-icon-box">\n  <div class="elementor-widget-container">\n    <div class="elementor-icon-box-wrapper">\n      <div class="elementor-icon-box-icon">\n        <i class="fas fa-check"></i>\n      </div>\n      <div class="elementor-icon-box-content">\n        <h3 class="elementor-icon-box-title">Title</h3>\n        <p class="elementor-icon-box-description">Description</p>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:image-box\n```html\n<div class="elementor-widget elementor-widget-image-box">\n  <div class="elementor-widget-container">\n    <div class="elementor-image-box-wrapper">\n      <figure class="elementor-image-box-img">\n        <img src="image-url.jpg" alt="Image">\n      </figure>\n      <div class="elementor-image-box-content">\n        <h3 class="elementor-image-box-title">Title</h3>\n        <p class="elementor-image-box-description">Description</p>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:star-rating\n```html\n<div class="elementor-widget elementor-widget-star-rating">\n  <div class="elementor-widget-container">\n    <div class="elementor-star-rating">\n      <i class="fas fa-star elementor-star-full"></i>\n      <i class="fas fa-star elementor-star-full"></i>\n      <i class="fas fa-star elementor-star-half"></i>\n      <i class="fas fa-star elementor-star-empty"></i>\n      <i class="fas fa-star elementor-star-empty"></i>\n    </div>\n  </div>\n</div>\n```\n\n### w:counter\n```html\n<div class="elementor-widget elementor-widget-counter">\n  <div class="elementor-widget-container">\n    <div class="elementor-counter-box">\n      <div class="elementor-counter-title">Title</div>\n      <div class="elementor-counter-number-wrapper">\n        <span class="elementor-counter-number" data-to-value="100">0</span>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:progress\n```html\n<div class="elementor-widget elementor-widget-progress">\n  <div class="elementor-widget-container">\n    <div class="elementor-progress-wrapper">\n      <div class="elementor-progress-title">Progress Title</div>\n      <div class="elementor-progress-bar">\n        <div class="elementor-progress-fill" style="width: 75%;"></div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:tabs\n```html\n<div class="elementor-widget elementor-widget-tabs">\n  <div class="elementor-widget-container">\n    <div class="elementor-tabs">\n      <div class="elementor-tabs-wrapper">\n        <div class="elementor-tab-title">Tab 1</div>\n        <div class="elementor-tab-title">Tab 2</div>\n      </div>\n      <div class="elementor-tabs-content-wrapper">\n        <div class="elementor-tab-content">Content 1</div>\n        <div class="elementor-tab-content" style="display:none;">Content 2</div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:accordion\n```html\n<div class="elementor-widget elementor-widget-accordion">\n  <div class="elementor-widget-container">\n    <div class="elementor-accordion">\n      <div class="elementor-accordion-item">\n        <h3 class="elementor-accordion-title">\n          <span class="elementor-accordion-icon"></span>\n          <span>Accordion Item</span>\n        </h3>\n        <div class="elementor-accordion-body">\n          <div class="elementor-accordion-body-title">Content</div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:toggle\n```html\n<div class="elementor-widget elementor-widget-toggle">\n  <div class="elementor-widget-container">\n    <div class="elementor-toggle">\n      <div class="elementor-toggle-item">\n        <h3 class="elementor-toggle-title">Toggle Title</h3>\n        <div class="elementor-toggle-content">Toggle content here</div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:alert\n```html\n<div class="elementor-widget elementor-widget-alert">\n  <div class="elementor-widget-container">\n    <div class="elementor-alert elementor-alert-type-info">\n      <div class="elementor-alert-title">Alert Title</div>\n      <div class="elementor-alert-description">Alert description</div>\n    </div>\n  </div>\n</div>\n```\n\n### w:social-icons\n```html\n<div class="elementor-widget elementor-widget-social-icons">\n  <div class="elementor-widget-container">\n    <div class="elementor-social-icons-wrapper">\n      <a href="#" class="elementor-social-icon elementor-social-icon-facebook">\n        <i class="fab fa-facebook"></i>\n      </a>\n      <a href="#" class="elementor-social-icon elementor-social-icon-twitter">\n        <i class="fab fa-twitter"></i>\n      </a>\n    </div>\n  </div>\n</div>\n```\n\n### w:soundcloud\n```html\n<div class="elementor-widget elementor-widget-soundcloud">\n  <div class="elementor-widget-container">\n    <iframe src="https://w.soundcloud.com/player/?url=..." \n            frameborder="no" \n            allow="autoplay">\n    </iframe>\n  </div>\n</div>\n```\n\n### w:shortcode\n```html\n<div class="elementor-widget elementor-widget-shortcode">\n  <div class="elementor-widget-container">\n    [shortcode_name param="value"]\n  </div>\n</div>\n```\n\n### w:html\n```html\n<div class="elementor-widget elementor-widget-html">\n  <div class="elementor-widget-container">\n    <!-- Custom HTML content -->\n    <div class="custom-html-content">\n      Your HTML code here\n    </div>\n  </div>\n</div>\n```\n\n### w:menu-anchor\n```html\n<div class="elementor-menu-anchor" id="menu-anchor-id"></div>\n```\n\n### w:sidebar\n```html\n<div class="elementor-widget elementor-widget-sidebar">\n  <div class="elementor-widget-container">\n    <aside class="elementor-sidebar">\n      <!-- Sidebar content -->\n    </aside>\n  </div>\n</div>\n```\n\n### w:read-more\n```html\n<div class="elementor-widget elementor-widget-read-more">\n  <div class="elementor-widget-container">\n    <a href="#" class="elementor-read-more">Read More</a>\n  </div>\n</div>\n```\n\n### w:image-carousel\n```html\n<div class="elementor-widget elementor-widget-image-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-image-carousel">\n      <div class="elementor-carousel">\n        <div class="elementor-slide">\n          <img src="image1.jpg" alt="Slide 1">\n        </div>\n        <div class="elementor-slide">\n          <img src="image2.jpg" alt="Slide 2">\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:basic-gallery\n```html\n<div class="elementor-widget elementor-widget-gallery">\n  <div class="elementor-widget-container">\n    <div class="elementor-gallery">\n      <div class="elementor-gallery-item">\n        <figure class="elementor-gallery-item__image">\n          <img src="image1.jpg" alt="Gallery Image">\n        </figure>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:gallery\n```html\n<div class="elementor-widget elementor-widget-gallery">\n  <div class="elementor-widget-container">\n    <div class="elementor-gallery__titles-container"></div>\n    <div class="elementor-gallery__container">\n      <a href="image.jpg" class="elementor-gallery-item">\n        <div class="elementor-gallery-item__image">\n          <img src="thumbnail.jpg" alt="Gallery">\n        </div>\n        <div class="elementor-gallery-item__overlay">\n          <div class="elementor-gallery-item__content">\n            <div class="elementor-gallery-item__title">Title</div>\n          </div>\n        </div>\n      </a>\n    </div>\n  </div>\n</div>\n```\n\n### w:icon-list\n```html\n<div class="elementor-widget elementor-widget-icon-list">\n  <div class="elementor-widget-container">\n    <ul class="elementor-icon-list-items">\n      <li class="elementor-icon-list-item">\n        <span class="elementor-icon-list-icon"><i class="fas fa-check"></i></span>\n        <span class="elementor-icon-list-text">List item</span>\n      </li>\n    </ul>\n  </div>\n</div>\n```\n\n### w:nav-menu\n```html\n<div class="elementor-widget elementor-widget-nav-menu">\n  <div class="elementor-widget-container">\n    <nav class="elementor-nav-menu">\n      <ul class="elementor-nav-menu-list">\n        <li class="elementor-item"><a href="#">Menu Item</a></li>\n      </ul>\n    </nav>\n  </div>\n</div>\n```\n\n### w:search-form\n```html\n<div class="elementor-widget elementor-widget-search-form">\n  <div class="elementor-widget-container">\n    <form class="elementor-search-form">\n      <input type="search" placeholder="Search...">\n      <button type="submit"><i class="fas fa-search"></i></button>\n    </form>\n  </div>\n</div>\n```\n\n### w:google-maps\n```html\n<div class="elementor-widget elementor-widget-google_maps">\n  <div class="elementor-widget-container">\n    <div class="elementor-google-map">\n      <div class="elementor-map" \n           data-lat="40.7128" \n           data-lng="-74.0060"\n           style="height: 400px;">\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:testimonial\n```html\n<div class="elementor-widget elementor-widget-testimonial">\n  <div class="elementor-widget-container">\n    <div class="elementor-testimonial">\n      <div class="elementor-testimonial-content">\n        <p class="elementor-testimonial-text">Testimonial text</p>\n      </div>\n      <div class="elementor-testimonial-meta">\n        <img src="avatar.jpg" class="elementor-testimonial-image" alt="Author">\n        <div class="elementor-testimonial-meta-inner">\n          <h3 class="elementor-testimonial-name">Author Name</h3>\n          <div class="elementor-testimonial-title">Author Title</div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:embed\n```html\n<div class="elementor-widget elementor-widget-embed">\n  <div class="elementor-widget-container">\n    <div class="elementor-embed-frame">\n      <iframe src="embed-url" frameborder="0"></iframe>\n    </div>\n  </div>\n</div>\n```\n\n### w:lottie\n```html\n<div class="elementor-widget elementor-widget-lottie">\n  <div class="elementor-widget-container">\n    <div class="elementor-lottie-animation" \n         data-animation-url="animation.json"\n         style="height: 300px;">\n    </div>\n  </div>\n</div>\n```\n\n### loop:grid\n```html\n<div class="elementor-widget elementor-widget-loop-grid">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-grid elementor-grid">\n      <div class="elementor-grid-item">\n        <!-- Loop item content -->\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n---\n\n## WIDGETS ELEMENTOR PRO\n\n### w:form\n```html\n<div class="elementor-widget elementor-widget-form">\n  <div class="elementor-widget-container">\n    <form class="elementor-form" method="post">\n      <div class="elementor-form-fields-wrapper">\n        <div class="elementor-field-group">\n          <label for="form-field-name" class="elementor-field-label">\n            <span class="elementor-screen-only">Name</span>\n          </label>\n          <input type="text" name="form_fields[name]" id="form-field-name" class="elementor-field-textual elementor-size-md" placeholder="Name" required>\n        </div>\n      </div>\n      <button type="submit" class="elementor-button">Submit</button>\n    </form>\n  </div>\n</div>\n```\n\n### w:login\n```html\n<div class="elementor-widget elementor-widget-login">\n  <div class="elementor-widget-container">\n    <form class="elementor-login-form" method="post">\n      <div class="elementor-login-form-field">\n        <label>Username or Email</label>\n        <input type="text" name="log" required>\n      </div>\n      <div class="elementor-login-form-field">\n        <label>Password</label>\n        <input type="password" name="pwd" required>\n      </div>\n      <button type="submit" class="elementor-button">Login</button>\n    </form>\n  </div>\n</div>\n```\n\n### w:subscription\n```html\n<div class="elementor-widget elementor-widget-subscription">\n  <div class="elementor-widget-container">\n    <form class="elementor-subscription-form" method="post">\n      <div class="elementor-subscription-content">\n        <h3 class="elementor-subscription-title">Subscribe</h3>\n        <input type="email" name="email" placeholder="Your email" required>\n        <button type="submit" class="elementor-button">Subscribe</button>\n      </div>\n    </form>\n  </div>\n</div>\n```\n\n### w:call-to-action\n```html\n<div class="elementor-widget elementor-widget-call-to-action">\n  <div class="elementor-widget-container">\n    <div class="elementor-cta">\n      <div class="elementor-cta__bg-overlay"></div>\n      <div class="elementor-cta__content">\n        <h2 class="elementor-cta__title">Call to Action</h2>\n        <div class="elementor-cta__description">Description text</div>\n        <a href="#" class="elementor-cta__button elementor-button">CTA Button</a>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### media:carousel\n```html\n<div class="elementor-widget elementor-widget-media-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-carousel">\n      <div class="elementor-slide">\n        <div class="elementor-carousel-item">\n          <img src="media1.jpg" alt="Media 1">\n        </div>\n      </div>\n      <div class="elementor-slide">\n        <div class="elementor-carousel-item">\n          <img src="media2.jpg" alt="Media 2">\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:portfolio\n```html\n<div class="elementor-widget elementor-widget-portfolio">\n  <div class="elementor-widget-container">\n    <div class="elementor-portfolio">\n      <div class="elementor-portfolio-item">\n        <figure class="elementor-portfolio-item__image">\n          <img src="portfolio.jpg" alt="Portfolio Item">\n        </figure>\n        <div class="elementor-portfolio-item__content">\n          <h3 class="elementor-portfolio-item__title">Project Title</h3>\n          <p class="elementor-portfolio-item__category">Category</p>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:gallery-pro\n```html\n<div class="elementor-widget elementor-widget-gallery-pro">\n  <div class="elementor-widget-container">\n    <div class="elementor-gallery-pro">\n      <div class="elementor-gallery-pro-item">\n        <img src="gallery-item.jpg" alt="Gallery Item">\n        <div class="elementor-gallery-pro-overlay">\n          <h3>Gallery Title</h3>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### slider:slides\n```html\n<div class="elementor-widget elementor-widget-slides">\n  <div class="elementor-widget-container">\n    <div class="elementor-slides-wrapper">\n      <div class="elementor-slide">\n        <div class="elementor-slide-background">\n          <img src="slide1.jpg" alt="Slide 1">\n        </div>\n        <div class="elementor-slide-content">\n          <h2 class="elementor-slide-heading">Slide 1</h2>\n          <p class="elementor-slide-description">Slide description</p>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:slideshow\n```html\n<div class="elementor-widget elementor-widget-slideshow">\n  <div class="elementor-widget-container">\n    <div class="elementor-slideshow">\n      <div class="elementor-slideshow-wrapper">\n        <div class="elementor-slide-show-slide">\n          <img src="slide.jpg" alt="Slide">\n        </div>\n      </div>\n      <div class="elementor-slideshow-navigation"></div>\n    </div>\n  </div>\n</div>\n```\n\n### w:flip-box\n```html\n<div class="elementor-widget elementor-widget-flip-box">\n  <div class="elementor-widget-container">\n    <div class="elementor-flip-box">\n      <div class="elementor-flip-box-front">\n        <div class="elementor-flip-box-front-inner">\n          <h3>Front Title</h3>\n        </div>\n      </div>\n      <div class="elementor-flip-box-back">\n        <div class="elementor-flip-box-back-inner">\n          <h3>Back Title</h3>\n          <p>Back content</p>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:animated-headline\n```html\n<div class="elementor-widget elementor-widget-animated-headline">\n  <div class="elementor-widget-container">\n    <h2 class="elementor-headline">\n      <span class="elementor-headline-plain-text">Before</span>\n      <span class="elementor-headline-dynamic-wrapper">\n        <span class="elementor-headline-text">Animated Text</span>\n      </span>\n    </h2>\n  </div>\n</div>\n```\n\n### w:post-navigation\n```html\n<div class="elementor-widget elementor-widget-post-navigation">\n  <div class="elementor-widget-container">\n    <nav class="elementor-post-navigation">\n      <div class="elementor-post-nav-prev">\n        <a href="#">Previous Post</a>\n      </div>\n      <div class="elementor-post-nav-next">\n        <a href="#">Next Post</a>\n      </div>\n    </nav>\n  </div>\n</div>\n```\n\n### w:share-buttons\n```html\n<div class="elementor-widget elementor-widget-share-buttons">\n  <div class="elementor-widget-container">\n    <div class="elementor-share-buttons">\n      <a href="#" class="elementor-share-btn facebook">\n        <i class="fab fa-facebook"></i>\n      </a>\n      <a href="#" class="elementor-share-btn twitter">\n        <i class="fab fa-twitter"></i>\n      </a>\n    </div>\n  </div>\n</div>\n```\n\n### w:table-of-contents\n```html\n<div class="elementor-widget elementor-widget-table-of-contents">\n  <div class="elementor-widget-container">\n    <div class="elementor-toc">\n      <h2 class="elementor-toc-title">Table of Contents</h2>\n      <ul class="elementor-toc-list">\n        <li><a href="#heading-1">Heading 1</a></li>\n        <li><a href="#heading-2">Heading 2</a></li>\n      </ul>\n    </div>\n  </div>\n</div>\n```\n\n### w:countdown\n```html\n<div class="elementor-widget elementor-widget-countdown">\n  <div class="elementor-widget-container">\n    <div class="elementor-countdown">\n      <div class="elementor-countdown-item days">\n        <span class="elementor-countdown-digit">0</span>\n        <span class="elementor-countdown-label">Days</span>\n      </div>\n      <div class="elementor-countdown-item hours">\n        <span class="elementor-countdown-digit">0</span>\n        <span class="elementor-countdown-label">Hours</span>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:blockquote\n```html\n<div class="elementor-widget elementor-widget-blockquote">\n  <div class="elementor-widget-container">\n    <blockquote class="elementor-blockquote">\n      <p class="elementor-blockquote-content">Blockquote text</p>\n      <footer class="elementor-blockquote-footer">\n        <cite class="elementor-blockquote-author">Author Name</cite>\n      </footer>\n    </blockquote>\n  </div>\n</div>\n```\n\n### w:testimonial-carousel\n```html\n<div class="elementor-widget elementor-widget-testimonial-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-testimonials-carousel elementor-carousel">\n      <div class="elementor-slide">\n        <div class="elementor-testimonial">\n          <p class="elementor-testimonial-text">Testimonial</p>\n          <footer class="elementor-testimonial-meta">\n            <cite class="elementor-testimonial-name">Author</cite>\n          </footer>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:review-box\n```html\n<div class="elementor-widget elementor-widget-review-box">\n  <div class="elementor-widget-container">\n    <div class="elementor-review">\n      <div class="elementor-review-header">\n        <h3 class="elementor-review-title">Review Title</h3>\n        <div class="elementor-review-rating">\u2605\u2605\u2605\u2605\u2606</div>\n      </div>\n      <div class="elementor-review-content">\n        <p>Review content here</p>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:hotspots\n```html\n<div class="elementor-widget elementor-widget-hotspots">\n  <div class="elementor-widget-container">\n    <div class="elementor-hotspots-container">\n      <img src="image.jpg" alt="Hotspot Image">\n      <div class="elementor-hotspot" data-x="50" data-y="50">\n        <span class="elementor-hotspot-indicator"></span>\n        <div class="elementor-hotspot-tooltip">Hotspot content</div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:sitemap\n```html\n<div class="elementor-widget elementor-widget-sitemap">\n  <div class="elementor-widget-container">\n    <div class="elementor-sitemap">\n      <ul class="elementor-sitemap-list">\n        <li><a href="#">Page Link</a></li>\n      </ul>\n    </div>\n  </div>\n</div>\n```\n\n### w:author-box\n```html\n<div class="elementor-widget elementor-widget-author-box">\n  <div class="elementor-widget-container">\n    <div class="elementor-author-box">\n      <img src="author-avatar.jpg" class="elementor-author-box-avatar" alt="Author">\n      <div class="elementor-author-box-content">\n        <h3 class="elementor-author-box-name">Author Name</h3>\n        <p class="elementor-author-box-bio">Author bio text</p>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:price-table\n```html\n<div class="elementor-widget elementor-widget-price-table">\n  <div class="elementor-widget-container">\n    <div class="elementor-price-table">\n      <div class="elementor-price-table-header">\n        <h3 class="elementor-price-table-title">Plan Name</h3>\n        <span class="elementor-price-table-currency">$</span>\n        <span class="elementor-price-table-integer-part">99</span>\n        <span class="elementor-price-table-fractional-part">99</span>\n      </div>\n      <ul class="elementor-price-table-features">\n        <li class="elementor-price-table-feature">\n          <span>Feature 1</span>\n        </li>\n      </ul>\n      <div class="elementor-price-table-footer">\n        <a href="#" class="elementor-button">Buy Now</a>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:price-list\n```html\n<div class="elementor-widget elementor-widget-price-list">\n  <div class="elementor-widget-container">\n    <div class="elementor-price-list">\n      <div class="elementor-price-list-item">\n        <h4 class="elementor-price-list-heading">Item Title</h4>\n        <span class="elementor-price-list-separator"></span>\n        <span class="elementor-price-list-price">$10</span>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:progress-tracker\n```html\n<div class="elementor-widget elementor-widget-progress-tracker">\n  <div class="elementor-widget-container">\n    <div class="elementor-progress-tracker">\n      <div class="elementor-progress-tracker-item">\n        <div class="elementor-progress-tracker-step">1</div>\n        <div class="elementor-progress-tracker-label">Step 1</div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:animated-text\n```html\n<div class="elementor-widget elementor-widget-animated-text">\n  <div class="elementor-widget-container">\n    <div class="elementor-animated-text">\n      <span class="elementor-animated-text-word">Animated</span>\n      <span class="elementor-animated-text-word">Text</span>\n    </div>\n  </div>\n</div>\n```\n\n### w:nav-menu-pro\n```html\n<div class="elementor-widget elementor-widget-nav-menu">\n  <div class="elementor-widget-container">\n    <nav class="elementor-nav-menu-pro">\n      <ul class="elementor-nav-menu-pro-list">\n        <li class="elementor-item">\n          <a href="#">Menu Item</a>\n          <ul class="elementor-submenu">\n            <li><a href="#">Submenu Item</a></li>\n          </ul>\n        </li>\n      </ul>\n    </nav>\n  </div>\n</div>\n```\n\n### w:breadcrumb\n```html\n<div class="elementor-widget elementor-widget-breadcrumb">\n  <div class="elementor-widget-container">\n    <div class="elementor-breadcrumb">\n      <span class="elementor-breadcrumb-item">\n        <a href="#">Home</a>\n      </span>\n      <span class="elementor-breadcrumb-separator">\u203A</span>\n      <span class="elementor-breadcrumb-item">\n        Current Page\n      </span>\n    </div>\n  </div>\n</div>\n```\n\n### w:facebook-button\n```html\n<div class="elementor-widget elementor-widget-facebook-button">\n  <div class="elementor-widget-container">\n    <a href="#" class="elementor-facebook-button fb-button">\n      <i class="fab fa-facebook"></i> Like\n    </a>\n  </div>\n</div>\n```\n\n### w:facebook-comments\n```html\n<div class="elementor-widget elementor-widget-facebook-comments">\n  <div class="elementor-widget-container">\n    <div class="fb-comments" data-href="page-url" data-numposts="5"></div>\n  </div>\n</div>\n```\n\n### w:facebook-embed\n```html\n<div class="elementor-widget elementor-widget-facebook-embed">\n  <div class="elementor-widget-container">\n    <div class="fb-post" data-href="post-url"></div>\n  </div>\n</div>\n```\n\n### w:facebook-page\n```html\n<div class="elementor-widget elementor-widget-facebook-page">\n  <div class="elementor-widget-container">\n    <div class="fb-page" data-href="page-url"></div>\n  </div>\n</div>\n```\n\n### loop:builder\n```html\n<div class="elementor-widget elementor-widget-loop-builder">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-builder">\n      <!-- Loop builder content -->\n    </div>\n  </div>\n</div>\n```\n\n### loop:grid-advanced\n```html\n<div class="elementor-widget elementor-widget-loop-grid-advanced">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-grid-advanced elementor-grid">\n      <div class="elementor-grid-item">\n        <!-- Advanced grid item -->\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### loop:carousel\n```html\n<div class="elementor-widget elementor-widget-loop-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-carousel elementor-carousel">\n      <div class="elementor-slide">\n        <!-- Carousel item -->\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:post-excerpt\n```html\n<div class="elementor-widget elementor-widget-post-excerpt">\n  <div class="elementor-widget-container">\n    <div class="elementor-post-excerpt">\n      <p>Post excerpt text here...</p>\n    </div>\n  </div>\n</div>\n```\n\n### w:post-content\n```html\n<div class="elementor-widget elementor-widget-post-content">\n  <div class="elementor-widget-container">\n    <div class="elementor-post-content">\n      <!-- Full post content renders here -->\n    </div>\n  </div>\n</div>\n```\n\n### w:post-title\n```html\n<div class="elementor-widget elementor-widget-post-title">\n  <div class="elementor-widget-container">\n    <h1 class="elementor-post-title">Post Title</h1>\n  </div>\n</div>\n```\n\n### w:post-info\n```html\n<div class="elementor-widget elementor-widget-post-info">\n  <div class="elementor-widget-container">\n    <div class="elementor-post-info">\n      <span class="elementor-post-info-author">By Author Name</span>\n      <span class="elementor-post-info-date">Date Published</span>\n    </div>\n  </div>\n</div>\n```\n\n### w:post-featured-image\n```html\n<div class="elementor-widget elementor-widget-post-featured-image">\n  <div class="elementor-widget-container">\n    <div class="elementor-post-featured-image">\n      <img src="featured-image.jpg" alt="Featured Image">\n    </div>\n  </div>\n</div>\n```\n\n### w:post-author\n```html\n<div class="elementor-widget elementor-widget-post-author">\n  <div class="elementor-widget-container">\n    <div class="elementor-post-author">\n      <img src="author.jpg" alt="Author">\n      <h4>Author Name</h4>\n    </div>\n  </div>\n</div>\n```\n\n### w:post-date\n```html\n<div class="elementor-widget elementor-widget-post-date">\n  <div class="elementor-widget-container">\n    <div class="elementor-post-date">\n      Published on: <time>Date</time>\n    </div>\n  </div>\n</div>\n```\n\n### w:post-terms\n```html\n<div class="elementor-widget elementor-widget-post-terms">\n  <div class="elementor-widget-container">\n    <div class="elementor-post-terms">\n      <a href="#">Category</a>, <a href="#">Tag</a>\n    </div>\n  </div>\n</div>\n```\n\n### w:archive-title\n```html\n<div class="elementor-widget elementor-widget-archive-title">\n  <div class="elementor-widget-container">\n    <h1 class="elementor-archive-title">Archive Title</h1>\n  </div>\n</div>\n```\n\n### w:archive-description\n```html\n<div class="elementor-widget elementor-widget-archive-description">\n  <div class="elementor-widget-container">\n    <div class="elementor-archive-description">\n      <p>Archive description here</p>\n    </div>\n  </div>\n</div>\n```\n\n### w:site-logo\n```html\n<div class="elementor-widget elementor-widget-site-logo">\n  <div class="elementor-widget-container">\n    <div class="elementor-site-logo">\n      <a href="/">\n        <img src="logo.png" alt="Logo">\n      </a>\n    </div>\n  </div>\n</div>\n```\n\n### w:site-title\n```html\n<div class="elementor-widget elementor-widget-site-title">\n  <div class="elementor-widget-container">\n    <h1 class="elementor-site-title">\n      <a href="/">Site Title</a>\n    </h1>\n  </div>\n</div>\n```\n\n### w:site-tagline\n```html\n<div class="elementor-widget elementor-widget-site-tagline">\n  <div class="elementor-widget-container">\n    <p class="elementor-site-tagline">Site tagline here</p>\n  </div>\n</div>\n```\n\n### w:search-results\n```html\n<div class="elementor-widget elementor-widget-search-results">\n  <div class="elementor-widget-container">\n    <div class="elementor-search-results">\n      <!-- Search results render here -->\n    </div>\n  </div>\n</div>\n```\n\n### w:global-widget\n```html\n<div class="elementor-widget elementor-widget-global-widget" data-widget-id="123">\n  <div class="elementor-widget-container">\n    <!-- Global widget content -->\n  </div>\n</div>\n```\n\n### w:video-playlist\n```html\n<div class="elementor-widget elementor-widget-video-playlist">\n  <div class="elementor-widget-container">\n    <div class="elementor-video-playlist">\n      <div class="elementor-playlist-item">\n        <iframe src="video-url"></iframe>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:video-gallery\n```html\n<div class="elementor-widget elementor-widget-video-gallery">\n  <div class="elementor-widget-container">\n    <div class="elementor-video-gallery">\n      <div class="elementor-video-gallery-item">\n        <iframe src="video-url"></iframe>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n---\n\n## WIDGETS WOOCOMMERCE\n\n### woo:product-title\n```html\n<div class="elementor-widget elementor-widget-wc-product-title">\n  <div class="elementor-widget-container">\n    <h1 class="product_title entry-title">Product Name</h1>\n  </div>\n</div>\n```\n\n### woo:product-image\n```html\n<div class="elementor-widget elementor-widget-wc-product-image">\n  <div class="elementor-widget-container">\n    <div class="product-images">\n      <figure class="woocommerce-product-gallery">\n        <img src="product.jpg" alt="Product">\n      </figure>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-price\n```html\n<div class="elementor-widget elementor-widget-wc-product-price">\n  <div class="elementor-widget-container">\n    <div class="product_price">\n      <span class="woocommerce-Price-amount amount">\n        <bdi><span class="woocommerce-Price-currencySymbol">$</span>99.99</bdi>\n      </span>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-add-to-cart\n```html\n<div class="elementor-widget elementor-widget-wc-product-add-to-cart">\n  <div class="elementor-widget-container">\n    <form class="cart" method="post" enctype="multipart/form-data">\n      <div class="quantity">\n        <input type="number" value="1" min="1">\n      </div>\n      <button type="submit" class="single_add_to_cart_button button alt">Add to Cart</button>\n    </form>\n  </div>\n</div>\n```\n\n### woo:product-data-tabs\n```html\n<div class="elementor-widget elementor-widget-wc-product-data-tabs">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-tabs">\n      <ul class="tabs">\n        <li><a href="#tab-description">Description</a></li>\n        <li><a href="#tab-reviews">Reviews</a></li>\n      </ul>\n      <div id="tab-description" class="tab-content">Description content</div>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-excerpt\n```html\n<div class="elementor-widget elementor-widget-wc-product-excerpt">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-product-details__short-description">\n      <p>Product short description</p>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-rating\n```html\n<div class="elementor-widget elementor-widget-wc-product-rating">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-product-rating">\n      <div class="star-rating" role="img">\n        <span style="width:80%;">Rated 4 out of 5</span>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-stock\n```html\n<div class="elementor-widget elementor-widget-wc-product-stock">\n  <div class="elementor-widget-container">\n    <p class="stock in-stock">In stock</p>\n  </div>\n</div>\n```\n\n### woo:product-meta\n```html\n<div class="elementor-widget elementor-widget-wc-product-meta">\n  <div class="elementor-widget-container">\n    <div class="product_meta">\n      <span class="sku_wrapper">SKU: <span class="sku">12345</span></span>\n      <span class="posted_in">Category: <a href="#">Electronics</a></span>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-additional-information\n```html\n<div class="elementor-widget elementor-widget-wc-product-additional-information">\n  <div class="elementor-widget-container">\n    <table class="woocommerce-product-attributes">\n      <tr class="woocommerce-product-attributes-item">\n        <th>Attribute</th>\n        <td>Value</td>\n      </tr>\n    </table>\n  </div>\n</div>\n```\n\n### woo:product-short-description\n```html\n<div class="elementor-widget elementor-widget-wc-product-short-description">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-product-details__short-description">\n      <p>Short description here</p>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-related\n```html\n<div class="elementor-widget elementor-widget-wc-product-related">\n  <div class="elementor-widget-container">\n    <section class="related products">\n      <h2>Related Products</h2>\n      <div class="products">\n        <div class="product">\n          <img src="product.jpg" alt="Related Product">\n        </div>\n      </div>\n    </section>\n  </div>\n</div>\n```\n\n### woo:product-upsells\n```html\n<div class="elementor-widget elementor-widget-wc-product-upsells">\n  <div class="elementor-widget-container">\n    <section class="up-sells upsells products">\n      <h2>You might also like\u2026</h2>\n      <div class="products">\n        <div class="product">\n          <img src="upsell.jpg" alt="Upsell Product">\n        </div>\n      </div>\n    </section>\n  </div>\n</div>\n```\n\n### woo:product-tabs\n```html\n<div class="elementor-widget elementor-widget-wc-product-tabs">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-tabs">\n      <ul class="tabs wc-tabs">\n        <li><a href="#tab-description">Description</a></li>\n      </ul>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-breadcrumb\n```html\n<div class="elementor-widget elementor-widget-wc-product-breadcrumb">\n  <div class="elementor-widget-container">\n    <nav class="woocommerce-breadcrumb">\n      <a href="#">Shop</a> \u203A Product\n    </nav>\n  </div>\n</div>\n```\n\n### woo:product-gallery\n```html\n<div class="elementor-widget elementor-widget-wc-product-gallery">\n  <div class="elementor-widget-container">\n    <div class="product-gallery-wrapper">\n      <figure class="woocommerce-product-gallery">\n        <img src="gallery.jpg" alt="Product Gallery">\n      </figure>\n    </div>\n  </div>\n</div>\n```\n\n### woo:products\n```html\n<div class="elementor-widget elementor-widget-wc-products">\n  <div class="elementor-widget-container">\n    <div class="woocommerce columns-4">\n      <ul class="products">\n        <li class="product">\n          <img src="product.jpg" alt="Product">\n          <h2>Product Name</h2>\n          <span class="price">$99.99</span>\n          <a href="#" class="button">Read more</a>\n        </li>\n      </ul>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-grid\n```html\n<div class="elementor-widget elementor-widget-wc-product-grid">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-product-grid elementor-grid">\n      <div class="product elementor-grid-item">\n        <!-- Product item -->\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-carousel\n```html\n<div class="elementor-widget elementor-widget-wc-product-carousel">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-product-carousel elementor-carousel">\n      <div class="product elementor-slide">\n        <!-- Carousel product -->\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-loop-item\n```html\n<div class="elementor-widget elementor-widget-wc-product-loop-item">\n  <div class="elementor-widget-container">\n    <div class="product-loop-item">\n      <!-- Product loop item content -->\n    </div>\n  </div>\n</div>\n```\n\n### woo:loop-product-title\n```html\n<div class="elementor-widget elementor-widget-wc-loop-product-title">\n  <div class="elementor-widget-container">\n    <h2><a href="#">Product Title</a></h2>\n  </div>\n</div>\n```\n\n### woo:loop-product-price\n```html\n<div class="elementor-widget elementor-widget-wc-loop-product-price">\n  <div class="elementor-widget-container">\n    <span class="price">$99.99</span>\n  </div>\n</div>\n```\n\n### woo:loop-product-rating\n```html\n<div class="elementor-widget elementor-widget-wc-loop-product-rating">\n  <div class="elementor-widget-container">\n    <div class="star-rating">\n      <span style="width:80%;">\u2605\u2605\u2605\u2605\u2606</span>\n    </div>\n  </div>\n</div>\n```\n\n### woo:loop-product-image\n```html\n<div class="elementor-widget elementor-widget-wc-loop-product-image">\n  <div class="elementor-widget-container">\n    <img src="product-thumbnail.jpg" alt="Product Thumbnail">\n  </div>\n</div>\n```\n\n### woo:loop-product-button\n```html\n<div class="elementor-widget elementor-widget-wc-loop-product-button">\n  <div class="elementor-widget-container">\n    <a href="#" class="button">Add to Cart</a>\n  </div>\n</div>\n```\n\n### woo:loop-product-meta\n```html\n<div class="elementor-widget elementor-widget-wc-loop-product-meta">\n  <div class="elementor-widget-container">\n    <div class="product-meta">SKU: 123, Category: Electronics</div>\n  </div>\n</div>\n```\n\n### woo:cart\n```html\n<div class="elementor-widget elementor-widget-wc-cart">\n  <div class="elementor-widget-container">\n    <div class="woocommerce">\n      <table class="shop_table cart">\n        <tr>\n          <td class="product-name">Product</td>\n          <td class="product-price">$99.99</td>\n        </tr>\n      </table>\n    </div>\n  </div>\n</div>\n```\n\n### woo:checkout\n```html\n<div class="elementor-widget elementor-widget-wc-checkout">\n  <div class="elementor-widget-container">\n    <div class="woocommerce">\n      <form class="checkout" method="post">\n        <div class="col-1">\n          <h3>Billing details</h3>\n          <div class="woocommerce-billing-fields">\n            <!-- Billing form fields -->\n          </div>\n        </div>\n      </form>\n    </div>\n  </div>\n</div>\n```\n\n### woo:my-account\n```html\n<div class="elementor-widget elementor-widget-wc-my-account">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-account">\n      <nav class="woocommerce-MyAccount-navigation">\n        <ul>\n          <li><a href="#">Dashboard</a></li>\n          <li><a href="#">Orders</a></li>\n        </ul>\n      </nav>\n    </div>\n  </div>\n</div>\n```\n\n### woo:purchase-summary\n```html\n<div class="elementor-widget elementor-widget-wc-purchase-summary">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-purchase-summary">\n      <h3>Order Summary</h3>\n      <p>Subtotal: $99.99</p>\n      <p>Total: $99.99</p>\n    </div>\n  </div>\n</div>\n```\n\n### woo:order-tracking\n```html\n<div class="elementor-widget elementor-widget-wc-order-tracking">\n  <div class="elementor-widget-container">\n    <form class="woocommerce-order-tracking" method="post">\n      <p>Enter your order number to track your shipment.</p>\n      <input type="text" name="order" placeholder="Order #">\n      <button type="submit" class="button">Track</button>\n    </form>\n  </div>\n</div>\n```\n\n---\n\n## LOOP BUILDER WIDGETS\n\n### loop:grid\n```html\n<div class="elementor-widget elementor-widget-loop-grid">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-grid elementor-grid">\n      <div class="elementor-grid-item">\n        <!-- Loop item -->\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### loop:carousel\n```html\n<div class="elementor-widget elementor-widget-loop-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-carousel elementor-carousel">\n      <div class="elementor-slide">\n        <!-- Carousel loop item -->\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### loop:item\n```html\n<div class="elementor-widget elementor-widget-loop-item">\n  <div class="elementor-widget-container">\n    <div class="loop-item">\n      <!-- Loop item content container -->\n    </div>\n  </div>\n</div>\n```\n\n### loop:image\n```html\n<div class="elementor-widget elementor-widget-loop-image">\n  <div class="elementor-widget-container">\n    <figure class="loop-item-image">\n      <img src="image.jpg" alt="Item Image">\n    </figure>\n  </div>\n</div>\n```\n\n### loop:title\n```html\n<div class="elementor-widget elementor-widget-loop-title">\n  <div class="elementor-widget-container">\n    <h2 class="loop-item-title"><a href="#">Item Title</a></h2>\n  </div>\n</div>\n```\n\n### loop:meta\n```html\n<div class="elementor-widget elementor-widget-loop-meta">\n  <div class="elementor-widget-container">\n    <div class="loop-item-meta">\n      <span class="loop-meta-author">By Author</span>\n      <span class="loop-meta-date">Date</span>\n    </div>\n  </div>\n</div>\n```\n\n### loop:terms\n```html\n<div class="elementor-widget elementor-widget-loop-terms">\n  <div class="elementor-widget-container">\n    <div class="loop-item-terms">\n      <a href="#">Category</a>, <a href="#">Tag</a>\n    </div>\n  </div>\n</div>\n```\n\n### loop:rating\n```html\n<div class="elementor-widget elementor-widget-loop-rating">\n  <div class="elementor-widget-container">\n    <div class="loop-item-rating">\n      <div class="star-rating">\u2605\u2605\u2605\u2605\u2606</div>\n    </div>\n  </div>\n</div>\n```\n\n### loop:price\n```html\n<div class="elementor-widget elementor-widget-loop-price">\n  <div class="elementor-widget-container">\n    <span class="loop-item-price">$99.99</span>\n  </div>\n</div>\n```\n\n### loop:add-to-cart\n```html\n<div class="elementor-widget elementor-widget-loop-add-to-cart">\n  <div class="elementor-widget-container">\n    <a href="#" class="loop-item-add-to-cart button">Add to Cart</a>\n  </div>\n</div>\n```\n\n### loop:read-more\n```html\n<div class="elementor-widget elementor-widget-loop-read-more">\n  <div class="elementor-widget-container">\n    <a href="#" class="loop-item-read-more button">Read More</a>\n  </div>\n</div>\n```\n\n### loop:featured-image\n```html\n<div class="elementor-widget elementor-widget-loop-featured-image">\n  <div class="elementor-widget-container">\n    <img src="featured.jpg" class="loop-featured-image" alt="Featured Image">\n  </div>\n</div>\n```\n\n---\n\n## CARROSS\xC9IS\n\n### w:image-carousel\n```html\n<div class="elementor-widget elementor-widget-image-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-image-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide">\n          <img src="image1.jpg" alt="Slide 1">\n        </div>\n        <div class="swiper-slide">\n          <img src="image2.jpg" alt="Slide 2">\n        </div>\n      </div>\n      <div class="swiper-pagination"></div>\n      <div class="swiper-button-prev"></div>\n      <div class="swiper-button-next"></div>\n    </div>\n  </div>\n</div>\n```\n\n### media:carousel\n```html\n<div class="elementor-widget elementor-widget-media-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-media-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide">\n          <img src="media1.jpg" alt="Media 1">\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:testimonial-carousel\n```html\n<div class="elementor-widget elementor-widget-testimonial-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-testimonials-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide">\n          <div class="elementor-testimonial">\n            <p class="elementor-testimonial-text">Testimonial text</p>\n          </div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:review-carousel\n```html\n<div class="elementor-widget elementor-widget-review-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-review-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide">\n          <div class="elementor-review-item">\u2605\u2605\u2605\u2605\u2605 Review</div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### slider:slides\n```html\n<div class="elementor-widget elementor-widget-slides">\n  <div class="elementor-widget-container">\n    <div class="elementor-slides-wrapper swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide elementor-slide">\n          <div class="elementor-slide-content">Slide content</div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### slider:slider\n```html\n<div class="elementor-widget elementor-widget-slider">\n  <div class="elementor-widget-container">\n    <div class="elementor-slider swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide">Slider item</div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### loop:carousel\n```html\n<div class="elementor-widget elementor-widget-loop-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide">\n          <!-- Loop carousel item -->\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### woo:product-carousel\n```html\n<div class="elementor-widget elementor-widget-wc-product-carousel">\n  <div class="elementor-widget-container">\n    <div class="woocommerce-product-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide product">\n          <img src="product.jpg" alt="Product">\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:posts-carousel\n```html\n<div class="elementor-widget elementor-widget-posts-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-posts-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide post">\n          <h3>Post Title</h3>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:gallery-carousel\n```html\n<div class="elementor-widget elementor-widget-gallery-carousel">\n  <div class="elementor-widget-container">\n    <div class="elementor-gallery-carousel swiper-container">\n      <div class="swiper-wrapper">\n        <div class="swiper-slide">\n          <img src="gallery.jpg" alt="Gallery">\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n---\n\n## WIDGETS EXPERIMENTAIS\n\n### w:nested-tabs\n```html\n<div class="elementor-widget elementor-widget-nested-tabs">\n  <div class="elementor-widget-container">\n    <div class="elementor-nested-tabs">\n      <div class="elementor-tabs-wrapper">\n        <div class="elementor-tab-title">Nested Tab</div>\n      </div>\n    </div>\n  </div>\n</div>\n```\n\n### w:mega-menu\n```html\n<div class="elementor-widget elementor-widget-mega-menu">\n  <div class="elementor-widget-container">\n    <nav class="elementor-mega-menu">\n      <ul>\n        <li>\n          <a href="#">Menu</a>\n          <div class="mega-menu-panel">Mega menu content</div>\n        </li>\n      </ul>\n    </nav>\n  </div>\n</div>\n```\n\n### w:scroll-snap\n```html\n<div class="elementor-widget elementor-widget-scroll-snap">\n  <div class="elementor-widget-container elementor-scroll-snap">\n    <section>Section 1</section>\n    <section>Section 2</section>\n  </div>\n</div>\n```\n\n### w:motion-effects\n```html\n<div class="elementor-widget elementor-widget-motion-effects" data-motion-effect="parallax">\n  <div class="elementor-widget-container">\n    <div class="motion-effect-content">\n      Content with motion effects\n    </div>\n  </div>\n</div>\n```\n\n### w:background-slideshow\n```html\n<div class="elementor-widget elementor-widget-background-slideshow" data-slideshow-effect="fade">\n  <div class="elementor-widget-container">\n    <div class="elementor-slideshow-background">\n      <img src="slide1.jpg" alt="Slide 1">\n      <img src="slide2.jpg" alt="Slide 2">\n    </div>\n    <div class="elementor-slideshow-content">Content</div>\n  </div>\n</div>\n```\n\n### w:css-transform\n```html\n<div class="elementor-widget elementor-widget-css-transform" style="transform: skewX(-10deg);">\n  <div class="elementor-widget-container">\n    Transformed content\n  </div>\n</div>\n```\n\n### w:custom-position\n```html\n<div class="elementor-widget elementor-widget-custom-position" style="position: absolute; top: 0; left: 0;">\n  <div class="elementor-widget-container">\n    Custom positioned content\n  </div>\n</div>\n```\n\n### w:dynamic-tags\n```html\n<div class="elementor-widget elementor-widget-dynamic-tags">\n  <div class="elementor-widget-container">\n    <div class="dynamic-tags-content">\n      [elementor-tag id="post_title"]\n    </div>\n  </div>\n</div>\n```\n\n### w:ajax-pagination\n```html\n<div class="elementor-widget elementor-widget-ajax-pagination">\n  <div class="elementor-widget-container">\n    <nav class="elementor-pagination">\n      <a href="#" class="page-numbers">1</a>\n      <a href="#" class="page-numbers">2</a>\n      <span class="page-numbers current">3</span>\n    </nav>\n  </div>\n</div>\n```\n\n### loop:pagination\n```html\n<div class="elementor-widget elementor-widget-loop-pagination">\n  <div class="elementor-widget-container">\n    <div class="elementor-loop-pagination">\n      <a href="#" class="pagination-link">Previous</a>\n      <span class="pagination-number">1</span>\n      <a href="#" class="pagination-link">Next</a>\n    </div>\n  </div>\n</div>\n```\n\n### w:aspect-ratio-container\n```html\n<div class="elementor-widget elementor-widget-aspect-ratio-container" style="aspect-ratio: 16/9;">\n  <div class="elementor-widget-container">\n    <div class="aspect-ratio-content">\n      Content maintaining aspect ratio\n    </div>\n  </div>\n</div>\n```\n\n---\n\n## WIDGETS WORDPRESS\n\n### w:wp-search\n```html\n<div class="elementor-widget elementor-widget-wp-search">\n  <div class="elementor-widget-container">\n    <aside class="widget widget_search">\n      <form class="searchform" method="get">\n        <input type="search" name="s" placeholder="Search...">\n        <button type="submit">Search</button>\n      </form>\n    </aside>\n  </div>\n</div>\n```\n\n### w:wp-recent-posts\n```html\n<div class="elementor-widget elementor-widget-wp-recent-posts">\n  <div class="elementor-widget-container">\n    <aside class="widget widget_recent_entries">\n      <h3>Recent Posts</h3>\n      <ul>\n        <li><a href="#">Post Title</a></li>\n      </ul>\n    </aside>\n  </div>\n</div>\n```\n\n### w:wp-recent-comments\n```html\n<div class="elementor-widget elementor-widget-wp-recent-comments">\n  <div class="elementor-widget-container">\n    <aside class="widget widget_recent_comments">\n      <h3>Recent Comments</h3>\n      <ul id="recent-comments">\n        <li>Comment text</li>\n      </ul>\n    </aside>\n  </div>\n</div>\n```\n\n### w:wp-archives\n```html\n<div class="elementor-widget elementor-widget-wp-archives">\n  <div class="elementor-widget-container">\n    <aside class="widget widget_archive">\n      <h3>Archives</h3>\n      <ul>\n        <li><a href="#">January 2025</a></li>\n      </ul>\n    </aside>\n  </div>\n</div>\n```\n\n### w:wp-categories\n```html\n<div class="elementor-widget elementor-widget-wp-categories">\n  <div class="elementor-widget-container">\n    <aside class="widget widget_categories">\n      <h3>Categories</h3>\n      <ul>\n        <li><a href="#">Category Name</a></li>\n      </ul>\n    </aside>\n  </div>\n</div>\n```\n\n### w:wp-calendar\n```html\n<div class="elementor-widget elementor-widget-wp-calendar">\n  <div class="elementor-widget-container">\n    <aside class="widget widget_calendar">\n      <div id="calendar_wrap">\n        <table id="wp-calendar">\n          <tr><th>S</th><th>M</th><th>T</th></tr>\n        </table>\n      </div>\n    </aside>\n  </div>\n</div>\n```\n\n### w:wp-tag-cloud\n```html\n<div class="elementor-widget elementor-widget-wp-tag-cloud">\n  <div class="elementor-widget-container">\n    <aside class="widget widget_tag_cloud">\n      <h3>Tags</h3>\n      <div class="tagcloud">\n        <a href="#">tag1</a>\n        <a href="#">tag2</a>\n      </div>\n    </aside>\n  </div>\n</div>\n```\n\n### w:wp-custom-menu\n```html\n<div class="elementor-widget elementor-widget-wp-custom-menu">\n  <div class="elementor-widget-container">\n    <nav class="elementor-wp-menu">\n      <ul class="wp-menu-list">\n        <li><a href="#">Menu Item</a></li>\n      </ul>\n    </nav>\n  </div>\n</div>\n```\n\n---\n\n## ESTRUTURA PADR\xC3O DE WRAPPER\n\nTodos os widgets seguem essa estrutura base:\n\n```html\n<div class="elementor-widget elementor-widget-[tipo]">\n  <div class="elementor-widget-container">\n    <!-- Widget content here -->\n  </div>\n</div>\n```\n\n---\n\n## CLASSES IMPORTANTES DE ELEMENTOR\n\n- `.elementor-widget` - Container raiz do widget\n- `.elementor-widget-container` - Container interno de conte\xFAdo\n- `.elementor-button` - Classe para bot\xF5es\n- `.elementor-carousel` - Classe para carross\xE9is (usa Swiper.js)\n- `.elementor-grid` - Classe para layouts em grid\n- `.elementor-tabs-wrapper` - Wrapper para tabs\n- `.elementor-accordion` - Classe para accordion\n- `.elementor-form` - Classe para formul\xE1rios\n- `.elementor-post-*` - Classes para widgets de posts\n\n---\n\n## ATRIBUTOS DATA IMPORTANTES\n\n- `data-animation-url` - URL da anima\xE7\xE3o Lottie\n- `data-lat` / `data-lng` - Coordenadas do Google Maps\n- `data-to-value` - Valor final do counter\n- `data-widget-id` - ID do widget global\n- `data-motion-effect` - Tipo de efeito de movimento\n- `data-slideshow-effect` - Tipo de efeito do slideshow\n\nEste documento serve como refer\xEAncia completa para mapeamento de componentes Figma \u2192 Elementor WordPress.\n\n';
+    }
+  });
+
+  // markdown-elementor/widgets-estrutural.md
+  var widgets_estrutural_default;
+  var init_widgets_estrutural = __esm({
+    "markdown-elementor/widgets-estrutural.md"() {
+      widgets_estrutural_default = '\n# Estruturas de Widgets para Elementor, Elementor Pro, WordPress, WooCommerce\n\n## Widgets Nativos do Elementor (Gratuito)\n\n### Caixa de Imagem (Image Box)\n```html\n<div class="elementor-image-box">\n  <figure class="elementor-image-box-img">\n    <img src="URL-da-imagem" alt="Descri\xE7\xE3o">\n  </figure>\n  <div class="elementor-image-box-content">\n    <h3 class="elementor-image-box-title">T\xEDtulo da Caixa</h3>\n    <p class="elementor-image-box-description">Descri\xE7\xE3o da caixa de imagem.</p>\n  </div>\n</div>\n```\n\n### Caixa de \xCDcone (Icon Box)\n```html\n<div class="elementor-icon-box">\n  <span class="elementor-icon">\n    <i class="fas fa-star"></i>\n  </span>\n  <div class="elementor-icon-box-content">\n    <h3 class="elementor-icon-box-title">T\xEDtulo do \xCDcone</h3>\n    <p class="elementor-icon-box-description">Descri\xE7\xE3o sobre o \xEDcone.</p>\n  </div>\n</div>\n```\n\n### Imagem\n```html\n<img class="elementor-widget-image" src="URL-da-imagem" alt="Descri\xE7\xE3o">\n```\n\n### V\xEDdeo\n```html\n<div class="elementor-widget-video">\n  <iframe src="URL-do-video"></iframe>\n</div>\n```\n\n### Bot\xE3o\n```html\n<a class="elementor-button" href="url-destino">\n  <span class="elementor-button-content-wrapper">\n    <span class="elementor-button-text">Texto do Bot\xE3o</span>\n  </span>\n</a>\n```\n\n### Divider (Divisor)\n```html\n<hr class="elementor-divider">\n```\n\n### Espa\xE7ador\n```html\n<div class="elementor-spacer"></div>\n```\n\n### T\xEDtulo (Heading)\n```html\n<h2 class="elementor-heading-title">T\xEDtulo</h2>\n```\n\n### Editor de Texto (Text Editor)\n```html\n<div class="elementor-text-editor">\n  <p>Texto livre e formatado.</p>\n</div>\n```\n\n### Imagem em Galeria (Image Gallery)\n```html\n<div class="elementor-image-gallery">\n  <img src="img1.jpg">\n  <img src="img2.jpg">\n</div>\n```\n\n### Lista de \xCDcones (Icon List)\n```html\n<ul class="elementor-icon-list">\n  <li class="elementor-icon-list-item">\n    <span class="elementor-icon-list-icon"><i class="fas fa-check"></i></span>\n    <span class="elementor-icon-list-text">Item 1</span>\n  </li>\n</ul>\n```\n\n### Alerta\n```html\n<div class="elementor-alert">\n  <span class="elementor-alert-title">Aten\xE7\xE3o!</span>\n  <div class="elementor-alert-description">Mensagem informativa.</div>\n</div>\n```\n\n### M\xFAsica (SoundCloud)\n```html\n<iframe width="400" height="100" src="https://soundcloud.com"></iframe>\n```\n\n### Google Maps\n```html\n<div class="elementor-google-map">\n  <iframe src="URL-do-mapa"></iframe>\n</div>\n```\n\n### Abas (Tabs)\n```html\n<div class="elementor-tabs">\n  <div class="elementor-tabs-wrapper">\n    <div class="elementor-tab-title">Tab 1</div>\n    <div class="elementor-tab-title">Tab 2</div>\n  </div>\n  <div class="elementor-tabs-content-wrapper">\n    <div class="elementor-tab-content">Conte\xFAdo 1</div>\n    <div class="elementor-tab-content">Conte\xFAdo 2</div>\n  </div>\n</div>\n```\n\n### Acorde\xE3o (Accordion)\n```html\n<div class="elementor-accordion">\n  <div class="elementor-accordion-item">\n    <div class="elementor-accordion-title">T\xEDtulo do Acorde\xE3o</div>\n    <div class="elementor-accordion-content">Conte\xFAdo do Acorde\xE3o</div>\n  </div>\n</div>\n```\n\n### Barra de Progresso (Progress Bar)\n```html\n<div class="elementor-progress-bar">\n  <div class="elementor-progress-bar-fill" style="width:70%"></div>\n</div>\n```\n\n### Contador (Counter)\n```html\n<div class="elementor-counter">\n  <span class="elementor-counter-number">100</span>\n  <span class="elementor-counter-title">T\xEDtulo</span>\n</div>\n```\n\n### \xC1reas de HTML Customizado\n```html\n<div class="elementor-widget-html">\n  <!-- Seu c\xF3digo HTML personalizado aqui -->\n</div>\n```\n\n### Shortcode\n```html\n<div class="elementor-shortcode">\n  [seu_shortcode]\n</div>\n```\n\n## Widgets do Elementor Pro (Adicionais)\n\n### Formul\xE1rio (Form)\n```html\n<form class="elementor-form">\n  <input type="text" placeholder="Nome">\n  <input type="email" placeholder="Email">\n  <textarea placeholder="Mensagem"></textarea>\n  <button type="submit">Enviar</button>\n</form>\n```\n\n### Posts (Grade de Posts/Artigos)\n```html\n<div class="elementor-posts">\n  <article class="elementor-post">\n    <a href="url-do-post">\n      <img src="thumb.jpg" alt="">\n      <h2>T\xEDtulo do Post</h2>\n      <p>Resumo...</p>\n    </a>\n  </article>\n</div>\n```\n\n### Slides\n```html\n<div class="elementor-slides">\n  <div class="elementor-slide">Conte\xFAdo 1</div>\n  <div class="elementor-slide">Conte\xFAdo 2</div>\n</div>\n```\n\n### Testemunhos (Testimonials)\n```html\n<div class="elementor-testimonial">\n  <blockquote>Opini\xE3o do cliente</blockquote>\n  <cite>Nome do Cliente</cite>\n</div>\n```\n\n### Portf\xF3lio\n```html\n<div class="elementor-portfolio">\n  <div class="elementor-portfolio-item">\n    <img src="portfolio.jpg" alt="Projeto">\n    <span>Nome do Projeto</span>\n  </div>\n</div>\n```\n\n### Lista de Pre\xE7os\n```html\n<ul class="elementor-price-list">\n  <li><span class="elementor-price-list-item">Servi\xE7o</span> <span class="elementor-price">R$ 100</span></li>\n</ul>\n```\n\n### Tabela de Pre\xE7os\n```html\n<table class="elementor-price-table">\n  <thead><tr><th>Plano</th><th>Pre\xE7o</th></tr></thead>\n  <tbody><tr><td>Basic</td><td>R$ 50</td></tr></tbody>\n</table>\n```\n\n### Call to Action\n```html\n<div class="elementor-cta">\n  <h2>Chamada</h2>\n  <button>Saiba Mais</button>\n</div>\n```\n\n### Flip Box\n```html\n<div class="elementor-flip-box">\n  <div class="elementor-flip-box-front">Frente</div>\n  <div class="elementor-flip-box-back">Verso</div>\n</div>\n```\n\n### Carrossel de M\xEDdia/Site\n```html\n<div class="elementor-media-carousel">\n  <div class="elementor-carousel-item">Item 1</div>\n  <div class="elementor-carousel-item">Item 2</div>\n</div>\n```\n\n### Formul\xE1rio de Login\n```html\n<form class="elementor-login">\n  <input type="text" placeholder="Usu\xE1rio">\n  <input type="password" placeholder="Senha">\n  <button type="submit">Entrar</button>\n</form>\n```\n\n### Menu Personalizado\n```html\n<nav class="elementor-nav-menu">\n  <ul>\n    <li><a href="#">In\xEDcio</a></li>\n    <li><a href="#">Sobre</a></li>\n  </ul>\n</nav>\n```\n\n### Busca Din\xE2mica\n```html\n<form class="elementor-search">\n  <input type="search" placeholder="Buscar...">\n  <button type="submit">Buscar</button>\n</form>\n```\n\n### Lista de Conte\xFAdos Din\xE2mica\n```html\n<ul class="elementor-dynamic-content">\n  <li>Conte\xFAdo 1</li>\n  <li>Conte\xFAdo 2</li>\n</ul>\n```\n\n### Breadcrumbs\n```html\n<nav class="elementor-breadcrumbs">\n  <a href="#">Home</a> &gt; <a href="#">P\xE1gina</a>\n</nav>\n```\n\n### Widgets para WooCommerce\n```html\n<!-- Exemplo: Adicionar ao Carrinho -->\n<button class="woocommerce-add-to-cart">Adicionar ao Carrinho</button>\n<!-- Grid de Produtos -->\n<ul class="products">\n  <li class="product">\n    <a href="url-produto">\n      <img src="imagem.jpg" alt="">\n      <h2>Nome do Produto</h2>\n      <span class="price">R$ 59,00</span>\n    </a>\n  </li>\n</ul>\n<!-- Produtos Relacionados -->\n<div class="related-products">\n  ...\n</div>\n<!-- Filtros -->\n<form class="woocommerce-product-filter">\n  ...\n</form>\n```\n\n### Popup\n```html\n<div class="elementor-popup">\n  <h2>T\xEDtulo Popup</h2>\n  <p>Conte\xFAdo popup</p>\n</div>\n```\n\n## Widgets Nativos do WordPress\n\n### Arquivos\n```html\n<aside class="widget widget_archives">\n  <h2 class="widget-title">Arquivos</h2>\n  <ul>\n    <li><a href="#">Novembro 2025</a></li>\n  </ul>\n</aside>\n```\n\n### Agenda\n```html\n<aside class="widget widget_calendar">\n  <table>\n    <tr><td>Seg</td><td>Ter</td></tr>\n  </table>\n</aside>\n```\n\n### \xC1udio\n```html\n<audio controls src="audio.mp3"></audio>\n```\n\n### Calend\xE1rio\n```html\n<aside class="widget widget_calendar">\n  <table></table>\n</aside>\n```\n\n### Categorias\n```html\n<aside class="widget widget_categories">\n  <ul>\n    <li><a href="#">Categoria</a></li>\n  </ul>\n</aside>\n```\n\n### Galeria\n```html\n<div class="gallery">\n  <img src="img1.jpg"><img src="img2.jpg">\n</div>\n```\n\n### Imagem\n```html\n<img src="img.jpg" alt="Imagem">\n```\n\n### Menu Personalizado\n```html\n<nav class="widget_nav_menu">\n  <ul>\n    <li><a href="#">Home</a></li>\n  </ul>\n</nav>\n```\n\n### Meta\n```html\n<aside class="widget widget_meta">\n  <ul>\n    <li><a href="#">Login</a></li>\n  </ul>\n</aside>\n```\n\n### P\xE1gina\n```html\n<aside class="widget widget_pages">\n  <ul>\n    <li><a href="#">P\xE1gina 1</a></li>\n  </ul>\n</aside>\n```\n\n### Pesquisar\n```html\n<form class="search-form">\n  <input type="search">\n  <button type="submit">Buscar</button>\n</form>\n```\n\n### Coment\xE1rios Recentes\n```html\n<aside class="widget widget_recent_comments">\n  <ul>\n    <li>Coment\xE1rio</li>\n  </ul>\n</aside>\n```\n\n### Posts Recentes\n```html\n<aside class="widget widget_recent_entries">\n  <ul>\n    <li><a href="#">T\xEDtulo do Post</a></li>\n  </ul>\n</aside>\n```\n\n### RSS\n```html\n<aside class="widget widget_rss">\n  <ul>\n    <li>Feed</li>\n  </ul>\n</aside>\n```\n\n### Lista de Tags\n```html\n<div class="tagcloud">\n  <a href="#">tag1</a>\n  <a href="#">tag2</a>\n</div>\n```\n\n### V\xEDdeo\n```html\n<video controls src="video.mp4"></video>\n```\n\n## Widgets Nativos do WooCommerce\n\n### Carrinho\n```html\n<div class="widget_shopping_cart_content">\n  <ul class="woocommerce-mini-cart">\n    <li>Produto</li>\n  </ul>\n</div>\n```\n\n### Filtros ativos de produto\n```html\n<div class="widget_layered_nav_filters">\n  <ul>\n    <li>Filtro</li>\n  </ul>\n</div>\n```\n\n### Filtro por Atributo\n```html\n<div class="widget_layered_nav">\n  <ul>\n    <li>Atributo</li>\n  </ul>\n</div>\n```\n\n### Filtro por Pre\xE7o\n```html\n<div class="widget_price_filter">\n  <input type="range">\n</div>\n```\n\n### Filtro por Avalia\xE7\xE3o\n```html\n<div class="widget_rating_filter">\n  <ul>\n    <li>Estrelas</li>\n  </ul>\n</div>\n```\n\n### Lista/Categorias de Produto\n```html\n<ul class="product-categories">\n  <li>Categoria</li>\n</ul>\n```\n\n### Produtos em Destaque\n```html\n<ul class="product_list_widget">\n  <li>Produto Destaque</li>\n</ul>\n```\n\n### Produtos em Promo\xE7\xE3o\n```html\n<ul class="product_list_widget">\n  <li>Produto em Promo\xE7\xE3o</li>\n</ul>\n```\n\n### Produtos Recentes/Populares/Mais Vendidos\n```html\n<ul class="product_list_widget">\n  <li>Produto</li>\n</ul>\n```\n\n### Avalia\xE7\xF5es recentes de produto\n```html\n<ul class="woocommerce-widget-reviews">\n  <li>Avalia\xE7\xE3o</li>\n</ul>\n```\n\n### Nuvem de Tags do Produto\n```html\n<div class="woocommerce-product-tag-cloud">\n  <a href="#">tag-produto</a>\n</div>\n```\n\n### Pesquisa de Produtos\n```html\n<form class="woocommerce-product-search">\n  <input type="search">\n  <button type="submit">Buscar</button>\n</form>\n```\n';
+    }
+  });
+
+  // src/reference_docs.ts
+  var referenceDocs;
+  var init_reference_docs = __esm({
+    "src/reference_docs.ts"() {
+      init_elementor_widgets_html_structure();
+      init_widgets_estrutural();
+      referenceDocs = [
+        { name: "elementor-widgets-html-structure.md", content: elementor_widgets_html_structure_default },
+        { name: "widgets-estrutural.md", content: widgets_estrutural_default }
+      ];
+    }
+  });
+
+  // src/heuristics/types.ts
+  var init_types = __esm({
+    "src/heuristics/types.ts"() {
+    }
+  });
+
+  // src/heuristics/engine.ts
+  function evaluateNode(node, heuristics, options = {}) {
+    var _a;
+    const minConfidence = (_a = options.minConfidence) != null ? _a : 0.3;
+    const results = [];
+    for (const rule of heuristics) {
+      try {
+        const out = rule.match(node);
+        if (!out) continue;
+        if (out.confidence < minConfidence) continue;
+        results.push(__spreadProps(__spreadValues({}, out), {
+          heuristicId: rule.id,
+          priority: rule.priority
+        }));
+      } catch (e) {
+        continue;
+      }
+    }
+    results.sort((a, b) => {
+      if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+      return b.priority - a.priority;
+    });
+    return results;
+  }
+  var init_engine = __esm({
+    "src/heuristics/engine.ts"() {
+    }
+  });
+
+  // src/heuristics/rules/utils.ts
+  function areWidthsRoughlyEqual(widths, tolerance = 12) {
+    if (widths.length < 2) return false;
+    const min = Math.min(...widths);
+    const max = Math.max(...widths);
+    return max - min <= tolerance;
+  }
+  function hasAnyText(node) {
+    return node.hasText === true;
+  }
+  function isFrameLike(node) {
+    return node.type === "FRAME" || node.type === "SECTION" || node.type === "COMPONENT" || node.type === "INSTANCE";
+  }
+  var init_utils = __esm({
+    "src/heuristics/rules/utils.ts"() {
+    }
+  });
+
+  // src/heuristics/rules/layout.ts
+  var LAYOUT_COLUMNS, LAYOUT_GRID, LAYOUT_HEURISTICS;
+  var init_layout = __esm({
+    "src/heuristics/rules/layout.ts"() {
+      init_utils();
+      LAYOUT_COLUMNS = {
+        id: "layout.columns",
+        priority: 70,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (node.direction !== "HORIZONTAL") return null;
+          if (node.childCount < 2) return null;
+          if (!areWidthsRoughlyEqual(node.childrenWidths)) return null;
+          let patternId = "layout.columnsN";
+          if (node.childCount === 2) patternId = "layout.columns2";
+          else if (node.childCount === 3) patternId = "layout.columns3";
+          else if (node.childCount === 4) patternId = "layout.columns4";
+          return {
+            patternId,
+            widget: "structure:columns",
+            confidence: 0.8,
+            meta: { columns: node.childCount }
+          };
+        }
+      };
+      LAYOUT_GRID = {
+        id: "layout.grid",
+        priority: 68,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (node.childCount < 3) return null;
+          const widths = node.childrenWidths;
+          if (!widths.length) return null;
+          const min = Math.min(...widths);
+          const max = Math.max(...widths);
+          if (max - min > 24) return null;
+          return {
+            patternId: "layout.grid",
+            widget: "structure:grid",
+            confidence: 0.77
+          };
+        }
+      };
+      LAYOUT_HEURISTICS = [
+        LAYOUT_COLUMNS,
+        LAYOUT_GRID
+      ];
+    }
+  });
+
+  // src/heuristics/rules/sections.ts
+  var SECTION_GENERIC, SECTION_HERO, SECTION_CTA, SECTION_HEURISTICS;
+  var init_sections = __esm({
+    "src/heuristics/rules/sections.ts"() {
+      init_utils();
+      SECTION_GENERIC = {
+        id: "section.generic",
+        priority: 60,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (node.width < 900) return null;
+          if (node.height < 180) return null;
+          return {
+            patternId: "section.generic",
+            widget: "structure:section",
+            confidence: 0.75
+          };
+        }
+      };
+      SECTION_HERO = {
+        id: "section.hero",
+        priority: 85,
+        match(node) {
+          var _a;
+          if (!isFrameLike(node)) return null;
+          if (node.width < 900) return null;
+          if (node.height < 380) return null;
+          if (!node.hasText) return null;
+          const hasVisual = node.hasBackground || node.hasChildImage;
+          if (!hasVisual) return null;
+          const bigText = ((_a = node.textFontSizeMax) != null ? _a : 0) >= 32;
+          if (!bigText) return null;
+          return {
+            patternId: "section.hero",
+            widget: "structure:section-hero",
+            confidence: 0.86,
+            meta: { isHero: true }
+          };
+        }
+      };
+      SECTION_CTA = {
+        id: "section.cta",
+        priority: 80,
+        match(node) {
+          var _a;
+          if (!isFrameLike(node)) return null;
+          if (!node.hasText) return null;
+          if (node.height < 140 || node.height > 520) return null;
+          if (!node.hasBackground && !node.hasBorder) return null;
+          const bigText = ((_a = node.textFontSizeMax) != null ? _a : 0) >= 20;
+          if (!bigText) return null;
+          return {
+            patternId: "section.cta",
+            widget: "structure:section-cta",
+            confidence: 0.8
+          };
+        }
+      };
+      SECTION_HEURISTICS = [
+        SECTION_HERO,
+        SECTION_CTA,
+        SECTION_GENERIC
+      ];
+    }
+  });
+
+  // src/heuristics/rules/navigation.ts
+  var HEADER_NAVBAR, FOOTER_MAIN, NAVIGATION_HEURISTICS;
+  var init_navigation = __esm({
+    "src/heuristics/rules/navigation.ts"() {
+      init_utils();
+      HEADER_NAVBAR = {
+        id: "navigation.header-navbar",
+        priority: 75,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (node.height > 200) return null;
+          if (node.width < 900) return null;
+          const nearTop = node.y <= 80;
+          if (!nearTop) return null;
+          if (!node.hasText && !node.hasChildImage) return null;
+          return {
+            patternId: "navigation.header-navbar",
+            widget: "structure:header-navbar",
+            confidence: 0.8
+          };
+        }
+      };
+      FOOTER_MAIN = {
+        id: "navigation.footer-main",
+        priority: 70,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (node.width < 900) return null;
+          if (node.height < 160) return null;
+          if (!node.hasText) return null;
+          return {
+            patternId: "navigation.footer-main",
+            widget: "structure:footer-main",
+            confidence: 0.72
+          };
+        }
+      };
+      NAVIGATION_HEURISTICS = [
+        HEADER_NAVBAR,
+        FOOTER_MAIN
+      ];
+    }
+  });
+
+  // src/heuristics/rules/typography.ts
+  var HEADING_GENERIC, PARAGRAPH_GENERIC, TYPOGRAPHY_HEURISTICS;
+  var init_typography = __esm({
+    "src/heuristics/rules/typography.ts"() {
+      init_utils();
+      HEADING_GENERIC = {
+        id: "typography.heading-generic",
+        priority: 80,
+        match(node) {
+          var _a, _b;
+          if (node.type !== "TEXT") return null;
+          if (!hasAnyText(node)) return null;
+          const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
+          const lineCount = (_b = node.textLineCount) != null ? _b : 1;
+          if (sizeMax < 20) return null;
+          if (lineCount > 3) return null;
+          return {
+            patternId: "typography.heading",
+            widget: "structure:heading",
+            confidence: 0.85
+          };
+        }
+      };
+      PARAGRAPH_GENERIC = {
+        id: "typography.paragraph-generic",
+        priority: 60,
+        match(node) {
+          var _a, _b, _c;
+          if (node.type !== "TEXT") return null;
+          if (!hasAnyText(node)) return null;
+          const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
+          const sizeMin = (_b = node.textFontSizeMin) != null ? _b : sizeMax;
+          const lineCount = (_c = node.textLineCount) != null ? _c : 1;
+          if (sizeMax > 22) return null;
+          if (sizeMin < 10) return null;
+          if (lineCount < 2) return null;
+          return {
+            patternId: "typography.paragraph",
+            widget: "structure:paragraph",
+            confidence: 0.8
+          };
+        }
+      };
+      TYPOGRAPHY_HEURISTICS = [
+        HEADING_GENERIC,
+        PARAGRAPH_GENERIC
+      ];
+    }
+  });
+
+  // src/heuristics/rules/media.ts
+  var IMAGE_SINGLE, MEDIA_HEURISTICS;
+  var init_media = __esm({
+    "src/heuristics/rules/media.ts"() {
+      init_utils();
+      IMAGE_SINGLE = {
+        id: "media.image-single",
+        priority: 65,
+        match(node) {
+          if (node.type === "RECTANGLE" || node.type === "ELLIPSE") {
+            if (node.hasImageFill) {
+              return {
+                patternId: "media.image",
+                widget: "structure:image",
+                confidence: 0.82
+              };
+            }
+          }
+          if (isFrameLike(node) && node.hasChildImage && !node.hasText) {
+            return {
+              patternId: "media.image",
+              widget: "structure:image",
+              confidence: 0.78
+            };
+          }
+          return null;
+        }
+      };
+      MEDIA_HEURISTICS = [
+        IMAGE_SINGLE
+      ];
+    }
+  });
+
+  // src/heuristics/widgets/elementor-basic.ts
+  var ELEM_HEADING, ELEM_TEXT_EDITOR, ELEM_IMAGE, ELEM_BUTTON, ELEM_ICON, ELEM_ICON_BOX, ELEM_IMAGE_BOX, ELEM_DIVIDER, ELEM_SPACER, ELEMENTOR_BASIC_WIDGET_HEURISTICS;
+  var init_elementor_basic = __esm({
+    "src/heuristics/widgets/elementor-basic.ts"() {
+      init_utils();
+      ELEM_HEADING = {
+        id: "widget.elementor.heading",
+        priority: 90,
+        match(node) {
+          var _a, _b, _c;
+          if (node.type !== "TEXT") return null;
+          if (!hasAnyText(node)) return null;
+          const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
+          const lineCount = (_b = node.textLineCount) != null ? _b : 1;
+          const isBold = (_c = node.textIsBoldDominant) != null ? _c : false;
+          if (sizeMax < 22) return null;
+          if (lineCount > 3) return null;
+          if (!isBold) return null;
+          return {
+            patternId: "widget.elementor.heading",
+            widget: "w:heading",
+            confidence: 0.9,
+            meta: { levelGuess: sizeMax >= 32 ? "h1-h2" : "h3" }
+          };
+        }
+      };
+      ELEM_TEXT_EDITOR = {
+        id: "widget.elementor.text-editor",
+        priority: 85,
+        match(node) {
+          var _a, _b;
+          if (node.type !== "TEXT") return null;
+          if (!hasAnyText(node)) return null;
+          const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
+          const lineCount = (_b = node.textLineCount) != null ? _b : 1;
+          if (sizeMax > 22) return null;
+          if (lineCount < 2) return null;
+          return {
+            patternId: "widget.elementor.text-editor",
+            widget: "w:text-editor",
+            confidence: 0.85
+          };
+        }
+      };
+      ELEM_IMAGE = {
+        id: "widget.elementor.image",
+        priority: 80,
+        match(node) {
+          if (node.type === "RECTANGLE" || node.type === "ELLIPSE") {
+            if (node.hasImageFill) {
+              return {
+                patternId: "widget.elementor.image",
+                widget: "w:image",
+                confidence: 0.88
+              };
+            }
+          }
+          if (isFrameLike(node) && node.hasChildImage && !node.hasText) {
+            return {
+              patternId: "widget.elementor.image",
+              widget: "w:image",
+              confidence: 0.8
+            };
+          }
+          return null;
+        }
+      };
+      ELEM_BUTTON = {
+        id: "widget.elementor.button",
+        priority: 90,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (!node.hasBackground) return null;
+          if (!node.hasText) return null;
+          if (node.height < 28 || node.height > 72) return null;
+          if (node.width < 80) return null;
+          const paddingH = (node.paddingLeft + node.paddingRight) / 2;
+          if (paddingH < 10) return null;
+          return {
+            patternId: "widget.elementor.button",
+            widget: "w:button",
+            confidence: 0.9
+          };
+        }
+      };
+      ELEM_ICON = {
+        id: "widget.elementor.icon",
+        priority: 70,
+        match(node) {
+          const isIconShape = node.type === "ELLIPSE" || node.type === "VECTOR" || node.type === "INSTANCE";
+          if (!isIconShape) return null;
+          if (node.width > 128 || node.height > 128) return null;
+          return {
+            patternId: "widget.elementor.icon",
+            widget: "w:icon",
+            confidence: 0.78
+          };
+        }
+      };
+      ELEM_ICON_BOX = {
+        id: "widget.elementor.icon-box",
+        priority: 78,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (node.direction !== "VERTICAL") return null;
+          if (!node.hasText) return null;
+          if (!node.hasChildImage) return null;
+          if (node.childCount < 2 || node.childCount > 4) return null;
+          return {
+            patternId: "widget.elementor.icon-box",
+            widget: "w:icon-box",
+            confidence: 0.8
+          };
+        }
+      };
+      ELEM_IMAGE_BOX = {
+        id: "widget.elementor.image-box",
+        priority: 78,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (node.direction !== "VERTICAL") return null;
+          if (!node.hasText) return null;
+          if (!node.hasChildImage) return null;
+          if (node.childCount < 2 || node.childCount > 4) return null;
+          return {
+            patternId: "widget.elementor.image-box",
+            widget: "w:image-box",
+            confidence: 0.8
+          };
+        }
+      };
+      ELEM_DIVIDER = {
+        id: "widget.elementor.divider",
+        priority: 65,
+        match(node) {
+          if (node.height > 4 && node.width < 200) return null;
+          if (!node.hasBorder && !node.hasBackground) return null;
+          return {
+            patternId: "widget.elementor.divider",
+            widget: "w:divider",
+            confidence: 0.7
+          };
+        }
+      };
+      ELEM_SPACER = {
+        id: "widget.elementor.spacer",
+        priority: 50,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (node.childCount !== 0) return null;
+          if (!node.hasBackground && !node.hasBorder) return null;
+          if (node.height >= 8 && node.height <= 80 && node.width >= 16) {
+            return {
+              patternId: "widget.elementor.spacer",
+              widget: "w:spacer",
+              confidence: 0.65
+            };
+          }
+          return null;
+        }
+      };
+      ELEMENTOR_BASIC_WIDGET_HEURISTICS = [
+        ELEM_HEADING,
+        ELEM_TEXT_EDITOR,
+        ELEM_IMAGE,
+        ELEM_BUTTON,
+        ELEM_ICON,
+        ELEM_ICON_BOX,
+        ELEM_IMAGE_BOX,
+        ELEM_DIVIDER,
+        ELEM_SPACER
+      ];
+    }
+  });
+
+  // src/heuristics/widgets/elementor-pro.ts
+  var ELEM_PRO_FORM, ELEM_PRO_POSTS, ELEM_PRO_SLIDES, ELEMENTOR_PRO_WIDGET_HEURISTICS;
+  var init_elementor_pro = __esm({
+    "src/heuristics/widgets/elementor-pro.ts"() {
+      init_utils();
+      ELEM_PRO_FORM = {
+        id: "widget.elementor-pro.form",
+        priority: 88,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (!node.hasText) return null;
+          if (node.childCount < 2) return null;
+          const looksTall = node.height >= 200;
+          const manyChildren = node.childCount >= 3;
+          if (!looksTall || !manyChildren) return null;
+          return {
+            patternId: "widget.elementor-pro.form",
+            widget: "e:form",
+            confidence: 0.78
+          };
+        }
+      };
+      ELEM_PRO_POSTS = {
+        id: "widget.elementor-pro.posts",
+        priority: 86,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (node.childCount < 3) return null;
+          const widths = node.childrenWidths;
+          if (!widths.length) return null;
+          const min = Math.min(...widths);
+          const max = Math.max(...widths);
+          if (max - min > 32) return null;
+          return {
+            patternId: "widget.elementor-pro.posts",
+            widget: "e:posts",
+            confidence: 0.8,
+            meta: { layout: "cards-grid-or-columns" }
+          };
+        }
+      };
+      ELEM_PRO_SLIDES = {
+        id: "widget.elementor-pro.slides",
+        priority: 80,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.hasChildImage) return null;
+          if (!node.hasText) return null;
+          if (node.width < 600 || node.height < 300) return null;
+          return {
+            patternId: "widget.elementor-pro.slides",
+            widget: "e:slides",
+            confidence: 0.75
+          };
+        }
+      };
+      ELEMENTOR_PRO_WIDGET_HEURISTICS = [
+        ELEM_PRO_FORM,
+        ELEM_PRO_POSTS,
+        ELEM_PRO_SLIDES
+      ];
+    }
+  });
+
+  // src/heuristics/widgets/wordpress-core.ts
+  var WP_SEARCH, WP_RECENT_POSTS_LIST, WP_CATEGORIES_LIST, WORDPRESS_CORE_WIDGET_HEURISTICS;
+  var init_wordpress_core = __esm({
+    "src/heuristics/widgets/wordpress-core.ts"() {
+      init_utils();
+      WP_SEARCH = {
+        id: "widget.wp.search",
+        priority: 70,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (node.childCount < 1 || node.childCount > 3) return null;
+          if (!node.hasText) return null;
+          if (node.height < 40 || node.height > 120) return null;
+          return {
+            patternId: "widget.wp.search",
+            widget: "wp:search",
+            confidence: 0.65
+          };
+        }
+      };
+      WP_RECENT_POSTS_LIST = {
+        id: "widget.wp.recent-posts",
+        priority: 60,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (node.direction !== "VERTICAL") return null;
+          if (!node.hasText) return null;
+          if (node.childCount < 3) return null;
+          return {
+            patternId: "widget.wp.recent-posts",
+            widget: "wp:recent-posts",
+            confidence: 0.6
+          };
+        }
+      };
+      WP_CATEGORIES_LIST = {
+        id: "widget.wp.categories",
+        priority: 60,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.isAutoLayout) return null;
+          if (node.direction !== "VERTICAL") return null;
+          if (!node.hasText) return null;
+          if (node.childCount < 3) return null;
+          return {
+            patternId: "widget.wp.categories",
+            widget: "wp:categories",
+            confidence: 0.55
+          };
+        }
+      };
+      WORDPRESS_CORE_WIDGET_HEURISTICS = [
+        WP_SEARCH,
+        WP_RECENT_POSTS_LIST,
+        WP_CATEGORIES_LIST
+      ];
+    }
+  });
+
+  // src/heuristics/widgets/woocommerce.ts
+  var WOO_PRODUCT_GRID, WOO_SINGLE_PRODUCT_SUMMARY, WOO_CART_LIKE, WOO_WIDGET_HEURISTICS;
+  var init_woocommerce = __esm({
+    "src/heuristics/widgets/woocommerce.ts"() {
+      init_utils();
+      WOO_PRODUCT_GRID = {
+        id: "widget.woo.product-grid",
+        priority: 85,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (node.childCount < 3) return null;
+          if (!node.hasChildImage || !node.hasText) return null;
+          const widths = node.childrenWidths;
+          if (!widths.length) return null;
+          const min = Math.min(...widths);
+          const max = Math.max(...widths);
+          if (max - min > 40) return null;
+          return {
+            patternId: "widget.woo.product-grid",
+            widget: "woo:products-grid",
+            confidence: 0.82
+          };
+        }
+      };
+      WOO_SINGLE_PRODUCT_SUMMARY = {
+        id: "widget.woo.single-product-summary",
+        priority: 82,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.hasText) return null;
+          if (node.width < 260) return null;
+          const tall = node.height >= 240;
+          if (!tall) return null;
+          return {
+            patternId: "widget.woo.single-product-summary",
+            widget: "woo:single-product-summary",
+            confidence: 0.78
+          };
+        }
+      };
+      WOO_CART_LIKE = {
+        id: "widget.woo.cart-like",
+        priority: 70,
+        match(node) {
+          if (!isFrameLike(node)) return null;
+          if (!node.hasText) return null;
+          if (node.width < 600) return null;
+          if (node.height < 200) return null;
+          return {
+            patternId: "widget.woo.cart",
+            widget: "woo:cart",
+            confidence: 0.7
+          };
+        }
+      };
+      WOO_WIDGET_HEURISTICS = [
+        WOO_PRODUCT_GRID,
+        WOO_SINGLE_PRODUCT_SUMMARY,
+        WOO_CART_LIKE
+      ];
+    }
+  });
+
+  // src/heuristics/index.ts
+  var DEFAULT_HEURISTICS;
+  var init_heuristics = __esm({
+    "src/heuristics/index.ts"() {
+      init_types();
+      init_engine();
+      init_layout();
+      init_sections();
+      init_navigation();
+      init_typography();
+      init_media();
+      init_elementor_basic();
+      init_elementor_pro();
+      init_wordpress_core();
+      init_woocommerce();
+      DEFAULT_HEURISTICS = [
+        ...LAYOUT_HEURISTICS,
+        ...SECTION_HEURISTICS,
+        ...NAVIGATION_HEURISTICS,
+        ...TYPOGRAPHY_HEURISTICS,
+        ...MEDIA_HEURISTICS,
+        ...ELEMENTOR_BASIC_WIDGET_HEURISTICS,
+        ...ELEMENTOR_PRO_WIDGET_HEURISTICS,
+        ...WORDPRESS_CORE_WIDGET_HEURISTICS,
+        ...WOO_WIDGET_HEURISTICS
+      ];
+    }
+  });
+
+  // src/heuristics/adapter.ts
+  function createNodeSnapshot(node) {
+    var _a;
+    const { width, height, x, y } = node;
+    const snapshot = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      width,
+      height,
+      x,
+      y,
+      isVisible: node.visible,
+      isAutoLayout: false,
+      direction: "NONE",
+      spacing: 0,
+      paddingTop: 0,
+      paddingRight: 0,
+      paddingBottom: 0,
+      paddingLeft: 0,
+      hasBackground: false,
+      backgroundOpacity: 0,
+      hasBorder: false,
+      borderRadius: 0,
+      hasShadow: false,
+      hasText: false,
+      hasImageFill: false,
+      hasChildImage: false,
+      childCount: 0,
+      childrenTypes: [],
+      childrenWidths: [],
+      childrenHeights: [],
+      childrenAlignment: "MIXED"
+    };
+    if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE" || node.type === "SECTION") {
+      const frame = node;
+      if (frame.layoutMode !== "NONE") {
+        snapshot.isAutoLayout = true;
+        snapshot.direction = frame.layoutMode;
+        snapshot.spacing = frame.itemSpacing;
+        snapshot.paddingTop = frame.paddingTop;
+        snapshot.paddingRight = frame.paddingRight;
+        snapshot.paddingBottom = frame.paddingBottom;
+        snapshot.paddingLeft = frame.paddingLeft;
+      }
+      if (Array.isArray(frame.fills)) {
+        const solid = frame.fills.find((f) => f.type === "SOLID");
+        if (solid) {
+          snapshot.hasBackground = true;
+          snapshot.backgroundOpacity = (_a = solid.opacity) != null ? _a : 1;
+        }
+        const image = frame.fills.find((f) => f.type === "IMAGE");
+        if (image) snapshot.hasImageFill = true;
+      }
+      if (Array.isArray(frame.strokes) && frame.strokes.length > 0) {
+        snapshot.hasBorder = true;
+      }
+      if (typeof frame.cornerRadius === "number") {
+        snapshot.borderRadius = frame.cornerRadius;
+      }
+      if (Array.isArray(frame.effects)) {
+        snapshot.hasShadow = frame.effects.some((e) => e.type === "DROP_SHADOW" && e.visible);
+      }
+      snapshot.childCount = frame.children.length;
+      snapshot.childrenTypes = frame.children.map((c) => c.type);
+      snapshot.childrenWidths = frame.children.map((c) => c.width);
+      snapshot.childrenHeights = frame.children.map((c) => c.height);
+      let textCount = 0;
+      let imageCount = 0;
+      let maxFontSize = 0;
+      let minFontSize = 9999;
+      let isBold = false;
+      let lineCount = 0;
+      const traverse = (n) => {
+        if (n.type === "TEXT") {
+          textCount++;
+          const t = n;
+          if (t.characters.trim().length > 0) {
+            snapshot.hasText = true;
+            const size = t.fontSize;
+            if (typeof size === "number") {
+              if (size > maxFontSize) maxFontSize = size;
+              if (size < minFontSize) minFontSize = size;
+            }
+          }
+        } else if (n.type === "VECTOR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "STAR" || n.type === "BOOLEAN_OPERATION") {
+          imageCount++;
+          snapshot.hasChildImage = true;
+        } else if (n.type === "RECTANGLE") {
+          if (Array.isArray(n.fills) && n.fills.some((f) => f.type === "IMAGE")) {
+            imageCount++;
+            snapshot.hasChildImage = true;
+          }
+        }
+        if ("children" in n) {
+          n.children.forEach(traverse);
+        }
+      };
+      frame.children.forEach((child) => {
+        if (child.type === "VECTOR" || child.type === "ELLIPSE" || child.type === "POLYGON" || child.type === "STAR" || child.type === "BOOLEAN_OPERATION") {
+          snapshot.hasChildImage = true;
+        }
+        if (child.type === "RECTANGLE") {
+          if (Array.isArray(child.fills) && child.fills.some((f) => f.type === "IMAGE")) {
+            snapshot.hasChildImage = true;
+          }
+        }
+        if (child.type === "TEXT") {
+          snapshot.hasText = true;
+          const t = child;
+          const size = t.fontSize;
+          if (typeof size === "number") {
+            if (size > maxFontSize) maxFontSize = size;
+            if (size < minFontSize) minFontSize = size;
+          }
+          if (t.height && typeof size === "number") {
+            lineCount += Math.round(t.height / size);
+          }
+        }
+        if (!snapshot.hasChildImage && (child.type === "FRAME" || child.type === "INSTANCE" || child.type === "GROUP")) {
+          const grandChildren = child.children;
+          if (grandChildren && grandChildren.some((gc) => gc.type === "VECTOR" || gc.fills && gc.fills.some((f) => f.type === "IMAGE"))) {
+            snapshot.hasChildImage = true;
+          }
+        }
+      });
+      if (snapshot.hasText) {
+        snapshot.textFontSizeMax = maxFontSize;
+        snapshot.textFontSizeMin = minFontSize === 9999 ? maxFontSize : minFontSize;
+        snapshot.textLineCount = lineCount || 1;
+      }
+    } else if (node.type === "TEXT") {
+      snapshot.hasText = true;
+      const t = node;
+      const size = t.fontSize;
+      if (typeof size === "number") {
+        snapshot.textFontSizeMax = size;
+        snapshot.textFontSizeMin = size;
+      }
+    } else if (node.type === "RECTANGLE" || node.type === "ELLIPSE") {
+      if (Array.isArray(node.fills) && node.fills.some((f) => f.type === "IMAGE")) {
+        snapshot.hasImageFill = true;
+      }
+    }
+    return snapshot;
+  }
+  var init_adapter = __esm({
+    "src/heuristics/adapter.ts"() {
+    }
+  });
+
   // src/pipeline.ts
   var ConversionPipeline;
   var init_pipeline = __esm({
@@ -2377,9 +3264,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       init_validation();
       init_prompts();
       init_noai_parser();
+      init_reference_docs();
+      init_heuristics();
+      init_adapter();
       ConversionPipeline = class {
         constructor() {
           this.autoFixLayout = false;
+          this.autoRename = false;
           this.compiler = new ElementorCompiler();
           this.imageUploader = new ImageUploader({});
         }
@@ -2390,8 +3281,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             this.imageUploader.setWPConfig(normalizedWP);
             const provider = (options == null ? void 0 : options.provider) || geminiProvider;
             this.autoFixLayout = !!(options == null ? void 0 : options.autoFixLayout);
+            this.autoRename = !!(options == null ? void 0 : options.autoRename);
             const preprocessed = this.preprocess(node);
-            const schema = yield this.generateSchema(preprocessed, provider, options == null ? void 0 : options.apiKey);
+            const screenshot = (options == null ? void 0 : options.includeScreenshot) === false ? null : yield this.captureNodeImage(preprocessed.serializedRoot.id);
+            const schema = yield this.generateSchema(preprocessed, provider, options == null ? void 0 : options.apiKey, {
+              includeReferences: (options == null ? void 0 : options.includeReferences) !== false,
+              screenshot
+            });
             this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
             validatePipelineSchema(schema);
             this.hydrateStyles(schema, preprocessed.flatNodes);
@@ -2452,7 +3348,46 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           }
           return defaultTokens;
         }
-        generateSchema(pre, provider, apiKey) {
+        captureNodeImage(nodeId) {
+          return __async(this, null, function* () {
+            if (!nodeId) return null;
+            const node = figma.getNodeById(nodeId);
+            if (!node || !("exportAsync" in node)) return null;
+            try {
+              const bytes = yield node.exportAsync({ format: "PNG" });
+              const base64 = this.uint8ToBase64(bytes);
+              const name = node.name || "frame";
+              const size = node.width && node.height ? { width: node.width, height: node.height } : {};
+              return __spreadValues({ data: base64, mimeType: "image/png", name }, size);
+            } catch (err) {
+              console.warn("Falha ao exportar imagem do frame:", err);
+              return null;
+            }
+          });
+        }
+        uint8ToBase64(bytes) {
+          const base64abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+          let result = "", i;
+          const l = bytes.length;
+          for (i = 2; i < l; i += 3) {
+            result += base64abc[bytes[i - 2] >> 2];
+            result += base64abc[(bytes[i - 2] & 3) << 4 | bytes[i - 1] >> 4];
+            result += base64abc[(bytes[i - 1] & 15) << 2 | bytes[i] >> 6];
+            result += base64abc[bytes[i] & 63];
+          }
+          if (i === l + 1) {
+            result += base64abc[bytes[i - 2] >> 2];
+            result += base64abc[(bytes[i - 2] & 3) << 4];
+            result += "==";
+          } else if (i === l) {
+            result += base64abc[bytes[i - 2] >> 2];
+            result += base64abc[(bytes[i - 2] & 3) << 4 | bytes[i - 1] >> 4];
+            result += base64abc[(bytes[i - 1] & 15) << 2];
+            result += "=";
+          }
+          return result;
+        }
+        generateSchema(pre, provider, apiKey, extras) {
           return __async(this, null, function* () {
             console.log("Generating Base Schema (Algorithm)...");
             const baseSchema = convertToFlexSchema(pre.serializedRoot);
@@ -2462,12 +3397,15 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 SCHEMA BASE:
 ${JSON.stringify(baseSchema, null, 2)}
 `;
+            const references = (extras == null ? void 0 : extras.includeReferences) === false ? [] : referenceDocs;
             try {
               const response = yield provider.generateSchema({
                 prompt,
                 snapshot: pre.serializedRoot,
                 instructions: "Otimize o schema JSON fornecido mantendo IDs e dados.",
-                apiKey
+                apiKey,
+                image: (extras == null ? void 0 : extras.screenshot) || void 0,
+                references
               });
               if (!response.ok || !response.schema) {
                 console.warn("AI returned invalid response. Falling back to base schema.", response.message);
@@ -2487,7 +3425,33 @@ ${JSON.stringify(baseSchema, null, 2)}
           if (!schema.page.tokens) schema.page.tokens = tokens;
           if (!schema.page.title) schema.page.title = root.name;
           if (!Array.isArray(schema.containers)) schema.containers = [];
+          this.rehydrateIds(schema.containers, root);
           schema.containers = this.normalizeContainers(schema.containers);
+        }
+        rehydrateIds(containers, root) {
+          const nodeMap = /* @__PURE__ */ new Map();
+          const collectNodes = (n) => {
+            nodeMap.set(n.id, n);
+            if ("children" in n && Array.isArray(n.children)) {
+              n.children.forEach(collectNodes);
+            }
+          };
+          collectNodes(root);
+          const walk = (c) => {
+            var _a, _b, _c;
+            if (!c.id || !nodeMap.has(c.id)) {
+              if (((_a = c.styles) == null ? void 0 : _a.sourceId) && nodeMap.has(c.styles.sourceId)) {
+                c.id = c.styles.sourceId;
+              }
+            }
+            (_b = c.widgets) == null ? void 0 : _b.forEach((w) => {
+              var _a2;
+              if (((_a2 = w.styles) == null ? void 0 : _a2.sourceId) && nodeMap.has(w.styles.sourceId)) {
+              }
+            });
+            (_c = c.children) == null ? void 0 : _c.forEach(walk);
+          };
+          containers.forEach(walk);
         }
         resolveImages(schema, wpConfig) {
           return __async(this, null, function* () {
@@ -2640,33 +3604,85 @@ ${JSON.stringify(baseSchema, null, 2)}
             } catch (e) {
             }
           };
+          containers = this.deduplicateContainers(containers);
           const walk = (c, parent) => {
+            var _a, _b, _c;
             if (!c.id) {
               logWarn("[AutoFix] Container sem id detectado. Ignorado para evitar quebra.");
               return null;
             }
+            if (c.children && c.children.length > 0) {
+              c.children = this.deduplicateContainers(c.children);
+            }
             const node = figma.getNodeById(c.id);
-            const layoutMode = node == null ? void 0 : node.layoutMode;
-            const type = node == null ? void 0 : node.type;
-            const isFrameLike = type === "FRAME" || type === "GROUP" || type === "COMPONENT" || type === "INSTANCE";
+            if (node) {
+              try {
+                const snapshot = createNodeSnapshot(node);
+                const results = evaluateNode(snapshot, DEFAULT_HEURISTICS);
+                const best = results[0];
+                if (best) {
+                  if (this.autoRename && best.confidence > 0.6) {
+                    try {
+                      const newName = best.widget;
+                      if (!node.name.match(/^[wc]:/) && node.name !== newName) {
+                        node.name = newName;
+                      }
+                    } catch (e) {
+                    }
+                  }
+                }
+                if (best && best.confidence >= 0.85) {
+                  const widgetType = best.widget.split(":")[1];
+                  const prefix = best.widget.split(":")[0];
+                  const isLeafWidget = ["w", "e", "wp", "woo"].includes(prefix) && !best.widget.includes("structure");
+                  if (isLeafWidget && parent) {
+                    let content = node.name;
+                    if (node.type === "TEXT") content = node.characters;
+                    else if (node.children) {
+                      const textChild = node.children.find((child) => child.type === "TEXT");
+                      if (textChild) content = textChild.characters;
+                    }
+                    let imageId = null;
+                    if (widgetType === "image" || widgetType === "image-box") {
+                      if ((_a = node.fills) == null ? void 0 : _a.some((f) => f.type === "IMAGE")) imageId = node.id;
+                      else if (node.children) {
+                        const imgChild = node.children.find((child) => child.type === "VECTOR" || child.type === "RECTANGLE" || child.type === "ELLIPSE");
+                        if (imgChild) imageId = imgChild.id;
+                      }
+                    }
+                    parent.widgets = parent.widgets || [];
+                    parent.widgets.push({
+                      type: widgetType,
+                      content,
+                      imageId,
+                      styles: { sourceId: c.id, sourceName: node.name }
+                    });
+                    return null;
+                  }
+                }
+              } catch (err) {
+                console.warn("[Heuristics] Error evaluating node:", err);
+              }
+            }
+            const layoutMode = (node == null ? void 0 : node.layoutMode) || c.layoutMode;
+            const type = (node == null ? void 0 : node.type) || c.type;
+            const name = (node == null ? void 0 : node.name) || c.name;
+            const isFrameLike2 = type === "FRAME" || type === "GROUP" || type === "COMPONENT" || type === "INSTANCE" || type === "SECTION";
             const hasAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
-            const looksInvalidContainer = !hasAutoLayout && node || !isFrameLike && node;
+            const looksInvalidContainer = !hasAutoLayout || !isFrameLike2;
             if (looksInvalidContainer) {
-              logWarn(`[AutoFix] Node ${c.id} (${(node == null ? void 0 : node.name) || "container"}) nao tem auto layout ou tipo invalido (${type}).`);
               if (!this.autoFixLayout) {
                 logWarn(`[AutoFix] Corre\xE7\xE3o desativada. Ative "auto_fix_layout" para aplicar fallback.`);
               } else {
-                if (!isFrameLike || type === "RECTANGLE" || type === "VECTOR" || type === "TEXT") {
+                if (!isFrameLike2 || type === "RECTANGLE" || type === "VECTOR" || type === "TEXT") {
                   if (parent) {
                     parent.widgets = parent.widgets || [];
                     parent.widgets.push({
                       type: "custom",
-                      content: (node == null ? void 0 : node.characters) || null,
+                      content: (node == null ? void 0 : node.characters) || c.characters || name || null,
                       imageId: null,
                       styles: { sourceId: c.id, sourceName: node == null ? void 0 : node.name }
                     });
-                    if (Array.isArray(c.widgets)) parent.widgets.push(...c.widgets);
-                    if (Array.isArray(c.children)) parent.children.push(...c.children);
                     return null;
                   }
                   c.direction = "column";
@@ -2678,18 +3694,118 @@ ${JSON.stringify(baseSchema, null, 2)}
             }
             if (c.direction !== "row" && c.direction !== "column") {
               c.direction = "column";
-              logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
+              if (c.children && c.children.length > 0) {
+                logWarn(`[AI] Container ${c.id} sem direction valido. Ajustado para 'column'.`);
+              }
             }
-            if (!c.width) c.width = "full";
+            if (!c.width) {
+              c.width = "full";
+            } else if (typeof c.width === "number") {
+              c.styles = c.styles || {};
+              c.styles.width = c.width;
+              c.width = "boxed";
+            } else if (c.width !== "full" && c.width !== "boxed") {
+              logWarn(`[AI] Container ${c.id} com width invalido (${String(c.width)}). Ajustado para 'full'.`);
+              c.width = "full";
+            }
             if (!Array.isArray(c.widgets)) c.widgets = [];
+            c.widgets.forEach((w) => this.normalizeWidget(w));
             if (!Array.isArray(c.children)) c.children = [];
             c.children = c.children.map((child) => walk(child, c)).filter(Boolean);
+            if (node && "children" in node) {
+              const collectIds = (container, ids) => {
+                var _a2, _b2;
+                if (container.id) ids.add(container.id);
+                (_a2 = container.widgets) == null ? void 0 : _a2.forEach((w) => {
+                  var _a3;
+                  if ((_a3 = w.styles) == null ? void 0 : _a3.sourceId) ids.add(w.styles.sourceId);
+                  if (w.imageId) ids.add(w.imageId);
+                });
+                (_b2 = container.children) == null ? void 0 : _b2.forEach((child) => collectIds(child, ids));
+              };
+              const existingIds = /* @__PURE__ */ new Set();
+              collectIds(c, existingIds);
+              for (const child of node.children) {
+                if (!existingIds.has(child.id) && child.visible) {
+                  if (child.type === "TEXT") {
+                    c.widgets.push({
+                      type: "heading",
+                      // Default to heading/text
+                      content: child.characters,
+                      imageId: null,
+                      styles: {
+                        sourceId: child.id,
+                        sourceName: child.name,
+                        color: ((_c = (_b = child.fills) == null ? void 0 : _b[0]) == null ? void 0 : _c.color) ? this.rgbaToHex(child.fills[0].color) : void 0
+                      }
+                    });
+                  } else if (child.type === "FRAME" || child.type === "GROUP" || child.type === "INSTANCE" || child.type === "RECTANGLE") {
+                    const rescuedContainer = {
+                      id: child.id,
+                      direction: child.layoutMode === "HORIZONTAL" ? "row" : "column",
+                      width: child.layoutMode ? "boxed" : "full",
+                      // Guess
+                      styles: { sourceId: child.id, sourceName: child.name },
+                      widgets: [],
+                      children: []
+                    };
+                    const processed = walk(rescuedContainer, c);
+                    if (processed) c.children.push(processed);
+                  }
+                }
+              }
+            }
             if (c.children && c.children.length > 0) {
               c.children = this.deduplicateContainers(c.children);
             }
             return c;
           };
           return containers.map((c) => walk(c, null)).filter(Boolean);
+        }
+        normalizeWidget(widget) {
+          var _a, _b, _c;
+          if ((widget.type === "image-box" || widget.type === "icon-box") && ((_a = widget.styles) == null ? void 0 : _a.title_text) && typeof widget.styles.title_text === "object") {
+            const tt = widget.styles.title_text;
+            if (tt.imageId && !widget.imageId) widget.imageId = tt.imageId;
+            if (tt.title) widget.content = tt.title;
+            if (tt.description) widget.styles.description_text = tt.description;
+            widget.styles.title_text = tt.title || "";
+          }
+          if (widget.type === "image-box" && !widget.imageId && ((_c = (_b = widget.styles) == null ? void 0 : _b.image) == null ? void 0 : _c.id)) {
+            widget.imageId = widget.styles.image.id;
+          }
+        }
+        rgbaToHex(color) {
+          if (!color) return "#000000";
+          const r = Math.round(color.r * 255);
+          const g = Math.round(color.g * 255);
+          const b = Math.round(color.b * 255);
+          return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+        }
+        deduplicateContainers(containers) {
+          const map = /* @__PURE__ */ new Map();
+          const order = [];
+          for (const c of containers) {
+            if (!c.id) {
+              continue;
+            }
+            if (!map.has(c.id)) {
+              map.set(c.id, __spreadProps(__spreadValues({}, c), { widgets: [...c.widgets || []], children: [...c.children || []] }));
+              order.push(c.id);
+            } else {
+              const existing = map.get(c.id);
+              if (c.widgets && c.widgets.length > 0) {
+                existing.widgets = (existing.widgets || []).concat(c.widgets);
+              }
+              if (c.children && c.children.length > 0) {
+                existing.children = (existing.children || []).concat(c.children);
+              }
+              if (c.styles) {
+                existing.styles = __spreadValues(__spreadValues({}, existing.styles), c.styles);
+              }
+            }
+          }
+          return order.map((id) => map.get(id));
         }
       };
     }
@@ -2840,6 +3956,7 @@ ${JSON.stringify(baseSchema, null, 2)}
         },
         generateSchema(input) {
           return __async(this, null, function* () {
+            var _a;
             const apiKey = input.apiKey || (yield getOpenAIKey());
             if (!apiKey) {
               return { ok: false, error: "API Key do OpenAI nao configurada." };
@@ -2852,6 +3969,26 @@ ${JSON_SAFETY}` },
               { role: "user", content: `SNAPSHOT (json esperado):
 ${JSON.stringify(input.snapshot)}` }
             ];
+            if (input.references && input.references.length > 0) {
+              const refText = input.references.map((r) => `### ${r.name}
+${r.content}`).join("\n\n");
+              messages.push({ role: "user", content: `REFERENCIAS:
+${refText}` });
+            }
+            if ((_a = input.image) == null ? void 0 : _a.data) {
+              messages.push({
+                role: "user",
+                content: [
+                  { type: "text", text: "PRINT DO FRAME (PNG base64 inline):" },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:${input.image.mimeType || "image/png"};base64,${input.image.data}`
+                    }
+                  }
+                ]
+              });
+            }
             const resp = yield callOpenAI(apiKey, model, messages);
             if (!resp.ok) return resp;
             return { ok: true, schema: resp.schema, data: resp.data, raw: resp.raw };
@@ -2881,6 +4018,8 @@ ${JSON.stringify(input.snapshot)}` }
       init_noai_parser();
       init_elementor_compiler();
       init_uploader();
+      init_adapter();
+      init_heuristics();
       figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
       var pipeline = new ConversionPipeline();
       var lastJSON = null;
@@ -3039,6 +4178,8 @@ ${JSON.stringify(input.snapshot)}` }
           const wpConfig = customWP || (yield loadWPConfig());
           const useAI = typeof (aiPayload == null ? void 0 : aiPayload.useAI) === "boolean" ? aiPayload.useAI : yield loadSetting("gptel_use_ai", true);
           const serialized = serializeNode(node);
+          const includeScreenshot = typeof (aiPayload == null ? void 0 : aiPayload.includeScreenshot) === "boolean" ? aiPayload.includeScreenshot : yield loadSetting("gptel_include_screenshot", true);
+          const includeReferences = typeof (aiPayload == null ? void 0 : aiPayload.includeReferences) === "boolean" ? aiPayload.includeReferences : yield loadSetting("gptel_include_references", true);
           if (!useAI) {
             log("Iniciando pipeline (NO-AI)...", "info");
             const elementorJson = yield runPipelineWithoutAI(serialized, wpConfig);
@@ -3048,7 +4189,15 @@ ${JSON.stringify(input.snapshot)}` }
           const { provider, apiKey, providerId } = yield resolveProviderConfig(aiPayload);
           const autoFixLayout = yield loadSetting("auto_fix_layout", false);
           log(`Iniciando pipeline (${providerId.toUpperCase()})...`, "info");
-          const result = yield pipeline.run(node, wpConfig, { debug, provider, apiKey, autoFixLayout });
+          const result = yield pipeline.run(node, wpConfig, {
+            debug,
+            provider,
+            apiKey,
+            autoFixLayout,
+            includeScreenshot,
+            includeReferences,
+            autoRename: typeof (aiPayload == null ? void 0 : aiPayload.autoRename) === "boolean" ? aiPayload.autoRename : yield loadSetting("gptel_auto_rename", false)
+          });
           log("Pipeline concluido.", "success");
           if (debug && result.elementorJson) {
             return result;
@@ -3163,6 +4312,9 @@ ${JSON.stringify(input.snapshot)}` }
           const autoPage = yield loadSetting("gptel_auto_page", false);
           const darkMode = yield loadSetting("gptel_dark_mode", false);
           const useAI = yield loadSetting("gptel_use_ai", true);
+          const includeScreenshot = yield loadSetting("gptel_include_screenshot", true);
+          const includeReferences = yield loadSetting("gptel_include_references", true);
+          const autoRename = yield loadSetting("gptel_auto_rename", false);
           figma.ui.postMessage({
             type: "load-settings",
             payload: {
@@ -3177,7 +4329,10 @@ ${JSON.stringify(input.snapshot)}` }
               exportImages,
               autoPage,
               darkMode,
-              useAI
+              useAI,
+              includeScreenshot,
+              includeReferences,
+              autoRename
             }
           });
         });
@@ -3234,76 +4389,6 @@ ${JSON.stringify(input.snapshot)}` }
               figma.ui.postMessage({ type: "preview", payload: lastJSON, action: "download" });
             } else {
               log("Nenhum JSON para baixar.", "warn");
-            }
-            break;
-          case "export-wp":
-            try {
-              const incoming = msg.wpConfig;
-              const cfg = incoming && incoming.url ? incoming : yield loadWPConfig();
-              if (!cfg.autoPage) {
-                figma.ui.postMessage({ type: "wp-status", success: false, message: "Criar p\xE1gina automaticamente est\xE1 desativado." });
-                break;
-              }
-              const url = normalizeWpUrl((cfg == null ? void 0 : cfg.url) || "");
-              const userRaw = (cfg == null ? void 0 : cfg.user) || "";
-              const tokenRaw = (cfg == null ? void 0 : cfg.token) || (cfg == null ? void 0 : cfg.password) || "";
-              const user = (userRaw || "").trim();
-              const token = (tokenRaw || "").replace(/\s+/g, "");
-              figma.ui.postMessage({
-                type: "log",
-                level: "info",
-                message: `[WP] Export -> endpoint: ${url || "(vazio)"} / user: ${user || "(vazio)"} / tokenLen: ${token.length}`
-              });
-              if (!lastJSON) {
-                figma.ui.postMessage({ type: "wp-status", success: false, message: "Nenhum JSON gerado para exportar." });
-                break;
-              }
-              if (!url || !user || !token) {
-                figma.ui.postMessage({ type: "wp-status", success: false, message: "URL, usuario ou senha do app ausentes." });
-                break;
-              }
-              const auth = `Basic ${toBase64(`${user}:${token}`)}`;
-              const base = url.replace(/\/$/, "");
-              const meEndpoint = `${base}/wp-json/wp/v2/users/me`;
-              const meResp = yield fetchWithTimeout3(meEndpoint, { headers: { Authorization: auth, Accept: "application/json" } });
-              if (!meResp.ok) {
-                const text = yield meResp.text();
-                figma.ui.postMessage({ type: "log", level: "error", message: `[WP] Auth FAIL (${meResp.status}) -> ${text}` });
-                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha de autenticacao (${meResp.status}): ${text}` });
-                break;
-              }
-              const pageEndpoint = `${base}/wp-json/wp/v2/pages`;
-              const pageBody = {
-                title: `FigToEL ${(/* @__PURE__ */ new Date()).toISOString()}`,
-                status: "draft",
-                meta: { _elementor_data: lastJSON },
-                content: "Gerado via FigToEL (Elementor JSON em _elementor_data)."
-              };
-              const pageResp = yield fetchWithTimeout3(pageEndpoint, {
-                method: "POST",
-                headers: {
-                  Authorization: auth,
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify(pageBody)
-              });
-              if (!pageResp.ok) {
-                const text = yield pageResp.text();
-                figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha ao criar pagina (${pageResp.status}): ${text}` });
-                break;
-              }
-              const pageJson = yield pageResp.json().catch(() => ({}));
-              yield saveSetting("gptel_wp_url", url);
-              yield saveSetting("gptel_wp_user", user);
-              yield saveSetting("gptel_wp_token", token);
-              yield saveSetting("gptel_export_images", !!cfg.exportImages);
-              yield saveSetting("gptel_auto_page", !!cfg.autoPage);
-              const link = (pageJson == null ? void 0 : pageJson.link) || url;
-              figma.ui.postMessage({ type: "wp-status", success: true, message: `Pagina enviada como rascunho. Link: ${link}` });
-            } catch (e) {
-              const aborted = (e == null ? void 0 : e.name) === "AbortError";
-              const msgErr = aborted ? "Tempo limite ao exportar para WP." : (e == null ? void 0 : e.message) || "Erro desconhecido";
-              figma.ui.postMessage({ type: "wp-status", success: false, message: msgErr });
             }
             break;
           case "test-gemini":
@@ -3408,6 +4493,37 @@ ${JSON.stringify(input.snapshot)}` }
               figma.notify(`Layer renomeada para ${name}`);
             } catch (e) {
               figma.notify((e == null ? void 0 : e.message) || "Falha ao renomear layer");
+            }
+            break;
+          case "run-heuristics-rename":
+            try {
+              const selection = figma.currentPage.selection;
+              if (!selection || selection.length === 0) throw new Error("Selecione um frame ou node para organizar.");
+              let count = 0;
+              const processNode = (node) => {
+                try {
+                  const snapshot = createNodeSnapshot(node);
+                  const results = evaluateNode(snapshot, DEFAULT_HEURISTICS);
+                  const best = results[0];
+                  if (best && best.confidence > 0.6) {
+                    const newName = best.widget;
+                    if (!node.name.match(/^[wc]:/) && node.name !== newName) {
+                      node.name = newName;
+                      count++;
+                    }
+                  }
+                } catch (e) {
+                }
+                if ("children" in node) {
+                  for (const child of node.children) {
+                    processNode(child);
+                  }
+                }
+              };
+              selection.forEach(processNode);
+              figma.notify(`Organiza\xE7\xE3o conclu\xEDda! ${count} layers renomeados.`);
+            } catch (e) {
+              figma.notify((e == null ? void 0 : e.message) || "Erro ao organizar layers");
             }
             break;
           case "close":
