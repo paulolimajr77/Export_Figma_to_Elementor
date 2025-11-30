@@ -3414,13 +3414,68 @@ ${JSON.stringify(baseSchema, null, 2)}
                 console.warn("AI returned invalid response. Falling back to base schema.", response.message);
                 return baseSchema;
               }
-              return response.schema;
+              const aiSchema = response.schema;
+              const merged = this.mergeSchemas(baseSchema, aiSchema);
+              return merged;
             } catch (error) {
               console.error("AI Optimization failed:", error);
               console.warn("Falling back to Base Schema.");
               return baseSchema;
             }
           });
+        }
+        /**
+         * Mescla o schema base (NO-AI) com o schema otimizado pela IA.
+         *
+         * Regras:
+         * - A estrutura de containers (hierarquia e ids) é sempre a do baseSchema.
+         * - A IA só pode sugerir estilos e widgets para containers existentes,
+         *   casados por styles.sourceId ou id.
+         * - Containers criados apenas pela IA (sem sourceId/id conhecido) são ignorados.
+         */
+        mergeSchemas(baseSchema, aiSchema) {
+          const aiContainersBySource = /* @__PURE__ */ new Map();
+          const collect = (c) => {
+            var _a;
+            const key = ((_a = c.styles) == null ? void 0 : _a.sourceId) || c.id;
+            if (key && !aiContainersBySource.has(key)) {
+              aiContainersBySource.set(key, c);
+            }
+            (c.children || []).forEach((child) => collect(child));
+          };
+          (aiSchema.containers || []).forEach((c) => collect(c));
+          const mergeContainer = (base) => {
+            var _a, _b, _c;
+            const key = ((_a = base.styles) == null ? void 0 : _a.sourceId) || base.id;
+            const ai = key ? aiContainersBySource.get(key) : void 0;
+            const merged = __spreadProps(__spreadValues({}, base), {
+              styles: __spreadValues({}, base.styles || {})
+            });
+            if (ai) {
+              merged.styles = __spreadProps(__spreadValues(__spreadValues({}, ai.styles || {}), base.styles || {}), {
+                sourceId: ((_b = base.styles) == null ? void 0 : _b.sourceId) || ((_c = ai.styles) == null ? void 0 : _c.sourceId) || base.id
+              });
+              if (Array.isArray(ai.widgets) && ai.widgets.length > 0) {
+                merged.widgets = ai.widgets.map((w) => {
+                  var _a2, _b2;
+                  return __spreadProps(__spreadValues({}, w), {
+                    styles: __spreadProps(__spreadValues({}, w.styles || {}), {
+                      sourceId: ((_a2 = w.styles) == null ? void 0 : _a2.sourceId) || w.sourceId || ((_b2 = base.styles) == null ? void 0 : _b2.sourceId) || base.id
+                    })
+                  });
+                });
+              }
+            }
+            if (Array.isArray(base.children) && base.children.length > 0) {
+              merged.children = base.children.map((child) => mergeContainer(child));
+            }
+            return merged;
+          };
+          const mergedContainers = baseSchema.containers.map((c) => mergeContainer(c));
+          return {
+            page: baseSchema.page,
+            containers: mergedContainers
+          };
         }
         validateAndNormalize(schema, root, tokens) {
           if (!schema || typeof schema !== "object") throw new Error("Schema invalido: nao e um objeto.");
@@ -3798,8 +3853,10 @@ ${JSON.stringify(baseSchema, null, 2)}
             }
             const key = resolveKey(c);
             if (!key) {
-              map.set(c.id, __spreadProps(__spreadValues({}, c), { widgets: [...c.widgets || []], children: [...c.children || []] }));
-              order.push(c.id);
+              if (!map.has(c.id)) {
+                map.set(c.id, __spreadProps(__spreadValues({}, c), { widgets: [...c.widgets || []], children: [...c.children || []] }));
+                order.push(c.id);
+              }
               continue;
             }
             if (!map.has(key)) {
@@ -3808,14 +3865,14 @@ ${JSON.stringify(baseSchema, null, 2)}
               continue;
             }
             const existing = map.get(key);
-            if (c.widgets && c.widgets.length > 0) {
-              existing.widgets = (existing.widgets || []).concat(c.widgets);
-            }
-            if (c.children && c.children.length > 0) {
-              existing.children = (existing.children || []).concat(c.children);
-            }
-            if (c.styles) {
-              existing.styles = __spreadValues(__spreadValues({}, existing.styles), c.styles);
+            if (c.styles && existing.styles) {
+              const existingStylesCount = Object.keys(existing.styles).length;
+              const newStylesCount = Object.keys(c.styles).length;
+              if (newStylesCount > existingStylesCount) {
+                existing.styles = __spreadValues(__spreadValues({}, existing.styles), c.styles);
+              }
+            } else if (c.styles && !existing.styles) {
+              existing.styles = __spreadValues({}, c.styles);
             }
           }
           return order.map((id) => map.get(id));

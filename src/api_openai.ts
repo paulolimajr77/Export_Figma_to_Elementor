@@ -156,11 +156,31 @@ export const openaiProvider: SchemaProvider = {
         }
 
         const model = this.model as OpenAIModel;
-        const messages = [
+        const messages: any[] = [
             { role: 'system', content: `${input.instructions}\n${JSON_SAFETY}` },
             { role: 'user', content: input.prompt },
             { role: 'user', content: `SNAPSHOT (json esperado):\n${JSON.stringify(input.snapshot)}` }
         ];
+
+        if (input.references && input.references.length > 0) {
+            const refText = input.references.map(r => `### ${r.name}\n${r.content}`).join('\n\n');
+            messages.push({ role: 'user', content: `REFERENCIAS:\n${refText}` });
+        }
+
+        if (input.image?.data) {
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: 'PRINT DO FRAME (PNG base64 inline):' },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:${input.image.mimeType || 'image/png'};base64,${input.image.data}`
+                        }
+                    }
+                ]
+            });
+        }
 
         const resp = await callOpenAI(apiKey, model, messages);
         if (!resp.ok) return resp;

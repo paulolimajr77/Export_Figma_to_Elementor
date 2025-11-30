@@ -202,12 +202,80 @@ ${JSON.stringify(baseSchema, null, 2)}
                 return baseSchema;
             }
 
-            return response.schema;
+            // 3. Merge AI schema into base schema, preservando estrutura 1:1
+            const aiSchema = response.schema as PipelineSchema;
+            const merged = this.mergeSchemas(baseSchema, aiSchema);
+            return merged;
         } catch (error) {
             console.error('AI Optimization failed:', error);
             console.warn('Falling back to Base Schema.');
             return baseSchema;
         }
+    }
+
+    /**
+     * Mescla o schema base (NO-AI) com o schema otimizado pela IA.
+     *
+     * Regras:
+     * - A estrutura de containers (hierarquia e ids) é sempre a do baseSchema.
+     * - A IA só pode sugerir estilos e widgets para containers existentes,
+     *   casados por styles.sourceId ou id.
+     * - Containers criados apenas pela IA (sem sourceId/id conhecido) são ignorados.
+     */
+    private mergeSchemas(baseSchema: PipelineSchema, aiSchema: PipelineSchema): PipelineSchema {
+        const aiContainersBySource = new Map<string, PipelineContainer>();
+
+        const collect = (c: PipelineContainer) => {
+            const key = (c.styles as any)?.sourceId || c.id;
+            if (key && !aiContainersBySource.has(key)) {
+                aiContainersBySource.set(key, c);
+            }
+            (c.children || []).forEach(child => collect(child));
+        };
+
+        (aiSchema.containers || []).forEach(c => collect(c));
+
+        const mergeContainer = (base: PipelineContainer): PipelineContainer => {
+            const key = (base.styles as any)?.sourceId || base.id;
+            const ai = key ? aiContainersBySource.get(key) : undefined;
+
+            const merged: PipelineContainer = {
+                ...base,
+                styles: { ...(base.styles || {}) }
+            };
+
+            if (ai) {
+                // Mescla estilos, preservando sourceId do base
+                merged.styles = {
+                    ...(ai.styles || {}),
+                    ...(base.styles || {}),
+                    sourceId: (base.styles as any)?.sourceId || (ai.styles as any)?.sourceId || base.id
+                };
+
+                // Se a IA definiu widgets para este container, usamos estes widgets
+                if (Array.isArray(ai.widgets) && ai.widgets.length > 0) {
+                    merged.widgets = ai.widgets.map(w => ({
+                        ...w,
+                        styles: {
+                            ...(w.styles || {}),
+                            sourceId: (w.styles as any)?.sourceId || (w as any).sourceId || (base.styles as any)?.sourceId || base.id
+                        }
+                    }));
+                }
+            }
+
+            if (Array.isArray(base.children) && base.children.length > 0) {
+                merged.children = base.children.map(child => mergeContainer(child));
+            }
+
+            return merged;
+        };
+
+        const mergedContainers = baseSchema.containers.map(c => mergeContainer(c));
+        return {
+            page: baseSchema.page,
+            containers: mergedContainers
+        };
     }
 
     private validateAndNormalize(schema: any, root: SerializedNode, tokens: { primaryColor: string; secondaryColor: string }): asserts schema is PipelineSchema {
@@ -692,34 +760,46 @@ ${JSON.stringify(baseSchema, null, 2)}
 
         for (const c of containers) {
             if (!c.id) {
-                continue;
+                continue; // Ignora containers sem ID
             }
 
             const key = resolveKey(c);
             if (!key) {
-                map.set(c.id, { ...c, widgets: [...(c.widgets || [])], children: [...(c.children || [])] });
-                order.push(c.id);
+                // Se não tem key, adiciona diretamente usando o ID como chave
+                if (!map.has(c.id)) {
+                    map.set(c.id, { ...c, widgets: [...(c.widgets || [])], children: [...(c.children || [])] });
+                    order.push(c.id);
+                }
                 continue;
             }
 
             if (!map.has(key)) {
+                // Primeira ocorrência: adiciona normalmente
                 map.set(key, { ...c, widgets: [...(c.widgets || [])], children: [...(c.children || [])] });
                 order.push(key);
                 continue;
             }
 
+            // Container duplicado encontrado - preserva apenas a primeira ocorrência
+            // Opcionalmente mescla styles se a duplicata tiver mais informações
             const existing = map.get(key)!;
-            if (c.widgets && c.widgets.length > 0) {
-                existing.widgets = (existing.widgets || []).concat(c.widgets);
+            if (c.styles && existing.styles) {
+                const existingStylesCount = Object.keys(existing.styles).length;
+                const newStylesCount = Object.keys(c.styles).length;
+
+                // Se a duplicata tem mais estilos, mescla-os (sem sobrescrever)
+                if (newStylesCount > existingStylesCount) {
+                    existing.styles = { ...existing.styles, ...c.styles };
+                }
+            } else if (c.styles && !existing.styles) {
+                existing.styles = { ...c.styles };
             }
-            if (c.children && c.children.length > 0) {
-                existing.children = (existing.children || []).concat(c.children);
-            }
-            if (c.styles) {
-                existing.styles = { ...existing.styles, ...c.styles };
-            }
+
+            // NÃO concatena widgets nem children - mantém apenas primeira ocorrência
+            // Isso previne a duplicação de elementos no JSON final
         }
 
         return order.map(id => map.get(id)!);
     }
+
 }

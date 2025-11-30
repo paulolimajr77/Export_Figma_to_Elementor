@@ -1,19 +1,53 @@
-# Registro de Alteracoes
+# Registro de Alterações
 
-- 03/12/2025: O deduplicador agora agrupa containers pelo `styles.sourceId` quando disponivel, eliminando duplicatas que diferem apenas no ID gerado pela IA.
-- 02/12/2025: Evita erro `this.deduplicateContainers is not a function` garantindo que o m�todo exista no bundle (dist/code.js) antes de chamar a deduplicacao.
-- 01/12/2025: Evita duplicacao de containers apos o uso da IA ao reexecutar a deduplicacao depois do resgate de nodes, mantendo cada node do Figma apenas uma vez no JSON final.
-- 30/11/2025: Normalizacao de slides dos carrosseis (`image-carousel`, `media:carousel`, `slider:slides`, `w:slideshow`) agora converte IDs para numericos e replica URL/objeto `image`, garantindo que as imagens aparecam na UI do Elementor.
-- 30/11/2025: `selected_icon` agora segue o formato oficial do Elementor (`{ value: { url, id }, library: 'svg' }`) usando o ID de midia quando presente, evitando icones SVG que apareciam em branco.
-- 30/11/2025: Containers boxer preservam padding/altura do pai e agora mapeiam `min_height` para o Elementor, evitando perda de espacamento vertical ao descartar o wrapper interno.
-- 30/11/2025: Carrosseis nomeados como `media:carousel`, `slider:slides` e `w:slideshow` sao compilados como `image-carousel` com slides validos, eliminando erros de importacao no Elementor.
-- 30/11/2025: Cores de texto preservadas: `heading` e `text-editor` agora recebem `title_color`/`text_color` no registry, impedindo sobrescrita pelo tema.
-- 30/11/2025: Regra de container boxer aplicada (pai >=1440 com inner menor gera container boxed e elimina wrapper interno mantendo filhos e estilos principais); icones exportados normalizados para `library: svg` em icon, icon-box e itens de icon-list quando recebem URLs.
-- 30/11/2025: Alinhamentos dos containers agora respeitam `justify_content`/`align_items` do Figma antes de aplicar defaults no compiler.
-- 30/11/2025: Ajuste de compatibilidade: alinhamentos passaram a usar `flex-start`/`flex-end` (Elementor), eliminando perdas de alinhamento na importacao.
-- 30/11/2025: Compatibilidade adicional: `flex_justify_content`/`flex_align_items` e flags `flex__is_row`/`flex__is_column` sao preenchidas para refletir alinhamentos na UI do Elementor.
-- 30/11/2025: Ajustado formato raiz do JSON Elementor (type elementor, version 0.4, elements) e bridge de copia para colagem direta; validacao atualizada.
-- 28/11/2025: Suporte ao provedor GPT (OpenAI) adicionado com fallback e selecao automatica.
-- 28/11/2025: Correcao na autenticacao WP (base64) e adicao de User-Agent.
-- 30/11/2025: JSON gerado (IA on/off) agora sempre preenche o textarea de saida.
-- 29/11/2025: Correcao critica para frames trancados (exportados como imagem unica) e upload de imagens (respeitando checkbox); suporte NO-AI ajustado; UI readonly (apenas preview); fluxos de JSON separados; otimizacao de performance (uploads paralelos); reimplementacao do handler de upload na UI (correcao de falha silenciosa); correcoes de estilo (icones SVG, tipografia, bordas, texto rico) unificadas para modos AI e NO-AI via style_utils.ts.
+## 30/11/2025 - Correção Crítica: Duplicação de Nós
+
+### Problema Identificado
+A função `deduplicateContainers()` em `src/pipeline.ts` estava concatenando widgets e children de containers duplicados, causando elementos duplicados no JSON Elementor final.
+
+### Causa Raiz
+- **Arquivo**: `src/pipeline.ts` (linhas 755-792)
+- **Função**: `deduplicateContainers()`
+- **Comportamento incorreto**: 
+  ```typescript
+  // ANTES - Concatenava duplicados ❌
+  if (c.widgets && c.widgets.length > 0) {
+      existing.widgets = (existing.widgets || []).concat(c.widgets);
+  }
+  if (c.children && c.children.length > 0) {
+      existing.children = (existing.children || []).concat(c.children);
+  }
+  ```
+
+### Correção Implementada
+- **Estratégia**: Preservar apenas a primeira ocorrência de cada container
+- **Mudanças**:
+  1. Removida concatenação de `widgets` e `children`
+  2. Adicionado check de duplicação para containers sem key
+  3. Implementado merge inteligente de `styles` sem duplicar conteúdo
+  4. Preservação da primeira ocorrência completa de cada container
+
+### Arquivos Modificados
+- `src/pipeline.ts` - Refatoração da função `deduplicateContainers()`
+
+### Testes
+- ✅ Compilação bem-sucedida (`npm run build`)
+- ⏳ Aguardando teste com layouts que apresentavam duplicação
+
+### Impacto
+- **Positivo**: Elimina duplicação de elementos no JSON final
+- **Sem breaking changes**: Preserva comportamento correto existente
+- **Performance**: Sem impacto negativo
+
+### Outros Achados
+- **Aba Ajuda**: Verificado que está funcionando corretamente. Todo código necessário presente.
+  - HTML estrutura: `ui.html:813-819`
+  - Dados completos: 152 widgets em 7 categorias
+  - Se não aparecer, recarregar plugin após compilação
+
+---
+
+## Alterações Anteriores
+
+- 03/12/2025: O deduplicador agora agrupa containers pelo `styles.sourceId` antes de gerar JSON Elementor
+- 29/11/2025: Correção crítica para frames trancados; lógica de estilos (tipografia, bordas, texto rico) unificadas para modos AI e NO-AI via style_utils.ts

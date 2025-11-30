@@ -20,7 +20,7 @@ function validateContainer(container: PipelineContainer) {
         throw new Error(`Container ${container.id} com direction invalido.`);
     }
     if (container.width !== 'full' && container.width !== 'boxed') {
-        throw new Error(`Container ${container.id} com width invalido.`);
+        throw new Error(`Container ${container.id} com width invalido: ${JSON.stringify(container.width)}`);
     }
     if (!Array.isArray(container.widgets) || !Array.isArray(container.children)) {
         throw new Error(`Container ${container.id} sem widgets/children array.`);

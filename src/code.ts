@@ -7,6 +7,8 @@ import { SchemaProvider } from './types/providers';
 import { analyzeTreeWithHeuristics, convertToFlexSchema } from './pipeline/noai.parser';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
+import { createNodeSnapshot } from './heuristics/adapter';
+import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 
@@ -211,6 +213,8 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
     const wpConfig = customWP || await loadWPConfig();
     const useAI = typeof aiPayload?.useAI === 'boolean' ? aiPayload.useAI : await loadSetting<boolean>('gptel_use_ai', true);
     const serialized = serializeNode(node);
+    const includeScreenshot = typeof aiPayload?.includeScreenshot === 'boolean' ? aiPayload.includeScreenshot : await loadSetting<boolean>('gptel_include_screenshot', true);
+    const includeReferences = typeof aiPayload?.includeReferences === 'boolean' ? aiPayload.includeReferences : await loadSetting<boolean>('gptel_include_references', true);
 
     if (!useAI) {
         log('Iniciando pipeline (NO-AI)...', 'info');
@@ -222,7 +226,15 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
     const { provider, apiKey, providerId } = await resolveProviderConfig(aiPayload);
     const autoFixLayout = await loadSetting<boolean>('auto_fix_layout', false);
     log(`Iniciando pipeline (${providerId.toUpperCase()})...`, 'info');
-    const result = await pipeline.run(node, wpConfig, { debug, provider, apiKey, autoFixLayout }) as any;
+    const result = await pipeline.run(node, wpConfig, {
+        debug,
+        provider,
+        apiKey,
+        autoFixLayout,
+        includeScreenshot,
+        includeReferences,
+        autoRename: typeof aiPayload?.autoRename === 'boolean' ? aiPayload.autoRename : await loadSetting<boolean>('gptel_auto_rename', false)
+    }) as any;
     log('Pipeline concluido.', 'success');
     if (debug && result.elementorJson) {
         return result;
@@ -351,6 +363,9 @@ async function sendStoredSettings() {
     const autoPage = await loadSetting<boolean>('gptel_auto_page', false);
     const darkMode = await loadSetting<boolean>('gptel_dark_mode', false);
     const useAI = await loadSetting<boolean>('gptel_use_ai', true);
+    const includeScreenshot = await loadSetting<boolean>('gptel_include_screenshot', true);
+    const includeReferences = await loadSetting<boolean>('gptel_include_references', true);
+    const autoRename = await loadSetting<boolean>('gptel_auto_rename', false);
 
     figma.ui.postMessage({
         type: 'load-settings',
@@ -366,7 +381,10 @@ async function sendStoredSettings() {
             exportImages,
             autoPage,
             darkMode,
-            useAI
+            useAI,
+            includeScreenshot,
+            includeReferences,
+            autoRename
         }
     });
 }
@@ -429,82 +447,7 @@ figma.ui.onmessage = async (msg) => {
             }
             break;
 
-        case 'export-wp':
-            try {
-                const incoming = msg.wpConfig as WPConfig | undefined;
-                const cfg = incoming && incoming.url ? incoming : await loadWPConfig();
-                if (!(cfg as any).autoPage) {
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'Criar p\u00e1gina automaticamente est\u00e1 desativado.' });
-                    break;
-                }
-                const url = normalizeWpUrl(cfg?.url || '');
-                const userRaw = (cfg as any)?.user || '';
-                const tokenRaw = (cfg as any)?.token || (cfg as any)?.password || '';
-                const user = (userRaw || '').trim();
-                const token = (tokenRaw || '').replace(/\s+/g, '');
-                figma.ui.postMessage({
-                    type: 'log',
-                    level: 'info',
-                    message: `[WP] Export -> endpoint: ${url || '(vazio)'} / user: ${user || '(vazio)'} / tokenLen: ${token.length}`
-                });
-                if (!lastJSON) {
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'Nenhum JSON gerado para exportar.' });
-                    break;
-                }
-                if (!url || !user || !token) {
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuario ou senha do app ausentes.' });
-                    break;
-                }
 
-                const auth = `Basic ${toBase64(`${user}:${token}`)}`;
-                const base = url.replace(/\/$/, '');
-                const meEndpoint = `${base}/wp-json/wp/v2/users/me`;
-                const meResp = await fetchWithTimeout(meEndpoint, { headers: { Authorization: auth, Accept: 'application/json' } });
-                if (!meResp.ok) {
-                    const text = await meResp.text();
-                    figma.ui.postMessage({ type: 'log', level: 'error', message: `[WP] Auth FAIL (${meResp.status}) -> ${text}` });
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha de autenticacao (${meResp.status}): ${text}` });
-                    break;
-                }
-
-                const pageEndpoint = `${base}/wp-json/wp/v2/pages`;
-                const pageBody = {
-                    title: `FigToEL ${new Date().toISOString()}`,
-                    status: 'draft',
-                    meta: { _elementor_data: lastJSON },
-                    content: 'Gerado via FigToEL (Elementor JSON em _elementor_data).'
-                };
-
-                const pageResp = await fetchWithTimeout(pageEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: auth,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(pageBody)
-                });
-
-                if (!pageResp.ok) {
-                    const text = await pageResp.text();
-                    figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha ao criar pagina (${pageResp.status}): ${text}` });
-                    break;
-                }
-
-                const pageJson = await pageResp.json().catch(() => ({}));
-                await saveSetting('gptel_wp_url', url);
-                await saveSetting('gptel_wp_user', user);
-                await saveSetting('gptel_wp_token', token);
-                await saveSetting('gptel_export_images', !!(cfg as any).exportImages);
-                await saveSetting('gptel_auto_page', !!(cfg as any).autoPage);
-
-                const link = pageJson?.link || url;
-                figma.ui.postMessage({ type: 'wp-status', success: true, message: `Pagina enviada como rascunho. Link: ${link}` });
-            } catch (e: any) {
-                const aborted = e?.name === 'AbortError';
-                const msgErr = aborted ? 'Tempo limite ao exportar para WP.' : (e?.message || 'Erro desconhecido');
-                figma.ui.postMessage({ type: 'wp-status', success: false, message: msgErr });
-            }
-            break;
 
         case 'test-gemini':
             try {
@@ -615,6 +558,45 @@ figma.ui.onmessage = async (msg) => {
                 figma.notify(`Layer renomeada para ${name}`);
             } catch (e: any) {
                 figma.notify(e?.message || 'Falha ao renomear layer');
+            }
+            break;
+
+        case 'run-heuristics-rename':
+            try {
+                const selection = figma.currentPage.selection;
+                if (!selection || selection.length === 0) throw new Error('Selecione um frame ou node para organizar.');
+
+                let count = 0;
+                const processNode = (node: SceneNode) => {
+                    try {
+                        // Create snapshot and evaluate
+                        const snapshot = createNodeSnapshot(node);
+                        const results = evaluateNode(snapshot, DEFAULT_HEURISTICS);
+                        const best = results[0];
+
+                        if (best && best.confidence > 0.6) {
+                            const newName = best.widget;
+                            // Rename if not already prefixed
+                            if (!node.name.match(/^[wc]:/) && node.name !== newName) {
+                                node.name = newName;
+                                count++;
+                            }
+                        }
+                    } catch (e) {
+                        // ignore individual node errors
+                    }
+
+                    if ('children' in node) {
+                        for (const child of node.children) {
+                            processNode(child);
+                        }
+                    }
+                };
+
+                selection.forEach(processNode);
+                figma.notify(`Organização concluída! ${count} layers renomeados.`);
+            } catch (e: any) {
+                figma.notify(e?.message || 'Erro ao organizar layers');
             }
             break;
 

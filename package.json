@@ -4,8 +4,8 @@
     "description": "Figma to Elementor Exporter",
     "main": "dist/code.js",
   "scripts": {
-        "build": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6",
-        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --watch",
+        "build": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --loader:.md=text",
+        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --loader:.md=text --watch",
         "test": "vitest run"
     },
     "devDependencies": {

@@ -5,6 +5,14 @@ export interface GenerateSchemaInput {
     snapshot: any;
     instructions: string;
     apiKey?: string;
+    image?: {
+        data: string; // base64 sem prefixo
+        mimeType?: string;
+        name?: string;
+        width?: number;
+        height?: number;
+    };
+    references?: { name: string; content: string }[];
 }
 
 export interface SchemaResponse {

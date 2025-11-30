@@ -273,6 +273,12 @@
       }
     }
 
+    .row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
     .card {
       background: var(--color-panel);
       border: 1px solid var(--color-border);
@@ -684,13 +690,14 @@
       <section class="tab-panel active" data-panel="layout">
         <div class="card">
           <div class="card-title">A&#231;&#245;es r&#225;pidas</div>
-          <div class="actions">
-            <button class="btn primary" data-action="inspect-layout">Inspecionar Layout</button>
-            <button class="btn primary" data-action="generate-json">Gerar JSON</button>
-            <button class="btn secondary" data-action="copy-json" disabled>Copiar JSON</button>
-            <button class="btn secondary" data-action="download-json" disabled>Baixar JSON</button>
-            <button class="btn secondary" data-action="export-wp" disabled>Exportar WP</button>
-            <button class="btn ghost" data-action="reset">Reiniciar</button>
+          <div class="row">
+            <button id="btn_inspect" class="btn secondary">Inspecionar Layout</button>
+            <button id="btn_generate" class="btn primary">Gerar JSON</button>
+            <button id="btn_rename_layers" class="btn secondary">Renomear Layers</button>
+          </div>
+          <div class="row">
+            <button id="btn_download" class="btn secondary" data-action="download-json">Baixar JSON</button>
+            <button id="btn_reset" class="btn secondary" data-action="reset">Reiniciar</button>
           </div>
         </div>
         <div class="card">
@@ -761,11 +768,16 @@
               <div id="gpt-status" class="status"></div>
             </div>
           </div>
-          <label class="checkbox">
-            <input id="auto_fix_layout" type="checkbox" />
-            <span>Corre&#231;&#227;o autom&#225;tica de layout (fallback flex column)</span>
-          </label>
-        </div>
+          <div class="checkbox-group">
+            <label class="checkbox">
+              <input id="include_screenshot" type="checkbox" checked />
+              <span>Enviar print do frame para a IA (Melhora precis&#227;o)</span>
+            </label>
+            <label class="checkbox">
+              <input id="include_references" type="checkbox" checked />
+              <span>Enviar arquivos de refer&#234;ncia (.md) junto com o pedido</span>
+            </label>
+          </div>
       </section>
 
       <section class="tab-panel" data-panel="wp">
@@ -816,10 +828,30 @@
       const indicator = document.querySelector('.tab-indicator');
       const output = document.getElementById('output');
       const logs = document.getElementById('logs');
-      const progress = document.getElementById('progress');
-      const btnCopy = document.querySelector('[data-action="copy-json"]');
+      const btnInspect = document.getElementById('btn_inspect');
       const btnDownload = document.querySelector('[data-action="download-json"]');
-      const btnExport = document.querySelector('[data-action="export-wp"]');
+
+      document.getElementById('btn_generate').onclick = () => {
+        const payload = {
+          type: 'generate-json',
+          apiKey: fields.gpt_api_key?.value || '',
+          gptModel: fields.gpt_model?.value || '',
+          geminiModel: fields.gemini_model?.value || '',
+          includeScreenshot: fields.include_screenshot?.checked !== false,
+          includeReferences: fields.include_references?.checked !== false,
+          autoRename: fields.auto_rename_layers?.checked || false
+        };
+        // ... rest of generate logic
+        send('generate-json', payload);
+      };
+
+      document.getElementById('btn_rename_layers').onclick = () => {
+        send('run-heuristics-rename');
+      };
+
+      document.getElementById('btn_inspect').onclick = () => {
+        send('inspect');
+      };
       const themeToggle = document.getElementById('theme-toggle');
       const darkSheet = document.getElementById('theme-dark');
       const bridgeOutput = document.getElementById('figma-json-output');
@@ -834,7 +866,8 @@
         gemini_model: document.getElementById('gemini_model'),
         gpt_api_key: document.getElementById('gpt_api_key'),
         gpt_model: document.getElementById('gpt_model'),
-        auto_fix_layout: document.getElementById('auto_fix_layout'),
+        include_screenshot: document.getElementById('include_screenshot'),
+        include_references: document.getElementById('include_references'),
         wp_url: document.getElementById('wp_url'),
         wp_user: document.getElementById('wp_user'),
         wp_token: document.getElementById('wp_token'),
@@ -949,7 +982,8 @@
         }
         if (fields.gpt_api_key) fields.gpt_api_key.value = payload.gptKey || '';
         if (fields.gpt_model && payload.gptModel) fields.gpt_model.value = payload.gptModel;
-        if (fields.auto_fix_layout) fields.auto_fix_layout.checked = !!payload.autoFixLayout;
+        if (fields.include_screenshot) fields.include_screenshot.checked = payload.includeScreenshot !== false;
+        if (fields.include_references) fields.include_references.checked = payload.includeReferences !== false;
         if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
         if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
         if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
@@ -983,7 +1017,8 @@
         }
         if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gptApiKey', fields.gpt_api_key));
         if (fields.gpt_model) fields.gpt_model.addEventListener('change', () => send('save-setting', { key: 'gptModel', value: fields.gpt_model.value }));
-        if (fields.auto_fix_layout) fields.auto_fix_layout.addEventListener('change', () => send('save-setting', { key: 'auto_fix_layout', value: fields.auto_fix_layout.checked }));
+        if (fields.include_screenshot) fields.include_screenshot.addEventListener('change', () => send('save-setting', { key: 'gptel_include_screenshot', value: fields.include_screenshot.checked }));
+        if (fields.include_references) fields.include_references.addEventListener('change', () => send('save-setting', { key: 'gptel_include_references', value: fields.include_references.checked }));
         if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
         if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
         if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
@@ -1014,7 +1049,9 @@
               },
               apiKey: fields.gemini_api_key?.value || '',
               gptApiKey: fields.gpt_api_key?.value || '',
-              geminiModel: fields.gemini_model?.value || ''
+              geminiModel: fields.gemini_model?.value || '',
+              includeScreenshot: fields.include_screenshot?.checked !== false,
+              includeReferences: fields.include_references?.checked !== false
             };
             if (payload.geminiModel) {
               send('save-setting', { key: 'gemini_model', value: payload.geminiModel });

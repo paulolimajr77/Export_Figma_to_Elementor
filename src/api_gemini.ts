@@ -106,13 +106,27 @@ export const geminiProvider: SchemaProvider = {
         const model = this.model || GEMINI_MODEL;
         const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
 
-        const contents = [{
-            parts: [
-                { text: input.instructions },
-                { text: input.prompt },
-                { text: `SNAPSHOT:\n${JSON.stringify(input.snapshot)}` }
-            ]
-        }];
+        const parts: any[] = [
+            { text: input.instructions },
+            { text: input.prompt },
+            { text: `SNAPSHOT:\n${JSON.stringify(input.snapshot)}` }
+        ];
+
+        if (input.references && input.references.length > 0) {
+            const refText = input.references.map(ref => `### ${ref.name}\n${ref.content}`).join('\n\n');
+            parts.push({ text: `REFERENCIAS:\n${refText}` });
+        }
+
+        if (input.image?.data) {
+            parts.push({
+                inlineData: {
+                    data: input.image.data,
+                    mimeType: input.image.mimeType || 'image/png'
+                }
+            });
+        }
+
+        const contents = [{ parts }];
 
         const requestBody = {
             contents,
