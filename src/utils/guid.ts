@@ -3,7 +3,8 @@
  * @returns String GUID de 10 caracteres alfanuméricos
  */
 export function generateGUID(): string {
-    return Math.random().toString(36).substring(2, 9);
+    const hex = Math.floor(Math.random() * 0xfffffff).toString(16);
+    return ('0000000' + hex).slice(-7);
 }
 
 /**

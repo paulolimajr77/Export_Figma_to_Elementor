@@ -1,0 +1,479 @@
+{
+    "id": "6011:366",
+    "name": "c:container",
+    "type": "FRAME",
+    "width": 1440,
+    "height": 7267,
+    "x": 4305,
+    "y": 2269,
+    "visible": true,
+    "locked": false,
+    "parentId": null,
+    "opacity": 1,
+    "blendMode": "PASS_THROUGH",
+    "fills": [],
+    "strokes": [],
+    "strokeWeight": 1,
+    "strokeAlign": "INSIDE",
+    "strokeCap": "NONE",
+    "strokeJoin": "MITER",
+    "dashPattern": [],
+    "effects": [],
+    "cornerRadius": 0,
+    "constraints": {
+        "horizontal": "CENTER",
+        "vertical": "MIN"
+    },
+    "layoutMode": "VERTICAL",
+    "direction": "column",
+    "primaryAxisSizingMode": "AUTO",
+    "counterAxisSizingMode": "FIXED",
+    "primaryAxisAlignItems": "MIN",
+    "counterAxisAlignItems": "CENTER",
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0,
+    "itemSpacing": 0,
+    "layoutWrap": "NO_WRAP",
+    "children": [
+        {
+            "id": "6011:367",
+            "name": "c:container",
+            "type": "FRAME",
+            "width": 1440,
+            "height": 1165,
+            "x": 0,
+            "y": 0,
+            "visible": true,
+            "locked": false,
+            "parentId": "6011:366",
+            "opacity": 1,
+            "blendMode": "PASS_THROUGH",
+            "fills": [
+                {
+                    "type": "GRADIENT_RADIAL",
+                    "gradientStops": [
+                        {
+                            "color": {
+                                "r": 0.11150716245174408,
+                                "g": 0.11150716245174408,
+                                "b": 0.11150716245174408,
+                                "a": 1
+                            },
+                            "position": 0.11999999731779099,
+                            "boundVariables": {
+                                "color": {
+                                    "type": "VARIABLE_ALIAS",
+                                    "id": "VariableID:2003:1181"
+                                }
+                            }
+                        },
+                        {
+                            "color": {
+                                "r": 0.054901961237192154,
+                                "g": 0.054901961237192154,
+                                "b": 0.054901961237192154,
+                                "a": 1
+                            },
+                            "position": 0.8450000286102295,
+                            "boundVariables": {
+                                "color": {
+                                    "type": "VARIABLE_ALIAS",
+                                    "id": "VariableID:2003:1176"
+                                }
+                            }
+                        }
+                    ],
+                    "gradientTransform": [
+                        [
+                            6.084749585665136e-16,
+                            1.1036269664764404,
+                            -0.05181347206234932
+                        ],
+                        [
+                            -1.1036269664764404,
+                            1.0141478890663639e-15,
+                            1.0518134832382202
+                        ]
+                    ],
+                    "opacity": 1,
+                    "visible": true
+                },
+                {
+                    "type": "IMAGE",
+                    "visible": true,
+                    "imageHash": "fca9c90b59338d09f59ac53c01edef83927986ef",
+                    "scaleMode": "TILE"
+                },
+                {
+                    "type": "GRADIENT_RADIAL",
+                    "gradientStops": [
+                        {
+                            "color": {
+                                "r": 0.03529411926865578,
+                                "g": 0.03529411926865578,
+                                "b": 0.04313725605607033,
+                                "a": 0.4000000059604645
+                            },
+                            "position": 0.3415234386920929,
+                            "boundVariables": {}
+                        },
+                        {
+                            "color": {
+                                "r": 0.054901961237192154,
+                                "g": 0.054901961237192154,
+                                "b": 0.054901961237192154,
+                                "a": 1
+                            },
+                            "position": 1,
+                            "boundVariables": {
+                                "color": {
+                                    "type": "VARIABLE_ALIAS",
+                                    "id": "VariableID:2003:1176"
+                                }
+                            }
+                        }
+                    ],
+                    "gradientTransform": [
+                        [
+                            6.123234262925839e-17,
+                            1,
+                            0
+                        ],
+                        [
+                            -1,
+                            6.123234262925839e-17,
+                            1
+                        ]
+                    ],
+                    "opacity": 1,
+                    "visible": true
+                },
+                {
+                    "type": "GRADIENT_LINEAR",
+                    "gradientStops": [
+                        {
+                            "color": {
+                                "r": 1,
+                                "g": 0.27843138575553894,
+                                "b": 0.05882352963089943,
+                                "a": 0
+                            },
+                            "position": 0,
+                            "boundVariables": {}
+                        },
+                        {
+                            "color": {
+                                "r": 1,
+                                "g": 0.27843138575553894,
+                                "b": 0.05882352963089943,
+                                "a": 0.05999999865889549
+                            },
+                            "position": 1,
+                            "boundVariables": {}
+                        }
+                    ],
+                    "gradientTransform": [
+                        [
+                            0.4333111643791199,
+                            -1.5698394775390625,
+                            0.636901319026947
+                        ],
+                        [
+                            1.569839596748352,
+                            0.25724565982818604,
+                            -0.8154674768447876
+                        ]
+                    ],
+                    "opacity": 1,
+                    "visible": true
+                }
+            ],
+            "strokes": [],
+            "strokeWeight": 1,
+            "strokeAlign": "INSIDE",
+            "strokeCap": "NONE",
+            "strokeJoin": "MITER",
+            "dashPattern": [],
+            "effects": [],
+            "cornerRadius": 0,
+            "constraints": {
+                "horizontal": "MIN",
+                "vertical": "MIN"
+            },
+            "layoutMode": "VERTICAL",
+            "direction": "column",
+            "primaryAxisSizingMode": "AUTO",
+            "counterAxisSizingMode": "FIXED",
+            "primaryAxisAlignItems": "MIN",
+            "counterAxisAlignItems": "CENTER",
+            "paddingTop": 145,
+            "paddingRight": 0,
+            "paddingBottom": 60,
+            "paddingLeft": 0,
+            "itemSpacing": 10,
+            "layoutWrap": "NO_WRAP",
+            "children": [
+                {
+                    "id": "6011:370",
+                    "name": "w:image",
+                    "type": "INSTANCE",
+                    "width": 1440,
+                    "height": 690,
+                    "x": 0,
+                    "y": 145,
+                    "visible": true,
+                    "locked": false,
+                    "parentId": "6011:367",
+                    "opacity": 1,
+                    "blendMode": "PASS_THROUGH",
+                    "fills": [],
+                    "strokes": [],
+                    "strokeWeight": 1,
+                    "strokeAlign": "INSIDE",
+                    "strokeCap": "NONE",
+                    "strokeJoin": "MITER",
+                    "dashPattern": [],
+                    "effects": [],
+                    "cornerRadius": 0,
+                    "constraints": {
+                        "horizontal": "MIN",
+                        "vertical": "MIN"
+                    },
+                    "layoutMode": "NONE",
+                    "direction": "column",
+                    "primaryAxisSizingMode": "AUTO",
+                    "counterAxisSizingMode": "FIXED",
+                    "primaryAxisAlignItems": "MIN",
+                    "counterAxisAlignItems": "MIN",
+                    "paddingTop": 0,
+                    "paddingRight": 0,
+                    "paddingBottom": 0,
+                    "paddingLeft": 0,
+                    "itemSpacing": 0,
+                    "layoutWrap": "NO_WRAP",
+                    "children": [
+                        {
+                            "id": "I6011:370;34:905",
+                            "name": "w:image",
+                            "type": "FRAME",
+                            "width": 1440,
+                            "height": 690,
+                            "x": 0,
+                            "y": 0,
+                            "visible": true,
+                            "locked": false,
+                            "parentId": "6011:370",
+                            "opacity": 1,
+                            "blendMode": "PASS_THROUGH",
+                            "fills": [
+                                {
+                                    "type": "IMAGE",
+                                    "visible": true,
+                                    "imageHash": "1f0c1554ab5e50788501785e2737333c939acf9e",
+                                    "scaleMode": "FIT"
+                                }
+                            ],
+                            "strokes": [],
+                            "strokeWeight": 1,
+                            "strokeAlign": "INSIDE",
+                            "strokeCap": "NONE",
+                            "strokeJoin": "MITER",
+                            "dashPattern": [],
+                            "effects": [],
+                            "cornerRadius": 0,
+                            "constraints": {
+                                "horizontal": "STRETCH",
+                                "vertical": "STRETCH"
+                            },
+                            "layoutMode": "NONE",
+                            "direction": "column",
+                            "primaryAxisSizingMode": "AUTO",
+                            "counterAxisSizingMode": "FIXED",
+                            "primaryAxisAlignItems": "MIN",
+                            "counterAxisAlignItems": "MIN",
+                            "paddingTop": 0,
+                            "paddingRight": 0,
+                            "paddingBottom": 0,
+                            "paddingLeft": 0,
+                            "itemSpacing": 0,
+                            "layoutWrap": "NO_WRAP",
+                            "children": []
+                        }
+                    ]
+                },
+                {
+                    "id": "6011:369",
+                    "name": "The Perfect sport drink",
+                    "type": "TEXT",
+                    "width": 734,
+                    "height": 260,
+                    "x": 353,
+                    "y": 845,
+                    "visible": true,
+                    "locked": false,
+                    "parentId": "6011:367",
+                    "opacity": 1,
+                    "blendMode": "PASS_THROUGH",
+                    "strokes": [],
+                    "strokeWeight": 1,
+                    "strokeAlign": "OUTSIDE",
+                    "strokeCap": "NONE",
+                    "strokeJoin": "MITER",
+                    "dashPattern": [],
+                    "effects": [],
+                    "constraints": {
+                        "horizontal": "MIN",
+                        "vertical": "MIN"
+                    },
+                    "characters": "The Perfect\nsport drink",
+                    "fontSize": 146,
+                    "fontName": {
+                        "family": "Figtree",
+                        "style": "Medium"
+                    },
+                    "fontWeight": 500,
+                    "textAlignHorizontal": "CENTER",
+                    "textAlignVertical": "CENTER",
+                    "textAutoResize": "WIDTH_AND_HEIGHT",
+                    "letterSpacing": {
+                        "unit": "PIXELS",
+                        "value": -3
+                    },
+                    "lineHeight": {
+                        "unit": "PIXELS",
+                        "value": 130
+                    },
+                    "textCase": "ORIGINAL",
+                    "textDecoration": "NONE",
+                    "styledTextSegments": [
+                        {
+                            "characters": "The ",
+                            "start": 0,
+                            "end": 4,
+                            "fontSize": 146,
+                            "fontName": {
+                                "family": "Figtree",
+                                "style": "Medium"
+                            },
+                            "fontWeight": 500,
+                            "textDecoration": "NONE",
+                            "textCase": "ORIGINAL",
+                            "lineHeight": {
+                                "unit": "PIXELS",
+                                "value": 130
+                            },
+                            "letterSpacing": {
+                                "unit": "PIXELS",
+                                "value": -3
+                            },
+                            "fills": [
+                                {
+                                    "type": "SOLID",
+                                    "visible": true,
+                                    "opacity": 1,
+                                    "blendMode": "NORMAL",
+                                    "color": {
+                                        "r": 0.5792806148529053,
+                                        "g": 0.5792806148529053,
+                                        "b": 0.5792806148529053
+                                    },
+                                    "boundVariables": {
+                                        "color": {
+                                            "type": "VARIABLE_ALIAS",
+                                            "id": "VariableID:2003:1184"
+                                        }
+                                    }
+                                }
+                            ],
+                            "fillStyleId": ""
+                        },
+                        {
+                            "characters": "Perfect\n",
+                            "start": 4,
+                            "end": 12,
+                            "fontSize": 146,
+                            "fontName": {
+                                "family": "Figtree",
+                                "style": "Medium"
+                            },
+                            "fontWeight": 500,
+                            "textDecoration": "NONE",
+                            "textCase": "ORIGINAL",
+                            "lineHeight": {
+                                "unit": "PIXELS",
+                                "value": 130
+                            },
+                            "letterSpacing": {
+                                "unit": "PIXELS",
+                                "value": -3
+                            },
+                            "fills": [
+                                {
+                                    "type": "SOLID",
+                                    "visible": true,
+                                    "opacity": 1,
+                                    "blendMode": "NORMAL",
+                                    "color": {
+                                        "r": 0.9803921580314636,
+                                        "g": 0.9803921580314636,
+                                        "b": 0.9803921580314636
+                                    },
+                                    "boundVariables": {
+                                        "color": {
+                                            "type": "VARIABLE_ALIAS",
+                                            "id": "VariableID:2007:858"
+                                        }
+                                    }
+                                }
+                            ],
+                            "fillStyleId": ""
+                        },
+                        {
+                            "characters": "sport drink",
+                            "start": 12,
+                            "end": 23,
+                            "fontSize": 146,
+                            "fontName": {
+                                "family": "Figtree",
+                                "style": "Medium"
+                            },
+                            "fontWeight": 500,
+                            "textDecoration": "NONE",
+                            "textCase": "ORIGINAL",
+                            "lineHeight": {
+                                "unit": "PIXELS",
+                                "value": 130
+                            },
+                            "letterSpacing": {
+                                "unit": "PIXELS",
+                                "value": -3
+                            },
+                            "fills": [
+                                {
+                                    "type": "SOLID",
+                                    "visible": true,
+                                    "opacity": 1,
+                                    "blendMode": "NORMAL",
+                                    "color": {
+                                        "r": 0.5792806148529053,
+                                        "g": 0.5792806148529053,
+                                        "b": 0.5792806148529053
+                                    },
+                                    "boundVariables": {
+                                        "color": {
+                                            "type": "VARIABLE_ALIAS",
+                                            "id": "VariableID:2003:1184"
+                                        }
+                                    }
+                                }
+                            ],
+                            "fillStyleId": ""
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

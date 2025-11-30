@@ -825,6 +825,7 @@
       const bridgeOutput = document.getElementById('figma-json-output');
       const btnCopyManual = document.getElementById('copy-manual');
       let lastPayload = '';
+      let fullPayload = '';
 
       const fields = {
         use_ai: document.getElementById('use_ai'),
@@ -1037,8 +1038,8 @@
                 }
                 break;
               case 'download-json':
-                if (lastPayload) {
-                  downloadPayload(lastPayload);
+                if (fullPayload || lastPayload) {
+                  downloadPayload(fullPayload || lastPayload);
                 } else {
                   send('download-json');
                 }
@@ -1049,7 +1050,9 @@
                 if (logs) logs.innerHTML = '';
                 if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
                 updateBridgeOutput('', false);
+                updateBridgeOutput('', false);
                 lastPayload = '';
+                fullPayload = '';
                 toggleProgress(false);
                 toggleResultButtons(false);
                 addLog('Sessao reiniciada.', 'info');
@@ -1121,7 +1124,10 @@
             break;
           case 'generation-complete':
             // Generation = Elementor JSON (editable) -> #figma-json-output
-            updateBridgeOutput(msg.payload || '', true);
+            // Use pastePayload (elements array) for display/copy, keep payload (full) for download
+            lastPayload = msg.pastePayload || msg.payload || '';
+            fullPayload = msg.payload || '';
+            updateBridgeOutput(lastPayload, true);
             addLog('JSON gerado.', 'info');
             toggleProgress(false);
             toggleResultButtons(true);

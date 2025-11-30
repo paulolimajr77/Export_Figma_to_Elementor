@@ -141,16 +141,16 @@ export function serializeNode(node: SceneNode, parentId?: string): SerializedNod
     // Text Properties
     if (node.type === 'TEXT') {
         data.characters = (node as any).characters;
-        data.fontSize = (node as any).fontSize;
-        data.fontName = (node as any).fontName;
-        data.fontWeight = getFontWeight((node as any).fontName?.style);
+        data.fontSize = (node as any).fontSize !== figma.mixed ? (node as any).fontSize : undefined;
+        data.fontName = (node as any).fontName !== figma.mixed ? (node as any).fontName : undefined;
+        data.fontWeight = (node as any).fontName !== figma.mixed ? getFontWeight((node as any).fontName?.style) : 400;
         data.textAlignHorizontal = (node as any).textAlignHorizontal;
         data.textAlignVertical = (node as any).textAlignVertical;
         data.textAutoResize = (node as any).textAutoResize;
-        data.letterSpacing = (node as any).letterSpacing;
-        data.lineHeight = (node as any).lineHeight;
-        data.textCase = (node as any).textCase;
-        data.textDecoration = (node as any).textDecoration;
+        data.letterSpacing = (node as any).letterSpacing !== figma.mixed ? (node as any).letterSpacing : undefined;
+        data.lineHeight = (node as any).lineHeight !== figma.mixed ? (node as any).lineHeight : undefined;
+        data.textCase = (node as any).textCase !== figma.mixed ? (node as any).textCase : undefined;
+        data.textDecoration = (node as any).textDecoration !== figma.mixed ? (node as any).textDecoration : undefined;
 
         if ((node as any).fills !== figma.mixed && (node as any).fills.length > 0 && (node as any).fills[0].type === 'SOLID') {
             data.color = ((node as any).fills[0] as SolidPaint).color;

@@ -330,6 +330,9 @@
       sourceName: node.name
     };
     if (typeof node.itemSpacing === "number") styles.gap = node.itemSpacing;
+    if (typeof node.height === "number") {
+      styles.minHeight = node.height;
+    }
     if (typeof node.paddingTop === "number" || typeof node.paddingRight === "number" || typeof node.paddingBottom === "number" || typeof node.paddingLeft === "number") {
       styles.paddingTop = node.paddingTop || 0;
       styles.paddingRight = node.paddingRight || 0;
@@ -360,8 +363,8 @@
     } else if (typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
       styles.border = { radius: node.cornerRadius };
     }
-    const justifyMap = { MIN: "start", CENTER: "center", MAX: "end", SPACE_BETWEEN: "space-between" };
-    const alignMap = { MIN: "start", CENTER: "center", MAX: "end", STRETCH: "stretch" };
+    const justifyMap = { MIN: "flex-start", CENTER: "center", MAX: "flex-end", SPACE_BETWEEN: "space-between" };
+    const alignMap = { MIN: "flex-start", CENTER: "center", MAX: "flex-end", STRETCH: "stretch" };
     if (node.primaryAxisAlignItems) styles.justify_content = justifyMap[node.primaryAxisAlignItems] || void 0;
     if (node.counterAxisAlignItems) styles.align_items = alignMap[node.counterAxisAlignItems] || void 0;
     return styles;
@@ -568,13 +571,29 @@ ${JSON.stringify(input.snapshot)}` }
           key: "heading",
           widgetType: "heading",
           family: "text",
-          compile: (w, base) => ({ widgetType: "heading", settings: __spreadProps(__spreadValues({}, base), { title: w.content || "Heading" }) })
+          compile: (w, base) => {
+            const color = base.color;
+            return {
+              widgetType: "heading",
+              settings: __spreadValues(__spreadProps(__spreadValues({}, base), {
+                title: w.content || "Heading"
+              }), color ? { title_color: color } : {})
+            };
+          }
         },
         {
           key: "text",
           widgetType: "text-editor",
           family: "text",
-          compile: (w, base) => ({ widgetType: "text-editor", settings: __spreadProps(__spreadValues({}, base), { editor: w.content || "Text" }) })
+          compile: (w, base) => {
+            const color = base.color;
+            return {
+              widgetType: "text-editor",
+              settings: __spreadValues(__spreadProps(__spreadValues({}, base), {
+                editor: w.content || "Text"
+              }), color ? { text_color: color } : {})
+            };
+          }
         },
         {
           key: "button",
@@ -786,18 +805,42 @@ ${JSON.stringify(input.snapshot)}` }
           key: "image-carousel",
           widgetType: "image-carousel",
           family: "media",
-          compile: (w, base) => ({
-            widgetType: "image-carousel",
-            settings: __spreadProps(__spreadValues({}, base), {
-              slides: base.slides || [
-                {
-                  id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
-                  url: w.content || "",
-                  _id: "slide1"
-                }
-              ]
-            })
-          })
+          compile: (w, base) => {
+            const slides = base.slides;
+            const fallbackSlide = {
+              id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+              url: w.content || "",
+              image: { url: w.content || "", id: w.imageId || "" },
+              _id: "slide1"
+            };
+            const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => {
+              var _a;
+              return {
+                _id: s._id || `slide_${i + 1}`,
+                id: (() => {
+                  var _a2, _b;
+                  const raw = (_b = s.id) != null ? _b : (_a2 = s.image) == null ? void 0 : _a2.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  return isNaN(parsed) ? "" : parsed;
+                })(),
+                url: s.url || ((_a = s.image) == null ? void 0 : _a.url) || "",
+                image: (() => {
+                  var _a2, _b, _c;
+                  const url = s.url || ((_a2 = s.image) == null ? void 0 : _a2.url) || "";
+                  const raw = (_c = s.id) != null ? _c : (_b = s.image) == null ? void 0 : _b.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  const id = isNaN(parsed) ? "" : parsed;
+                  return { url, id };
+                })()
+              };
+            }) : [fallbackSlide];
+            return {
+              widgetType: "image-carousel",
+              settings: __spreadProps(__spreadValues({}, base), {
+                slides: normalizedSlides
+              })
+            };
+          }
         },
         {
           key: "basic-gallery",
@@ -812,6 +855,129 @@ ${JSON.stringify(input.snapshot)}` }
               }]
             })
           })
+        },
+        {
+          key: "media:carousel",
+          widgetType: "image-carousel",
+          family: "media",
+          compile: (w, base) => {
+            const slides = base.slides;
+            const fallbackSlide = {
+              id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+              url: w.content || "",
+              image: { url: w.content || "", id: w.imageId || "" },
+              _id: "slide1"
+            };
+            const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => {
+              var _a;
+              return {
+                _id: s._id || `slide_${i + 1}`,
+                id: (() => {
+                  var _a2, _b;
+                  const raw = (_b = s.id) != null ? _b : (_a2 = s.image) == null ? void 0 : _a2.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  return isNaN(parsed) ? "" : parsed;
+                })(),
+                url: s.url || ((_a = s.image) == null ? void 0 : _a.url) || "",
+                image: (() => {
+                  var _a2, _b, _c;
+                  const url = s.url || ((_a2 = s.image) == null ? void 0 : _a2.url) || "";
+                  const raw = (_c = s.id) != null ? _c : (_b = s.image) == null ? void 0 : _b.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  const id = isNaN(parsed) ? "" : parsed;
+                  return { url, id };
+                })()
+              };
+            }) : [fallbackSlide];
+            return {
+              widgetType: "image-carousel",
+              settings: __spreadProps(__spreadValues({}, base), {
+                slides: normalizedSlides
+              })
+            };
+          }
+        },
+        {
+          key: "slider:slides",
+          widgetType: "image-carousel",
+          family: "media",
+          compile: (w, base) => {
+            const slides = base.slides;
+            const fallbackSlide = {
+              id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+              url: w.content || "",
+              image: { url: w.content || "", id: w.imageId || "" },
+              _id: "slide1"
+            };
+            const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => {
+              var _a;
+              return {
+                _id: s._id || `slide_${i + 1}`,
+                id: (() => {
+                  var _a2, _b;
+                  const raw = (_b = s.id) != null ? _b : (_a2 = s.image) == null ? void 0 : _a2.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  return isNaN(parsed) ? "" : parsed;
+                })(),
+                url: s.url || ((_a = s.image) == null ? void 0 : _a.url) || "",
+                image: (() => {
+                  var _a2, _b, _c;
+                  const url = s.url || ((_a2 = s.image) == null ? void 0 : _a2.url) || "";
+                  const raw = (_c = s.id) != null ? _c : (_b = s.image) == null ? void 0 : _b.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  const id = isNaN(parsed) ? "" : parsed;
+                  return { url, id };
+                })()
+              };
+            }) : [fallbackSlide];
+            return {
+              widgetType: "image-carousel",
+              settings: __spreadProps(__spreadValues({}, base), {
+                slides: normalizedSlides
+              })
+            };
+          }
+        },
+        {
+          key: "w:slideshow",
+          widgetType: "image-carousel",
+          family: "media",
+          compile: (w, base) => {
+            const slides = base.slides;
+            const fallbackSlide = {
+              id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+              url: w.content || "",
+              image: { url: w.content || "", id: w.imageId || "" },
+              _id: "slide1"
+            };
+            const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => {
+              var _a;
+              return {
+                _id: s._id || `slide_${i + 1}`,
+                id: (() => {
+                  var _a2, _b;
+                  const raw = (_b = s.id) != null ? _b : (_a2 = s.image) == null ? void 0 : _a2.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  return isNaN(parsed) ? "" : parsed;
+                })(),
+                url: s.url || ((_a = s.image) == null ? void 0 : _a.url) || "",
+                image: (() => {
+                  var _a2, _b, _c;
+                  const url = s.url || ((_a2 = s.image) == null ? void 0 : _a2.url) || "";
+                  const raw = (_c = s.id) != null ? _c : (_b = s.image) == null ? void 0 : _b.id;
+                  const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+                  const id = isNaN(parsed) ? "" : parsed;
+                  return { url, id };
+                })()
+              };
+            }) : [fallbackSlide];
+            return {
+              widgetType: "image-carousel",
+              settings: __spreadProps(__spreadValues({}, base), {
+                slides: normalizedSlides
+              })
+            };
+          }
         },
         {
           key: "gallery",
@@ -1074,17 +1240,22 @@ ${JSON.stringify(input.snapshot)}` }
         }
         compileContainer(container, isInner) {
           const id = generateGUID();
+          const flexDirection = container.direction === "row" ? "row" : "column";
           const settings = __spreadValues({
             _element_id: id,
             container_type: "flex",
             content_width: container.width === "full" ? "full" : "boxed",
-            flex_direction: container.direction === "row" ? "row" : "column"
+            flex_direction: flexDirection,
+            flex__is_row: "row",
+            flex__is_column: "column"
           }, this.mapContainerStyles(container.styles));
           if (!settings.flex_gap) {
             settings.flex_gap = { unit: "px", size: 0, column: "0", row: "0", isLinked: true };
           }
-          if (!settings.justify_content) settings.justify_content = "start";
-          if (!settings.align_items) settings.align_items = "start";
+          if (!settings.justify_content) settings.justify_content = "flex-start";
+          if (!settings.align_items) settings.align_items = "flex-start";
+          settings.flex_justify_content = settings.justify_content;
+          settings.flex_align_items = settings.align_items;
           const widgetElements = container.widgets.map((w) => {
             var _a, _b;
             return { order: (_b = (_a = w.styles) == null ? void 0 : _a._order) != null ? _b : 0, el: this.compileWidget(w) };
@@ -1107,6 +1278,20 @@ ${JSON.stringify(input.snapshot)}` }
         mapContainerStyles(styles) {
           const settings = {};
           if (!styles) return settings;
+          const normalizeFlexValue = (value) => {
+            if (!value) return void 0;
+            if (value === "start") return "flex-start";
+            if (value === "end") return "flex-end";
+            return value;
+          };
+          if (styles.justify_content) {
+            settings.justify_content = normalizeFlexValue(styles.justify_content);
+            settings.flex_justify_content = settings.justify_content;
+          }
+          if (styles.align_items) {
+            settings.align_items = normalizeFlexValue(styles.align_items);
+            settings.flex_align_items = settings.align_items;
+          }
           if (styles.gap !== void 0) {
             settings.flex_gap = {
               unit: "px",
@@ -1144,13 +1329,16 @@ ${JSON.stringify(input.snapshot)}` }
           if (styles.width) {
             settings.width = { unit: "px", size: styles.width, sizes: [] };
           }
+          if (styles.minHeight) {
+            settings.min_height = { unit: "px", size: styles.minHeight, sizes: [] };
+          }
           if (styles.primaryAxisAlignItems) {
             const map = { MIN: "start", CENTER: "center", MAX: "end", SPACE_BETWEEN: "space-between" };
-            settings.justify_content = map[styles.primaryAxisAlignItems] || "start";
+            settings.justify_content = settings.justify_content || map[styles.primaryAxisAlignItems] || "start";
           }
           if (styles.counterAxisAlignItems) {
             const map = { MIN: "start", CENTER: "center", MAX: "end", STRETCH: "stretch" };
-            settings.align_items = map[styles.counterAxisAlignItems] || "start";
+            settings.align_items = settings.align_items || map[styles.counterAxisAlignItems] || "start";
           }
           if (styles.border) {
             const b = styles.border;
@@ -1226,8 +1414,60 @@ ${JSON.stringify(input.snapshot)}` }
           });
           return out;
         }
-        compileWidget(widget) {
+        looksLikeIconUrl(value) {
+          if (typeof value !== "string") return false;
+          const trimmed = value.trim();
+          return /^https?:\/\//i.test(trimmed) || trimmed.startsWith("data:") || trimmed.endsWith(".svg") || trimmed.startsWith("<svg");
+        }
+        normalizeSelectedIcon(icon, imageId, fallback = { value: "fas fa-star", library: "fa-solid" }) {
+          var _a;
+          if (!icon) return __spreadValues({}, fallback);
+          const rawValue = icon.value || icon.url || icon.icon || icon;
+          const normalized = __spreadProps(__spreadValues(__spreadValues({}, fallback), icon), { value: rawValue });
+          if (this.looksLikeIconUrl(rawValue)) {
+            const parsedId = imageId !== void 0 ? parseInt(String(imageId), 10) : (_a = icon.id) != null ? _a : icon.wpId;
+            normalized.library = "svg";
+            normalized.value = {
+              url: rawValue,
+              id: isNaN(parsedId) ? "" : parsedId
+            };
+          } else if (!normalized.library) {
+            normalized.library = fallback.library;
+          }
+          return normalized;
+        }
+        normalizeIconList(settings) {
+          if (!Array.isArray(settings.icon_list)) return settings;
+          settings.icon_list = settings.icon_list.map((item, idx) => {
+            var _a, _b, _c, _d, _e, _f;
+            const normalizedIcon = this.normalizeSelectedIcon(
+              item.icon || item.selected_icon || item,
+              item.imageId || ((_a = item.icon) == null ? void 0 : _a.id) || ((_b = item.selected_icon) == null ? void 0 : _b.id),
+              { value: ((_c = item == null ? void 0 : item.icon) == null ? void 0 : _c.value) || ((_d = item == null ? void 0 : item.selected_icon) == null ? void 0 : _d.value) || "fas fa-check", library: ((_e = item == null ? void 0 : item.icon) == null ? void 0 : _e.library) || ((_f = item == null ? void 0 : item.selected_icon) == null ? void 0 : _f.library) || "fa-solid" }
+            );
+            return __spreadProps(__spreadValues({
+              _id: item._id || `icon_item_${idx + 1}`
+            }, item), {
+              icon: normalizedIcon,
+              selected_icon: normalizedIcon
+            });
+          });
+          return settings;
+        }
+        normalizeIconSettings(widgetType, settings, widget) {
           var _a, _b;
+          const normalized = __spreadValues({}, settings);
+          if (widgetType === "icon" || widgetType === "icon-box") {
+            const imageId = (widget == null ? void 0 : widget.imageId) || ((_a = normalized.selected_icon) == null ? void 0 : _a.id) || ((_b = normalized.selected_icon) == null ? void 0 : _b.wpId);
+            normalized.selected_icon = this.normalizeSelectedIcon(normalized.selected_icon, imageId);
+          }
+          if (widgetType === "icon-list") {
+            this.normalizeIconList(normalized);
+          }
+          return normalized;
+        }
+        compileWidget(widget) {
+          var _a, _b, _c;
           const widgetId = generateGUID();
           const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
           Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
@@ -1239,12 +1479,13 @@ ${JSON.stringify(input.snapshot)}` }
           }
           const registryResult = compileWithRegistry(widget, baseSettings);
           if (registryResult) {
+            const normalizedSettings = this.normalizeIconSettings(registryResult.widgetType, registryResult.settings, widget);
             return {
               id: widgetId,
               elType: "widget",
               isLocked: false,
               widgetType: registryResult.widgetType,
-              settings: registryResult.settings,
+              settings: normalizedSettings,
               defaultEditSettings: { defaultEditRoute: "content" },
               elements: []
             };
@@ -1278,7 +1519,7 @@ ${JSON.stringify(input.snapshot)}` }
               break;
             case "icon":
               widgetType = "icon";
-              settings.selected_icon = { value: widget.content || "fas fa-star", library: "fa-solid" };
+              settings.selected_icon = this.normalizeSelectedIcon(((_c = widget.styles) == null ? void 0 : _c.selected_icon) || baseSettings.selected_icon || widget.content, widget.imageId);
               break;
             case "custom":
             default:
@@ -1286,12 +1527,13 @@ ${JSON.stringify(input.snapshot)}` }
               settings.html = widget.content || "";
               break;
           }
+          const finalSettings = this.normalizeIconSettings(widgetType, settings, widget);
           return {
             id: widgetId,
             elType: "widget",
             isLocked: false,
             widgetType,
-            settings,
+            settings: finalSettings,
             defaultEditSettings: { defaultEditRoute: "content" },
             elements: []
           };
@@ -1629,6 +1871,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 
   // src/pipeline/noai.parser.ts
   function isImageFill(node) {
+    if (!node) return false;
+    if (node.type === "IMAGE") return true;
     const fills = node == null ? void 0 : node.fills;
     if (!Array.isArray(fills)) return false;
     return fills.some((f) => (f == null ? void 0 : f.type) === "IMAGE");
@@ -1671,6 +1915,27 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const { r, g, b, a = 1 } = solid.color || {};
     const to255 = (v) => Math.round((v || 0) * 255);
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
+  }
+  function isContainerLike(node) {
+    const containerTypes = ["FRAME", "GROUP", "SECTION", "INSTANCE", "COMPONENT"];
+    return containerTypes.includes(node.type);
+  }
+  function unwrapBoxedInner(node) {
+    const rawChildren = Array.isArray(node.children) ? node.children : [];
+    if (node.width < BOXED_MIN_PARENT_WIDTH || rawChildren.length === 0) {
+      return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
+    }
+    const candidate = rawChildren.find(
+      (child) => isContainerLike(child) && typeof child.width === "number" && child.width > 0 && child.width < node.width && node.width - child.width >= BOXED_MIN_WIDTH_DELTA
+    );
+    if (!candidate) {
+      return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
+    }
+    const innerChildren = Array.isArray(candidate.children) ? candidate.children : [];
+    const idx = rawChildren.indexOf(candidate);
+    const before = idx >= 0 ? rawChildren.slice(0, idx) : [];
+    const after = idx >= 0 ? rawChildren.slice(idx + 1) : [];
+    return { isBoxed: true, inner: candidate, flattenedChildren: [...before, ...innerChildren, ...after] };
   }
   function calculateWidgetScore(node) {
     const scores = [];
@@ -1731,6 +1996,10 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     if (allImages && children.length >= 3) galleryScore += 60;
     if (name.includes("gallery")) galleryScore += 40;
     if (galleryScore > 0) scores.push({ type: "basic-gallery", score: galleryScore, matchedFeatures: ["all-images"] });
+    let carouselScore = 0;
+    if (allImages && children.length >= 2) carouselScore += 60;
+    if (name.includes("carousel") || name.includes("slider")) carouselScore += 50;
+    if (carouselScore > 0) scores.push({ type: "image-carousel", score: carouselScore, matchedFeatures: ["images", "carousel"] });
     let iconListScore = 0;
     if (hasIcon && hasText && (children.length >= 3 || name.includes("list"))) iconListScore += 40;
     if (name.includes("icon") && name.includes("list")) iconListScore += 40;
@@ -1867,7 +2136,11 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           case "testimonial":
             return { type: "testimonial", content: "", imageId: null, styles };
           case "basic-gallery":
-            return { type: "basic-gallery", content: node.name, imageId: null, styles };
+            return { type: "basic-gallery", content: null, imageId: null, styles };
+          case "image-carousel": {
+            const slides = children.filter((c) => isImageFill(c) || vectorTypes.includes(c.type) || c.type === "IMAGE").map((img, i) => ({ id: img.id, url: "", _id: `slide_${i + 1}` }));
+            return { type: "image-carousel", content: null, imageId: null, styles: __spreadProps(__spreadValues({}, styles), { slides }) };
+          }
           case "icon_list":
             return { type: "icon_list", content: node.name, imageId: null, styles };
           // New Widgets
@@ -1960,12 +2233,36 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return null;
   }
   function toContainer(node) {
-    const direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
+    let direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
     const styles = extractContainerStyles(node);
     const widgets = [];
     const childrenContainers = [];
-    const childNodes = Array.isArray(node.children) ? [...node.children] : [];
-    if (node.layoutMode !== "HORIZONTAL" && node.layoutMode !== "VERTICAL") {
+    const boxed = unwrapBoxedInner(node);
+    let childNodes = boxed.flattenedChildren;
+    let containerWidth = boxed.isBoxed ? "boxed" : "full";
+    if (boxed.isBoxed && boxed.inner) {
+      const innerStyles = extractContainerStyles(boxed.inner);
+      if (boxed.inner.layoutMode === "HORIZONTAL" || boxed.inner.layoutMode === "VERTICAL") {
+        direction = boxed.inner.layoutMode === "HORIZONTAL" ? "row" : "column";
+      }
+      const hasPadding = (s) => ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"].some((k) => s[k] !== void 0 && s[k] !== null);
+      if (styles.gap === void 0 && innerStyles.gap !== void 0) styles.gap = innerStyles.gap;
+      if (!hasPadding(styles) && hasPadding(innerStyles)) {
+        styles.paddingTop = innerStyles.paddingTop;
+        styles.paddingRight = innerStyles.paddingRight;
+        styles.paddingBottom = innerStyles.paddingBottom;
+        styles.paddingLeft = innerStyles.paddingLeft;
+      }
+      if (!styles.justify_content && innerStyles.justify_content) styles.justify_content = innerStyles.justify_content;
+      if (!styles.align_items && innerStyles.align_items) styles.align_items = innerStyles.align_items;
+      if (!styles.background && innerStyles.background) styles.background = innerStyles.background;
+      if (!styles.border && innerStyles.border) styles.border = innerStyles.border;
+      styles.width = boxed.inner.width;
+      styles._boxedInnerSourceId = boxed.inner.id;
+    }
+    if (!Array.isArray(childNodes)) childNodes = [];
+    const hasInnerAutoLayout = boxed.isBoxed && boxed.inner && (boxed.inner.layoutMode === "HORIZONTAL" || boxed.inner.layoutMode === "VERTICAL");
+    if (node.layoutMode !== "HORIZONTAL" && node.layoutMode !== "VERTICAL" && !hasInnerAutoLayout) {
       childNodes.sort((a, b) => {
         const yDiff = (a.y || 0) - (b.y || 0);
         if (Math.abs(yDiff) > 5) return yDiff;
@@ -1997,7 +2294,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return {
       id: node.id,
       direction: direction === "row" ? "row" : "column",
-      width: "full",
+      width: containerWidth,
       styles,
       widgets,
       children: childrenContainers
@@ -2058,11 +2355,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     }
     return { imageId, title, description };
   }
-  var vectorTypes;
+  var vectorTypes, BOXED_MIN_PARENT_WIDTH, BOXED_MIN_WIDTH_DELTA;
   var init_noai_parser = __esm({
     "src/pipeline/noai.parser.ts"() {
       init_style_utils();
       vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE", "RECTANGLE"];
+      BOXED_MIN_PARENT_WIDTH = 1440;
+      BOXED_MIN_WIDTH_DELTA = 40;
     }
   });
 
@@ -2194,40 +2493,61 @@ ${JSON.stringify(baseSchema, null, 2)}
           return __async(this, null, function* () {
             const uploadEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token) && wpConfig.exportImages);
             if (!uploadEnabled) return;
+            const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
+            const hasVectorChildren = (n) => {
+              if (isVectorNode(n)) return true;
+              if ("children" in n) {
+                return n.children.some((c) => hasVectorChildren(c));
+              }
+              return false;
+            };
+            const uploadNodeImage = (nodeId, preferSvg = false) => __async(this, null, function* () {
+              const node = figma.getNodeById(nodeId);
+              if (!node) return null;
+              let format = preferSvg ? "SVG" : "WEBP";
+              if ("locked" in node && node.locked || hasVectorChildren(node)) {
+                format = "SVG";
+              }
+              return this.imageUploader.uploadToWordPress(node, format);
+            });
             const processWidget = (widget) => __async(this, null, function* () {
+              var _a;
               if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box")) {
                 try {
-                  const node = figma.getNodeById(widget.imageId);
-                  if (node) {
-                    let format = widget.type === "icon" || widget.type === "icon-box" ? "SVG" : "WEBP";
-                    const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
-                    const hasVectorChildren = (n) => {
-                      if (isVectorNode(n)) return true;
-                      if ("children" in n) {
-                        return n.children.some((c) => hasVectorChildren(c));
-                      }
-                      return false;
-                    };
-                    if ("locked" in node && node.locked || hasVectorChildren(node)) {
-                      format = "SVG";
+                  const result = yield uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box");
+                  if (result) {
+                    if (widget.type === "image-box") {
+                      if (!widget.styles) widget.styles = {};
+                      widget.styles.image_url = result.url;
+                    } else if (widget.type === "icon-box") {
+                      if (!widget.styles) widget.styles = {};
+                      widget.styles.selected_icon = { value: result.url, library: "svg" };
+                    } else {
+                      widget.content = result.url;
                     }
-                    const result = yield this.imageUploader.uploadToWordPress(node, format);
-                    if (result) {
-                      if (widget.type === "image-box") {
-                        if (!widget.styles) widget.styles = {};
-                        widget.styles.image_url = result.url;
-                      } else if (widget.type === "icon-box") {
-                        if (!widget.styles) widget.styles = {};
-                        widget.styles.selected_icon = { value: result.url, library: "svg" };
-                      } else {
-                        widget.content = result.url;
-                      }
-                      widget.imageId = result.id.toString();
-                    }
+                    widget.imageId = result.id.toString();
                   }
                 } catch (e) {
                   console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
                 }
+              }
+              if (widget.type === "image-carousel" && ((_a = widget.styles) == null ? void 0 : _a.slides) && Array.isArray(widget.styles.slides)) {
+                const uploads = widget.styles.slides.map((slide, idx) => __async(this, null, function* () {
+                  if (!(slide == null ? void 0 : slide.id)) return;
+                  try {
+                    const result = yield uploadNodeImage(slide.id, false);
+                    if (result) {
+                      slide.url = result.url;
+                      const parsedId = parseInt(String(result.id), 10);
+                      slide.id = isNaN(parsedId) ? "" : parsedId;
+                      slide._id = slide._id || `slide_${idx + 1}`;
+                      slide.image = { url: slide.url, id: slide.id };
+                    }
+                  } catch (e) {
+                    console.error(`[Pipeline] Erro ao processar slide ${slide.id}:`, e);
+                  }
+                }));
+                yield Promise.all(uploads);
               }
             });
             const uploadPromises = [];

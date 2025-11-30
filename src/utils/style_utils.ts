@@ -120,6 +120,11 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
 
     // Layout
     if (typeof node.itemSpacing === 'number') styles.gap = node.itemSpacing;
+
+    if (typeof (node as any).height === 'number') {
+        styles.minHeight = (node as any).height;
+    }
+
     if (
         typeof node.paddingTop === 'number' ||
         typeof node.paddingRight === 'number' ||
@@ -161,8 +166,8 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
     }
 
     // Alignment (Flex)
-    const justifyMap: Record<string, string> = { MIN: 'start', CENTER: 'center', MAX: 'end', SPACE_BETWEEN: 'space-between' };
-    const alignMap: Record<string, string> = { MIN: 'start', CENTER: 'center', MAX: 'end', STRETCH: 'stretch' };
+    const justifyMap: Record<string, string> = { MIN: 'flex-start', CENTER: 'center', MAX: 'flex-end', SPACE_BETWEEN: 'space-between' };
+    const alignMap: Record<string, string> = { MIN: 'flex-start', CENTER: 'center', MAX: 'flex-end', STRETCH: 'stretch' };
 
     if (node.primaryAxisAlignItems) styles.justify_content = justifyMap[node.primaryAxisAlignItems] || undefined;
     if (node.counterAxisAlignItems) styles.align_items = alignMap[node.counterAxisAlignItems] || undefined;

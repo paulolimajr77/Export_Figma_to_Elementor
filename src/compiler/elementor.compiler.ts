@@ -39,18 +39,24 @@ export class ElementorCompiler {
 
     private compileContainer(container: PipelineContainer, isInner: boolean): ElementorElement {
         const id = generateGUID();
+        const flexDirection = container.direction === 'row' ? 'row' : 'column';
         const settings: ElementorSettings = {
             _element_id: id,
             container_type: 'flex',
             content_width: container.width === 'full' ? 'full' : 'boxed',
-            flex_direction: container.direction === 'row' ? 'row' : 'column',
+            flex_direction: flexDirection,
+            flex__is_row: 'row',
+            flex__is_column: 'column',
             ...this.mapContainerStyles(container.styles)
         };
         if (!settings.flex_gap) {
             settings.flex_gap = { unit: 'px', size: 0, column: '0', row: '0', isLinked: true };
         }
-        if (!settings.justify_content) settings.justify_content = 'start';
-        if (!settings.align_items) settings.align_items = 'start';
+        if (!settings.justify_content) settings.justify_content = 'flex-start';
+        if (!settings.align_items) settings.align_items = 'flex-start';
+        // Compatibilidade Elementor: duplicar alinhamentos nas chaves flex_*
+        settings.flex_justify_content = settings.justify_content;
+        settings.flex_align_items = settings.align_items;
 
         const widgetElements = container.widgets.map(w => ({ order: (w.styles as any)?._order ?? 0, el: this.compileWidget(w) }));
         const childContainers = container.children.map(child => ({ order: (child.styles as any)?._order ?? 0, el: this.compileContainer(child, true) }));
@@ -70,6 +76,22 @@ export class ElementorCompiler {
     private mapContainerStyles(styles: Record<string, any>): ElementorSettings {
         const settings: ElementorSettings = {};
         if (!styles) return settings;
+
+        const normalizeFlexValue = (value?: string): string | undefined => {
+            if (!value) return undefined;
+            if (value === 'start') return 'flex-start';
+            if (value === 'end') return 'flex-end';
+            return value;
+        };
+
+        if (styles.justify_content) {
+            settings.justify_content = normalizeFlexValue(styles.justify_content);
+            settings.flex_justify_content = settings.justify_content;
+        }
+        if (styles.align_items) {
+            settings.align_items = normalizeFlexValue(styles.align_items);
+            settings.flex_align_items = settings.align_items;
+        }
 
         if (styles.gap !== undefined) {
             settings.flex_gap = {
@@ -117,14 +139,18 @@ export class ElementorCompiler {
             settings.width = { unit: 'px', size: styles.width, sizes: [] };
         }
 
+        if (styles.minHeight) {
+            settings.min_height = { unit: 'px', size: styles.minHeight, sizes: [] };
+        }
+
         if (styles.primaryAxisAlignItems) {
             const map: Record<string, string> = { MIN: 'start', CENTER: 'center', MAX: 'end', SPACE_BETWEEN: 'space-between' };
-            settings.justify_content = map[styles.primaryAxisAlignItems] || 'start';
+            settings.justify_content = settings.justify_content || map[styles.primaryAxisAlignItems] || 'start';
         }
 
         if (styles.counterAxisAlignItems) {
             const map: Record<string, string> = { MIN: 'start', CENTER: 'center', MAX: 'end', STRETCH: 'stretch' };
-            settings.align_items = map[styles.counterAxisAlignItems] || 'start';
+            settings.align_items = settings.align_items || map[styles.counterAxisAlignItems] || 'start';
         }
 
         if (styles.border) {
@@ -183,6 +209,71 @@ export class ElementorCompiler {
         return out;
     }
 
+    private looksLikeIconUrl(value: any): boolean {
+        if (typeof value !== 'string') return false;
+        const trimmed = value.trim();
+        return /^https?:\/\//i.test(trimmed) || trimmed.startsWith('data:') || trimmed.endsWith('.svg') || trimmed.startsWith('<svg');
+    }
+
+    private normalizeSelectedIcon(
+        icon: any,
+        imageId?: string | number,
+        fallback: { value: string; library: string } = { value: 'fas fa-star', library: 'fa-solid' }
+    ): { value: any; library: string } {
+        if (!icon) return { ...fallback };
+
+        const rawValue = icon.value || icon.url || icon.icon || icon;
+        const normalized: any = { ...fallback, ...icon, value: rawValue };
+
+        if (this.looksLikeIconUrl(rawValue)) {
+            const parsedId = imageId !== undefined ? parseInt(String(imageId), 10) : (icon.id ?? icon.wpId);
+            normalized.library = 'svg';
+            normalized.value = {
+                url: rawValue,
+                id: isNaN(parsedId as any) ? '' : parsedId
+            };
+        } else if (!normalized.library) {
+            normalized.library = fallback.library;
+        }
+
+        return normalized;
+    }
+
+    private normalizeIconList(settings: ElementorSettings): ElementorSettings {
+        if (!Array.isArray(settings.icon_list)) return settings;
+
+        settings.icon_list = settings.icon_list.map((item: any, idx: number) => {
+            const normalizedIcon = this.normalizeSelectedIcon(
+                item.icon || item.selected_icon || item,
+                item.imageId || item.icon?.id || item.selected_icon?.id,
+                { value: (item?.icon?.value || item?.selected_icon?.value || 'fas fa-check'), library: item?.icon?.library || item?.selected_icon?.library || 'fa-solid' }
+            );
+            return {
+                _id: item._id || `icon_item_${idx + 1}`,
+                ...item,
+                icon: normalizedIcon,
+                selected_icon: normalizedIcon
+            };
+        });
+
+        return settings;
+    }
+
+    private normalizeIconSettings(widgetType: string, settings: ElementorSettings, widget?: PipelineWidget): ElementorSettings {
+        const normalized = { ...settings };
+
+        if (widgetType === 'icon' || widgetType === 'icon-box') {
+            const imageId = widget?.imageId || (normalized.selected_icon as any)?.id || (normalized.selected_icon as any)?.wpId;
+            normalized.selected_icon = this.normalizeSelectedIcon(normalized.selected_icon, imageId);
+        }
+
+        if (widgetType === 'icon-list') {
+            this.normalizeIconList(normalized);
+        }
+
+        return normalized;
+    }
+
     private compileWidget(widget: PipelineWidget): ElementorElement {
         const widgetId = generateGUID();
         const baseSettings: ElementorSettings = { _element_id: widgetId, ...this.sanitizeSettings(widget.styles || {}) };
@@ -199,12 +290,13 @@ export class ElementorCompiler {
         // Tenta registry primeiro (baseado em type/kind)
         const registryResult = compileWithRegistry(widget, baseSettings);
         if (registryResult) {
+            const normalizedSettings = this.normalizeIconSettings(registryResult.widgetType, registryResult.settings, widget);
             return {
                 id: widgetId,
                 elType: 'widget',
                 isLocked: false,
                 widgetType: registryResult.widgetType,
-                settings: registryResult.settings,
+                settings: normalizedSettings,
                 defaultEditSettings: { defaultEditRoute: 'content' },
                 elements: []
             };
@@ -242,7 +334,7 @@ export class ElementorCompiler {
                 break;
             case 'icon':
                 widgetType = 'icon';
-                settings.selected_icon = { value: widget.content || 'fas fa-star', library: 'fa-solid' };
+                settings.selected_icon = this.normalizeSelectedIcon(widget.styles?.selected_icon || baseSettings.selected_icon || widget.content, widget.imageId);
                 break;
             case 'custom':
             default:
@@ -251,12 +343,14 @@ export class ElementorCompiler {
                 break;
         }
 
+        const finalSettings = this.normalizeIconSettings(widgetType, settings, widget);
+
         return {
             id: widgetId,
             elType: 'widget',
             isLocked: false,
             widgetType,
-            settings,
+            settings: finalSettings,
             defaultEditSettings: { defaultEditRoute: 'content' },
             elements: []
         };

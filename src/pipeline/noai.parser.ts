@@ -7,6 +7,8 @@ type MaybeWidget = PipelineWidget | null;
 const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE', 'RECTANGLE'];
 
 function isImageFill(node: any): boolean {
+    if (!node) return false;
+    if (node.type === 'IMAGE') return true;
     const fills = node?.fills;
     if (!Array.isArray(fills)) return false;
     return fills.some((f: any) => f?.type === 'IMAGE');
@@ -53,6 +55,40 @@ function isSolidColor(node: any): string | undefined {
     const { r, g, b, a = 1 } = solid.color || {};
     const to255 = (v: number) => Math.round((v || 0) * 255);
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
+}
+
+const BOXED_MIN_PARENT_WIDTH = 1440;
+const BOXED_MIN_WIDTH_DELTA = 40;
+
+function isContainerLike(node: SerializedNode): boolean {
+    const containerTypes = ['FRAME', 'GROUP', 'SECTION', 'INSTANCE', 'COMPONENT'];
+    return containerTypes.includes(node.type);
+}
+
+function unwrapBoxedInner(node: SerializedNode): { isBoxed: boolean; inner: SerializedNode | null; flattenedChildren: SerializedNode[] } {
+    const rawChildren = Array.isArray((node as any).children) ? ((node as any).children as SerializedNode[]) : [];
+    if (node.width < BOXED_MIN_PARENT_WIDTH || rawChildren.length === 0) {
+        return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
+    }
+
+    const candidate = rawChildren.find(child =>
+        isContainerLike(child) &&
+        typeof child.width === 'number' &&
+        child.width > 0 &&
+        child.width < node.width &&
+        (node.width - child.width) >= BOXED_MIN_WIDTH_DELTA
+    );
+
+    if (!candidate) {
+        return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
+    }
+
+    const innerChildren = Array.isArray((candidate as any).children) ? (candidate as any).children as SerializedNode[] : [];
+    const idx = rawChildren.indexOf(candidate);
+    const before = idx >= 0 ? rawChildren.slice(0, idx) : [];
+    const after = idx >= 0 ? rawChildren.slice(idx + 1) : [];
+
+    return { isBoxed: true, inner: candidate, flattenedChildren: [...before, ...innerChildren, ...after] };
 }
 
 
@@ -151,6 +187,12 @@ function calculateWidgetScore(node: SerializedNode): WidgetScore[] {
     if (name.includes('gallery')) galleryScore += 40;
     if (galleryScore > 0) scores.push({ type: 'basic-gallery', score: galleryScore, matchedFeatures: ['all-images'] });
 
+    // 7b. Image Carousel (media:carousel)
+    let carouselScore = 0;
+    if (allImages && children.length >= 2) carouselScore += 60;
+    if (name.includes('carousel') || name.includes('slider')) carouselScore += 50;
+    if (carouselScore > 0) scores.push({ type: 'image-carousel', score: carouselScore, matchedFeatures: ['images', 'carousel'] });
+
     // 8. Icon List (w:icon-list)
     let iconListScore = 0;
     if (hasIcon && hasText && (children.length >= 3 || name.includes('list'))) iconListScore += 40;
@@ -247,6 +289,12 @@ function calculateWidgetScore(node: SerializedNode): WidgetScore[] {
 
 function detectWidget(node: SerializedNode): MaybeWidget {
     const name = (node.name || '').toLowerCase();
+
+    // Explicitly ignore containers so they are processed as containers by the recursive logic
+    if (name.startsWith('c:container') || name.startsWith('w:container')) {
+        return null;
+    }
+
     const styles: Record<string, any> = {
         sourceId: node.id,
         sourceName: node.name
@@ -327,7 +375,13 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 case 'star-rating': return { type: 'star-rating', content: '5', imageId: null, styles };
                 case 'social-icons': return { type: 'social-icons', content: '', imageId: null, styles };
                 case 'testimonial': return { type: 'testimonial', content: '', imageId: null, styles };
-                case 'basic-gallery': return { type: 'basic-gallery', content: node.name, imageId: null, styles };
+                case 'basic-gallery': return { type: 'basic-gallery', content: null, imageId: null, styles };
+                case 'image-carousel': {
+                    const slides = children
+                        .filter(c => isImageFill(c) || vectorTypes.includes(c.type) || c.type === 'IMAGE')
+                        .map((img, i) => ({ id: img.id, url: '', _id: `slide_${i + 1}` }));
+                    return { type: 'image-carousel', content: null, imageId: null, styles: { ...styles, slides } };
+                }
                 case 'icon_list': return { type: 'icon_list', content: node.name, imageId: null, styles };
 
                 // New Widgets
@@ -440,17 +494,48 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
 
 function toContainer(node: SerializedNode): PipelineContainer {
-    const direction = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
+    let direction: 'row' | 'column' = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
     const styles = extractContainerStyles(node);
 
     const widgets: PipelineWidget[] = [];
     const childrenContainers: PipelineContainer[] = [];
 
-    const childNodes: SerializedNode[] = Array.isArray((node as any).children) ? [...(node as any).children] : [];
+    const boxed = unwrapBoxedInner(node);
+    let childNodes: SerializedNode[] = boxed.flattenedChildren;
+    let containerWidth: PipelineContainer['width'] = boxed.isBoxed ? 'boxed' : 'full';
+
+    if (boxed.isBoxed && boxed.inner) {
+        const innerStyles = extractContainerStyles(boxed.inner);
+
+        if (boxed.inner.layoutMode === 'HORIZONTAL' || boxed.inner.layoutMode === 'VERTICAL') {
+            direction = boxed.inner.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
+        }
+
+        const hasPadding = (s: any) => ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].some(k => s[k] !== undefined && s[k] !== null);
+
+        // Use o gap/padding do pai; só herde do inner se o pai não tiver valores definidos
+        if (styles.gap === undefined && innerStyles.gap !== undefined) styles.gap = innerStyles.gap;
+        if (!hasPadding(styles) && hasPadding(innerStyles)) {
+            styles.paddingTop = innerStyles.paddingTop;
+            styles.paddingRight = innerStyles.paddingRight;
+            styles.paddingBottom = innerStyles.paddingBottom;
+            styles.paddingLeft = innerStyles.paddingLeft;
+        }
+        if (!styles.justify_content && innerStyles.justify_content) styles.justify_content = innerStyles.justify_content;
+        if (!styles.align_items && innerStyles.align_items) styles.align_items = innerStyles.align_items;
+        if (!styles.background && innerStyles.background) styles.background = innerStyles.background;
+        if (!styles.border && innerStyles.border) styles.border = innerStyles.border;
+
+        styles.width = boxed.inner.width;
+        styles._boxedInnerSourceId = boxed.inner.id;
+    }
+
+    if (!Array.isArray(childNodes)) childNodes = [];
 
     // Se não tiver Auto Layout, ordenar visualmente (Top -> Bottom, Left -> Right)
     // Isso garante que elementos soltos fiquem em uma ordem lógica na coluna
-    if (node.layoutMode !== 'HORIZONTAL' && node.layoutMode !== 'VERTICAL') {
+    const hasInnerAutoLayout = boxed.isBoxed && boxed.inner && (boxed.inner.layoutMode === 'HORIZONTAL' || boxed.inner.layoutMode === 'VERTICAL');
+    if (node.layoutMode !== 'HORIZONTAL' && node.layoutMode !== 'VERTICAL' && !hasInnerAutoLayout) {
         childNodes.sort((a, b) => {
             const yDiff = (a.y || 0) - (b.y || 0);
             if (Math.abs(yDiff) > 5) return yDiff; // Tolerância de 5px para linhas
@@ -485,7 +570,7 @@ function toContainer(node: SerializedNode): PipelineContainer {
     return {
         id: node.id,
         direction: direction === 'row' ? 'row' : 'column',
-        width: 'full',
+        width: containerWidth,
         styles,
         widgets,
         children: childrenContainers

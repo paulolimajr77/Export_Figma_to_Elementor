@@ -166,49 +166,70 @@ ${JSON.stringify(baseSchema, null, 2)}
         const uploadEnabled = !!(wpConfig && wpConfig.url && (wpConfig as any).user && ((wpConfig as any).password || (wpConfig as any).token) && (wpConfig as any).exportImages);
         if (!uploadEnabled) return;
 
+        const isVectorNode = (n: SceneNode) =>
+            n.type === 'VECTOR' || n.type === 'STAR' || n.type === 'ELLIPSE' ||
+            n.type === 'POLYGON' || n.type === 'BOOLEAN_OPERATION' || n.type === 'LINE';
+
+        const hasVectorChildren = (n: SceneNode): boolean => {
+            if (isVectorNode(n)) return true;
+            if ('children' in n) {
+                return n.children.some(c => hasVectorChildren(c));
+            }
+            return false;
+        };
+
+        const uploadNodeImage = async (nodeId: string, preferSvg: boolean = false) => {
+            const node = figma.getNodeById(nodeId);
+            if (!node) return null;
+            let format: any = preferSvg ? 'SVG' : 'WEBP';
+            if (('locked' in node && (node as any).locked) || hasVectorChildren(node as SceneNode)) {
+                format = 'SVG';
+            }
+            return this.imageUploader.uploadToWordPress(node as SceneNode, format);
+        };
+
         const processWidget = async (widget: PipelineWidget) => {
+            // Widgets simples com imageId
             if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box')) {
                 try {
-                    const node = figma.getNodeById(widget.imageId);
-                    if (node) {
-                        let format = (widget.type === 'icon' || widget.type === 'icon-box') ? 'SVG' : 'WEBP';
-
-                        // Smart Format Detection:
-                        // If it's a locked frame/group OR contains vectors, prefer SVG for sharpness
-                        const isVectorNode = (n: SceneNode) =>
-                            n.type === 'VECTOR' || n.type === 'STAR' || n.type === 'ELLIPSE' ||
-                            n.type === 'POLYGON' || n.type === 'BOOLEAN_OPERATION' || n.type === 'LINE';
-
-                        const hasVectorChildren = (n: SceneNode): boolean => {
-                            if (isVectorNode(n)) return true;
-                            if ('children' in n) {
-                                return n.children.some(c => hasVectorChildren(c));
-                            }
-                            return false;
-                        };
-
-                        if (('locked' in node && node.locked) || hasVectorChildren(node as SceneNode)) {
-                            format = 'SVG';
+                    const result = await uploadNodeImage(widget.imageId, widget.type === 'icon' || widget.type === 'icon-box');
+                    if (result) {
+                        if (widget.type === 'image-box') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.image_url = result.url;
+                            // Keep widget.content as Title
+                        } else if (widget.type === 'icon-box') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.selected_icon = { value: result.url, library: 'svg' };
+                            // Keep widget.content as Title
+                        } else {
+                            widget.content = result.url;
                         }
-                        const result = await this.imageUploader.uploadToWordPress(node as SceneNode, format as any);
-                        if (result) {
-                            if (widget.type === 'image-box') {
-                                if (!widget.styles) widget.styles = {};
-                                widget.styles.image_url = result.url;
-                                // Keep widget.content as Title
-                            } else if (widget.type === 'icon-box') {
-                                if (!widget.styles) widget.styles = {};
-                                widget.styles.selected_icon = { value: result.url, library: 'svg' };
-                                // Keep widget.content as Title
-                            } else {
-                                widget.content = result.url;
-                            }
-                            widget.imageId = result.id.toString();
-                        }
+                        widget.imageId = result.id.toString();
                     }
                 } catch (e) {
                     console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
                 }
+            }
+
+            // Carrosseis: preencher slides com URLs/IDs do WP
+            if (widget.type === 'image-carousel' && widget.styles?.slides && Array.isArray(widget.styles.slides)) {
+                const uploads = widget.styles.slides.map(async (slide: any, idx: number) => {
+                    if (!slide?.id) return;
+                    try {
+                        const result = await uploadNodeImage(slide.id, false);
+                        if (result) {
+                            slide.url = result.url;
+                            const parsedId = parseInt(String(result.id), 10);
+                            slide.id = isNaN(parsedId) ? '' : parsedId;
+                            slide._id = slide._id || `slide_${idx + 1}`;
+                            slide.image = { url: slide.url, id: slide.id };
+                        }
+                    } catch (e) {
+                        console.error(`[Pipeline] Erro ao processar slide ${slide.id}:`, e);
+                    }
+                });
+                await Promise.all(uploads);
             }
         };
 
