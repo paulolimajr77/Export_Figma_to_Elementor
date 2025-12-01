@@ -20,4 +20,6 @@ export interface PipelineWidget {
     content?: string | null;
     imageId?: string | null;
     styles?: Record<string, any>;
+    children?: PipelineWidget[];
+    kind?: string;
 }

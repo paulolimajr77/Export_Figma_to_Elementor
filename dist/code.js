@@ -824,7 +824,18 @@ ${refText}` });
       widgetType: "image-carousel",
       family: "media",
       compile: (w, base) => {
-        const slides = base.slides;
+        let slides = base.slides;
+        if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+          slides = w.children.filter((c) => c.type === "image").map((c, i) => ({
+            _id: `slide_${i + 1}`,
+            id: c.imageId ? parseInt(c.imageId, 10) : "",
+            url: c.content || "",
+            image: {
+              url: c.content || "",
+              id: c.imageId ? parseInt(c.imageId, 10) : ""
+            }
+          }));
+        }
         const fallbackSlide = {
           id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
           url: w.content || "",
@@ -864,22 +875,42 @@ ${refText}` });
       key: "basic-gallery",
       widgetType: "basic-gallery",
       family: "media",
-      compile: (w, base) => ({
-        widgetType: "basic-gallery",
-        settings: __spreadProps(__spreadValues({}, base), {
-          gallery: base.gallery || [{
-            id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
-            url: w.content || ""
-          }]
-        })
-      })
+      compile: (w, base) => {
+        let gallery = base.gallery;
+        if ((!gallery || gallery.length === 0) && w.children && w.children.length > 0) {
+          gallery = w.children.filter((c) => c.type === "image").map((c) => ({
+            id: c.imageId ? parseInt(c.imageId, 10) : "",
+            url: c.content || ""
+          }));
+        }
+        return {
+          widgetType: "basic-gallery",
+          settings: __spreadProps(__spreadValues({}, base), {
+            gallery: gallery || [{
+              id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+              url: w.content || ""
+            }]
+          })
+        };
+      }
     },
     {
       key: "media:carousel",
       widgetType: "image-carousel",
       family: "media",
       compile: (w, base) => {
-        const slides = base.slides;
+        let slides = base.slides;
+        if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+          slides = w.children.filter((c) => c.type === "image").map((c, i) => ({
+            _id: `slide_${i + 1}`,
+            id: c.imageId ? parseInt(c.imageId, 10) : "",
+            url: c.content || "",
+            image: {
+              url: c.content || "",
+              id: c.imageId ? parseInt(c.imageId, 10) : ""
+            }
+          }));
+        }
         const fallbackSlide = {
           id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
           url: w.content || "",
@@ -920,7 +951,18 @@ ${refText}` });
       widgetType: "image-carousel",
       family: "media",
       compile: (w, base) => {
-        const slides = base.slides;
+        let slides = base.slides;
+        if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+          slides = w.children.filter((c) => c.type === "image").map((c, i) => ({
+            _id: `slide_${i + 1}`,
+            id: c.imageId ? parseInt(c.imageId, 10) : "",
+            url: c.content || "",
+            image: {
+              url: c.content || "",
+              id: c.imageId ? parseInt(c.imageId, 10) : ""
+            }
+          }));
+        }
         const fallbackSlide = {
           id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
           url: w.content || "",
@@ -961,7 +1003,18 @@ ${refText}` });
       widgetType: "image-carousel",
       family: "media",
       compile: (w, base) => {
-        const slides = base.slides;
+        let slides = base.slides;
+        if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+          slides = w.children.filter((c) => c.type === "image").map((c, i) => ({
+            _id: `slide_${i + 1}`,
+            id: c.imageId ? parseInt(c.imageId, 10) : "",
+            url: c.content || "",
+            image: {
+              url: c.content || "",
+              id: c.imageId ? parseInt(c.imageId, 10) : ""
+            }
+          }));
+        }
         const fallbackSlide = {
           id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
           url: w.content || "",
@@ -1001,15 +1054,24 @@ ${refText}` });
       key: "gallery",
       widgetType: "gallery",
       family: "media",
-      compile: (w, base) => ({
-        widgetType: "gallery",
-        settings: __spreadProps(__spreadValues({}, base), {
-          gallery: base.gallery || [{
-            id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
-            url: w.content || ""
-          }]
-        })
-      })
+      compile: (w, base) => {
+        let gallery = base.gallery;
+        if ((!gallery || gallery.length === 0) && w.children && w.children.length > 0) {
+          gallery = w.children.filter((c) => c.type === "image").map((c) => ({
+            id: c.imageId ? parseInt(c.imageId, 10) : "",
+            url: c.content || ""
+          }));
+        }
+        return {
+          widgetType: "gallery",
+          settings: __spreadProps(__spreadValues({}, base), {
+            gallery: gallery || [{
+              id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
+              url: w.content || ""
+            }]
+          })
+        };
+      }
     },
     {
       key: "nav-menu",
@@ -1449,6 +1511,9 @@ ${refText}` });
     normalizeSelectedIcon(icon, imageId, fallback = { value: "fas fa-star", library: "fa-solid" }) {
       var _a;
       if (!icon) return __spreadValues({}, fallback);
+      if (icon.value && icon.library === "svg" && typeof icon.value === "object" && icon.value.url) {
+        return icon;
+      }
       const rawValue = icon.value || icon.url || icon.icon || icon;
       const normalized = __spreadProps(__spreadValues(__spreadValues({}, fallback), icon), { value: rawValue });
       if (this.looksLikeIconUrl(rawValue)) {
@@ -1585,7 +1650,7 @@ ${refText}` });
           break;
         case "icon":
           widgetType = "icon";
-          settings.selected_icon = this.normalizeSelectedIcon(((_k = widget.styles) == null ? void 0 : _k.selected_icon) || baseSettings.selected_icon || widget.content, widget.imageId);
+          settings.selected_icon = ((_k = widget.styles) == null ? void 0 : _k.selected_icon) || baseSettings.selected_icon || widget.content;
           break;
         case "custom":
         default:
@@ -2107,7 +2172,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       if (lineCount > 3) return null;
       return {
         patternId: "typography.heading",
-        widget: "structure:heading",
+        widget: "w:heading",
         confidence: 0.85
       };
     }
@@ -2127,7 +2192,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       if (lineCount < 2) return null;
       return {
         patternId: "typography.paragraph",
-        widget: "structure:paragraph",
+        widget: "w:text",
         confidence: 0.8
       };
     }
@@ -2818,11 +2883,21 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             visible: true
           }];
         }
+        let content = analysis.text;
+        if (!content) {
+          const isTechnicalName = node.name.includes(":") || node.name.startsWith("w-") || node.name.startsWith("Frame ") || node.name.startsWith("Group ");
+          if (!isTechnicalName) {
+            content = node.name;
+          } else {
+            content = widgetType === "heading" ? "Heading" : widgetType === "button" ? "Button" : widgetType === "text" ? "Text Block" : "";
+          }
+        }
         return {
           type: widgetType,
-          content: analysis.text || node.name,
+          content,
           imageId: analysis.iconId,
-          styles: mergedStyles
+          styles: mergedStyles,
+          children: analysis.childWidgets
         };
       }
     } catch (error) {
@@ -3128,6 +3203,14 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const childWidgets = [];
     console.log("[WIDGET STRUCTURE] Analyzing", widgetType, ":", node.name);
     console.log("[WIDGET STRUCTURE] Children count:", children.length);
+    if (node.type === "TEXT") {
+      text = node.characters || node.name || "";
+      textStyles = extractWidgetStyles(node);
+      console.log("[WIDGET STRUCTURE] Node is TEXT. Content:", text);
+    } else if (isImageFill(node) || node.type === "IMAGE" || node.type === "VECTOR") {
+      iconId = node.id;
+      console.log("[WIDGET STRUCTURE] Node is IMAGE/VECTOR. ID:", iconId);
+    }
     children.forEach((child) => {
       const detectedWidget = detectWidget(child);
       if (detectedWidget) {
@@ -3137,12 +3220,12 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         if (!text) {
           text = child.characters || child.name || "";
           textStyles = extractWidgetStyles(child);
-          console.log("[WIDGET STRUCTURE] Found text:", text);
+          console.log("[WIDGET STRUCTURE] Found text child:", text);
         }
       } else if (isImageFill(child) || child.type === "IMAGE" || child.type === "VECTOR") {
         if (!iconId) {
           iconId = child.id;
-          console.log("[WIDGET STRUCTURE] Found image/icon ID:", iconId);
+          console.log("[WIDGET STRUCTURE] Found image/icon child ID:", iconId);
         }
       }
     });

@@ -222,6 +222,11 @@ export class ElementorCompiler {
     ): { value: any; library: string } {
         if (!icon) return { ...fallback };
 
+        // Safety check: if icon is already a normalized SVG object, return it to prevent double nesting
+        if (icon.value && icon.library === 'svg' && typeof icon.value === 'object' && icon.value.url) {
+            return icon;
+        }
+
         const rawValue = icon.value || icon.url || icon.icon || icon;
         const normalized: any = { ...fallback, ...icon, value: rawValue };
 
@@ -387,7 +392,8 @@ export class ElementorCompiler {
                 break;
             case 'icon':
                 widgetType = 'icon';
-                settings.selected_icon = this.normalizeSelectedIcon(widget.styles?.selected_icon || baseSettings.selected_icon || widget.content, widget.imageId);
+                // Don't normalize here, let normalizeIconSettings handle it at the end
+                settings.selected_icon = widget.styles?.selected_icon || baseSettings.selected_icon || widget.content;
                 break;
             case 'custom':
             default:

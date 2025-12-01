@@ -21,7 +21,7 @@ export const HEADING_GENERIC: Heuristic = {
 
         return {
             patternId: "typography.heading",
-            widget: "structure:heading",
+            widget: "w:heading",
             confidence: 0.85,
         };
     },
@@ -44,7 +44,7 @@ export const PARAGRAPH_GENERIC: Heuristic = {
 
         return {
             patternId: "typography.paragraph",
-            widget: "structure:paragraph",
+            widget: "w:text",
             confidence: 0.8,
         };
     },

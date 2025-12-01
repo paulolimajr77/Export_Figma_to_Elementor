@@ -427,11 +427,31 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 }];
             }
 
+            // Determine content fallback
+            let content = analysis.text;
+            if (!content) {
+                // Only use node.name if it's NOT a technical identifier
+                const isTechnicalName = node.name.includes(':') ||
+                    node.name.startsWith('w-') ||
+                    node.name.startsWith('Frame ') ||
+                    node.name.startsWith('Group ');
+
+                if (!isTechnicalName) {
+                    content = node.name;
+                } else {
+                    // Generic fallback based on type
+                    content = widgetType === 'heading' ? 'Heading' :
+                        widgetType === 'button' ? 'Button' :
+                            widgetType === 'text' ? 'Text Block' : '';
+                }
+            }
+
             return {
                 type: widgetType,
-                content: analysis.text || node.name,
+                content: content,
                 imageId: analysis.iconId,
-                styles: mergedStyles
+                styles: mergedStyles,
+                children: analysis.childWidgets
             };
         }
     } catch (error) {
@@ -816,7 +836,17 @@ function analyzeWidgetStructure(
     console.log('[WIDGET STRUCTURE] Analyzing', widgetType, ':', node.name);
     console.log('[WIDGET STRUCTURE] Children count:', children.length);
 
-    // Process each child to detect widgets
+    // 1. Check if the node ITSELF is content (Leaf Node)
+    if (node.type === 'TEXT') {
+        text = node.characters || node.name || '';
+        textStyles = extractWidgetStyles(node);
+        console.log('[WIDGET STRUCTURE] Node is TEXT. Content:', text);
+    } else if (isImageFill(node) || node.type === 'IMAGE' || node.type === 'VECTOR') {
+        iconId = node.id; // Use own ID if it's an image
+        console.log('[WIDGET STRUCTURE] Node is IMAGE/VECTOR. ID:', iconId);
+    }
+
+    // 2. Process children (Container/Frame)
     children.forEach((child: SerializedNode) => {
         // Try to detect widget from child
         const detectedWidget = detectWidget(child);
@@ -825,17 +855,17 @@ function analyzeWidgetStructure(
             console.log('[WIDGET STRUCTURE] Detected child widget:', detectedWidget.type, 'from', child.name);
             childWidgets.push(detectedWidget);
         } else if (child.type === 'TEXT') {
-            // Direct text node
-            if (!text) {  // Use first text as fallback
+            // Direct text node child (only if we haven't found text yet or if it's a container)
+            if (!text) {
                 text = child.characters || child.name || '';
                 textStyles = extractWidgetStyles(child);
-                console.log('[WIDGET STRUCTURE] Found text:', text);
+                console.log('[WIDGET STRUCTURE] Found text child:', text);
             }
         } else if (isImageFill(child) || child.type === 'IMAGE' || child.type === 'VECTOR') {
-            // Direct image/icon node
-            if (!iconId) {  // Use first image as fallback
+            // Direct image/icon node child
+            if (!iconId) {
                 iconId = child.id;
-                console.log('[WIDGET STRUCTURE] Found image/icon ID:', iconId);
+                console.log('[WIDGET STRUCTURE] Found image/icon child ID:', iconId);
             }
         }
     });

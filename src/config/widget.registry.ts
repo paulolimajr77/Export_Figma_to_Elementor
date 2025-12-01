@@ -343,7 +343,23 @@ const registry: WidgetDefinition[] = [
         widgetType: 'image-carousel',
         family: 'media',
         compile: (w, base) => {
-            const slides = (base as any).slides as any[];
+            let slides = (base as any).slides as any[];
+
+            // Fallback: use children if no slides in settings
+            if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+                slides = w.children
+                    .filter(c => c.type === 'image')
+                    .map((c, i) => ({
+                        _id: `slide_${i + 1}`,
+                        id: c.imageId ? parseInt(c.imageId, 10) : '',
+                        url: c.content || '',
+                        image: {
+                            url: c.content || '',
+                            id: c.imageId ? parseInt(c.imageId, 10) : ''
+                        }
+                    }));
+            }
+
             const fallbackSlide = {
                 id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
                 url: w.content || '',
@@ -381,23 +397,52 @@ const registry: WidgetDefinition[] = [
         key: 'basic-gallery',
         widgetType: 'basic-gallery',
         family: 'media',
-        compile: (w, base) => ({
-            widgetType: 'basic-gallery',
-            settings: {
-                ...base,
-                gallery: base.gallery || [{
-                    id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
-                    url: w.content || ''
-                } as any]
+        compile: (w, base) => {
+            let gallery = base.gallery as any[];
+
+            if ((!gallery || gallery.length === 0) && w.children && w.children.length > 0) {
+                gallery = w.children
+                    .filter(c => c.type === 'image')
+                    .map(c => ({
+                        id: c.imageId ? parseInt(c.imageId, 10) : '',
+                        url: c.content || ''
+                    }));
             }
-        })
+
+            return {
+                widgetType: 'basic-gallery',
+                settings: {
+                    ...base,
+                    gallery: gallery || [{
+                        id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
+                        url: w.content || ''
+                    } as any]
+                }
+            };
+        }
     },
     {
         key: 'media:carousel',
         widgetType: 'image-carousel',
         family: 'media',
         compile: (w, base) => {
-            const slides = (base as any).slides as any[];
+            let slides = (base as any).slides as any[];
+
+            // Fallback: use children if no slides in settings
+            if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+                slides = w.children
+                    .filter(c => c.type === 'image')
+                    .map((c, i) => ({
+                        _id: `slide_${i + 1}`,
+                        id: c.imageId ? parseInt(c.imageId, 10) : '',
+                        url: c.content || '',
+                        image: {
+                            url: c.content || '',
+                            id: c.imageId ? parseInt(c.imageId, 10) : ''
+                        }
+                    }));
+            }
+
             const fallbackSlide = {
                 id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
                 url: w.content || '',
@@ -436,13 +481,30 @@ const registry: WidgetDefinition[] = [
         widgetType: 'image-carousel',
         family: 'media',
         compile: (w, base) => {
-            const slides = (base as any).slides as any[];
+            let slides = (base as any).slides as any[];
+
+            // Fallback: use children if no slides in settings
+            if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+                slides = w.children
+                    .filter(c => c.type === 'image')
+                    .map((c, i) => ({
+                        _id: `slide_${i + 1}`,
+                        id: c.imageId ? parseInt(c.imageId, 10) : '',
+                        url: c.content || '',
+                        image: {
+                            url: c.content || '',
+                            id: c.imageId ? parseInt(c.imageId, 10) : ''
+                        }
+                    }));
+            }
+
             const fallbackSlide = {
                 id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
                 url: w.content || '',
                 image: { url: w.content || '', id: w.imageId || '' },
                 _id: 'slide1'
             };
+
             const normalizedSlides = Array.isArray(slides) && slides.length > 0
                 ? slides.map((s, i) => ({
                     _id: s._id || `slide_${i + 1}`,
@@ -461,6 +523,7 @@ const registry: WidgetDefinition[] = [
                     })()
                 }))
                 : [fallbackSlide];
+
             return {
                 widgetType: 'image-carousel',
                 settings: {
@@ -475,7 +538,23 @@ const registry: WidgetDefinition[] = [
         widgetType: 'image-carousel',
         family: 'media',
         compile: (w, base) => {
-            const slides = (base as any).slides as any[];
+            let slides = (base as any).slides as any[];
+
+            // Fallback: use children if no slides in settings
+            if ((!slides || slides.length === 0) && w.children && w.children.length > 0) {
+                slides = w.children
+                    .filter(c => c.type === 'image')
+                    .map((c, i) => ({
+                        _id: `slide_${i + 1}`,
+                        id: c.imageId ? parseInt(c.imageId, 10) : '',
+                        url: c.content || '',
+                        image: {
+                            url: c.content || '',
+                            id: c.imageId ? parseInt(c.imageId, 10) : ''
+                        }
+                    }));
+            }
+
             const fallbackSlide = {
                 id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
                 url: w.content || '',
@@ -513,16 +592,29 @@ const registry: WidgetDefinition[] = [
         key: 'gallery',
         widgetType: 'gallery',
         family: 'media',
-        compile: (w, base) => ({
-            widgetType: 'gallery',
-            settings: {
-                ...base,
-                gallery: base.gallery || [{
-                    id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
-                    url: w.content || ''
-                } as any]
+        compile: (w, base) => {
+            let gallery = base.gallery as any[];
+
+            if ((!gallery || gallery.length === 0) && w.children && w.children.length > 0) {
+                gallery = w.children
+                    .filter(c => c.type === 'image')
+                    .map(c => ({
+                        id: c.imageId ? parseInt(c.imageId, 10) : '',
+                        url: c.content || ''
+                    }));
             }
-        })
+
+            return {
+                widgetType: 'gallery',
+                settings: {
+                    ...base,
+                    gallery: gallery || [{
+                        id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : '',
+                        url: w.content || ''
+                    } as any]
+                }
+            };
+        }
     },
     {
         key: 'nav-menu',
