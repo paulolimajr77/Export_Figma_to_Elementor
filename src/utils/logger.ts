@@ -3,14 +3,21 @@
  * 
  * Writes all console.log messages to a file for easier debugging and test analysis.
  * Usage: Replace console.log with logger.log() throughout the codebase.
+/**
+ * File Logger for Figma Plugin
+ * 
+ * Writes all console.log messages to a file for easier debugging and test analysis.
+ * Usage: Replace console.log with logger.log() throughout the codebase.
  */
 
 class FileLogger {
     private logs: string[] = [];
     private sessionStart: string;
     private maxLogs: number = 1000; // Prevent memory issues
+    private originalLog: (...args: any[]) => void;
 
-    constructor() {
+    constructor(originalConsoleLog?: (...args: any[]) => void) {
+        this.originalLog = originalConsoleLog || console.log.bind(console);
         this.sessionStart = new Date().toISOString();
         this.log('='.repeat(80));
         this.log(`[SESSION START] ${this.sessionStart}`);
@@ -43,8 +50,8 @@ class FileLogger {
             this.logs.shift();
         }
 
-        // Also log to console for immediate feedback
-        console.log(...args);
+        // Also log to original console for immediate feedback (NO RECURSION)
+        this.originalLog(...args);
     }
 
     /**
@@ -98,8 +105,6 @@ class FileLogger {
     }
 }
 
-// Create global logger instance
-export const logger = new FileLogger();
-
-// Export for use in code.ts
-export default logger;
+// Export for use in code.ts - will be initialized there with originalConsoleLog
+export { FileLogger };
+export let logger: FileLogger;

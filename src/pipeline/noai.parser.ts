@@ -5,6 +5,7 @@ import { extractWidgetStyles, extractContainerStyles, buildHtmlFromSegments } fr
 import { evaluateNode, DEFAULT_HEURISTICS } from '../heuristics';
 import type { NodeSnapshot } from '../heuristics/types';
 import type { PipelineSchema, PipelineContainer, PipelineWidget } from '../types/pipeline.schema';
+import { logger } from '../utils/logger';
 
 type MaybeWidget = PipelineWidget | null;
 
@@ -402,6 +403,13 @@ function detectWidget(node: SerializedNode): MaybeWidget {
             const widgetType = best.widget.replace(/^w:/, '');
             const analysis = analyzeWidgetStructure(node, widgetType);
 
+            // **NEW: If this is a container/section with child widgets, return null**
+            // This allows toContainer to process it properly with hierarchy
+            if ((widgetType === 'section' || widgetType === 'container') && analysis.childWidgets.length > 0) {
+                console.log('[HEURISTICS] Container with', analysis.childWidgets.length, 'child widgets - delegating to toContainer');
+                return null;  // Let toContainer handle it
+            }
+
             // Merge all styles
             const mergedStyles = {
                 ...styles,
@@ -796,39 +804,69 @@ function analyzeWidgetStructure(
     iconId: string | null;
     textStyles: Record<string, any>;
     containerStyles: Record<string, any>;
+    childWidgets: PipelineWidget[];  // NEW: Detected child widgets
 } {
     const children = (node as any).children || [];
     let text = '';
     let iconId: string | null = null;
     let textStyles: Record<string, any> = {};
     let containerStyles: Record<string, any> = {};
+    const childWidgets: PipelineWidget[] = [];  // NEW: Store detected widgets
 
     console.log('[WIDGET STRUCTURE] Analyzing', widgetType, ':', node.name);
     console.log('[WIDGET STRUCTURE] Children count:', children.length);
 
-    // Find text child
-    const textChild = children.find((c: SerializedNode) =>
-        c.type === 'TEXT' ||
-        c.name?.toLowerCase().includes('heading') ||
-        c.name?.toLowerCase().includes('text')
-    );
+    // Process each child to detect widgets
+    children.forEach((child: SerializedNode) => {
+        // Try to detect widget from child
+        const detectedWidget = detectWidget(child);
 
-    if (textChild) {
-        text = textChild.characters || textChild.name || '';
-        textStyles = extractWidgetStyles(textChild);
-        console.log('[WIDGET STRUCTURE] Found text:', text);
-    }
+        if (detectedWidget) {
+            console.log('[WIDGET STRUCTURE] Detected child widget:', detectedWidget.type, 'from', child.name);
+            childWidgets.push(detectedWidget);
+        } else if (child.type === 'TEXT') {
+            // Direct text node
+            if (!text) {  // Use first text as fallback
+                text = child.characters || child.name || '';
+                textStyles = extractWidgetStyles(child);
+                console.log('[WIDGET STRUCTURE] Found text:', text);
+            }
+        } else if (isImageFill(child) || child.type === 'IMAGE' || child.type === 'VECTOR') {
+            // Direct image/icon node
+            if (!iconId) {  // Use first image as fallback
+                iconId = child.id;
+                console.log('[WIDGET STRUCTURE] Found image/icon ID:', iconId);
+            }
+        }
+    });
 
-    // Find icon/image child
-    iconId = findFirstImageId(node);
-    if (iconId) {
-        console.log('[WIDGET STRUCTURE] Found image/icon ID:', iconId);
+    // If no child widgets detected, fallback to old behavior (find first text/image)
+    if (childWidgets.length === 0) {
+        if (!text) {
+            const textChild = children.find((c: SerializedNode) =>
+                c.type === 'TEXT' ||
+                c.name?.toLowerCase().includes('heading') ||
+                c.name?.toLowerCase().includes('text')
+            );
+            if (textChild) {
+                text = textChild.characters || textChild.name || '';
+                textStyles = extractWidgetStyles(textChild);
+                console.log('[WIDGET STRUCTURE] Fallback: Found text:', text);
+            }
+        }
+
+        if (!iconId) {
+            iconId = findFirstImageId(node);
+            if (iconId) {
+                console.log('[WIDGET STRUCTURE] Fallback: Found image/icon ID:', iconId);
+            }
+        }
     }
 
     // Extract container styles
     containerStyles = extractContainerStyles(node);
 
-    return { text, iconId, textStyles, containerStyles };
+    return { text, iconId, textStyles, containerStyles, childWidgets };
 }
 
 export function analyzeTreeWithHeuristics(tree: SerializedNode): SerializedNode {

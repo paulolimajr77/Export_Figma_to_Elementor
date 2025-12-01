@@ -698,7 +698,16 @@
           <div class="row">
             <button id="btn_download" class="btn secondary" data-action="download-json">Baixar JSON</button>
             <button id="btn_reset" class="btn secondary" data-action="reset">Reiniciar</button>
+            <button onclick="parent.postMessage({ pluginMessage: { type: 'save-logs' } }, '*')"
+              style="background: #0c7bff; color: white; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; cursor: pointer;">
+              💾 Salvar Logs
+            </button>
+            <button onclick="parent.postMessage({ pluginMessage: { type: 'clear-logs' } }, '*')"
+              style="background: #ff4444; color: white; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; cursor: pointer;">
+              🗑️ Limpar Logs
+            </button>
           </div>
+
         </div>
         <div class="card">
           <div class="card-title">Sa&#237;da / Logs</div>
@@ -860,6 +869,10 @@
       const btnCopyManual = document.getElementById('copy-manual');
       let lastPayload = '';
       let fullPayload = '';
+
+
+
+
 
       const fields = {
         use_ai: document.getElementById('use_ai'),
@@ -1146,7 +1159,7 @@
         });
       }
 
-            async function convertToWebP(uint8Array, originalMime) {
+      async function convertToWebP(uint8Array, originalMime) {
         const blob = new Blob([new Uint8Array(uint8Array)], { type: originalMime });
         const url = URL.createObjectURL(blob);
         const img = new Image();

@@ -9,7 +9,18 @@ import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
 import { createNodeSnapshot } from './heuristics/adapter';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
-import { logger } from './utils/logger';
+import { FileLogger } from './utils/logger';
+
+// Save original console.log BEFORE any modifications
+const originalConsoleLog = console.log.bind(console);
+
+// Initialize logger with original console.log
+export const logger = new FileLogger(originalConsoleLog);
+
+// Override console.log to route through logger
+console.log = (...args: any[]) => {
+    logger.log(...args);
+};
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 
