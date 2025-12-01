@@ -3542,11 +3542,25 @@ ${JSON.stringify(baseSchema, null, 2)}
               const node = figma.getNodeById(nodeId);
               if (!node) return null;
               let format = preferSvg ? "SVG" : "WEBP";
-              if ("locked" in node && node.locked || hasVectorChildren(node)) {
+              const hasImageChildren = (n) => {
+                if ("fills" in n && Array.isArray(n.fills)) {
+                  if (n.fills.some((f) => f.type === "IMAGE")) return true;
+                }
+                if ("children" in n) {
+                  return n.children.some((c) => hasImageChildren(c));
+                }
+                return false;
+              };
+              if ("locked" in node && node.locked) {
+                if (hasImageChildren(node)) {
+                  format = "WEBP";
+                } else if (hasVectorChildren(node)) {
+                  format = "SVG";
+                } else {
+                  format = "WEBP";
+                }
+              } else if (hasVectorChildren(node)) {
                 format = "SVG";
-              }
-              if (node.type === "IMAGE") {
-                console.warn(`[Pipeline] Tentando exportar n\xF3 do tipo IMAGE depreciado: ${node.name} (${node.id}). Isso pode falhar.`);
               }
               return this.imageUploader.uploadToWordPress(node, format);
             });
@@ -4286,6 +4300,7 @@ ${refText}` });
       function generateElementorJSON(aiPayload, customWP, debug) {
         return __async(this, null, function* () {
           const node = getSelectedNode();
+          log(`[DEBUG] Selected Node: ${node.name} (ID: ${node.id}, Type: ${node.type}, Locked: ${node.locked})`, "info");
           const wpConfig = customWP || (yield loadWPConfig());
           const useAI = typeof (aiPayload == null ? void 0 : aiPayload.useAI) === "boolean" ? aiPayload.useAI : yield loadSetting("gptel_use_ai", true);
           const serialized = serializeNode(node);
@@ -4363,7 +4378,24 @@ ${refText}` });
                     }
                     return false;
                   };
-                  if ("locked" in node && node.locked || hasVectorChildren(node)) {
+                  const hasImageChildren = (n) => {
+                    if ("fills" in n && Array.isArray(n.fills)) {
+                      if (n.fills.some((f) => f.type === "IMAGE")) return true;
+                    }
+                    if ("children" in n) {
+                      return n.children.some((c) => hasImageChildren(c));
+                    }
+                    return false;
+                  };
+                  if ("locked" in node && node.locked) {
+                    if (hasImageChildren(node)) {
+                      format = "WEBP";
+                    } else if (hasVectorChildren(node)) {
+                      format = "SVG";
+                    } else {
+                      format = "WEBP";
+                    }
+                  } else if (hasVectorChildren(node)) {
                     format = "SVG";
                   }
                   const result = yield noaiUploader.uploadToWordPress(node, format);

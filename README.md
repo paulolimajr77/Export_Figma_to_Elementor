@@ -96,6 +96,7 @@ Acoes de exportacao:
 - **Unificação de Estilos:** Lógica de extração de estilos centralizada em `style_utils.ts` para consistência entre modos AI e NO-AI.
 - **Correção de Ícones (w:icon):** Nós do Figma nomeados como `w:icon` e do tipo `IMAGE` agora são corretamente compilados como widgets de ícone no Elementor.
 - **Refatoração do Compiler:** A lógica de compilação de widgets foi movida para o novo arquivo `compiler-utils.ts`.
+- **Fix (Image Export):** Implementada conversão automática de PNG para WebP no cliente (UI) para otimização de upload. Frames bloqueados contendo imagens agora são exportados corretamente como WebP, enquanto frames bloqueados contendo apenas vetores continuam sendo exportados como SVG. Imagens soltas também são convertidas para WebP.
 
 ---
 

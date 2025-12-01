@@ -1,4 +1,4 @@
-import { serializeNode, SerializedNode } from './utils/serialization_utils';
+import { serializeNode, SerializedNode } from './utils/serialization_utils'; // Force re-check
 import { extractWidgetStyles, extractContainerStyles, buildHtmlFromSegments } from './utils/style_utils';
 import { geminiProvider } from './api_gemini';
 import { ElementorCompiler } from './compiler/elementor.compiler';
@@ -357,13 +357,34 @@ ${JSON.stringify(baseSchema, null, 2)}
             const node = figma.getNodeById(nodeId);
             if (!node) return null;
             let format: any = preferSvg ? 'SVG' : 'WEBP';
-            if (('locked' in node && (node as any).locked) || hasVectorChildren(node as SceneNode)) {
+            const hasImageChildren = (n: SceneNode): boolean => {
+                if ('fills' in n && Array.isArray((n as any).fills)) {
+                    if ((n as any).fills.some((f: any) => f.type === 'IMAGE')) return true;
+                }
+                if ('children' in n) {
+                    return n.children.some(c => hasImageChildren(c));
+                }
+                return false;
+            };
+
+            if (('locked' in node && (node as any).locked)) {
+                // Se trancado: prioridade para WebP se tiver imagem, senão SVG se tiver vetor
+                if (hasImageChildren(node as SceneNode)) {
+                    format = 'WEBP';
+                } else if (hasVectorChildren(node as SceneNode)) {
+                    format = 'SVG';
+                } else {
+                    // Trancado mas sem imagem nem vetor (ex: texto puro ou frame vazio)
+                    // Mantém o default (WEBP)
+                    format = 'WEBP';
+                }
+            } else if (hasVectorChildren(node as SceneNode)) {
                 format = 'SVG';
             }
             // Adicionado log para debug de nós do tipo IMAGE
-            if (node.type === 'IMAGE') {
-                console.warn(`[Pipeline] Tentando exportar nó do tipo IMAGE depreciado: ${node.name} (${node.id}). Isso pode falhar.`);
-            }
+            // if (node.type === 'IMAGE') {
+            //    console.warn(`[Pipeline] Tentando exportar nó do tipo IMAGE depreciado: ${node.name} (${node.id}). Isso pode falhar.`);
+            // }
             return this.imageUploader.uploadToWordPress(node as SceneNode, format);
         };
 
@@ -419,7 +440,7 @@ ${JSON.stringify(baseSchema, null, 2)}
                 });
                 await Promise.all(uploads);
             }
-            
+
             // Galerias: preencher imagens com URLs/IDs do WP
             if ((widget.type === 'gallery' || widget.type === 'basic-gallery') && widget.styles?.gallery && Array.isArray(widget.styles.gallery)) {
                 const uploads = widget.styles.gallery.map(async (imageItem: any) => {

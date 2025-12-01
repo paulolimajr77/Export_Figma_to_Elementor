@@ -1146,32 +1146,8 @@
         });
       }
 
-            async function convertToWebP(uint8Array, originalMime) {
-        const blob = new Blob([new Uint8Array(uint8Array)], { type: originalMime });
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = url;
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-
-        return new Promise(resolve => {
-          canvas.toBlob(blob => {
-            URL.revokeObjectURL(url);
-            resolve(blob);
-          }, 'image/webp', 0.85);
-        });
-      }
-
       async function uploadImage(msg) {
-        const { id, name, mimeType, data, needsConversion } = msg;
+        const { id, name, mimeType, data } = msg;
         const url = (fields.wp_url.value || '').replace(/\/$/, '');
         const user = fields.wp_user.value;
         const token = fields.wp_token.value;
@@ -1182,17 +1158,7 @@
         }
 
         try {
-          let blob;
-          addLog('[UI] Uploading image: ' + name + ' needsConversion: ' + needsConversion, 'info');
-          if (needsConversion) {
-            addLog('[UI] Converting to WebP...', 'info');
-            blob = await convertToWebP(data, mimeType);
-            addLog('[UI] Converted blob type: ' + blob.type + ' size: ' + blob.size, 'info');
-          } else {
-            blob = new Blob([new Uint8Array(data)], { type: mimeType });
-            addLog('[UI] Using original blob type: ' + blob.type, 'info');
-          }
-
+          const blob = new Blob([new Uint8Array(data)], { type: mimeType });
           const formData = new FormData();
           formData.append('file', blob, name);
           formData.append('title', name.split('.')[0]);

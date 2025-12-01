@@ -210,6 +210,7 @@ function getSelectedNode(): SceneNode {
 
 async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug?: boolean): Promise<{ elementorJson: ElementorJSON; debugInfo?: any }> {
     const node = getSelectedNode();
+    log(`[DEBUG] Selected Node: ${node.name} (ID: ${node.id}, Type: ${node.type}, Locked: ${node.locked})`, 'info');
     const wpConfig = customWP || await loadWPConfig();
     const useAI = typeof aiPayload?.useAI === 'boolean' ? aiPayload.useAI : await loadSetting<boolean>('gptel_use_ai', true);
     const serialized = serializeNode(node);
@@ -300,7 +301,25 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                         return false;
                     };
 
-                    if (('locked' in node && node.locked) || hasVectorChildren(node as SceneNode)) {
+                    const hasImageChildren = (n: SceneNode): boolean => {
+                        if ('fills' in n && Array.isArray((n as any).fills)) {
+                            if ((n as any).fills.some((f: any) => f.type === 'IMAGE')) return true;
+                        }
+                        if ('children' in n) {
+                            return n.children.some(c => hasImageChildren(c));
+                        }
+                        return false;
+                    };
+
+                    if (('locked' in node && node.locked)) {
+                        if (hasImageChildren(node as SceneNode)) {
+                            format = 'WEBP';
+                        } else if (hasVectorChildren(node as SceneNode)) {
+                            format = 'SVG';
+                        } else {
+                            format = 'WEBP';
+                        }
+                    } else if (hasVectorChildren(node as SceneNode)) {
                         format = 'SVG';
                     }
                     const result = await noaiUploader.uploadToWordPress(node as SceneNode, format as any);
