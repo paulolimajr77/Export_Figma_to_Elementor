@@ -333,26 +333,6 @@
       border-radius: var(--radius);
       padding: 12px;
       font-family: "SFMono-Regular", Consolas, monospace;
-      background: #f5f6f8;
-      resize: vertical;
-      color: var(--color-text);
-    }
-
-    .logs {
-      margin-top: 10px;
-      min-height: 80px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 10px;
-      background: var(--color-panel);
-      font-size: 12px;
-      color: var(--color-text);
-      overflow-y: auto;
-    }
-
-    .status {
-      margin-top: 10px;
-      font-size: 13px;
       color: var(--color-text-secondary);
     }
 
@@ -707,7 +687,7 @@
             <span class="progress-text">Processando pipeline...</span>
           </div>
           <textarea id="output" placeholder="O JSON gerado aparecer&#225; aqui" readonly></textarea>
-          <div id="logs" class="logs"></div>
+          <textarea id="logs" class="logs" readonly placeholder="Logs do sistema..."></textarea>
           <div style="margin-top:12px;">
             <label style="display:block;font-size:12px;margin-bottom:6px;">JSON gerado (selecionamos automaticamente; se
               precisar use Ctrl+C):</label>
@@ -937,252 +917,26 @@
         }
       }
 
+      function send(type, payload) {
+        parent.postMessage({ pluginMessage: { type, payload } }, '*');
+      }
+
       function initTheme(pref) {
-        let stored = null;
-        if (storage) {
-          try { stored = storage.getItem('figtoel-theme'); } catch (_) { stored = null; }
+        if (typeof pref === 'boolean') {
+          applyTheme(pref);
+        } else {
+          const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          applyTheme(sysDark);
         }
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (typeof pref === 'boolean') applyTheme(pref);
-        else applyTheme(stored === 'dark' || (stored === null && prefersDark));
-      }
-
-      if (themeToggle) {
-        themeToggle.addEventListener('change', () => {
-          applyTheme(themeToggle.checked);
-          send('save-setting', { key: 'gptel_dark_mode', value: themeToggle.checked });
-        });
-      }
-
-      function send(type, payload = {}) {
-        parent.postMessage({ pluginMessage: { type, ...payload } }, '*');
-      }
-
-      function addLog(message, level = 'info') {
-        if (!logs) return;
-        const now = new Date();
-        const time = now.toLocaleTimeString('pt-BR', { hour12: false });
-        const div = document.createElement('div');
-        div.textContent = `[${time}] [${level}] ${message}`;
-        logs.appendChild(div);
-        logs.scrollTo(0, logs.scrollHeight);
-      }
-
-      async function copyWithFallback(text, label = 'conte�do') {
-        if (!text) {
-          addLog(`Nenhum ${label} para copiar.`, 'warn');
-          return false;
-        }
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(text);
-            addLog(` ${label} copiado!`, 'info');
-            return true;
-          }
-        } catch (err) {
-          console.warn('Clipboard API falhou:', err);
-        }
-        try {
-          const textarea = document.createElement('textarea');
-          textarea.value = text;
-          textarea.style.position = 'fixed';
-          textarea.style.opacity = '0';
-          document.body.appendChild(textarea);
-          textarea.select();
-          const success = document.execCommand('copy');
-          document.body.removeChild(textarea);
-          if (success) {
-            addLog(` ${label} copiado!`, 'info');
-            return true;
-          }
-        } catch (err) {
-          addLog(` Falha ao copiar. Use Ctrl+C.`, 'error');
-        }
-        return false;
-      }
-
-      function loadStoredSettings(payload) {
-        if (!payload) return;
-        const useAI = payload.useAI;
-        if (fields.use_ai) {
-          const val = typeof useAI === 'boolean' ? useAI : true;
-          fields.use_ai.checked = val;
-          toggleAIFields(val);
-        }
-        if (fields.provider_ai) setProvider(payload.providerAi || 'gemini');
-        if (fields.gemini_api_key) fields.gemini_api_key.value = payload.geminiKey || '';
-        if (fields.gemini_model && payload.geminiModel) {
-          fields.gemini_model.value = payload.geminiModel;
-          addLog(`Modelo carregado: ${payload.geminiModel}`, 'info');
-        }
-        if (fields.gpt_api_key) fields.gpt_api_key.value = payload.gptKey || '';
-        if (fields.gpt_model && payload.gptModel) fields.gpt_model.value = payload.gptModel;
-        if (fields.include_screenshot) fields.include_screenshot.checked = payload.includeScreenshot !== false;
-        if (fields.include_references) fields.include_references.checked = payload.includeReferences !== false;
-        if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
-        if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
-        if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
-        if (fields.wp_export_images) fields.wp_export_images.checked = !!payload.exportImages;
-        if (fields.wp_create_page) fields.wp_create_page.checked = !!payload.autoPage;
-        if (typeof payload.darkMode === 'boolean') applyTheme(payload.darkMode);
-        updateIndicator();
       }
 
       function watchInputs() {
-        const saveText = (key, el) => debounce(() => send('save-setting', { key, value: el.value }));
-        if (fields.use_ai) {
-          fields.use_ai.addEventListener('change', () => {
-            const enabled = fields.use_ai.checked;
-            toggleAIFields(enabled);
-            send('save-setting', { key: 'gptel_use_ai', value: enabled });
-          });
-        }
-        if (fields.provider_ai) {
-          fields.provider_ai.addEventListener('change', () => {
-            setProvider(fields.provider_ai.value);
-            send('save-setting', { key: 'aiProvider', value: fields.provider_ai.value });
-          });
-        }
-        if (fields.gemini_api_key) fields.gemini_api_key.addEventListener('input', saveText('gptel_gemini_key', fields.gemini_api_key));
-        if (fields.gemini_model) {
-          fields.gemini_model.addEventListener('change', () => {
-            send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value });
-            addLog(`Modelo alterado para: ${fields.gemini_model.value}`, 'info');
-          });
-        }
-        if (fields.gpt_api_key) fields.gpt_api_key.addEventListener('input', saveText('gptApiKey', fields.gpt_api_key));
-        if (fields.gpt_model) fields.gpt_model.addEventListener('change', () => send('save-setting', { key: 'gptModel', value: fields.gpt_model.value }));
-        if (fields.include_screenshot) fields.include_screenshot.addEventListener('change', () => send('save-setting', { key: 'gptel_include_screenshot', value: fields.include_screenshot.checked }));
-        if (fields.include_references) fields.include_references.addEventListener('change', () => send('save-setting', { key: 'gptel_include_references', value: fields.include_references.checked }));
-        if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
-        if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
-        if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
-        if (fields.wp_export_images) fields.wp_export_images.addEventListener('change', () => send('save-setting', { key: 'gptel_export_images', value: fields.wp_export_images.checked }));
-        if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
+        // Monitora inputs
       }
 
       function bindActions() {
-        document.querySelectorAll('[data-action]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            if (btn.disabled && ['copy-json', 'download-json', 'export-wp'].includes(btn.getAttribute('data-action') || '')) {
-              return;
-            }
-            const action = btn.getAttribute('data-action');
-            if (fields.gemini_model && fields.gemini_model.value) {
-              send('save-setting', { key: 'gemini_model', value: fields.gemini_model.value });
-            }
-            const payload = {
-              useAI: fields.use_ai?.checked !== false,
-              providerAi: fields.provider_ai?.value || 'gemini',
-              gptModel: fields.gpt_model?.value || '',
-              wpConfig: {
-                url: fields.wp_url?.value || '',
-                user: fields.wp_user?.value || '',
-                token: fields.wp_token?.value || '',
-                exportImages: fields.wp_export_images?.checked || false,
-                autoPage: fields.wp_create_page?.checked || false
-              },
-              apiKey: fields.gemini_api_key?.value || '',
-              gptApiKey: fields.gpt_api_key?.value || '',
-              geminiModel: fields.gemini_model?.value || '',
-              includeScreenshot: fields.include_screenshot?.checked !== false,
-              includeReferences: fields.include_references?.checked !== false
-            };
-            if (payload.geminiModel) {
-              send('save-setting', { key: 'gemini_model', value: payload.geminiModel });
-            }
-            if (payload.gptModel) {
-              send('save-setting', { key: 'gptModel', value: payload.gptModel });
-            }
-            switch (action) {
-              case 'inspect-layout': send('inspect'); break;
-              case 'generate-json':
-                toggleProgress(true);
-                send('generate-json', payload);
-                break;
-              case 'optimize-structure': send('optimize-structure', payload); break;
-              case 'analyze-widgets': send('analyze-widgets', payload); break;
-              case 'copy-json':
-                if (lastPayload) {
-                  copyToClipboard(lastPayload);
-                } else {
-                  send('copy-json');
-                }
-                break;
-              case 'download-json':
-                if (fullPayload || lastPayload) {
-                  downloadPayload(fullPayload || lastPayload);
-                } else {
-                  send('download-json');
-                }
-                break;
-              case 'export-wp': send('export-wp', payload); break;
-              case 'reset':
-                if (output) output.value = '';
-                if (logs) logs.innerHTML = '';
-                if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
-                updateBridgeOutput('', false);
-                updateBridgeOutput('', false);
-                lastPayload = '';
-                fullPayload = '';
-                toggleProgress(false);
-                toggleResultButtons(false);
-                addLog('Sessao reiniciada.', 'info');
-                send('reset');
-                break;
-              case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
-              case 'test-gpt': send('test-gpt', { apiKey: payload.gptApiKey, model: payload.gptModel || fields.gpt_model?.value }); break;
-              case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
-              case 'resize-ui': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
-              default: send(action || 'noop', payload);
-            }
-          });
-        });
-        document.querySelectorAll('[data-rename]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const name = btn.getAttribute('data-rename');
-            send('rename-layer', { name });
-          });
-        });
-      }
-
-      async function uploadImage(msg) {
-        const { id, name, mimeType, data } = msg;
-        const url = (fields.wp_url.value || '').replace(/\/$/, '');
-        const user = fields.wp_user.value;
-        const token = fields.wp_token.value;
-
-        if (!url || !user || !token) {
-          send('upload-image-response', { id, success: false, error: 'Credenciais WP ausentes na UI' });
-          return;
-        }
-
-        try {
-          const blob = new Blob([new Uint8Array(data)], { type: mimeType });
-          const formData = new FormData();
-          formData.append('file', blob, name);
-          formData.append('title', name.split('.')[0]);
-          formData.append('caption', 'Exported via FigToEL');
-
-          const auth = btoa(`${user}:${token}`);
-          const resp = await fetch(`${url}/wp-json/wp/v2/media`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`
-            },
-            body: formData
-          });
-
-          if (!resp.ok) {
-            const errText = await resp.text();
-            throw new Error(`HTTP ${resp.status}: ${errText}`);
-          }
-
-          const json = await resp.json();
-          send('upload-image-response', { id, success: true, url: json.source_url, wpId: json.id });
-
-        } catch (e) {
-          send('upload-image-response', { id, success: false, error: e.message });
+        if (themeToggle) {
+          themeToggle.addEventListener('change', (e) => applyTheme(e.target.checked));
         }
       }
 
@@ -1191,12 +945,9 @@
         if (!msg) return;
         switch (msg.type) {
           case 'preview':
-            // Preview = Figma JSON (readonly) -> #output
             if (output) output.value = msg.payload || '';
             break;
           case 'generation-complete':
-            // Generation = Elementor JSON (editable) -> #figma-json-output
-            // Use pastePayload (elements array) for display/copy, keep payload (full) for download
             lastPayload = msg.pastePayload || msg.payload || '';
             fullPayload = msg.payload || '';
             updateBridgeOutput(lastPayload, true);
@@ -1208,7 +959,7 @@
             const txt = msg.payload || '';
             lastPayload = txt;
             updateBridgeOutput(txt, true);
-            addLog('JSON pronto para copiar. Clique em "Copiar JSON" ou use Ctrl+C.', 'info');
+            addLog('JSON pronto para copiar.', 'info');
             break;
           }
           case 'generation-error':
@@ -1219,7 +970,6 @@
           case 'generation-start':
             toggleProgress(true);
             updateBridgeOutput('', false);
-            // N�o limpamos o #output (Figma JSON) pois o usu�rio pode querer consult�-lo
             toggleResultButtons(false);
             break;
           case 'gemini-status':
@@ -1237,45 +987,61 @@
             const ws = document.getElementById('wp-status');
             if (ws) ws.textContent = msg.message;
             break;
+          case 'save-debug-json':
+            if (msg.name && msg.data) {
+              try {
+                const blob = new Blob([msg.data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = msg.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                addLog(`Debug JSON salvo: ${msg.name}`, 'info');
+              } catch (err) {
+                console.error('[UI] Erro ao salvar debug JSON:', err);
+                addLog('Erro ao salvar debug JSON.', 'error');
+              }
+            }
+            break;
           case 'log':
             if (typeof msg.message === 'string' && msg.message.includes('Iniciando pipeline')) {
               toggleProgress(true);
+              setProvider(fields.provider_ai?.value || 'gemini');
+              toggleAIFields(fields.use_ai?.checked !== false);
+              send('load-settings');
+              setActiveTab('layout');
+              if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
             }
             addLog(msg.message, msg.level);
-            break;
-          case 'load-settings':
-            loadStoredSettings(msg.payload);
-            break;
-          case 'upload-image-request':
-            uploadImage(msg);
             break;
         }
       };
 
-      bindActions();
-      watchInputs();
-      initTheme();
-      setProvider(fields.provider_ai?.value || 'gemini');
-      toggleAIFields(fields.use_ai?.checked !== false);
-      send('load-settings');
-      setActiveTab('layout');
-      if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
+      function addLog(message, level = 'info') {
+        if (!logs) return;
+        const now = new Date();
+        const time = now.toLocaleTimeString('pt-BR', { hour12: false });
+        const line = `[${time}] [${level}] ${message}\n`;
+        logs.value += line;
+        logs.scrollTop = logs.scrollHeight;
+      }
 
       function toggleResultButtons(enabled) {
         if (btnCopy) btnCopy.disabled = !enabled;
         if (btnDownload) btnDownload.disabled = !enabled;
         if (btnExport) btnExport.disabled = !enabled;
       }
-      toggleResultButtons(false);
 
       function toggleProgress(show) {
+        const progress = document.getElementById('progress');
         if (!progress) return;
         if (show) {
           progress.classList.remove('hidden');
-          progress.style.display = 'flex';
         } else {
           progress.classList.add('hidden');
-          progress.style.display = 'none';
         }
       }
 
@@ -1309,22 +1075,7 @@
         }
       }
 
-      const copyToClipboard = (text) => copyWithFallback(text, 'JSON');
-
-      function downloadPayload(text) {
-        const blob = new Blob([text], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'elementor.json';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        addLog('Download iniciado.', 'info');
-      }
-
-      // Resizer handle (drag to resize the plugin window)
+      // Resizer
       const resizer = document.getElementById('resizer-handle');
       if (resizer) {
         let startX = 0, startY = 0, startW = window.innerWidth, startH = window.innerHeight;
@@ -1347,49 +1098,9 @@
           window.addEventListener('mousemove', onMouseMove);
           window.addEventListener('mouseup', onMouseUp);
         });
-        // suporte touch
-        const onTouchMove = (e) => {
-          const t = e.touches[0];
-          if (t) onMove(t.clientX, t.clientY);
-        };
-        const onTouchEnd = () => {
-          window.removeEventListener('touchmove', onTouchMove);
-          window.removeEventListener('touchend', onTouchEnd);
-        };
-        resizer.addEventListener('touchstart', (e) => {
-          const t = e.touches[0];
-          if (!t) return;
-          startX = t.clientX;
-          startY = t.clientY;
-          startW = window.innerWidth;
-          startH = window.innerHeight;
-          window.addEventListener('touchmove', onTouchMove);
-          window.addEventListener('touchend', onTouchEnd);
-        }, { passive: true });
       }
 
-      if (btnCopyManual) {
-        btnCopyManual.addEventListener('click', async () => {
-          const txt = bridgeOutput?.value || lastPayload || '';
-          if (!txt) {
-            addLog('Nenhum JSON gerado para copiar ainda.', 'warn');
-            return;
-          }
-          if (bridgeOutput) {
-            bridgeOutput.focus();
-            bridgeOutput.select();
-          }
-          await copyWithFallback(txt, 'JSON');
-        });
-      }
-
-      if (bridgeOutput) {
-        bridgeOutput.addEventListener('click', () => {
-          bridgeOutput.focus();
-          bridgeOutput.select();
-        });
-      }
-      // Icones SVG otimizados
+      // Icons
       const ICONS = {
         text: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>`,
         image: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
@@ -1416,7 +1127,6 @@
         return ICONS.default;
       }
 
-      // Dados dos widgets para geracao dinamica
       const WIDGET_DATA = {
         'Basicos': [
           'heading', 'text', 'button', 'image', 'icon', 'video', 'divider', 'spacer', 'image-box', 'icon-box',
@@ -1469,7 +1179,6 @@
         const search = filterText.toLowerCase().trim();
         let html = '';
 
-        // Se tiver busca, adiciona header de resultados
         if (search) {
           html += `<div class="search-status">Filtrando por: "<strong>${search}</strong>"</div>`;
         }
@@ -1477,7 +1186,6 @@
         let hasResults = false;
 
         for (const [category, items] of Object.entries(WIDGET_DATA)) {
-          // Filtra itens
           const filteredItems = items.filter(item => {
             if (!search) return true;
             return item.toLowerCase().includes(search);
@@ -1515,10 +1223,12 @@
         container.innerHTML = html;
       }
 
-      // Inicializa a lista
+      // Init
       renderWidgetList();
+      bindActions();
+      watchInputs();
 
-      // Listener de busca
+      // Listeners
       const searchInput = document.getElementById('widget-search');
       if (searchInput) {
         searchInput.addEventListener('input', (e) => {
@@ -1526,7 +1236,6 @@
         });
       }
 
-      // Event delegation para botoes de renomear
       document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-rename]');
         if (btn) {
@@ -1534,6 +1243,28 @@
           send('rename-layer', { name });
         }
       });
+
+      if (btnCopyManual) {
+        btnCopyManual.addEventListener('click', async () => {
+          const txt = bridgeOutput?.value || lastPayload || '';
+          if (!txt) {
+            addLog('Nenhum JSON gerado para copiar ainda.', 'warn');
+            return;
+          }
+          if (bridgeOutput) {
+            bridgeOutput.focus();
+            bridgeOutput.select();
+          }
+          await copyWithFallback(txt, 'JSON');
+        });
+      }
+
+      if (bridgeOutput) {
+        bridgeOutput.addEventListener('click', () => {
+          bridgeOutput.focus();
+          bridgeOutput.select();
+        });
+      }
 
     })();
   </script>
