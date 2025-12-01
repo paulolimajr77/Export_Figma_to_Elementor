@@ -3452,10 +3452,11 @@ ${JSON.stringify(baseSchema, null, 2)}
               styles: __spreadValues({}, base.styles || {})
             });
             if (ai) {
+              merged._aiOptimized = true;
               merged.styles = __spreadProps(__spreadValues(__spreadValues({}, ai.styles || {}), base.styles || {}), {
                 sourceId: ((_b = base.styles) == null ? void 0 : _b.sourceId) || ((_c = ai.styles) == null ? void 0 : _c.sourceId) || base.id
               });
-              if (Array.isArray(ai.widgets) && ai.widgets.length > 0) {
+              if (Array.isArray(ai.widgets)) {
                 merged.widgets = ai.widgets.map((w) => {
                   var _a2, _b2;
                   return __spreadProps(__spreadValues({}, w), {
@@ -3464,6 +3465,10 @@ ${JSON.stringify(baseSchema, null, 2)}
                     })
                   });
                 });
+              }
+              if (Array.isArray(ai.children)) {
+                merged.children = ai.children.map((child) => mergeContainer(child));
+                return merged;
               }
             }
             if (Array.isArray(base.children) && base.children.length > 0) {
@@ -3533,7 +3538,7 @@ ${JSON.stringify(baseSchema, null, 2)}
               return this.imageUploader.uploadToWordPress(node, format);
             });
             const processWidget = (widget) => __async(this, null, function* () {
-              var _a;
+              var _a, _b;
               if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box")) {
                 try {
                   const result = yield uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box");
@@ -3543,7 +3548,11 @@ ${JSON.stringify(baseSchema, null, 2)}
                       widget.styles.image_url = result.url;
                     } else if (widget.type === "icon-box") {
                       if (!widget.styles) widget.styles = {};
-                      widget.styles.selected_icon = { value: result.url, library: "svg" };
+                      widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
+                    } else if (widget.type === "icon") {
+                      widget.content = { value: { id: result.id, url: result.url }, library: "svg" };
+                    } else if (((_a = widget.styles) == null ? void 0 : _a.icon) && widget.type === "icon-list") {
+                      widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
                     } else {
                       widget.content = result.url;
                     }
@@ -3553,7 +3562,7 @@ ${JSON.stringify(baseSchema, null, 2)}
                   console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
                 }
               }
-              if (widget.type === "image-carousel" && ((_a = widget.styles) == null ? void 0 : _a.slides) && Array.isArray(widget.styles.slides)) {
+              if (widget.type === "image-carousel" && ((_b = widget.styles) == null ? void 0 : _b.slides) && Array.isArray(widget.styles.slides)) {
                 const uploads = widget.styles.slides.map((slide, idx) => __async(this, null, function* () {
                   if (!(slide == null ? void 0 : slide.id)) return;
                   try {
@@ -3770,7 +3779,7 @@ ${JSON.stringify(baseSchema, null, 2)}
             c.widgets.forEach((w) => this.normalizeWidget(w));
             if (!Array.isArray(c.children)) c.children = [];
             c.children = c.children.map((child) => walk(child, c)).filter(Boolean);
-            if (node && "children" in node) {
+            if (node && "children" in node && !c._aiOptimized) {
               const collectIds = (container, ids) => {
                 var _a2, _b2;
                 if (container.id) ids.add(container.id);

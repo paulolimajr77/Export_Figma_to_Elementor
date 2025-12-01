@@ -1,0 +1,220 @@
+{
+  "page": {
+    "title": "w:aspect-ratio-container",
+    "tokens": {
+      "primaryColor": "#000000",
+      "secondaryColor": "#FFFFFF"
+    }
+  },
+  "containers": [
+    {
+      "id": "27:92",
+      "direction": "column",
+      "width": "boxed",
+      "styles": {
+        "sourceId": "27:92",
+        "sourceName": "w:aspect-ratio-container",
+        "gap": 0,
+        "minHeight": 607.5,
+        "paddingTop": 96,
+        "paddingRight": 192,
+        "paddingBottom": 96,
+        "paddingLeft": 192,
+        "background": {
+          "color": "rgba(0, 0, 0, 1)"
+        },
+        "justify_content": "flex-start",
+        "align_items": "flex-start",
+        "width": 1536,
+        "_boxedInnerSourceId": "27:93"
+      },
+      "widgets": [
+        {
+          "type": "image-box",
+          "content": "Experience",
+          "imageId": "27:99",
+          "styles": {
+            "sourceId": "27:94",
+            "sourceName": "w:heading",
+            "title_text": "Experience",
+            "description_text": "4 Pilares do Sucesso",
+            "_order": 0
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "27:100",
+          "direction": "column",
+          "width": "boxed",
+          "styles": {
+            "sourceId": "27:100",
+            "sourceName": "w:aspect-ratio-container",
+            "gap": 24,
+            "minHeight": 239.5,
+            "paddingTop": 0,
+            "paddingRight": 0,
+            "paddingBottom": 0,
+            "paddingLeft": 0,
+            "justify_content": "center",
+            "align_items": "flex-start",
+            "background": {
+              "color": "rgba(17, 17, 17, 1)"
+            },
+            "border": {
+              "type": "solid",
+              "width": 1,
+              "color": "rgba(255, 255, 255, 0.05000000074505806)",
+              "radius": 24
+            },
+            "width": 354,
+            "_boxedInnerSourceId": "27:101",
+            "_order": 1
+          },
+          "widgets": [
+            {
+              "type": "icon-box",
+              "content": "Visibilidade",
+              "imageId": "27:104",
+              "styles": {
+                "sourceId": "27:103",
+                "sourceName": "w:icon-box",
+                "title_text": "Visibilidade",
+                "description_text": "Posicione sua marca no radar dos grandes\nplayers globais.",
+                "_order": 0
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "27:113",
+              "direction": "column",
+              "width": "full",
+              "styles": {
+                "sourceId": "27:113",
+                "sourceName": "w:aspect-ratio-container",
+                "gap": 0,
+                "minHeight": 239.5,
+                "paddingTop": 32,
+                "paddingRight": 32,
+                "paddingBottom": 32,
+                "paddingLeft": 32,
+                "background": {
+                  "color": "rgba(17, 17, 17, 1)"
+                },
+                "border": {
+                  "type": "solid",
+                  "width": 1,
+                  "color": "rgba(255, 255, 255, 0.05000000074505806)",
+                  "radius": 24
+                },
+                "justify_content": "flex-start",
+                "align_items": "flex-start",
+                "_order": 1
+              },
+              "widgets": [
+                {
+                  "type": "image-box",
+                  "content": "Lucro",
+                  "imageId": "27:116",
+                  "styles": {
+                    "sourceId": "27:115",
+                    "sourceName": "w:image-box",
+                    "title_text": "Lucro",
+                    "description_text": "Estratégias validadas para multiplicar seu\nfaturamento real.",
+                    "_order": 0
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "27:125",
+              "direction": "column",
+              "width": "full",
+              "styles": {
+                "sourceId": "27:125",
+                "sourceName": "w:aspect-ratio-container",
+                "gap": 0,
+                "minHeight": 239.5,
+                "paddingTop": 32,
+                "paddingRight": 32,
+                "paddingBottom": 32,
+                "paddingLeft": 32,
+                "background": {
+                  "color": "rgba(17, 17, 17, 1)"
+                },
+                "border": {
+                  "type": "solid",
+                  "width": 1,
+                  "color": "rgba(255, 255, 255, 0.05000000074505806)",
+                  "radius": 24
+                },
+                "justify_content": "flex-start",
+                "align_items": "flex-start",
+                "_order": 2
+              },
+              "widgets": [
+                {
+                  "type": "icon-box",
+                  "content": "Networking",
+                  "imageId": "27:128",
+                  "styles": {
+                    "sourceId": "27:127",
+                    "sourceName": "w:icon-box",
+                    "title_text": "Networking",
+                    "description_text": "Conexões de alto nível que abrem portas\ninternacionais.",
+                    "_order": 0
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "27:137",
+              "direction": "column",
+              "width": "full",
+              "styles": {
+                "sourceId": "27:137",
+                "sourceName": "w:aspect-ratio-container",
+                "gap": 0,
+                "minHeight": 239.5,
+                "paddingTop": 32,
+                "paddingRight": 32,
+                "paddingBottom": 32,
+                "paddingLeft": 32,
+                "background": {
+                  "color": "rgba(17, 17, 17, 1)"
+                },
+                "border": {
+                  "type": "solid",
+                  "width": 1,
+                  "color": "rgba(255, 255, 255, 0.05000000074505806)",
+                  "radius": 24
+                },
+                "justify_content": "flex-start",
+                "align_items": "flex-start",
+                "_order": 3
+              },
+              "widgets": [
+                {
+                  "type": "icon-box",
+                  "content": "Execução",
+                  "imageId": "27:140",
+                  "styles": {
+                    "sourceId": "27:139",
+                    "sourceName": "w:icon-box",
+                    "title_text": "Execução",
+                    "description_text": "Saia do campo das ideias para a prática de\nelite.",
+                    "_order": 0
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

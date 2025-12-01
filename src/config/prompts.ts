@@ -11,7 +11,7 @@ REGRAS CRÍTICAS:
 - styles deve incluir sourceId com o id do node original.
 - Modo sem IA: se o usuário desligar IA, siga o mesmo schema usando apenas heurísticas (não invente texto).
 
-- **N�O DUPLIQUE NENHUM NODE**: para cada node Figma de entrada (id ou sourceId), crie no m�ximo UM container ou widget correspondente no schema. Nunca crie dois containers ou widgets diferentes apontando para o mesmo id/sourceId.
+- **N�O DUPLIQUE NENHUM NODE**: para cada node Figma de entrada (id ou sourceId), crie no m�ximo UM container ou widget correspondente no schema. Nunca crie dois containers ou widgets diferentes apontando para o mesmo id/sourceId.
 
 WIDGETS PERMITIDOS (use exatamente estes tipos; se não se encaixar, use "custom"):
 - Básicos: heading, text, button, image, icon, video, divider, spacer, image-box, icon-box, star-rating, counter, progress, tabs, accordion, toggle, alert, social-icons, soundcloud, shortcode, html, menu-anchor, sidebar, read-more, image-carousel, basic-gallery, gallery, icon-list, nav-menu, search-form, google-maps, testimonial, embed, lottie, loop:grid.
@@ -66,9 +66,9 @@ REGRAS CRÍTICAS (NÃO QUEBRE O SCHEMA):
 
 4.  **NÃO DUPLIQUE NENHUM NODE**: para cada container ou widget do SCHEMA BASE (identificado por id e/ou styles.sourceId), mantenha no máximo UMA instância correspondente no schema otimizado. É proibido gerar dois containers/widgets diferentes com o mesmo id ou styles.sourceId.
 5.  **NÃO CRIE NODES NOVOS**: não invente containers ou widgets para nodes que não existam no SCHEMA BASE. Se precisar agrupar logicamente, use apenas estruturas já existentes, sem adicionar novos IDs.
+6.  **NUNCA CONVERTA MÚLTIPLOS BOXES EM LISTA**: É ESTRITAMENTE PROIBIDO converter múltiplos widgets 'icon-box' ou 'image-box' em um único widget 'icon-list'. PRESERVE SEMPRE os widgets individuais.
 
 TRANSFORMAÇÕES DESEJADAS:
--   **Icon List**: Se vir uma lista de containers onde cada um tem um Ícone + Texto -> Converta para widget "icon-list".
 -   **Image Box**: Se vir Container com Imagem + Título + Texto -> Converta para widget "image-box".
 -   **Icon Box**: Se vir Container com Ícone + Título + Texto -> Converta para widget "icon-box".
 -   **Gallery**: Se vir um Grid de Imagens -> Converta para "gallery" ou "basic-gallery".

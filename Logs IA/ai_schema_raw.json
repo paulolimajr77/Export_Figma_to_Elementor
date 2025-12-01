@@ -1,0 +1,112 @@
+{
+  "page": {
+    "title": "w:aspect-ratio-container",
+    "tokens": {
+      "primaryColor": "#000000",
+      "secondaryColor": "#FFFFFF"
+    }
+  },
+  "containers": [
+    {
+      "id": "27:92",
+      "direction": "column",
+      "width": "boxed",
+      "styles": {
+        "sourceId": "27:92",
+        "sourceName": "w:aspect-ratio-container",
+        "gap": 0,
+        "minHeight": 607.5,
+        "paddingTop": 96,
+        "paddingRight": 192,
+        "paddingBottom": 96,
+        "paddingLeft": 192,
+        "background": {
+          "color": "rgba(0, 0, 0, 1)"
+        },
+        "justify_content": "flex-start",
+        "align_items": "flex-start",
+        "width": 1536,
+        "_boxedInnerSourceId": "27:93"
+      },
+      "widgets": [
+        {
+          "type": "image-box",
+          "content": "Experience",
+          "imageId": "27:99",
+          "styles": {
+            "sourceId": "27:94",
+            "sourceName": "w:heading",
+            "title_text": "Experience",
+            "description_text": "4 Pilares do Sucesso",
+            "_order": 0
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "27:100",
+          "direction": "row",
+          "width": "boxed",
+          "styles": {
+            "sourceId": "27:100",
+            "sourceName": "w:aspect-ratio-container",
+            "gap": 24,
+            "minHeight": 239.5,
+            "paddingTop": 0,
+            "paddingRight": 0,
+            "paddingBottom": 0,
+            "paddingLeft": 0,
+            "justify_content": "center",
+            "align_items": "flex-start",
+            "background": {
+              "color": "rgba(17, 17, 17, 1)"
+            },
+            "border": {
+              "type": "solid",
+              "width": 1,
+              "color": "rgba(255, 255, 255, 0.05000000074505806)",
+              "radius": 24
+            },
+            "width": 354,
+            "_boxedInnerSourceId": "27:101",
+            "_order": 1
+          },
+          "widgets": [
+            {
+              "type": "icon-list",
+              "content": "",
+              "styles": {
+                "sourceId": "27:100",
+                "sourceName": "w:icon-list",
+                "_order": 0
+              },
+              "items": [
+                {
+                  "iconImageId": "27:104",
+                  "title": "Visibilidade",
+                  "description": "Posicione sua marca no radar dos grandes\nplayers globais."
+                },
+                {
+                  "iconImageId": "27:116",
+                  "title": "Lucro",
+                  "description": "Estratégias validadas para multiplicar seu\nfaturamento real."
+                },
+                {
+                  "iconImageId": "27:128",
+                  "title": "Networking",
+                  "description": "Conexões de alto nível que abrem portas\ninternacionais."
+                },
+                {
+                  "iconImageId": "27:140",
+                  "title": "Execução",
+                  "description": "Saia do campo das ideias para a prática de\nelite."
+                }
+              ]
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

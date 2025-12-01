@@ -1,53 +1,26 @@
-# Registro de Alterações
-
-## 30/11/2025 - Correção Crítica: Duplicação de Nós
-
-### Problema Identificado
-A função `deduplicateContainers()` em `src/pipeline.ts` estava concatenando widgets e children de containers duplicados, causando elementos duplicados no JSON Elementor final.
-
-### Causa Raiz
-- **Arquivo**: `src/pipeline.ts` (linhas 755-792)
-- **Função**: `deduplicateContainers()`
-- **Comportamento incorreto**: 
-  ```typescript
-  // ANTES - Concatenava duplicados ❌
-  if (c.widgets && c.widgets.length > 0) {
-      existing.widgets = (existing.widgets || []).concat(c.widgets);
-  }
-  if (c.children && c.children.length > 0) {
-      existing.children = (existing.children || []).concat(c.children);
-  }
-  ```
-
-### Correção Implementada
-- **Estratégia**: Preservar apenas a primeira ocorrência de cada container
-- **Mudanças**:
-  1. Removida concatenação de `widgets` e `children`
-  2. Adicionado check de duplicação para containers sem key
-  3. Implementado merge inteligente de `styles` sem duplicar conteúdo
-  4. Preservação da primeira ocorrência completa de cada container
-
-### Arquivos Modificados
-- `src/pipeline.ts` - Refatoração da função `deduplicateContainers()`
-
-### Testes
-- ✅ Compilação bem-sucedida (`npm run build`)
-- ⏳ Aguardando teste com layouts que apresentavam duplicação
-
-### Impacto
-- **Positivo**: Elimina duplicação de elementos no JSON final
-- **Sem breaking changes**: Preserva comportamento correto existente
-- **Performance**: Sem impacto negativo
-
-### Outros Achados
-- **Aba Ajuda**: Verificado que está funcionando corretamente. Todo código necessário presente.
-  - HTML estrutura: `ui.html:813-819`
-  - Dados completos: 152 widgets em 7 categorias
-  - Se não aparecer, recarregar plugin após compilação
-
----
-
-## Alterações Anteriores
-
-- 03/12/2025: O deduplicador agora agrupa containers pelo `styles.sourceId` antes de gerar JSON Elementor
-- 29/11/2025: Correção crítica para frames trancados; lógica de estilos (tipografia, bordas, texto rico) unificadas para modos AI e NO-AI via style_utils.ts
+ # Registro de Alterações e Análises
+ 
+ ## 04/12/2025: Análise do Problema de Duplicação de Nós pela IA
+ 
+ **Problema Identificado:**
+ O pipeline de conversão estava gerando itens duplicados no JSON final do Elementor quando o Agente IA era utilizado.
+ 
+ **Causa Raiz:**
+ A análise dos logs e do `README.md` revelou que a duplicação era causada por uma combinação de fatores:
+ 1.  O Agente IA, em seu processo de geração do schema intermediário, criava representações duplicadas para um mesmo nó do Figma.
+ 2.  A etapa de "resgate de nós faltantes", que visa garantir que nenhum nó seja ignorado, acabava reintroduzindo nós que já haviam sido processados (e duplicados) pela IA.
+ 
+ **Solução Implementada (conforme histórico):**
+ O problema foi endereçado através de múltiplas atualizações na função `deduplicateContainers()` e no pipeline:
+ - A função foi refatorada para preservar apenas a primeira ocorrência de cada container, baseando-se no `styles.sourceId` para uma identificação mais precisa.
+ - A execução da deduplicação foi movida para *após* a etapa de resgate de nós, garantindo a remoção final de todas as duplicatas antes da compilação do JSON do Elementor.
+ 
+ ## 04/12/2025: Correção da Compilação de Ícones
+ 
+ **Problema Identificado:**
+ Nós do Figma do tipo `IMAGE` e nomeados como `w:icon` estavam sendo incorretamente compilados como `containers` vazios no JSON final do Elementor, em vez de `widgets` de ícone.
+ 
+ **Solução Implementada:**
+ - Foi criada a função `compileIconWidget` no novo arquivo `src/compiler-utils.ts` para centralizar e corrigir a lógica de compilação de ícones.
+ - O `Agente Compiler` foi atualizado para usar esta nova função, garantindo que os nós `w:icon` sejam convertidos para a estrutura correta do widget de ícone do Elementor, incluindo o objeto `selected_icon` com a URL do SVG e a `library` correta.
+ - Esta correção resolve o problema de ícones que não apareciam ou quebravam a estrutura do layout no Elementor.
