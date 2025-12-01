@@ -64,32 +64,65 @@ const registry: WidgetDefinition[] = [
         family: 'action',
         compile: (w, base) => {
             console.log('[REGISTRY DEBUG] Compiling button widget:', w.type);
-            console.log('[REGISTRY DEBUG] Widget data:', JSON.stringify(w, null, 2));
-            console.log('[REGISTRY DEBUG] Base settings:', JSON.stringify(base, null, 2));
 
-            const settings: any = { ...base, text: w.content || 'Button' };
+            const settings: any = {
+                ...base,
+                text: w.content || 'Button',
+                // Default Elementor settings
+                size: 'sm',
+                button_type: '',
+                align: 'center', // Default alignment
+                typography_typography: 'custom'
+            };
 
-            // Background color from fills
+            // 1. Typography Mapping
+            if (w.styles) {
+                if (w.styles.fontName) settings.typography_font_family = w.styles.fontName.family;
+                if (w.styles.fontSize) settings.typography_font_size = { unit: 'px', size: w.styles.fontSize };
+                if (w.styles.fontWeight) settings.typography_font_weight = w.styles.fontWeight;
+                if (w.styles.lineHeight && w.styles.lineHeight.unit !== 'AUTO') {
+                    settings.typography_line_height = {
+                        unit: w.styles.lineHeight.unit === 'PIXELS' ? 'px' : 'em',
+                        size: w.styles.lineHeight.value
+                    };
+                }
+                if (w.styles.textDecoration) {
+                    settings.typography_text_decoration = w.styles.textDecoration.toLowerCase();
+                }
+                if (w.styles.textCase) {
+                    const caseMap: Record<string, string> = { UPPER: 'uppercase', LOWER: 'lowercase', TITLE: 'capitalize' };
+                    if (caseMap[w.styles.textCase]) settings.typography_text_transform = caseMap[w.styles.textCase];
+                }
+
+                // Alignment
+                if (w.styles.textAlignHorizontal) {
+                    const alignMap: Record<string, string> = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'justify' };
+                    if (alignMap[w.styles.textAlignHorizontal]) settings.align = alignMap[w.styles.textAlignHorizontal];
+                }
+            }
+
+            // 2. Colors
+            // Background Color
             if (w.styles?.background) {
                 settings.background_color = w.styles.background.color || w.styles.background;
-                console.log('[REGISTRY DEBUG] Set background from styles.background:', settings.background_color);
             } else if (w.styles?.fills && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
                 const solidFill = w.styles.fills.find((f: any) => f.type === 'SOLID');
                 if (solidFill && solidFill.color) {
                     const { r, g, b } = solidFill.color;
                     const a = solidFill.opacity !== undefined ? solidFill.opacity : 1;
                     settings.background_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
-                    console.log('[REGISTRY DEBUG] Set background from fills:', settings.background_color);
                 }
             }
 
-            // Text color
-            if (base.color) {
+            // Text Color
+            if (w.styles?.color) {
+                const { r, g, b } = w.styles.color;
+                settings.button_text_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
+            } else if (base.color) {
                 settings.button_text_color = base.color;
-                console.log('[REGISTRY DEBUG] Set text color:', settings.button_text_color);
             }
 
-            // Padding
+            // 3. Padding
             if (w.styles?.paddingTop !== undefined || w.styles?.paddingRight !== undefined ||
                 w.styles?.paddingBottom !== undefined || w.styles?.paddingLeft !== undefined) {
                 settings.button_padding = {
@@ -100,11 +133,19 @@ const registry: WidgetDefinition[] = [
                     left: w.styles.paddingLeft || 0,
                     isLinked: false
                 };
-                console.log('[REGISTRY DEBUG] Set padding:', settings.button_padding);
             }
 
-            // Border radius
-            if (w.styles?.cornerRadius !== undefined) {
+            // 4. Border Radius
+            if (w.styles?.border?.radius !== undefined) {
+                settings.border_radius = {
+                    unit: 'px',
+                    top: w.styles.border.radius,
+                    right: w.styles.border.radius,
+                    bottom: w.styles.border.radius,
+                    left: w.styles.border.radius,
+                    isLinked: true
+                };
+            } else if (w.styles?.cornerRadius !== undefined) {
                 settings.border_radius = {
                     unit: 'px',
                     top: w.styles.cornerRadius,
@@ -113,21 +154,18 @@ const registry: WidgetDefinition[] = [
                     left: w.styles.cornerRadius,
                     isLinked: true
                 };
-                console.log('[REGISTRY DEBUG] Set border radius:', settings.border_radius);
             }
 
-            // Icon
+            // 5. Icon
             if (w.imageId) {
                 const imgId = parseInt(w.imageId, 10);
                 settings.selected_icon = {
                     value: isNaN(imgId) ? w.imageId : { url: '', id: imgId },
                     library: isNaN(imgId) ? 'fa-solid' : 'svg'
                 };
-                settings.icon_align = 'right';
-                console.log('[REGISTRY DEBUG] Set icon:', settings.selected_icon);
+                settings.icon_align = 'right'; // Default to right for buttons usually
             }
 
-            console.log('[REGISTRY DEBUG] Final settings:', JSON.stringify(settings, null, 2));
             return { widgetType: 'button', settings };
         }
     },

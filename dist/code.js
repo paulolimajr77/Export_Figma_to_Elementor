@@ -563,28 +563,56 @@ ${refText}` });
       widgetType: "button",
       family: "action",
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
         console.log("[REGISTRY DEBUG] Compiling button widget:", w.type);
-        console.log("[REGISTRY DEBUG] Widget data:", JSON.stringify(w, null, 2));
-        console.log("[REGISTRY DEBUG] Base settings:", JSON.stringify(base, null, 2));
-        const settings = __spreadProps(__spreadValues({}, base), { text: w.content || "Button" });
+        const settings = __spreadProps(__spreadValues({}, base), {
+          text: w.content || "Button",
+          // Default Elementor settings
+          size: "sm",
+          button_type: "",
+          align: "center",
+          // Default alignment
+          typography_typography: "custom"
+        });
+        if (w.styles) {
+          if (w.styles.fontName) settings.typography_font_family = w.styles.fontName.family;
+          if (w.styles.fontSize) settings.typography_font_size = { unit: "px", size: w.styles.fontSize };
+          if (w.styles.fontWeight) settings.typography_font_weight = w.styles.fontWeight;
+          if (w.styles.lineHeight && w.styles.lineHeight.unit !== "AUTO") {
+            settings.typography_line_height = {
+              unit: w.styles.lineHeight.unit === "PIXELS" ? "px" : "em",
+              size: w.styles.lineHeight.value
+            };
+          }
+          if (w.styles.textDecoration) {
+            settings.typography_text_decoration = w.styles.textDecoration.toLowerCase();
+          }
+          if (w.styles.textCase) {
+            const caseMap = { UPPER: "uppercase", LOWER: "lowercase", TITLE: "capitalize" };
+            if (caseMap[w.styles.textCase]) settings.typography_text_transform = caseMap[w.styles.textCase];
+          }
+          if (w.styles.textAlignHorizontal) {
+            const alignMap = { LEFT: "left", CENTER: "center", RIGHT: "right", JUSTIFIED: "justify" };
+            if (alignMap[w.styles.textAlignHorizontal]) settings.align = alignMap[w.styles.textAlignHorizontal];
+          }
+        }
         if ((_a = w.styles) == null ? void 0 : _a.background) {
           settings.background_color = w.styles.background.color || w.styles.background;
-          console.log("[REGISTRY DEBUG] Set background from styles.background:", settings.background_color);
         } else if (((_b = w.styles) == null ? void 0 : _b.fills) && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
           const solidFill = w.styles.fills.find((f) => f.type === "SOLID");
           if (solidFill && solidFill.color) {
             const { r, g, b } = solidFill.color;
             const a = solidFill.opacity !== void 0 ? solidFill.opacity : 1;
             settings.background_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
-            console.log("[REGISTRY DEBUG] Set background from fills:", settings.background_color);
           }
         }
-        if (base.color) {
+        if ((_c = w.styles) == null ? void 0 : _c.color) {
+          const { r, g, b } = w.styles.color;
+          settings.button_text_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
+        } else if (base.color) {
           settings.button_text_color = base.color;
-          console.log("[REGISTRY DEBUG] Set text color:", settings.button_text_color);
         }
-        if (((_c = w.styles) == null ? void 0 : _c.paddingTop) !== void 0 || ((_d = w.styles) == null ? void 0 : _d.paddingRight) !== void 0 || ((_e = w.styles) == null ? void 0 : _e.paddingBottom) !== void 0 || ((_f = w.styles) == null ? void 0 : _f.paddingLeft) !== void 0) {
+        if (((_d = w.styles) == null ? void 0 : _d.paddingTop) !== void 0 || ((_e = w.styles) == null ? void 0 : _e.paddingRight) !== void 0 || ((_f = w.styles) == null ? void 0 : _f.paddingBottom) !== void 0 || ((_g = w.styles) == null ? void 0 : _g.paddingLeft) !== void 0) {
           settings.button_padding = {
             unit: "px",
             top: w.styles.paddingTop || 0,
@@ -593,9 +621,17 @@ ${refText}` });
             left: w.styles.paddingLeft || 0,
             isLinked: false
           };
-          console.log("[REGISTRY DEBUG] Set padding:", settings.button_padding);
         }
-        if (((_g = w.styles) == null ? void 0 : _g.cornerRadius) !== void 0) {
+        if (((_i = (_h = w.styles) == null ? void 0 : _h.border) == null ? void 0 : _i.radius) !== void 0) {
+          settings.border_radius = {
+            unit: "px",
+            top: w.styles.border.radius,
+            right: w.styles.border.radius,
+            bottom: w.styles.border.radius,
+            left: w.styles.border.radius,
+            isLinked: true
+          };
+        } else if (((_j = w.styles) == null ? void 0 : _j.cornerRadius) !== void 0) {
           settings.border_radius = {
             unit: "px",
             top: w.styles.cornerRadius,
@@ -604,7 +640,6 @@ ${refText}` });
             left: w.styles.cornerRadius,
             isLinked: true
           };
-          console.log("[REGISTRY DEBUG] Set border radius:", settings.border_radius);
         }
         if (w.imageId) {
           const imgId = parseInt(w.imageId, 10);
@@ -613,9 +648,7 @@ ${refText}` });
             library: isNaN(imgId) ? "fa-solid" : "svg"
           };
           settings.icon_align = "right";
-          console.log("[REGISTRY DEBUG] Set icon:", settings.selected_icon);
         }
-        console.log("[REGISTRY DEBUG] Final settings:", JSON.stringify(settings, null, 2));
         return { widgetType: "button", settings };
       }
     },

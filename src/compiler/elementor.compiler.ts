@@ -54,7 +54,8 @@ export class ElementorCompiler {
         }
         if (!settings.justify_content) settings.justify_content = 'flex-start';
         if (!settings.align_items) settings.align_items = 'flex-start';
-        // Compatibilidade Elementor: duplicar alinhamentos nas chaves flex_*
+
+        // Ensure standard Elementor flex properties
         settings.flex_justify_content = settings.justify_content;
         settings.flex_align_items = settings.align_items;
 
