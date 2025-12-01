@@ -302,6 +302,167 @@
 
     .input-label {
       display: block;
+      width: 56px;
+      height: 30px;
+    }
+
+    .switch input {
+      display: none;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      cursor: pointer;
+      background: var(--color-border);
+      border-radius: 999px;
+      transition: var(--anim);
+    }
+
+    .slider:before {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 4px;
+      width: 22px;
+      height: 22px;
+      background: var(--color-panel);
+      border-radius: 50%;
+      box-shadow: var(--shadow-1);
+      transition: var(--anim);
+      z-index: 2;
+    }
+
+    .slider .sun,
+    .slider .moon {
+      position: absolute;
+      font-size: 13px;
+      top: 7px;
+      transition: var(--anim);
+    }
+
+    .slider .sun {
+      left: 10px;
+      opacity: 1;
+    }
+
+    .slider .moon {
+      right: 10px;
+      opacity: 0;
+    }
+
+    input:checked+.slider {
+      background: var(--color-primary);
+    }
+
+    input:checked+.slider:before {
+      transform: translateX(26px);
+    }
+
+    input:checked+.slider .sun {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+
+    input:checked+.slider .moon {
+      opacity: 1;
+      transform: translateX(6px);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: var(--space-2);
+      border: none;
+      background: transparent;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      position: relative;
+      transition: color var(--anim), background var(--anim);
+    }
+
+    .tab-btn.active {
+      color: var(--color-primary);
+    }
+
+    .tab-btn:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .tab-indicator {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      width: 25%;
+      background: var(--color-primary);
+      transition: transform var(--anim), width var(--anim);
+    }
+
+    .tab-panels {
+      margin-top: var(--space-2);
+    }
+
+    .tab-panel {
+      display: none;
+      animation: fadeIn var(--anim);
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .card {
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
+      box-shadow: var(--shadow-1);
+    }
+
+    .card-title {
+      font-weight: 700;
+      margin-bottom: var(--space-2);
+      color: var(--color-text);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: var(--space-2);
+    }
+
+    .input-label {
+      display: block;
       margin: var(--space-2) 0 var(--space-1);
       font-weight: 600;
       color: var(--color-text-secondary);
@@ -326,7 +487,8 @@
       color: var(--color-text-secondary);
     }
 
-    #output {
+    #output,
+    #logs {
       width: 100%;
       min-height: 160px;
       border: 1px solid var(--color-border);
@@ -334,6 +496,7 @@
       padding: 12px;
       font-family: "SFMono-Regular", Consolas, monospace;
       color: var(--color-text-secondary);
+      margin-bottom: 8px;
     }
 
     .provider-block {
@@ -416,15 +579,10 @@
       color: #eee;
     }
 
-    body.dark #output {
+    body.dark #output,
+    body.dark #logs {
       background: #242424;
       color: #eee;
-      border-color: var(--color-border);
-    }
-
-    body.dark .logs {
-      background: #242424;
-      color: #bbb;
       border-color: var(--color-border);
     }
 
@@ -512,7 +670,7 @@
       font-size: 13px;
       background: var(--color-panel);
       color: var(--color-text);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3C/svg>");
       background-repeat: no-repeat;
       background-position: 10px center;
     }
@@ -687,7 +845,13 @@
             <span class="progress-text">Processando pipeline...</span>
           </div>
           <textarea id="output" placeholder="O JSON gerado aparecer&#225; aqui" readonly></textarea>
-          <textarea id="logs" class="logs" readonly placeholder="Logs do sistema..."></textarea>
+          <div style="margin-top:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="input-label" style="margin:0;">Logs</label>
+              <button id="btn_download_logs" class="btn tiny secondary">Baixar Logs</button>
+            </div>
+            <textarea id="logs" class="logs" readonly placeholder="Logs do sistema..."></textarea>
+          </div>
           <div style="margin-top:12px;">
             <label style="display:block;font-size:12px;margin-bottom:6px;">JSON gerado (selecionamos automaticamente; se
               precisar use Ctrl+C):</label>
@@ -1263,6 +1427,26 @@
         bridgeOutput.addEventListener('click', () => {
           bridgeOutput.focus();
           bridgeOutput.select();
+        });
+      }
+
+      const btnDownloadLogs = document.getElementById('btn_download_logs');
+      if (btnDownloadLogs) {
+        btnDownloadLogs.addEventListener('click', () => {
+          const content = logs ? logs.value : '';
+          if (!content) {
+            alert('Sem logs para baixar.');
+            return;
+          }
+          const blob = new Blob([content], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `figtoel-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
         });
       }
 
