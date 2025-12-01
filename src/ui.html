@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -830,6 +830,8 @@
       const logs = document.getElementById('logs');
       const btnInspect = document.getElementById('btn_inspect');
       const btnDownload = document.querySelector('[data-action="download-json"]');
+      const btnCopy = document.querySelector('[data-action="copy-json"]');
+      const btnExport = document.querySelector('[data-action="export-wp"]');
 
       document.getElementById('btn_generate').onclick = () => {
         const payload = {
@@ -966,7 +968,7 @@
         logs.scrollTo(0, logs.scrollHeight);
       }
 
-      async function copyWithFallback(text, label = 'conteúdo') {
+      async function copyWithFallback(text, label = 'conteï¿½do') {
         if (!text) {
           addLog(`Nenhum ${label} para copiar.`, 'warn');
           return false;
@@ -1217,7 +1219,7 @@
           case 'generation-start':
             toggleProgress(true);
             updateBridgeOutput('', false);
-            // Não limpamos o #output (Figma JSON) pois o usuário pode querer consultá-lo
+            // Nï¿½o limpamos o #output (Figma JSON) pois o usuï¿½rio pode querer consultï¿½-lo
             toggleResultButtons(false);
             break;
           case 'gemini-status':
