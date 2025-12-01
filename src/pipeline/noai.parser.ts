@@ -681,7 +681,63 @@ function detectWidget(node: SerializedNode): MaybeWidget {
     return null;
 }
 
+/**
+ * Determines if a node is a redundant wrapper that should be flattened.
+ * Criteria:
+ * 1. Is a FRAME, INSTANCE, or GROUP.
+ * 2. Has exactly ONE child.
+ * 3. Is visually transparent (no fills, strokes, effects).
+ * 4. Has no padding (if it's a frame).
+ * 5. Is NOT a marked widget (w:...).
+ */
+function shouldFlattenNode(node: SerializedNode): boolean {
+    // 1. Check type
+    if (node.type !== 'FRAME' && node.type !== 'INSTANCE' && node.type !== 'GROUP') return false;
 
+    // 2. Check name (exclude explicit widgets)
+    const name = (node.name || '').toLowerCase();
+    if (name.startsWith('w:')) return false;
+
+    // 3. Check child count (Safe Mode: Only flatten single-child wrappers)
+    const children = (node as any).children || [];
+    if (children.length !== 1) return false;
+
+    // 4. Check visual properties (Must be invisible)
+    const hasFills = node.fills && node.fills.some((f: any) => f.visible && f.opacity > 0);
+    const hasStrokes = node.strokes && node.strokes.length > 0;
+    const hasEffects = node.effects && node.effects.length > 0;
+    if (hasFills || hasStrokes || hasEffects) return false;
+
+    // 5. Check padding (Must be 0 to preserve layout)
+    const pTop = (node as any).paddingTop || 0;
+    const pRight = (node as any).paddingRight || 0;
+    const pBottom = (node as any).paddingBottom || 0;
+    const pLeft = (node as any).paddingLeft || 0;
+    if (pTop > 0 || pRight > 0 || pBottom > 0 || pLeft > 0) return false;
+
+    return true;
+}
+
+/**
+ * Recursively flattens children that meet the flattening criteria.
+ */
+function flattenChildren(nodes: SerializedNode[], parentX: number = 0, parentY: number = 0): SerializedNode[] {
+    return nodes.reduce((acc: SerializedNode[], node) => {
+        if (shouldFlattenNode(node)) {
+            console.log('[FLATTENING] Flattening redundant node:', node.name, 'ID:', node.id);
+            const children = (node as any).children || [];
+            // Adjust coordinates of children relative to the new parent
+            // Note: For Auto Layout parents, this might be ignored, but good for absolute positioning fallback
+            const flattenedChildren = children.map((c: SerializedNode) => ({
+                ...c,
+                x: (c.x || 0) + (node.x || 0),
+                y: (c.y || 0) + (node.y || 0)
+            }));
+            return acc.concat(flattenChildren(flattenedChildren, parentX, parentY));
+        }
+        return acc.concat([node]);
+    }, []);
+}
 
 function toContainer(node: SerializedNode): PipelineContainer {
     let direction: 'row' | 'column' = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
@@ -733,7 +789,11 @@ function toContainer(node: SerializedNode): PipelineContainer {
         });
     }
 
-    childNodes.forEach((child, idx) => {
+    // **PHASE 3: Smart Flattening**
+    // Pre-process children to remove redundant wrappers
+    const flattenedChildNodes = flattenChildren(childNodes, node.x || 0, node.y || 0);
+
+    flattenedChildNodes.forEach((child, idx) => {
         const w = detectWidget(child);
         const childHasChildren = Array.isArray((child as any).children) && (child as any).children.length > 0;
         const orderMark = idx;

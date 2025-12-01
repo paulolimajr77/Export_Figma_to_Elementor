@@ -579,9 +579,10 @@ ${refText}` });
           if (w.styles.fontSize) settings.typography_font_size = { unit: "px", size: w.styles.fontSize };
           if (w.styles.fontWeight) settings.typography_font_weight = w.styles.fontWeight;
           if (w.styles.lineHeight && w.styles.lineHeight.unit !== "AUTO") {
+            const isPixel = w.styles.lineHeight.unit === "PIXELS";
             settings.typography_line_height = {
-              unit: w.styles.lineHeight.unit === "PIXELS" ? "px" : "em",
-              size: w.styles.lineHeight.value
+              unit: isPixel ? "px" : "em",
+              size: isPixel ? w.styles.lineHeight.value : w.styles.lineHeight.value / 100
             };
           }
           if (w.styles.textDecoration) {
@@ -3122,6 +3123,37 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     }
     return null;
   }
+  function shouldFlattenNode(node) {
+    if (node.type !== "FRAME" && node.type !== "INSTANCE" && node.type !== "GROUP") return false;
+    const name = (node.name || "").toLowerCase();
+    if (name.startsWith("w:")) return false;
+    const children = node.children || [];
+    if (children.length !== 1) return false;
+    const hasFills = node.fills && node.fills.some((f) => f.visible && f.opacity > 0);
+    const hasStrokes = node.strokes && node.strokes.length > 0;
+    const hasEffects = node.effects && node.effects.length > 0;
+    if (hasFills || hasStrokes || hasEffects) return false;
+    const pTop = node.paddingTop || 0;
+    const pRight = node.paddingRight || 0;
+    const pBottom = node.paddingBottom || 0;
+    const pLeft = node.paddingLeft || 0;
+    if (pTop > 0 || pRight > 0 || pBottom > 0 || pLeft > 0) return false;
+    return true;
+  }
+  function flattenChildren(nodes, parentX = 0, parentY = 0) {
+    return nodes.reduce((acc, node) => {
+      if (shouldFlattenNode(node)) {
+        console.log("[FLATTENING] Flattening redundant node:", node.name, "ID:", node.id);
+        const children = node.children || [];
+        const flattenedChildren = children.map((c) => __spreadProps(__spreadValues({}, c), {
+          x: (c.x || 0) + (node.x || 0),
+          y: (c.y || 0) + (node.y || 0)
+        }));
+        return acc.concat(flattenChildren(flattenedChildren, parentX, parentY));
+      }
+      return acc.concat([node]);
+    }, []);
+  }
   function toContainer(node) {
     let direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
     const styles = extractContainerStyles(node);
@@ -3159,7 +3191,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         return (a.x || 0) - (b.x || 0);
       });
     }
-    childNodes.forEach((child, idx) => {
+    const flattenedChildNodes = flattenChildren(childNodes, node.x || 0, node.y || 0);
+    flattenedChildNodes.forEach((child, idx) => {
       const w = detectWidget(child);
       const childHasChildren = Array.isArray(child.children) && child.children.length > 0;
       const orderMark = idx;

@@ -81,9 +81,10 @@ const registry: WidgetDefinition[] = [
                 if (w.styles.fontSize) settings.typography_font_size = { unit: 'px', size: w.styles.fontSize };
                 if (w.styles.fontWeight) settings.typography_font_weight = w.styles.fontWeight;
                 if (w.styles.lineHeight && w.styles.lineHeight.unit !== 'AUTO') {
+                    const isPixel = w.styles.lineHeight.unit === 'PIXELS';
                     settings.typography_line_height = {
-                        unit: w.styles.lineHeight.unit === 'PIXELS' ? 'px' : 'em',
-                        size: w.styles.lineHeight.value
+                        unit: isPixel ? 'px' : 'em',
+                        size: isPixel ? w.styles.lineHeight.value : (w.styles.lineHeight.value / 100)
                     };
                 }
                 if (w.styles.textDecoration) {
