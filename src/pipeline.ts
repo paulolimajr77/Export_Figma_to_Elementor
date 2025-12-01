@@ -177,6 +177,17 @@ export class ConversionPipeline {
         console.log('Generating Base Schema (Algorithm)...');
         const baseSchema = convertToFlexSchema(pre.serializedRoot);
 
+        // 📊 LOG: Base Schema gerado
+        try {
+            figma.ui.postMessage
+
+                ({
+                    type: 'log',
+                    level: 'info',
+                    message: `[DEBUG] Base Schema gerado (${baseSchema.containers.length} containers raiz)`
+                });
+        } catch { /* ignore */ }
+
         // 2. Optimize Schema using AI
         console.log('Optimizing Schema (AI)...');
         const prompt = `${OPTIMIZE_SCHEMA_PROMPT}
@@ -204,7 +215,48 @@ ${JSON.stringify(baseSchema, null, 2)}
 
             // 3. Merge AI schema into base schema, preservando estrutura 1:1
             const aiSchema = response.schema as PipelineSchema;
+
+            // 📊 LOG: AI Schema e Merged Schema
+            try {
+                const aiContainersCount = aiSchema.containers?.length || 0;
+                figma.ui.postMessage({
+                    type: 'log',
+                    level: 'info',
+                    message: `[DEBUG IA] Schema retornado pela IA (${aiContainersCount} containers raiz)`
+                });
+
+                // Salva JSONs para análise
+                figma.ui.postMessage({
+                    type: 'save-debug-json',
+                    name: 'ai_schema_raw.json',
+                    data: JSON.stringify(aiSchema, null, 2)
+                });
+
+                figma.ui.postMessage({
+                    type: 'save-debug-json',
+                    name: 'base_schema.json',
+                    data: JSON.stringify(baseSchema, null, 2)
+                });
+            } catch { /* ignore */ }
+
             const merged = this.mergeSchemas(baseSchema, aiSchema);
+
+            // 📊 LOG: Merged Schema Final
+            try {
+                const mergedContainersCount = merged.containers?.length || 0;
+                figma.ui.postMessage({
+                    type: 'log',
+                    level: 'info',
+                    message: `[DEBUG MERGE] Schema final após merge (${mergedContainersCount} containers raiz)`
+                });
+
+                figma.ui.postMessage({
+                    type: 'save-debug-json',
+                    name: 'merged_schema.json',
+                    data: JSON.stringify(merged, null, 2)
+                });
+            } catch { /* ignore */ }
+
             return merged;
         } catch (error) {
             console.error('AI Optimization failed:', error);
@@ -261,6 +313,9 @@ ${JSON.stringify(baseSchema, null, 2)}
                             sourceId: (w.styles as any)?.sourceId || (w as any).sourceId || (base.styles as any)?.sourceId || base.id
                         }
                     }));
+                    // Se a IA definiu widgets, assumimos que ela substituiu o conteúdo (incluindo filhos)
+                    merged.children = [];
+                    merged._aiOptimized = true;
                 }
             }
 
@@ -666,7 +721,8 @@ ${JSON.stringify(baseSchema, null, 2)}
             c.children = c.children.map(child => walk(child as any, c)).filter(Boolean) as PipelineContainer[];
 
             // Rescue Missing Children (Safety Net for AI omissions)
-            if (node && 'children' in node) {
+            // Skip rescue if container was optimized by AI (it intentionally removed children)
+            if (node && 'children' in node && !c._aiOptimized) {
                 // Recursively collect all IDs present in the current schema subtree
                 const collectIds = (container: PipelineContainer, ids: Set<string>) => {
                     if (container.id) ids.add(container.id);

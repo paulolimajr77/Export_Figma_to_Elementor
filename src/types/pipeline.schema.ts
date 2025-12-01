@@ -20,6 +20,7 @@ export interface PipelineContainer {
     styles: Record<string, any>;
     widgets: PipelineWidget[];
     children: PipelineContainer[];
+    _aiOptimized?: boolean;
 }
 
 export interface PipelineWidget {
