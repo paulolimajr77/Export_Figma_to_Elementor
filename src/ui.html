@@ -1,4 +1,4 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -966,6 +966,39 @@
         logs.scrollTo(0, logs.scrollHeight);
       }
 
+      async function copyWithFallback(text, label = 'conteúdo') {
+        if (!text) {
+          addLog(`Nenhum ${label} para copiar.`, 'warn');
+          return false;
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            addLog(` ${label} copiado!`, 'info');
+            return true;
+          }
+        } catch (err) {
+          console.warn('Clipboard API falhou:', err);
+        }
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          const success = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          if (success) {
+            addLog(` ${label} copiado!`, 'info');
+            return true;
+          }
+        } catch (err) {
+          addLog(` Falha ao copiar. Use Ctrl+C.`, 'error');
+        }
+        return false;
+      }
+
       function loadStoredSettings(payload) {
         if (!payload) return;
         const useAI = payload.useAI;
@@ -1184,7 +1217,7 @@
           case 'generation-start':
             toggleProgress(true);
             updateBridgeOutput('', false);
-            // NÃ£o limpamos o #output (Figma JSON) pois o usuÃ¡rio pode querer consultÃ¡-lo
+            // Não limpamos o #output (Figma JSON) pois o usuário pode querer consultá-lo
             toggleResultButtons(false);
             break;
           case 'gemini-status':
