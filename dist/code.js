@@ -612,7 +612,62 @@ ${refText}` });
           key: "button",
           widgetType: "button",
           family: "action",
-          compile: (w, base) => ({ widgetType: "button", settings: __spreadProps(__spreadValues({}, base), { text: w.content || "Button" }) })
+          compile: (w, base) => {
+            var _a, _b, _c, _d, _e, _f, _g;
+            console.log("[REGISTRY DEBUG] Compiling button widget:", w.type);
+            console.log("[REGISTRY DEBUG] Widget data:", JSON.stringify(w, null, 2));
+            console.log("[REGISTRY DEBUG] Base settings:", JSON.stringify(base, null, 2));
+            const settings = __spreadProps(__spreadValues({}, base), { text: w.content || "Button" });
+            if ((_a = w.styles) == null ? void 0 : _a.background) {
+              settings.background_color = w.styles.background.color || w.styles.background;
+              console.log("[REGISTRY DEBUG] Set background from styles.background:", settings.background_color);
+            } else if (((_b = w.styles) == null ? void 0 : _b.fills) && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
+              const solidFill = w.styles.fills.find((f) => f.type === "SOLID");
+              if (solidFill && solidFill.color) {
+                const { r, g, b } = solidFill.color;
+                const a = solidFill.opacity !== void 0 ? solidFill.opacity : 1;
+                settings.background_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+                console.log("[REGISTRY DEBUG] Set background from fills:", settings.background_color);
+              }
+            }
+            if (base.color) {
+              settings.button_text_color = base.color;
+              console.log("[REGISTRY DEBUG] Set text color:", settings.button_text_color);
+            }
+            if (((_c = w.styles) == null ? void 0 : _c.paddingTop) !== void 0 || ((_d = w.styles) == null ? void 0 : _d.paddingRight) !== void 0 || ((_e = w.styles) == null ? void 0 : _e.paddingBottom) !== void 0 || ((_f = w.styles) == null ? void 0 : _f.paddingLeft) !== void 0) {
+              settings.button_padding = {
+                unit: "px",
+                top: w.styles.paddingTop || 0,
+                right: w.styles.paddingRight || 0,
+                bottom: w.styles.paddingBottom || 0,
+                left: w.styles.paddingLeft || 0,
+                isLinked: false
+              };
+              console.log("[REGISTRY DEBUG] Set padding:", settings.button_padding);
+            }
+            if (((_g = w.styles) == null ? void 0 : _g.cornerRadius) !== void 0) {
+              settings.border_radius = {
+                unit: "px",
+                top: w.styles.cornerRadius,
+                right: w.styles.cornerRadius,
+                bottom: w.styles.cornerRadius,
+                left: w.styles.cornerRadius,
+                isLinked: true
+              };
+              console.log("[REGISTRY DEBUG] Set border radius:", settings.border_radius);
+            }
+            if (w.imageId) {
+              const imgId = parseInt(w.imageId, 10);
+              settings.selected_icon = {
+                value: isNaN(imgId) ? w.imageId : { url: "", id: imgId },
+                library: isNaN(imgId) ? "fa-solid" : "svg"
+              };
+              settings.icon_align = "right";
+              console.log("[REGISTRY DEBUG] Set icon:", settings.selected_icon);
+            }
+            console.log("[REGISTRY DEBUG] Final settings:", JSON.stringify(settings, null, 2));
+            return { widgetType: "button", settings };
+          }
         },
         {
           key: "image",
@@ -1480,7 +1535,7 @@ ${refText}` });
           return normalized;
         }
         compileWidget(widget) {
-          var _a, _b, _c;
+          var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
           const widgetId = generateGUID();
           const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
           Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
@@ -1520,6 +1575,45 @@ ${refText}` });
               widgetType = "button";
               settings.text = widget.content || "Button";
               Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
+              if ((_c = widget.styles) == null ? void 0 : _c.background) {
+                settings.background_color = this.sanitizeColor(widget.styles.background);
+              } else if (((_d = widget.styles) == null ? void 0 : _d.fills) && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
+                const solidFill = widget.styles.fills.find((f) => f.type === "SOLID");
+                if (solidFill) {
+                  settings.background_color = this.sanitizeColor(solidFill.color);
+                }
+              }
+              if (baseSettings.color) {
+                settings.button_text_color = baseSettings.color;
+              }
+              if (((_e = widget.styles) == null ? void 0 : _e.paddingTop) !== void 0 || ((_f = widget.styles) == null ? void 0 : _f.paddingRight) !== void 0 || ((_g = widget.styles) == null ? void 0 : _g.paddingBottom) !== void 0 || ((_h = widget.styles) == null ? void 0 : _h.paddingLeft) !== void 0) {
+                settings.button_padding = {
+                  unit: "px",
+                  top: widget.styles.paddingTop || 0,
+                  right: widget.styles.paddingRight || 0,
+                  bottom: widget.styles.paddingBottom || 0,
+                  left: widget.styles.paddingLeft || 0,
+                  isLinked: false
+                };
+              }
+              if (((_i = widget.styles) == null ? void 0 : _i.cornerRadius) !== void 0) {
+                settings.border_radius = {
+                  unit: "px",
+                  top: widget.styles.cornerRadius,
+                  right: widget.styles.cornerRadius,
+                  bottom: widget.styles.cornerRadius,
+                  left: widget.styles.cornerRadius,
+                  isLinked: true
+                };
+              }
+              if (widget.imageId) {
+                settings.selected_icon = this.normalizeSelectedIcon(
+                  ((_j = widget.styles) == null ? void 0 : _j.selected_icon) || baseSettings.selected_icon || widget.content,
+                  widget.imageId,
+                  { value: "fas fa-arrow-right", library: "fa-solid" }
+                );
+                settings.icon_align = "right";
+              }
               break;
             case "image":
               widgetType = "image";
@@ -1532,7 +1626,7 @@ ${refText}` });
               break;
             case "icon":
               widgetType = "icon";
-              settings.selected_icon = this.normalizeSelectedIcon(((_c = widget.styles) == null ? void 0 : _c.selected_icon) || baseSettings.selected_icon || widget.content, widget.imageId);
+              settings.selected_icon = this.normalizeSelectedIcon(((_k = widget.styles) == null ? void 0 : _k.selected_icon) || baseSettings.selected_icon || widget.content, widget.imageId);
               break;
             case "custom":
             default:
@@ -2077,7 +2171,9 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
   function detectWidget(node) {
     var _a, _b;
     const name = (node.name || "").toLowerCase();
+    console.log("[DETECT WIDGET] Processing node:", node.name, "Type:", node.type, "Name (lowercase):", name);
     if (name.startsWith("c:container") || name.startsWith("w:container")) {
+      console.log("[DETECT WIDGET] Ignoring container:", node.name);
       return null;
     }
     const styles = {
@@ -2106,11 +2202,25 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         };
       }
       if (name.includes("button")) {
+        console.log("[BUTTON DETECT] Found button by name:", node.name);
+        const buttonData = analyzeButtonStructure(node);
+        const containerStyles = extractContainerStyles(node);
+        const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), containerStyles), buttonData.textStyles);
+        console.log("[BUTTON DETECT] Button data:", JSON.stringify(buttonData, null, 2));
+        console.log("[BUTTON DETECT] Merged styles:", JSON.stringify(mergedStyles, null, 2));
+        if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+          mergedStyles.fills = [{
+            type: "SOLID",
+            color: { r: 1, g: 1, b: 1 },
+            opacity: 0,
+            visible: true
+          }];
+        }
         return {
           type: "button",
-          content: boxContent.title || node.name,
-          imageId: null,
-          styles
+          content: buttonData.text || node.name,
+          imageId: buttonData.iconId,
+          styles: mergedStyles
         };
       }
       if (name.includes("video")) return { type: "video", content: "", imageId: null, styles };
@@ -2139,11 +2249,6 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
               imageId: boxContent.imageId || findFirstImageId(node) || null,
               styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
             };
-          }
-          case "button": {
-            const boxContent = extractBoxContent(node);
-            if (!boxContent.title && hasTextDeep(node)) break;
-            return { type: "button", content: boxContent.title || node.name, imageId: null, styles };
           }
           case "star-rating":
             return { type: "star-rating", content: "5", imageId: null, styles };
@@ -2244,7 +2349,23 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       return { type: "image", content: null, imageId: nestedImageId || node.id, styles };
     }
     if (name.includes("button") || name.includes("btn")) {
-      return { type: "button", content: node.name, imageId: null, styles };
+      const boxContent = extractBoxContent(node);
+      const containerStyles = extractContainerStyles(node);
+      const mergedStyles = __spreadValues(__spreadValues({}, styles), containerStyles);
+      if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+        mergedStyles.fills = [{
+          type: "SOLID",
+          color: { r: 1, g: 1, b: 1 },
+          opacity: 0,
+          visible: true
+        }];
+      }
+      return {
+        type: "button",
+        content: boxContent.title || node.name,
+        imageId: boxContent.imageId || null,
+        styles: mergedStyles
+      };
     }
     return null;
   }
@@ -2316,6 +2437,35 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       children: childrenContainers
     };
   }
+  function analyzeButtonStructure(node) {
+    const children = node.children || [];
+    let text = "";
+    let iconId = null;
+    let textStyles = {};
+    console.log("[BUTTON STRUCTURE] Analyzing button:", node.name);
+    console.log("[BUTTON STRUCTURE] Children count:", children.length);
+    const textChild = children.find(
+      (c) => {
+        var _a, _b;
+        return c.type === "TEXT" || ((_a = c.name) == null ? void 0 : _a.toLowerCase().includes("heading")) || ((_b = c.name) == null ? void 0 : _b.toLowerCase().includes("text"));
+      }
+    );
+    if (textChild) {
+      text = textChild.characters || textChild.name || "";
+      textStyles = extractWidgetStyles(textChild);
+      console.log("[BUTTON STRUCTURE] Found text child:", textChild.name, "Text:", text);
+      console.log("[BUTTON STRUCTURE] Text styles:", JSON.stringify(textStyles, null, 2));
+    } else {
+      console.log("[BUTTON STRUCTURE] No text child found");
+    }
+    iconId = findFirstImageId(node);
+    if (iconId) {
+      console.log("[BUTTON STRUCTURE] Found icon ID:", iconId);
+    } else {
+      console.log("[BUTTON STRUCTURE] No icon found");
+    }
+    return { text, iconId, textStyles };
+  }
   function analyzeTreeWithHeuristics(tree) {
     return tree;
   }
@@ -2332,18 +2482,25 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     let imageId = null;
     let title = "";
     let description = "";
+    function findIconDeep(n) {
+      if (isImageFill(n) || n.type === "IMAGE" || n.type === "VECTOR") {
+        return n.id;
+      }
+      if (n.children) {
+        for (const child of n.children) {
+          const found = findIconDeep(child);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
     const imgNode = children.find((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
     if (imgNode) {
       imageId = imgNode.id;
     } else {
       for (const child of children) {
-        if (child.children) {
-          const deepImg = child.children.find((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
-          if (deepImg) {
-            imageId = deepImg.id;
-            break;
-          }
-        }
+        imageId = findIconDeep(child);
+        if (imageId) break;
       }
     }
     const textNodes = [];
@@ -4365,7 +4522,7 @@ ${refText}` });
           const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password && normalizedWP.exportImages);
           const uploadPromises = [];
           const processWidget = (widget) => __async(null, null, function* () {
-            if (uploadEnabled && widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box")) {
+            if (uploadEnabled && widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button")) {
               try {
                 const node = figma.getNodeById(widget.imageId);
                 if (node) {
@@ -4406,6 +4563,10 @@ ${refText}` });
                     } else if (widget.type === "icon-box") {
                       if (!widget.styles) widget.styles = {};
                       widget.styles.selected_icon = { value: result.url, library: "svg" };
+                    } else if (widget.type === "button") {
+                      if (!widget.styles) widget.styles = {};
+                      widget.styles.selected_icon = { value: result.url, library: "svg" };
+                      console.log("[BUTTON UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
                     } else {
                       widget.content = result.url;
                     }

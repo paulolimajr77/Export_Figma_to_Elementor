@@ -62,7 +62,74 @@ const registry: WidgetDefinition[] = [
         key: 'button',
         widgetType: 'button',
         family: 'action',
-        compile: (w, base) => ({ widgetType: 'button', settings: { ...base, text: w.content || 'Button' } })
+        compile: (w, base) => {
+            console.log('[REGISTRY DEBUG] Compiling button widget:', w.type);
+            console.log('[REGISTRY DEBUG] Widget data:', JSON.stringify(w, null, 2));
+            console.log('[REGISTRY DEBUG] Base settings:', JSON.stringify(base, null, 2));
+
+            const settings: any = { ...base, text: w.content || 'Button' };
+
+            // Background color from fills
+            if (w.styles?.background) {
+                settings.background_color = w.styles.background.color || w.styles.background;
+                console.log('[REGISTRY DEBUG] Set background from styles.background:', settings.background_color);
+            } else if (w.styles?.fills && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
+                const solidFill = w.styles.fills.find((f: any) => f.type === 'SOLID');
+                if (solidFill && solidFill.color) {
+                    const { r, g, b } = solidFill.color;
+                    const a = solidFill.opacity !== undefined ? solidFill.opacity : 1;
+                    settings.background_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+                    console.log('[REGISTRY DEBUG] Set background from fills:', settings.background_color);
+                }
+            }
+
+            // Text color
+            if (base.color) {
+                settings.button_text_color = base.color;
+                console.log('[REGISTRY DEBUG] Set text color:', settings.button_text_color);
+            }
+
+            // Padding
+            if (w.styles?.paddingTop !== undefined || w.styles?.paddingRight !== undefined ||
+                w.styles?.paddingBottom !== undefined || w.styles?.paddingLeft !== undefined) {
+                settings.button_padding = {
+                    unit: 'px',
+                    top: w.styles.paddingTop || 0,
+                    right: w.styles.paddingRight || 0,
+                    bottom: w.styles.paddingBottom || 0,
+                    left: w.styles.paddingLeft || 0,
+                    isLinked: false
+                };
+                console.log('[REGISTRY DEBUG] Set padding:', settings.button_padding);
+            }
+
+            // Border radius
+            if (w.styles?.cornerRadius !== undefined) {
+                settings.border_radius = {
+                    unit: 'px',
+                    top: w.styles.cornerRadius,
+                    right: w.styles.cornerRadius,
+                    bottom: w.styles.cornerRadius,
+                    left: w.styles.cornerRadius,
+                    isLinked: true
+                };
+                console.log('[REGISTRY DEBUG] Set border radius:', settings.border_radius);
+            }
+
+            // Icon
+            if (w.imageId) {
+                const imgId = parseInt(w.imageId, 10);
+                settings.selected_icon = {
+                    value: isNaN(imgId) ? w.imageId : { url: '', id: imgId },
+                    library: isNaN(imgId) ? 'fa-solid' : 'svg'
+                };
+                settings.icon_align = 'right';
+                console.log('[REGISTRY DEBUG] Set icon:', settings.selected_icon);
+            }
+
+            console.log('[REGISTRY DEBUG] Final settings:', JSON.stringify(settings, null, 2));
+            return { widgetType: 'button', settings };
+        }
     },
     {
         key: 'image',

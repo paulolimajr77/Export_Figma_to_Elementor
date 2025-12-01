@@ -320,7 +320,60 @@ export class ElementorCompiler {
             case 'button':
                 widgetType = 'button';
                 settings.text = widget.content || 'Button';
+
+                // Typography
                 Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
+
+                // Background color
+                if (widget.styles?.background) {
+                    settings.background_color = this.sanitizeColor(widget.styles.background);
+                } else if (widget.styles?.fills && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
+                    const solidFill = widget.styles.fills.find((f: any) => f.type === 'SOLID');
+                    if (solidFill) {
+                        settings.background_color = this.sanitizeColor(solidFill.color);
+                    }
+                }
+
+                // Text color
+                if (baseSettings.color) {
+                    settings.button_text_color = baseSettings.color;
+                }
+
+                // Padding
+                if (widget.styles?.paddingTop !== undefined || widget.styles?.paddingRight !== undefined ||
+                    widget.styles?.paddingBottom !== undefined || widget.styles?.paddingLeft !== undefined) {
+                    settings.button_padding = {
+                        unit: 'px',
+                        top: widget.styles.paddingTop || 0,
+                        right: widget.styles.paddingRight || 0,
+                        bottom: widget.styles.paddingBottom || 0,
+                        left: widget.styles.paddingLeft || 0,
+                        isLinked: false
+                    };
+                }
+
+                // Border radius
+                if (widget.styles?.cornerRadius !== undefined) {
+                    settings.border_radius = {
+                        unit: 'px',
+                        top: widget.styles.cornerRadius,
+                        right: widget.styles.cornerRadius,
+                        bottom: widget.styles.cornerRadius,
+                        left: widget.styles.cornerRadius,
+                        isLinked: true
+                    };
+                }
+
+                // Icon
+                if (widget.imageId) {
+                    settings.selected_icon = this.normalizeSelectedIcon(
+                        widget.styles?.selected_icon || baseSettings.selected_icon || widget.content,
+                        widget.imageId,
+                        { value: 'fas fa-arrow-right', library: 'fa-solid' }
+                    );
+                    settings.icon_align = 'right'; // Default to right alignment
+                }
+
                 break;
             case 'image':
                 widgetType = 'image';

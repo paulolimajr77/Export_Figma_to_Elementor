@@ -282,7 +282,7 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
     const uploadPromises: Promise<void>[] = [];
 
     const processWidget = async (widget: any) => {
-        if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box')) {
+        if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'button')) {
             try {
                 const node = figma.getNodeById(widget.imageId);
                 if (node) {
@@ -330,6 +330,10 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                         } else if (widget.type === 'icon-box') {
                             if (!widget.styles) widget.styles = {};
                             widget.styles.selected_icon = { value: result.url, library: 'svg' };
+                        } else if (widget.type === 'button') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.selected_icon = { value: result.url, library: 'svg' };
+                            console.log('[BUTTON UPLOAD] Icon uploaded:', result.url, 'ID:', result.id);
                         } else {
                             widget.content = result.url;
                         }

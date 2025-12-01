@@ -290,8 +290,11 @@ function calculateWidgetScore(node: SerializedNode): WidgetScore[] {
 function detectWidget(node: SerializedNode): MaybeWidget {
     const name = (node.name || '').toLowerCase();
 
+    console.log('[DETECT WIDGET] Processing node:', node.name, 'Type:', node.type, 'Name (lowercase):', name);
+
     // Explicitly ignore containers so they are processed as containers by the recursive logic
     if (name.startsWith('c:container') || name.startsWith('w:container')) {
+        console.log('[DETECT WIDGET] Ignoring container:', node.name);
         return null;
     }
 
@@ -325,11 +328,33 @@ function detectWidget(node: SerializedNode): MaybeWidget {
             };
         }
         if (name.includes('button')) {
+            console.log('[BUTTON DETECT] Found button by name:', node.name);
+
+            // Structural analysis - extract from children
+            const buttonData = analyzeButtonStructure(node);
+
+            // Buttons are FRAMEs, so we need container styles for padding/fills
+            const containerStyles = extractContainerStyles(node);
+            const mergedStyles = { ...styles, ...containerStyles, ...buttonData.textStyles };
+
+            console.log('[BUTTON DETECT] Button data:', JSON.stringify(buttonData, null, 2));
+            console.log('[BUTTON DETECT] Merged styles:', JSON.stringify(mergedStyles, null, 2));
+
+            // If no fills, set transparent white background
+            if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+                mergedStyles.fills = [{
+                    type: 'SOLID',
+                    color: { r: 1, g: 1, b: 1 },
+                    opacity: 0,
+                    visible: true
+                }];
+            }
+
             return {
                 type: 'button',
-                content: boxContent.title || node.name,
-                imageId: null,
-                styles
+                content: buttonData.text || node.name,
+                imageId: buttonData.iconId,
+                styles: mergedStyles
             };
         }
         if (name.includes('video')) return { type: 'video', content: '', imageId: null, styles };
@@ -365,12 +390,6 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                         imageId: boxContent.imageId || findFirstImageId(node) || null,
                         styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
                     };
-                }
-                case 'button': {
-                    const boxContent = extractBoxContent(node);
-                    // For button, we accept if there is direct text OR if it's an icon-only button (no text deep)
-                    if (!boxContent.title && hasTextDeep(node)) break;
-                    return { type: 'button', content: boxContent.title || node.name, imageId: null, styles };
                 }
                 case 'star-rating': return { type: 'star-rating', content: '5', imageId: null, styles };
                 case 'social-icons': return { type: 'social-icons', content: '', imageId: null, styles };
@@ -485,7 +504,26 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
     // Button by name
     if (name.includes('button') || name.includes('btn')) {
-        return { type: 'button', content: node.name, imageId: null, styles };
+        const boxContent = extractBoxContent(node);
+        const containerStyles = extractContainerStyles(node);
+        const mergedStyles = { ...styles, ...containerStyles };
+
+        // If no fills, set transparent white background
+        if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+            mergedStyles.fills = [{
+                type: 'SOLID',
+                color: { r: 1, g: 1, b: 1 },
+                opacity: 0,
+                visible: true
+            }];
+        }
+
+        return {
+            type: 'button',
+            content: boxContent.title || node.name,
+            imageId: boxContent.imageId || null,
+            styles: mergedStyles
+        };
     }
 
     return null;
@@ -577,6 +615,46 @@ function toContainer(node: SerializedNode): PipelineContainer {
     };
 }
 
+function analyzeButtonStructure(node: SerializedNode): {
+    text: string;
+    iconId: string | null;
+    textStyles: Record<string, any>;
+} {
+    const children = (node as any).children || [];
+    let text = '';
+    let iconId: string | null = null;
+    let textStyles: Record<string, any> = {};
+
+    console.log('[BUTTON STRUCTURE] Analyzing button:', node.name);
+    console.log('[BUTTON STRUCTURE] Children count:', children.length);
+
+    // Find text child (w:heading, w:text, or TEXT node)
+    const textChild = children.find((c: SerializedNode) =>
+        c.type === 'TEXT' ||
+        c.name?.toLowerCase().includes('heading') ||
+        c.name?.toLowerCase().includes('text')
+    );
+
+    if (textChild) {
+        text = textChild.characters || textChild.name || '';
+        textStyles = extractWidgetStyles(textChild);
+        console.log('[BUTTON STRUCTURE] Found text child:', textChild.name, 'Text:', text);
+        console.log('[BUTTON STRUCTURE] Text styles:', JSON.stringify(textStyles, null, 2));
+    } else {
+        console.log('[BUTTON STRUCTURE] No text child found');
+    }
+
+    // Find icon child (deep search for VECTOR/IMAGE)
+    iconId = findFirstImageId(node);
+    if (iconId) {
+        console.log('[BUTTON STRUCTURE] Found icon ID:', iconId);
+    } else {
+        console.log('[BUTTON STRUCTURE] No icon found');
+    }
+
+    return { text, iconId, textStyles };
+}
+
 export function analyzeTreeWithHeuristics(tree: SerializedNode): SerializedNode {
     return tree;
 }
@@ -596,22 +674,29 @@ function extractBoxContent(node: SerializedNode): { imageId: string | null, titl
     let title = '';
     let description = '';
 
-    // Find Image/Icon
+    // Find Image/Icon - Deep recursive search
+    function findIconDeep(n: SerializedNode): string | null {
+        if (isImageFill(n) || n.type === 'IMAGE' || n.type === 'VECTOR') {
+            return n.id;
+        }
+        if ((n as any).children) {
+            for (const child of (n as any).children) {
+                const found = findIconDeep(child);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
     // Check direct children first
     const imgNode = children.find((c: SerializedNode) => isImageFill(c) || c.type === 'IMAGE' || c.type === 'VECTOR');
     if (imgNode) {
         imageId = imgNode.id;
     } else {
-        // If not found directly, try to find deeper (e.g. inside a frame wrapper)
-        // Shallow deep search (1 level)
+        // Deep search through all descendants
         for (const child of children) {
-            if ((child as any).children) {
-                const deepImg = (child as any).children.find((c: SerializedNode) => isImageFill(c) || c.type === 'IMAGE' || c.type === 'VECTOR');
-                if (deepImg) {
-                    imageId = deepImg.id;
-                    break;
-                }
-            }
+            imageId = findIconDeep(child);
+            if (imageId) break;
         }
     }
 
