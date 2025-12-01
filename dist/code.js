@@ -4412,6 +4412,89 @@ ${refText}` });
     }
   });
 
+  // src/utils/logger.ts
+  var FileLogger, logger;
+  var init_logger = __esm({
+    "src/utils/logger.ts"() {
+      FileLogger = class {
+        // Prevent memory issues
+        constructor() {
+          this.logs = [];
+          this.maxLogs = 1e3;
+          this.sessionStart = (/* @__PURE__ */ new Date()).toISOString();
+          this.log("=".repeat(80));
+          this.log(`[SESSION START] ${this.sessionStart}`);
+          this.log("=".repeat(80));
+        }
+        /**
+         * Log a message (replaces console.log)
+         */
+        log(...args) {
+          const timestamp = (/* @__PURE__ */ new Date()).toISOString().split("T")[1].split(".")[0];
+          const message = args.map((arg) => {
+            if (typeof arg === "object") {
+              try {
+                return JSON.stringify(arg, null, 2);
+              } catch (e) {
+                return String(arg);
+              }
+            }
+            return String(arg);
+          }).join(" ");
+          const logEntry = `[${timestamp}] ${message}`;
+          this.logs.push(logEntry);
+          if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+          }
+          console.log(...args);
+        }
+        /**
+         * Get all logs as a single string
+         */
+        getLogs() {
+          return this.logs.join("\n");
+        }
+        /**
+         * Save logs to a file (called from UI)
+         */
+        saveToFile() {
+          const content = this.getLogs();
+          const filename = `test-logs-${this.sessionStart.replace(/:/g, "-").split(".")[0]}.txt`;
+          return content;
+        }
+        /**
+         * Clear all logs
+         */
+        clear() {
+          this.logs = [];
+          this.sessionStart = (/* @__PURE__ */ new Date()).toISOString();
+          this.log("=".repeat(80));
+          this.log(`[SESSION CLEARED] ${this.sessionStart}`);
+          this.log("=".repeat(80));
+        }
+        /**
+         * Add a test marker
+         */
+        startTest(testName) {
+          this.log("");
+          this.log("\u2550".repeat(80));
+          this.log(`TEST START: ${testName}`);
+          this.log("\u2550".repeat(80));
+        }
+        /**
+         * End test marker
+         */
+        endTest(testName, passed) {
+          this.log("\u2500".repeat(80));
+          this.log(`TEST END: ${testName} - ${passed ? "\u2705 PASSED" : "\u274C FAILED"}`);
+          this.log("\u2550".repeat(80));
+          this.log("");
+        }
+      };
+      logger = new FileLogger();
+    }
+  });
+
   // src/code.ts
   var require_code = __commonJS({
     "src/code.ts"(exports) {
@@ -4424,6 +4507,7 @@ ${refText}` });
       init_uploader();
       init_adapter();
       init_heuristics();
+      init_logger();
       figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
       var pipeline = new ConversionPipeline();
       var lastJSON = null;
@@ -4767,6 +4851,29 @@ ${refText}` });
         var _a;
         if (!msg || typeof msg !== "object") return;
         switch (msg.type) {
+          case "save-logs":
+            try {
+              const logs = logger.getLogs();
+              const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/:/g, "-").split(".")[0];
+              const filename = `test-logs-${timestamp}.txt`;
+              figma.ui.postMessage({
+                type: "download-logs",
+                content: logs,
+                filename
+              });
+              figma.notify(`Logs salvos: ${filename}`, { timeout: 3e3 });
+            } catch (error) {
+              figma.notify("Erro ao salvar logs", { timeout: 3e3 });
+            }
+            break;
+          case "clear-logs":
+            try {
+              logger.clear();
+              figma.notify("Logs limpos", { timeout: 2e3 });
+            } catch (error) {
+              figma.notify("Erro ao limpar logs", { timeout: 3e3 });
+            }
+            break;
           case "inspect":
             try {
               const node = getSelectedNode();

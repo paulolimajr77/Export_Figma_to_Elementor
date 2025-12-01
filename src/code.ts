@@ -9,6 +9,7 @@ import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
 import { createNodeSnapshot } from './heuristics/adapter';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
+import { logger } from './utils/logger';
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 
@@ -416,6 +417,33 @@ figma.ui.onmessage = async (msg) => {
     if (!msg || typeof msg !== 'object') return;
 
     switch (msg.type) {
+        case 'save-logs':
+            try {
+                const logs = logger.getLogs();
+                const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+                const filename = `test-logs-${timestamp}.txt`;
+
+                figma.ui.postMessage({
+                    type: 'download-logs',
+                    content: logs,
+                    filename
+                });
+
+                figma.notify(`Logs salvos: ${filename}`, { timeout: 3000 });
+            } catch (error: any) {
+                figma.notify('Erro ao salvar logs', { timeout: 3000 });
+            }
+            break;
+
+        case 'clear-logs':
+            try {
+                logger.clear();
+                figma.notify('Logs limpos', { timeout: 2000 });
+            } catch (error: any) {
+                figma.notify('Erro ao limpar logs', { timeout: 3000 });
+            }
+            break;
+
         case 'inspect':
             try {
                 const node = getSelectedNode();
