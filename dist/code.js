@@ -1871,9 +1871,9 @@ REGRAS CR\xCDTICAS (N\xC3O QUEBRE O SCHEMA):
 
 4.  **N\xC3O DUPLIQUE NENHUM NODE**: para cada container ou widget do SCHEMA BASE (identificado por id e/ou styles.sourceId), mantenha no m\xE1ximo UMA inst\xE2ncia correspondente no schema otimizado. \xC9 proibido gerar dois containers/widgets diferentes com o mesmo id ou styles.sourceId.
 5.  **N\xC3O CRIE NODES NOVOS**: n\xE3o invente containers ou widgets para nodes que n\xE3o existam no SCHEMA BASE. Se precisar agrupar logicamente, use apenas estruturas j\xE1 existentes, sem adicionar novos IDs.
+6.  **NUNCA CONVERTA M\xDALTIPLOS BOXES EM LISTA**: \xC9 ESTRITAMENTE PROIBIDO converter m\xFAltiplos widgets 'icon-box' ou 'image-box' em um \xFAnico widget 'icon-list'. PRESERVE SEMPRE os widgets individuais.
 
 TRANSFORMA\xC7\xD5ES DESEJADAS:
--   **Icon List**: Se vir uma lista de containers onde cada um tem um \xCDcone + Texto -> Converta para widget "icon-list".
 -   **Image Box**: Se vir Container com Imagem + T\xEDtulo + Texto -> Converta para widget "image-box".
 -   **Icon Box**: Se vir Container com \xCDcone + T\xEDtulo + Texto -> Converta para widget "icon-box".
 -   **Gallery**: Se vir um Grid de Imagens -> Converta para "gallery" ou "basic-gallery".
@@ -2683,20 +2683,29 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         id: "media.image-single",
         priority: 65,
         match(node) {
-          if (node.type === "RECTANGLE" || node.type === "ELLIPSE") {
-            if (node.hasImageFill) {
-              return {
-                patternId: "media.image",
-                widget: "structure:image",
-                confidence: 0.82
-              };
+          const isGeometricShape = node.type === "RECTANGLE" || node.type === "ELLIPSE";
+          if ((isGeometricShape || isFrameLike(node)) && node.hasImageFill) {
+            if (isFrameLike(node) && (node.hasText || node.children.length > 0)) {
+              return null;
             }
-          }
-          if (isFrameLike(node) && node.hasChildImage && !node.hasText) {
             return {
-              patternId: "media.image",
-              widget: "structure:image",
-              confidence: 0.78
+              patternId: "media.image.fill",
+              // ID mais específico
+              widget: "image",
+              // Widget de imagem direto
+              confidence: 0.85,
+              imageId: node.id
+            };
+          }
+          if (isFrameLike(node) && node.hasChildImage && !node.hasText && node.children.length === 1) {
+            const imageChild = node.children[0];
+            return {
+              patternId: "media.image.child",
+              // ID mais específico
+              widget: "image",
+              // Widget de imagem direto
+              confidence: 0.8,
+              imageId: imageChild.id
             };
           }
           return null;
@@ -3529,16 +3538,20 @@ ${JSON.stringify(baseSchema, null, 2)}
               return false;
             };
             const uploadNodeImage = (nodeId, preferSvg = false) => __async(this, null, function* () {
+              if (!nodeId) return null;
               const node = figma.getNodeById(nodeId);
               if (!node) return null;
               let format = preferSvg ? "SVG" : "WEBP";
               if ("locked" in node && node.locked || hasVectorChildren(node)) {
                 format = "SVG";
               }
+              if (node.type === "IMAGE") {
+                console.warn(`[Pipeline] Tentando exportar n\xF3 do tipo IMAGE depreciado: ${node.name} (${node.id}). Isso pode falhar.`);
+              }
               return this.imageUploader.uploadToWordPress(node, format);
             });
             const processWidget = (widget) => __async(this, null, function* () {
-              var _a, _b;
+              var _a, _b, _c;
               if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box")) {
                 try {
                   const result = yield uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box");
@@ -3564,9 +3577,10 @@ ${JSON.stringify(baseSchema, null, 2)}
               }
               if (widget.type === "image-carousel" && ((_b = widget.styles) == null ? void 0 : _b.slides) && Array.isArray(widget.styles.slides)) {
                 const uploads = widget.styles.slides.map((slide, idx) => __async(this, null, function* () {
-                  if (!(slide == null ? void 0 : slide.id)) return;
+                  const nodeId = (slide == null ? void 0 : slide.id) || (slide == null ? void 0 : slide.imageId);
+                  if (!nodeId) return;
                   try {
-                    const result = yield uploadNodeImage(slide.id, false);
+                    const result = yield uploadNodeImage(nodeId, false);
                     if (result) {
                       slide.url = result.url;
                       const parsedId = parseInt(String(result.id), 10);
@@ -3575,10 +3589,28 @@ ${JSON.stringify(baseSchema, null, 2)}
                       slide.image = { url: slide.url, id: slide.id };
                     }
                   } catch (e) {
-                    console.error(`[Pipeline] Erro ao processar slide ${slide.id}:`, e);
+                    console.error(`[Pipeline] Erro ao processar slide ${nodeId}:`, e);
                   }
                 }));
                 yield Promise.all(uploads);
+              }
+              if ((widget.type === "gallery" || widget.type === "basic-gallery") && ((_c = widget.styles) == null ? void 0 : _c.gallery) && Array.isArray(widget.styles.gallery)) {
+                const uploads = widget.styles.gallery.map((imageItem) => __async(this, null, function* () {
+                  const nodeId = (imageItem == null ? void 0 : imageItem.id) || (imageItem == null ? void 0 : imageItem.imageId);
+                  if (!nodeId) return;
+                  try {
+                    const result = yield uploadNodeImage(nodeId, false);
+                    if (result) {
+                      imageItem.url = result.url;
+                      const parsedId = parseInt(String(result.id), 10);
+                      imageItem.id = isNaN(parsedId) ? "" : parsedId;
+                    }
+                  } catch (e) {
+                    console.error(`[Pipeline] Erro ao processar imagem da galeria ${nodeId}:`, e);
+                  }
+                }));
+                yield Promise.all(uploads);
+                widget.styles.gallery = widget.styles.gallery.filter((item) => item.url && item.id);
               }
             });
             const uploadPromises = [];

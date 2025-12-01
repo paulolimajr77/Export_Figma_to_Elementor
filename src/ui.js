@@ -14,7 +14,7 @@
   const btnCopyManual = document.getElementById('copy-manual');
   let lastPayload = '';
 
- const fields = {
+  const fields = {
     use_ai: document.getElementById('use_ai'),
     provider_ai: document.getElementById('provider_ai'),
     gemini_api_key: document.getElementById('gemini_api_key'),

@@ -353,11 +353,16 @@ ${JSON.stringify(baseSchema, null, 2)}
         };
 
         const uploadNodeImage = async (nodeId: string, preferSvg: boolean = false) => {
+            if (!nodeId) return null; // Adicionado para segurança
             const node = figma.getNodeById(nodeId);
             if (!node) return null;
             let format: any = preferSvg ? 'SVG' : 'WEBP';
             if (('locked' in node && (node as any).locked) || hasVectorChildren(node as SceneNode)) {
                 format = 'SVG';
+            }
+            // Adicionado log para debug de nós do tipo IMAGE
+            if (node.type === 'IMAGE') {
+                console.warn(`[Pipeline] Tentando exportar nó do tipo IMAGE depreciado: ${node.name} (${node.id}). Isso pode falhar.`);
             }
             return this.imageUploader.uploadToWordPress(node as SceneNode, format);
         };
@@ -397,9 +402,10 @@ ${JSON.stringify(baseSchema, null, 2)}
             // Carrosseis: preencher slides com URLs/IDs do WP
             if (widget.type === 'image-carousel' && widget.styles?.slides && Array.isArray(widget.styles.slides)) {
                 const uploads = widget.styles.slides.map(async (slide: any, idx: number) => {
-                    if (!slide?.id) return;
+                    const nodeId = slide?.id || slide?.imageId; // Verifica ambos
+                    if (!nodeId) return;
                     try {
-                        const result = await uploadNodeImage(slide.id, false);
+                        const result = await uploadNodeImage(nodeId, false);
                         if (result) {
                             slide.url = result.url;
                             const parsedId = parseInt(String(result.id), 10);
@@ -408,10 +414,32 @@ ${JSON.stringify(baseSchema, null, 2)}
                             slide.image = { url: slide.url, id: slide.id };
                         }
                     } catch (e) {
-                        console.error(`[Pipeline] Erro ao processar slide ${slide.id}:`, e);
+                        console.error(`[Pipeline] Erro ao processar slide ${nodeId}:`, e);
                     }
                 });
                 await Promise.all(uploads);
+            }
+            
+            // Galerias: preencher imagens com URLs/IDs do WP
+            if ((widget.type === 'gallery' || widget.type === 'basic-gallery') && widget.styles?.gallery && Array.isArray(widget.styles.gallery)) {
+                const uploads = widget.styles.gallery.map(async (imageItem: any) => {
+                    const nodeId = imageItem?.id || imageItem?.imageId; // O ID aqui deve ser o ID do nó do Figma
+                    if (!nodeId) return;
+                    try {
+                        const result = await uploadNodeImage(nodeId, false);
+                        if (result) {
+                            imageItem.url = result.url;
+                            const parsedId = parseInt(String(result.id), 10);
+                            imageItem.id = isNaN(parsedId) ? '' : parsedId; // Este ID passa a ser o do WP
+                        }
+                    } catch (e) {
+                        console.error(`[Pipeline] Erro ao processar imagem da galeria ${nodeId}:`, e);
+                    }
+                });
+                await Promise.all(uploads);
+
+                // Filtra itens que falharam no upload para não gerar lixo no JSON
+                widget.styles.gallery = widget.styles.gallery.filter((item: any) => item.url && item.id);
             }
         };
 

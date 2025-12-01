@@ -76,6 +76,7 @@ Acoes de exportacao:
 ---
 
 ## Notas de versao
+- **Fix (Image Widget):** Resolvido um bug onde nós do Figma (especialmente Frames) com preenchimento de imagem não eram exportados como widgets de imagem do Elementor. A heurística de detecção de mídia foi aprimorada para identificar esses casos, acionar o upload da imagem para o WordPress e preencher corretamente a URL e o ID no widget de imagem gerado.
 - **Fix (SVG Icons):** Corrigido um bug crítico onde ícones SVG não eram exibidos no Elementor. A estrutura JSON para widgets `icon`, `icon-box` e `icon-list` foi ajustada para corresponder ao formato esperado pelo Elementor, que requer um objeto `{ value: { id, url }, library: 'svg' }`. Antes, apenas a URL era enviada, causando falha na renderização.
 - **Fix (pipeline):** Implementada uma correção em duas etapas para resolver a duplicação de nós em conversões com IA.
     1.  Containers otimizados pela IA são agora marcados com uma flag (`_aiOptimized`) durante a fase de fusão de schemas.
