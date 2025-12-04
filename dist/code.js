@@ -7399,9 +7399,6 @@ ${detection.justification}
       // ========== LINTER HANDLERS ==========
       case "analyze-layout":
         try {
-          console.log("\u26A0\uFE0F\u26A0\uFE0F\u26A0\uFE0F [FORENSIC] analyze-layout HANDLER CHAMADO!");
-          console.log("\u26A0\uFE0F Timestamp:", (/* @__PURE__ */ new Date()).toISOString());
-          console.log("\u26A0\uFE0F Stack trace:", new Error().stack);
           log("\u{1F50D} Handler analyze-layout iniciado", "info");
           const selection = figma.currentPage.selection;
           if (!selection || selection.length === 0) {
@@ -7551,6 +7548,18 @@ ${detection.justification}
             type: "linter-error",
             message: error.message
           });
+        }
+        break;
+      case "focus-node":
+        if (msg.nodeId) {
+          const node = figma.getNodeById(msg.nodeId);
+          if (node) {
+            figma.currentPage.selection = [node];
+            figma.viewport.scrollAndZoomIntoView([node]);
+            figma.notify(`Focando em: ${node.name}`);
+          } else {
+            figma.notify("Node n\xE3o encontrado (pode ter sido deletado).", { error: true });
+          }
         }
         break;
       case "close":

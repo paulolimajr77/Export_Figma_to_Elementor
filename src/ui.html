@@ -835,6 +835,222 @@
       color: var(--color-text-secondary);
       font-style: italic;
     }
+
+    /* Linter Report UI */
+    .linter-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 4px;
+    }
+
+    .linter-header {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      background: var(--figma-color-bg-secondary);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .linter-score-card {
+      flex-shrink: 0;
+    }
+
+    .score-ring {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 4px solid var(--figma-color-bg-brand);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--figma-color-bg);
+    }
+
+    .score-value {
+      font-size: 18px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .score-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      color: var(--figma-color-text-secondary);
+    }
+
+    .linter-stats {
+      display: flex;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 4px;
+      flex: 1;
+      background: var(--figma-color-bg);
+    }
+
+    .stat-item.critical {
+      border-bottom: 2px solid #e03e1a;
+    }
+
+    .stat-item.major {
+      border-bottom: 2px solid #f3c11b;
+    }
+
+    .stat-item.minor {
+      border-bottom: 2px solid #2f80ed;
+    }
+
+    .stat-count {
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--figma-color-text-secondary);
+    }
+
+    .linter-actions-bar {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .linter-content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .issues-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .linter-issue-card {
+      background: var(--figma-color-bg);
+      border: 1px solid var(--figma-color-border);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .linter-issue-card:hover {
+      border-color: var(--figma-color-border-brand);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .issue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .issue-title {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--figma-color-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .issue-badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .issue-badge.critical {
+      background: #fadbd8;
+      color: #c0392b;
+    }
+
+    .issue-badge.major {
+      background: #fcf3cf;
+      color: #d68910;
+    }
+
+    .issue-badge.minor {
+      background: #d6eaf8;
+      color: #2980b9;
+    }
+
+    .issue-desc {
+      font-size: 11px;
+      color: var(--figma-color-text-secondary);
+      line-height: 1.4;
+    }
+
+    .issue-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .widgets-section h3 {
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: var(--figma-color-text);
+    }
+
+    .widgets-table-container {
+      border: 1px solid var(--figma-color-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .widgets-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .widgets-table th {
+      background: var(--figma-color-bg-secondary);
+      text-align: left;
+      padding: 8px;
+      font-weight: 600;
+      color: var(--figma-color-text-secondary);
+    }
+
+    .widgets-table td {
+      padding: 8px;
+      border-top: 1px solid var(--figma-color-border);
+      color: var(--figma-color-text);
+    }
+
+    .widgets-table tr:hover td {
+      background: var(--figma-color-bg-hover);
+    }
+
+    .linter-empty-state {
+      text-align: center;
+      padding: 32px;
+      background: var(--figma-color-bg-secondary);
+      border-radius: 8px;
+    }
+
+    .empty-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
   </style>
 </head>
 
@@ -858,6 +1074,7 @@
 
     <nav class="tabs">
       <button class="tab-btn active" data-tab="layout">Layout &rarr; Elementor</button>
+      <button class="tab-btn" data-tab="linter">Linter</button>
       <button class="tab-btn" data-tab="ai">Configura&#231;&#227;o da IA</button>
       <button class="tab-btn" data-tab="wp">WordPress</button>
       <button class="tab-btn" data-tab="help">Ajuda</button>
@@ -902,6 +1119,75 @@
               <button class="btn secondary" id="copy-manual">Copiar JSON</button>
               <span style="font-size:12px;color:#999;">Se o navegador bloquear, selecione o campo e pressione
                 Ctrl+C.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="linter">
+        <div class="linter-container">
+          <!-- Header / Summary -->
+          <div class="linter-header">
+            <div class="linter-score-card">
+              <div class="score-ring" id="linter-score-ring">
+                <span class="score-value" id="linter-total-issues">0</span>
+                <span class="score-label">Issues</span>
+              </div>
+            </div>
+            <div class="linter-stats">
+              <div class="stat-item critical">
+                <span class="stat-count" id="count-critical">0</span>
+                <span class="stat-label">Critical</span>
+              </div>
+              <div class="stat-item major">
+                <span class="stat-count" id="count-major">0</span>
+                <span class="stat-label">Major</span>
+              </div>
+              <div class="stat-item minor">
+                <span class="stat-count" id="count-minor">0</span>
+                <span class="stat-label">Minor</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions Bar -->
+          <div class="linter-actions-bar">
+            <button class="btn secondary small" id="btn-reanalyze" data-action="analyze-layout">
+              <span class="icon">🔄</span> Re-analisar
+            </button>
+            <button class="btn secondary small" id="btn-copy-report" data-action="copy-linter-report">
+              <span class="icon">📋</span> Copiar
+            </button>
+          </div>
+
+          <!-- Issues List -->
+          <div class="linter-content">
+            <div id="linter-issues-list" class="issues-list">
+              <!-- Issues will be injected here -->
+              <div class="linter-empty-state">
+                <div class="empty-icon">✨</div>
+                <h3>Nenhum problema encontrado</h3>
+                <p>Seu layout parece estar seguindo todas as boas práticas!</p>
+              </div>
+            </div>
+
+            <!-- Widgets Table -->
+            <div class="widgets-section">
+              <h3>🎨 Widgets Detectados (<span id="widgets-count">0</span>)</h3>
+              <div class="widgets-table-container">
+                <table class="widgets-table">
+                  <thead>
+                    <tr>
+                      <th>Widget</th>
+                      <th>Node</th>
+                      <th>Confiança</th>
+                    </tr>
+                  </thead>
+                  <tbody id="widgets-table-body">
+                    <!-- Widgets will be injected here -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -1151,6 +1437,7 @@
         }
         parent.postMessage({ pluginMessage: { type, ...payload } }, '*');
       }
+      window.send = send;
 
       function addLog(message, level = 'info') {
         if (!logs) return;
@@ -1309,6 +1596,17 @@
                 } else {
                   send('download-json');
                 }
+                break;
+              case 'analyze-layout':
+                // Botão "Re-analisar"
+                send('analyze-layout');
+                break;
+
+              case 'copy-linter-report':
+                // Botão "Copiar"
+                const reportText = `Relatório de Análise:\nTotal Issues: ${document.getElementById('linter-total-issues').textContent}\n...`; // Simplificado
+                copyToClipboard(reportText); // Ou apenas notificar que copiou
+                addLog('Relatório copiado para a área de transferência', 'success');
                 break;
               case 'export-wp': send('export-wp', payload); break;
               case 'reset':
@@ -1530,55 +1828,17 @@
             break;
 
           case 'linter-report':
-            console.log('📊 [UI] Recebendo relatório do Linter:', msg.payload);
-            if (msg.payload) {
-              const report = msg.payload;
+            const report = msg.payload;
+            console.log('📊 [UI] Recebendo relatório do Linter:', report);
 
-              // Exibe no console para DEBUG
-              console.log(`📊 Total de issues: ${report.summary.total}`);
-              console.log(`📊 Widgets detectados: ${report.widgets.length}`);
+            // Renderizar visualmente
+            renderLinterReport(report);
 
-              // Exibe relatório completo no console
-              console.table(report.analysis.map(issue => ({
-                'Node': issue.node_name,
-                'Regra': issue.rule,
-                'Severidade': issue.severity,
-                'Mensagem': issue.message
-              })));
+            // Mudar para a aba do Linter automaticamente
+            setActiveTab('linter');
 
-              // Exibe widgets detectados
-              if (report.widgets.length > 0) {
-                console.log('🎨 Widgets detectados:');
-                console.table(report.widgets.map(w => ({
-                  'Widget': w.widget,
-                  'Node': w.node_name,
-                  'Confiança': `${Math.round(w.confidence * 100)}%`,
-                  'Categoria': w.category
-                })));
-              }
-
-              // Conta issues por severidade
-              const critical = report.analysis.filter(i => i.severity === 'critical').length;
-              const major = report.analysis.filter(i => i.severity === 'major').length;
-              const minor = report.analysis.filter(i => i.severity === 'minor').length;
-              const info = report.analysis.filter(i => i.severity === 'info').length;
-
-              // Mostra alerta com resumo
-              const summary = `RELATÓRIO LINTER ✅
-
-              Total de issues: ${report.summary.total}
-              - Critical: ${critical}
-              - Major: ${major}
-              - Minor: ${minor}
-              - Info: ${info}
-
-              Widgets detectados: ${report.widgets.length}
-
-              Veja o console para detalhes completos!`;
-
-              alert(summary);
-              addLog('Análise concluída! Veja o console.', 'success');
-            }
+            // Log no console para debug (mantido)
+            addLog(`📊 Análise concluída: ${report.summary.total} issues encontrados.`, 'info');
             break;
         }
       };
@@ -1832,39 +2092,184 @@
 
       // Linter Logic
       const linterPanel = document.getElementById('linter-panel');
-      const linterSummary = document.getElementById('linter-summary');
-      const linterIssues = document.getElementById('linter-issues');
-      const btnAnalyze = document.getElementById('btn_analyze');
-      const btnCloseLinter = document.getElementById('btn_close_linter');
+      });
+    }
 
-      if (btnAnalyze) {
-        btnAnalyze.onclick = () => {
-          send('analyze-layout');
-          addLog('Iniciando análise de layout...', 'info');
-        };
+    // Icones SVG otimizados
+    const ICONS = {
+      text: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>`,
+      image: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+      button: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="2"/><line x1="12" y1="12" x2="12" y2="12"/></svg>`,
+      container: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>`,
+      woo: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`,
+      star: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+      video: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`,
+      menu: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`,
+      form: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+      default: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`
+    };
+
+    function getWidgetIcon(name) {
+      if (name.includes('image') || name.includes('gallery') || name.includes('thumb')) return ICONS.image;
+      if (name.includes('text') || name.includes('heading') || name.includes('title')) return ICONS.text;
+      if (name.includes('button') || name.includes('btn') || name.includes('link')) return ICONS.button;
+      if (name.includes('container') || name.includes('section') || name.includes('div')) return ICONS.container;
+      if (name.includes('woo') || name.includes('product') || name.includes('cart')) return ICONS.woo;
+      if (name.includes('star') || name.includes('rating') || name.includes('review')) return ICONS.star;
+      if (name.includes('video') || name.includes('youtube')) return ICONS.video;
+      if (name.includes('menu') || name.includes('nav')) return ICONS.menu;
+      if (name.includes('form') || name.includes('input')) return ICONS.form;
+      return ICONS.default;
+    }
+
+    // Dados dos widgets para geracao dinamica
+    const WIDGET_DATA = {
+      'Basicos': [
+        'heading', 'text', 'button', 'image', 'icon', 'video', 'divider', 'spacer', 'image-box', 'icon-box',
+        'star-rating', 'counter', 'progress', 'tabs', 'accordion', 'toggle', 'alert', 'social-icons',
+        'soundcloud', 'shortcode', 'html', 'menu-anchor', 'sidebar', 'read-more', 'image-carousel',
+        'basic-gallery', 'gallery', 'icon-list', 'nav-menu', 'search-form', 'google-maps', 'testimonial',
+        'embed', 'lottie', 'loop:grid', 'w:container', 'w:inner-container',
+      ],
+      'Pro': [
+        'form', 'login', 'subscription', 'call-to-action', 'media:carousel', 'portfolio', 'gallery-pro',
+        'slider:slides', 'slideshow', 'flip-box', 'animated-headline', 'post-navigation', 'share-buttons',
+        'table-of-contents', 'countdown', 'blockquote', 'testimonial-carousel', 'review-box', 'reviews', 'hotspots',
+        'sitemap', 'author-box', 'price-table', 'price-list', 'progress-tracker', 'animated-text',
+        'nav-menu-pro', 'breadcrumb', 'facebook-button', 'facebook-comments', 'facebook-embed',
+        'facebook-page', 'loop:builder', 'loop:grid-advanced', 'loop-carousel', 'post-excerpt',
+        'post-content', 'post-title', 'post-info', 'post-featured-image', 'post-author', 'post-date',
+        'post-terms', 'archive-title', 'archive-description', 'site-logo', 'site-title', 'site-tagline',
+        'search-results', 'global-widget', 'video-playlist', 'video-gallery'
+      ],
+      'WooCommerce': [
+        'woo:product-title', 'woo:product-image', 'woo:product-price', 'woo:product-add-to-cart',
+        'woo:product-data-tabs', 'woo:product-excerpt', 'woo:product-rating', 'woo:product-stock',
+        'woo:product-meta', 'woo:product-additional-information', 'woo:product-short-description',
+        'woo:product-related', 'woo:product-upsells', 'woo:product-tabs', 'woo:product-breadcrumb',
+        'woo:product-gallery', 'woo:products', 'woo:product-grid', 'woo:product-carousel',
+        'woo:product-loop-item', 'woo:loop-product-title', 'woo:loop-product-price',
+        'woo:loop-product-rating', 'woo:loop-product-image', 'woo:loop-product-button',
+        'woo:loop-product-meta', 'woo:cart', 'woo:checkout', 'woo:my-account', 'woo:purchase-summary',
+        'woo:order-tracking'
+      ],
+      'Loop Builder': [
+        'loop:item', 'loop:image', 'loop:title', 'loop:meta', 'loop:terms', 'loop:rating', 'loop:price',
+        'loop:add-to-cart', 'loop:read-more', 'loop:featured-image', 'loop:pagination'
+      ],
+      'Experimentais': [
+        'w:nested-tabs', 'w:mega-menu', 'w:scroll-snap', 'w:motion-effects', 'w:background-slideshow',
+        'w:css-transform', 'w:custom-position', 'w:dynamic-tags', 'w:ajax-pagination'
+      ],
+      'WordPress': [
+        'w:wp-search', 'w:wp-recent-posts', 'w:wp-recent-comments', 'w:wp-archives', 'w:wp-categories',
+        'w:wp-calendar', 'w:wp-tag-cloud', 'w:wp-custom-menu'
+      ]
+    };
+
+    function renderWidgetList(filterText = '') {
+      const container = document.getElementById('widget-list-container');
+      if (!container) return;
+
+      const search = filterText.toLowerCase().trim();
+      let html = '';
+
+      if (search) {
+        html += `<div class="search-status">Filtrando por: "<strong>${search}</strong>"</div>`;
       }
 
-      if (btnCloseLinter) {
-        btnCloseLinter.onclick = () => {
-          if (linterPanel) linterPanel.style.display = 'none';
-        };
+      let hasResults = false;
+
+      for (const [category, items] of Object.entries(WIDGET_DATA)) {
+        const filteredItems = items.filter(item => {
+          if (!search) return true;
+          return item.toLowerCase().includes(search);
+        });
+
+        if (filteredItems.length === 0) continue;
+        hasResults = true;
+
+        html += `<div class="card compact"><div class="card-title small">${category}</div><div class="help-grid compact">`;
+
+        filteredItems.forEach(item => {
+          let fullName = item;
+          if (!item.includes(':') && !item.startsWith('w:')) {
+            fullName = 'w:' + item;
+          }
+          const icon = getWidgetIcon(fullName);
+
+          html += `
+              <div class="help-item compact" title="${fullName}">
+                <div class="item-header">
+                  <span class="item-icon">${icon}</span>
+                  <span class="label">${fullName}</span>
+                </div>
+                <button class="btn tiny ghost full-width" data-rename="${fullName}">Aplicar</button>
+              </div>`;
+        });
+
+        html += `</div></div>`;
       }
 
-      function renderLinterReport(report) {
-        if (!linterPanel || !linterSummary || !linterIssues) return;
+      if (!hasResults) {
+        html = `<div class="empty-state">Nenhum widget encontrado para "${search}"</div>`;
+      }
 
-        linterPanel.style.display = 'block';
-        linterIssues.innerHTML = '';
-        linterSummary.innerHTML = '';
+      container.innerHTML = html;
+    }
 
-        if (!report) {
-          linterSummary.innerHTML = '<div class="linter-empty">Erro ao gerar relatório.</div>';
-          return;
-        }
+    renderWidgetList();
 
-        // Render Summary
-        const scoreColor = report.score >= 90 ? 'success' : report.score >= 70 ? 'warning' : 'error';
-        linterSummary.innerHTML = `
+    const searchInput = document.getElementById('widget-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        renderWidgetList(e.target.value);
+      });
+    }
+
+    document.body.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-rename]');
+      if (btn) {
+        const name = btn.getAttribute('data-rename');
+        send('rename-layer', { name });
+      }
+    });
+
+    // Linter Logic
+    const linterPanel = document.getElementById('linter-panel');
+    const linterSummary = document.getElementById('linter-summary');
+    const linterIssues = document.getElementById('linter-issues');
+    const btnAnalyze = document.getElementById('btn_analyze');
+    const btnCloseLinter = document.getElementById('btn_close_linter');
+
+    if (btnAnalyze) {
+      btnAnalyze.onclick = () => {
+        send('analyze-layout');
+        addLog('Iniciando análise de layout...', 'info');
+      };
+    }
+
+    if (btnCloseLinter) {
+      btnCloseLinter.onclick = () => {
+        if (linterPanel) linterPanel.style.display = 'none';
+      };
+    }
+
+    function renderLinterReport(report) {
+      if (!linterPanel || !linterSummary || !linterIssues) return;
+
+      linterPanel.style.display = 'block';
+      linterIssues.innerHTML = '';
+      linterSummary.innerHTML = '';
+
+      if (!report) {
+        linterSummary.innerHTML = '<div class="linter-empty">Erro ao gerar relatório.</div>';
+        return;
+      }
+
+      // Render Summary
+      const scoreColor = report.score >= 90 ? 'success' : report.score >= 70 ? 'warning' : 'error';
+      linterSummary.innerHTML = `
           <div class="linter-score ${scoreColor}">
             <div class="score-value">${report.score}</div>
             <div class="score-label">Score</div>
@@ -1881,14 +2286,14 @@
           </div>
         `;
 
-        // Render Issues
-        if (report.issues.length === 0) {
-          linterIssues.innerHTML = '<div class="linter-empty">Nenhum problema encontrado! 🎉</div>';
-        } else {
-          report.issues.forEach(issue => {
-            const issueEl = document.createElement('div');
-            issueEl.className = `linter-issue ${issue.severity}`;
-            issueEl.innerHTML = `
+      // Render Issues
+      if (report.issues.length === 0) {
+        linterIssues.innerHTML = '<div class="linter-empty">Nenhum problema encontrado! 🎉</div>';
+      } else {
+        report.issues.forEach(issue => {
+          const issueEl = document.createElement('div');
+          issueEl.className = `linter-issue ${issue.severity}`;
+          issueEl.innerHTML = `
               <div class="issue-header">
                 <span class="issue-severity ${issue.severity}">${issue.severity === 'error' ? 'Erro' : 'Alerta'}</span>
                 <span class="issue-message">${issue.message}</span>
@@ -1900,28 +2305,54 @@
               </div>
             `;
 
-            // Add click handler for selection
-            issueEl.addEventListener('click', (e) => {
-              if (e.target.tagName !== 'BUTTON') {
-                send('select-node', { nodeId: issue.nodeId });
-              }
-            });
-
-            // Add fix handler
-            const fixBtn = issueEl.querySelector('[data-fix]');
-            if (fixBtn) {
-              fixBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                send('fix-issue', { ruleId: issue.ruleId, nodeId: issue.nodeId });
-              });
+          // Add click handler for selection
+          issueEl.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+              send('select-node', { nodeId: issue.nodeId });
             }
-
-            linterIssues.appendChild(issueEl);
           });
-        }
-      }
 
-    })();
+          // Add fix handler
+          const fixBtn = issueEl.querySelector('[data-fix]');
+          if (fixBtn) {
+            fixBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              send('fix-issue', { ruleId: issue.ruleId, nodeId: issue.nodeId });
+            });
+          }
+
+          linterIssues.appendChild(issueEl);
+        });
+      }
+      // 3. Renderizar Tabela de Widgets
+      const widgetsBody = document.getElementById('widgets-table-body');
+      const widgetsCount = document.getElementById('widgets-count');
+
+      widgetsBody.innerHTML = ''; // Limpar tabela
+      widgetsCount.textContent = report.widgets ? report.widgets.length : 0;
+      if (report.widgets && report.widgets.length > 0) {
+        // Mostrar apenas os top 20 para não travar a UI se houver muitos
+        report.widgets.slice(0, 20).forEach(widget => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+              <td><strong>${widget.widget}</strong></td>
+              <td>${widget.nodeName}</td>
+              <td>${widget.confidence}</td>
+            `;
+          widgetsBody.appendChild(row);
+        });
+
+        if (report.widgets.length > 20) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td colspan="3" style="text-align:center; color:#888;">... e mais ${report.widgets.length - 20} widgets</td>`;
+          widgetsBody.appendChild(row);
+        }
+      } else {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td colspan="3" style="text-align:center; padding: 12px;">Nenhum widget detectado</td>`;
+        widgetsBody.appendChild(row);
+      }
+    }
   </script>
 </body>
 
