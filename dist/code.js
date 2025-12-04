@@ -4777,6 +4777,571 @@ ${refText}` });
     }
   };
 
+  // src/linter/core/LinterEngine.ts
+  var LinterEngine = class {
+    constructor() {
+      this.startTime = 0;
+      this.endTime = 0;
+    }
+    /**
+     * Analisa um node do Figma
+     */
+    analyze(_0, _1) {
+      return __async(this, arguments, function* (node, registry2, options = {}) {
+        this.startTime = Date.now();
+        registry2.resetExecutedRules();
+        const results = [];
+        const rules = this.getApplicableRules(registry2, options);
+        for (const rule of rules) {
+          const result = yield rule.validate(node);
+          if (result) {
+            results.push(result);
+          }
+          registry2.markAsExecuted(rule.id);
+        }
+        if ("children" in node && node.children) {
+          for (const child of node.children) {
+            const childResults = yield this.analyzeNode(child, registry2);
+            results.push(...childResults);
+          }
+        }
+        this.endTime = Date.now();
+        return results;
+      });
+    }
+    /**
+     * Analisa um único node (sem recursão)
+     */
+    analyzeNode(node, registry2) {
+      return __async(this, null, function* () {
+        const results = [];
+        const rules = registry2.getAll();
+        for (const rule of rules) {
+          const result = yield rule.validate(node);
+          if (result) {
+            results.push(result);
+          }
+        }
+        if ("children" in node && node.children) {
+          for (const child of node.children) {
+            const childResults = yield this.analyzeNode(child, registry2);
+            results.push(...childResults);
+          }
+        }
+        return results;
+      });
+    }
+    /**
+     * Gera relatório completo
+     */
+    generateReport(results, registry2, options = {}) {
+      const summary = this.generateSummary(results);
+      const guides = this.generateGuides(results, registry2);
+      return {
+        summary,
+        analysis: results,
+        widgets: [],
+        // Será implementado na Fase 2
+        guides,
+        metadata: {
+          duration: this.getDuration(),
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          device_target: "desktop",
+          ai_used: options.aiAssisted || false,
+          rules_executed: registry2.getExecutedRules()
+        }
+      };
+    }
+    /**
+     * Gera sumário de problemas
+     */
+    generateSummary(results) {
+      return {
+        total: results.length,
+        critical: results.filter((r) => r.severity === "critical").length,
+        major: results.filter((r) => r.severity === "major").length,
+        minor: results.filter((r) => r.severity === "minor").length,
+        info: results.filter((r) => r.severity === "info").length
+      };
+    }
+    /**
+     * Gera guias de correção manual
+     */
+    generateGuides(results, registry2) {
+      const guides = [];
+      for (const result of results) {
+        const rule = registry2.get(result.rule);
+        if (rule && rule.generateGuide) {
+          const guide = {
+            node_id: result.node_id,
+            problem: result.message,
+            severity: result.severity,
+            step_by_step: this.getGenericSteps(result.rule),
+            estimated_time: this.estimateTime(result.severity),
+            difficulty: this.estimateDifficulty(result.severity)
+          };
+          guides.push(guide);
+        }
+      }
+      return guides;
+    }
+    /**
+     * Obtém passos genéricos baseados na regra
+     */
+    getGenericSteps(ruleId) {
+      const stepsMap = {
+        "auto-layout-required": [
+          "Selecione o frame no Figma",
+          "Pressione Shift + A (atalho para Auto Layout)",
+          "Ajuste a dire\xE7\xE3o (Vertical ou Horizontal)",
+          "Defina o espa\xE7amento (Gap) entre itens",
+          "Adicione padding interno se necess\xE1rio"
+        ],
+        "spacer-detected": [
+          "Selecione o frame pai",
+          "Aumente o valor de Gap",
+          "Delete o elemento spacer"
+        ],
+        "generic-name-detected": [
+          "Clique duas vezes no nome da camada",
+          "Renomeie seguindo o padr\xE3o sugerido"
+        ]
+      };
+      const actions = stepsMap[ruleId] || ["Corrija o problema manualmente"];
+      return actions.map((action, index) => ({ step: index + 1, action }));
+    }
+    /**
+     * Estima tempo de correção
+     */
+    estimateTime(severity) {
+      const timeMap = {
+        critical: "1-2 minutos",
+        major: "30 segundos",
+        minor: "10 segundos",
+        info: "5 segundos"
+      };
+      return timeMap[severity] || "1 minuto";
+    }
+    /**
+     * Estima dificuldade de correção
+     */
+    estimateDifficulty(severity) {
+      if (severity === "critical") return "medium";
+      if (severity === "major") return "easy";
+      return "easy";
+    }
+    /**
+     * Obtém regras aplicáveis baseado nas opções
+     */
+    getApplicableRules(registry2, options) {
+      let rules = registry2.getAll();
+      if (options.rules && options.rules.length > 0) {
+        rules = rules.filter((rule) => options.rules.includes(rule.id));
+      }
+      if (options.severity && options.severity.length > 0) {
+        rules = rules.filter((rule) => options.severity.includes(rule.severity));
+      }
+      return rules;
+    }
+    /**
+     * Obtém duração da análise em ms
+     */
+    getDuration() {
+      return this.endTime - this.startTime;
+    }
+  };
+
+  // src/linter/core/RuleRegistry.ts
+  var RuleRegistry = class {
+    constructor() {
+      this.rules = /* @__PURE__ */ new Map();
+      this.executedRules = [];
+    }
+    /**
+     * Registra uma nova regra
+     */
+    register(rule) {
+      this.rules.set(rule.id, rule);
+    }
+    /**
+     * Registra múltiplas regras
+     */
+    registerAll(rules) {
+      rules.forEach((rule) => this.register(rule));
+    }
+    /**
+     * Registra apenas regras para desktop
+     */
+    registerDesktopRules() {
+    }
+    /**
+     * Obtém uma regra por ID
+     */
+    get(ruleId) {
+      return this.rules.get(ruleId);
+    }
+    /**
+     * Obtém todas as regras registradas
+     */
+    getAll() {
+      return Array.from(this.rules.values());
+    }
+    /**
+     * Obtém regras por categoria
+     */
+    getByCategory(category) {
+      return this.getAll().filter((rule) => rule.category === category);
+    }
+    /**
+     * Obtém regras por severidade
+     */
+    getBySeverity(severity) {
+      return this.getAll().filter((rule) => rule.severity === severity);
+    }
+    /**
+     * Marca uma regra como executada
+     */
+    markAsExecuted(ruleId) {
+      if (!this.executedRules.includes(ruleId)) {
+        this.executedRules.push(ruleId);
+      }
+    }
+    /**
+     * Obtém lista de regras executadas
+     */
+    getExecutedRules() {
+      return [...this.executedRules];
+    }
+    /**
+     * Reseta lista de regras executadas
+     */
+    resetExecutedRules() {
+      this.executedRules = [];
+    }
+    /**
+     * Obtém total de regras registradas
+     */
+    count() {
+      return this.rules.size;
+    }
+  };
+
+  // src/linter/rules/structure/AutoLayoutRule.ts
+  var AutoLayoutRule = class {
+    constructor() {
+      this.id = "auto-layout-required";
+      this.category = "structure";
+      this.severity = "critical";
+    }
+    validate(node) {
+      return __async(this, null, function* () {
+        if (node.type !== "FRAME") return null;
+        const frame = node;
+        const hasChildren = frame.children && frame.children.length > 0;
+        const hasAutoLayout = frame.layoutMode !== "NONE";
+        if (hasChildren && !hasAutoLayout) {
+          return {
+            node_id: frame.id,
+            node_name: frame.name,
+            severity: this.severity,
+            category: this.category,
+            rule: this.id,
+            message: `Frame "${frame.name}" possui ${frame.children.length} filhos mas n\xE3o usa Auto Layout`,
+            educational_tip: `
+\u26A0\uFE0F Por que isso \xE9 cr\xEDtico?
+
+Frames sem Auto Layout usam posicionamento absoluto, que n\xE3o \xE9 suportado pelo Elementor. Isso causar\xE1:
+\u2022 Sobreposi\xE7\xE3o de elementos
+\u2022 Quebra de layout em diferentes resolu\xE7\xF5es
+\u2022 Dificuldade de manuten\xE7\xE3o
+
+\u2705 Solu\xE7\xE3o:
+Aplicar Auto Layout permite que o Elementor entenda a estrutura e gere containers flex\xEDveis e responsivos.
+        `.trim()
+          };
+        }
+        return null;
+      });
+    }
+    generateGuide(node) {
+      const frame = node;
+      return {
+        node_id: frame.id,
+        problem: `Frame "${frame.name}" sem Auto Layout`,
+        severity: this.severity,
+        step_by_step: [
+          { step: 1, action: "Selecione o frame no Figma" },
+          { step: 2, action: "Pressione Shift + A (atalho para Auto Layout)" },
+          { step: 3, action: "No painel direito, ajuste a dire\xE7\xE3o (Vertical ou Horizontal)" },
+          { step: 4, action: "Defina o espa\xE7amento (Gap) entre itens" },
+          { step: 5, action: "Adicione padding interno se necess\xE1rio" }
+        ],
+        before_after_example: {
+          before: "Frame com posicionamento absoluto dos filhos",
+          after: "Frame com Auto Layout vertical, gap de 16px e padding de 24px"
+        },
+        estimated_time: "1 minuto",
+        difficulty: "easy"
+      };
+    }
+  };
+
+  // src/linter/rules/structure/SpacerDetectionRule.ts
+  var SpacerDetectionRule = class {
+    constructor() {
+      this.id = "spacer-detected";
+      this.category = "structure";
+      this.severity = "major";
+    }
+    validate(node) {
+      return __async(this, null, function* () {
+        if (node.type !== "RECTANGLE") return null;
+        const rect = node;
+        const hasNoFill = !rect.fills || typeof rect.fills !== "symbol" && rect.fills.length === 0 || typeof rect.fills !== "symbol" && rect.fills.every(
+          (fill) => fill.type === "SOLID" && fill.visible === false
+        );
+        const hasNoStroke = !rect.strokes || typeof rect.strokes !== "symbol" && rect.strokes.length === 0;
+        const isGenericName = /^(Rectangle|Spacer|Space|Gap)\s*\d*$/i.test(rect.name);
+        if (hasNoFill && hasNoStroke && isGenericName) {
+          return {
+            node_id: rect.id,
+            node_name: rect.name,
+            severity: this.severity,
+            category: this.category,
+            rule: this.id,
+            message: `Spacer detectado: "${rect.name}"`,
+            educational_tip: `
+\u26A0\uFE0F Por que evitar spacers?
+
+Ret\xE2ngulos vazios usados como espa\xE7amento devem ser substitu\xEDdos pela propriedade "gap" do Auto Layout. Isso:
+\u2022 Reduz a complexidade do layout
+\u2022 Melhora a manuten\xE7\xE3o
+\u2022 Facilita ajustes responsivos
+\u2022 Gera c\xF3digo Elementor mais limpo
+
+\u2705 Solu\xE7\xE3o:
+Use a propriedade "Gap" do Auto Layout no frame pai ao inv\xE9s de elementos invis\xEDveis.
+        `.trim()
+          };
+        }
+        return null;
+      });
+    }
+    generateGuide(node) {
+      const rect = node;
+      return {
+        node_id: rect.id,
+        problem: `Spacer detectado: "${rect.name}"`,
+        severity: this.severity,
+        step_by_step: [
+          { step: 1, action: "Selecione o frame pai que cont\xE9m este spacer" },
+          { step: 2, action: "Verifique se o frame pai usa Auto Layout (se n\xE3o, aplique com Shift + A)" },
+          { step: 3, action: 'Aumente o valor de "Gap" no painel direito' },
+          { step: 4, action: `Delete o elemento "${rect.name}"` },
+          { step: 5, action: "Ajuste o gap at\xE9 obter o espa\xE7amento desejado" }
+        ],
+        before_after_example: {
+          before: "Frame com spacers (ret\xE2ngulos invis\xEDveis) entre elementos",
+          after: "Frame com Auto Layout e gap configurado"
+        },
+        estimated_time: "30 segundos",
+        difficulty: "easy"
+      };
+    }
+  };
+
+  // src/linter/rules/naming/GenericNameRule.ts
+  var GenericNameRule = class {
+    constructor() {
+      this.id = "generic-name-detected";
+      this.category = "naming";
+      this.severity = "major";
+      this.GENERIC_PATTERNS = /^(Frame|Rectangle|Group|Vector|Ellipse|Line|Component|Instance)\s+\d+$/;
+    }
+    validate(node) {
+      return __async(this, null, function* () {
+        if (this.GENERIC_PATTERNS.test(node.name)) {
+          const suggestedPattern = this.detectSuggestedPattern(node);
+          const examples = this.getExamplesForNodeType(node);
+          return {
+            node_id: node.id,
+            node_name: node.name,
+            severity: this.severity,
+            category: this.category,
+            rule: this.id,
+            message: `Nome gen\xE9rico detectado: "${node.name}"`,
+            educational_tip: `
+\u26A0\uFE0F Por que nomenclatura importa?
+
+\u2022 Facilita manuten\xE7\xE3o do design no Figma
+\u2022 Melhora a detec\xE7\xE3o autom\xE1tica de widgets
+\u2022 Gera c\xF3digo Elementor mais leg\xEDvel
+\u2022 Facilita colabora\xE7\xE3o em equipe
+
+\u{1F4A1} Padr\xE3o sugerido: ${suggestedPattern}
+
+\u{1F4D6} Exemplos:
+${examples.map((ex) => `  \u2022 ${ex}`).join("\n")}
+
+\u2705 Solu\xE7\xE3o:
+Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, Card/*, etc.)
+        `.trim()
+          };
+        }
+        return null;
+      });
+    }
+    generateGuide(node) {
+      const suggestedPattern = this.detectSuggestedPattern(node);
+      const examples = this.getExamplesForNodeType(node);
+      return {
+        node_id: node.id,
+        problem: `Nome gen\xE9rico: "${node.name}"`,
+        severity: this.severity,
+        step_by_step: [
+          { step: 1, action: "Clique duas vezes no nome da camada no Figma" },
+          { step: 2, action: `Renomeie seguindo o padr\xE3o: ${suggestedPattern}` },
+          { step: 3, action: "Use nomes descritivos que indiquem a fun\xE7\xE3o do elemento" }
+        ],
+        before_after_example: {
+          before: `"${node.name}" (gen\xE9rico)`,
+          after: `"${examples[0]}" (descritivo)`
+        },
+        estimated_time: "10 segundos",
+        difficulty: "easy"
+      };
+    }
+    /**
+     * Detecta padrão sugerido baseado no tipo de node
+     */
+    detectSuggestedPattern(node) {
+      if (node.type === "TEXT") {
+        const textNode = node;
+        const fontSize = typeof textNode.fontSize === "number" ? textNode.fontSize : 16;
+        if (fontSize >= 32) return "H1, H2, H3";
+        if (fontSize >= 24) return "H4, H5";
+        return "Text/Paragraph, Text/Description, Text/Label";
+      }
+      if (node.type === "RECTANGLE") {
+        const rect = node;
+        if (this.hasImageFill(rect)) {
+          return "Img/Hero, Img/Product, Img/Background";
+        }
+        if (this.isButtonLike(rect)) {
+          return "Btn/Primary, Btn/Secondary, Btn/Outline";
+        }
+        return "Container/*, Section/*";
+      }
+      if (node.type === "VECTOR" || node.type === "BOOLEAN_OPERATION") {
+        return "Icon/Menu, Icon/Close, Icon/Arrow";
+      }
+      if (node.type === "FRAME") {
+        const frame = node;
+        if (frame.layoutMode !== "NONE") {
+          return "Card/*, Grid/*, Section/*, Container/*";
+        }
+      }
+      return "Descreva a fun\xE7\xE3o do elemento";
+    }
+    /**
+     * Obtém exemplos de nomenclatura para o tipo de node
+     */
+    getExamplesForNodeType(node) {
+      if (node.type === "TEXT") {
+        return [
+          "H1 - T\xEDtulo principal",
+          "H2/Features - Subt\xEDtulo da se\xE7\xE3o",
+          "Text/Description - Texto descritivo",
+          "Label/Price - R\xF3tulo de pre\xE7o"
+        ];
+      }
+      if (node.type === "RECTANGLE") {
+        const rect = node;
+        if (this.hasImageFill(rect)) {
+          return [
+            "Img/Hero - Imagem principal",
+            "Img/Product - Imagem de produto",
+            "Img/Avatar - Foto de perfil"
+          ];
+        }
+        if (this.isButtonLike(rect)) {
+          return [
+            "Btn/Primary - Bot\xE3o principal",
+            "Btn/CTA - Call to action",
+            "Btn/Submit - Bot\xE3o de envio"
+          ];
+        }
+      }
+      if (node.type === "VECTOR" || node.type === "BOOLEAN_OPERATION") {
+        return [
+          "Icon/Menu - \xCDcone de menu",
+          "Icon/Close - \xCDcone de fechar",
+          "Icon/Arrow - \xCDcone de seta"
+        ];
+      }
+      if (node.type === "FRAME") {
+        return [
+          "Card/Product - Card de produto",
+          "Grid/Features - Grid de funcionalidades",
+          "Section/Hero - Se\xE7\xE3o hero",
+          "Container/Content - Container de conte\xFAdo"
+        ];
+      }
+      return ["Use nomes descritivos"];
+    }
+    /**
+     * Verifica se node tem fill de imagem
+     */
+    hasImageFill(node) {
+      if (!node.fills || typeof node.fills === "symbol") return false;
+      return node.fills.some((fill) => fill.type === "IMAGE");
+    }
+    /**
+     * Verifica se node parece um botão
+     */
+    isButtonLike(node) {
+      const hasFill = node.fills && typeof node.fills !== "symbol" && node.fills.length > 0;
+      const hasStroke = node.strokes && typeof node.strokes !== "symbol" && node.strokes.length > 0;
+      const hasRadius = typeof node.cornerRadius === "number" && node.cornerRadius > 0;
+      return hasFill && hasRadius || hasFill && hasStroke;
+    }
+  };
+
+  // src/linter/index.ts
+  function analyzeFigmaLayout(_0) {
+    return __async(this, arguments, function* (node, options = {
+      aiAssisted: false,
+      aiProvider: "none",
+      deviceTarget: "desktop"
+    }) {
+      const engine = new LinterEngine();
+      const registry2 = new RuleRegistry();
+      registry2.registerAll([
+        new AutoLayoutRule(),
+        new SpacerDetectionRule(),
+        new GenericNameRule()
+      ]);
+      const results = yield engine.analyze(node, registry2, options);
+      return engine.generateReport(results, registry2, options);
+    });
+  }
+  function validateSingleNode(node) {
+    return __async(this, null, function* () {
+      const engine = new LinterEngine();
+      const registry2 = new RuleRegistry();
+      registry2.registerAll([
+        new AutoLayoutRule(),
+        new SpacerDetectionRule(),
+        new GenericNameRule()
+      ]);
+      const results = yield engine.analyzeNode(node, registry2);
+      return {
+        isValid: results.length === 0,
+        issues: results.map((r) => r.message)
+      };
+    });
+  }
+
   // src/code.ts
   var originalConsoleLog = console.log.bind(console);
   var logger = new FileLogger(originalConsoleLog);
@@ -5362,6 +5927,115 @@ ${refText}` });
           figma.notify(`Organiza\xE7\xE3o conclu\xEDda! ${count} layers renomeados.`);
         } catch (e) {
           figma.notify((e == null ? void 0 : e.message) || "Erro ao organizar layers");
+        }
+        break;
+      // ========== LINTER HANDLERS ==========
+      case "analyze-layout":
+        try {
+          const selection = figma.currentPage.selection;
+          if (!selection || selection.length === 0) {
+            figma.ui.postMessage({
+              type: "linter-error",
+              message: "Selecione um Frame para analisar"
+            });
+            break;
+          }
+          const node = selection[0];
+          if (node.type !== "FRAME") {
+            figma.ui.postMessage({
+              type: "linter-error",
+              message: "Selecione um Frame (n\xE3o um " + node.type + ")"
+            });
+            break;
+          }
+          log("Iniciando an\xE1lise de layout...", "info");
+          const report = yield analyzeFigmaLayout(node, {
+            aiAssisted: false,
+            deviceTarget: "desktop"
+          });
+          figma.ui.postMessage({
+            type: "linter-report",
+            report
+          });
+          log(`An\xE1lise conclu\xEDda: ${report.summary.total} problemas encontrados`, "success");
+        } catch (error) {
+          const message = (error == null ? void 0 : error.message) || String(error);
+          log(`Erro ao analisar layout: ${message}`, "error");
+          figma.ui.postMessage({
+            type: "linter-error",
+            message
+          });
+        }
+        break;
+      case "select-problem-node":
+        try {
+          const nodeId = msg.nodeId;
+          if (!nodeId) {
+            figma.ui.postMessage({
+              type: "linter-error",
+              message: "ID do node n\xE3o fornecido"
+            });
+            break;
+          }
+          const node = figma.getNodeById(nodeId);
+          if (!node) {
+            figma.ui.postMessage({
+              type: "linter-error",
+              message: "Node n\xE3o encontrado"
+            });
+            break;
+          }
+          figma.currentPage.selection = [node];
+          figma.viewport.scrollAndZoomIntoView([node]);
+          figma.ui.postMessage({
+            type: "node-selected",
+            nodeId
+          });
+        } catch (error) {
+          figma.ui.postMessage({
+            type: "linter-error",
+            message: (error == null ? void 0 : error.message) || "Erro ao selecionar node"
+          });
+        }
+        break;
+      case "mark-problem-resolved":
+        try {
+          const nodeId = msg.nodeId;
+          if (!nodeId) {
+            figma.ui.postMessage({
+              type: "linter-error",
+              message: "ID do node n\xE3o fornecido"
+            });
+            break;
+          }
+          const node = figma.getNodeById(nodeId);
+          if (!node) {
+            figma.ui.postMessage({
+              type: "linter-error",
+              message: "Node n\xE3o encontrado"
+            });
+            break;
+          }
+          const result = yield validateSingleNode(node);
+          if (result.isValid) {
+            yield figma.clientStorage.setAsync(`linter-resolved-${nodeId}`, true);
+          }
+          figma.ui.postMessage({
+            type: "validation-result",
+            nodeId,
+            isFixed: result.isValid,
+            issues: result.issues
+          });
+          if (result.isValid) {
+            log("\u2705 Problema resolvido!", "success");
+          } else {
+            log(`\u26A0\uFE0F Problema ainda n\xE3o resolvido: ${result.issues.join(", ")}`, "warn");
+          }
+        } catch (error) {
+          figma.ui.postMessage({
+            type: "linter-error",
+            message: (error == null ? void 0 : error.message) || "Erro ao validar corre\xE7\xE3o"
+          });
         }
         break;
       case "close":

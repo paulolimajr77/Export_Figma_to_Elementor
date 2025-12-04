@@ -693,13 +693,11 @@
           <div class="row">
             <button id="btn_inspect" class="btn secondary">Inspecionar Layout</button>
             <button id="btn_generate" class="btn primary">Gerar JSON</button>
-            <button id="btn_rename_layers" class="btn secondary">Renomear Layers</button>
-          </div>
-          <div class="row">
-            <button id="btn_download" class="btn secondary" data-action="download-json">Baixar JSON</button>
             <button id="btn_reset" class="btn secondary" data-action="reset">Reiniciar</button>
           </div>
         </div>
+
+
         <div class="card">
           <div class="card-title">Sa&#237;da / Logs</div>
           <div id="progress" class="progress hidden">
@@ -801,6 +799,7 @@
             <input id="wp_create_page" type="checkbox" />
             <span>Criar p&#225;gina automaticamente</span>
           </label>
+          </label>
 
           <div class="actions">
             <button class="btn primary" data-action="test-wp">Testar conex&#227;o</button>
@@ -847,9 +846,7 @@
         send('generate-json', payload);
       };
 
-      document.getElementById('btn_rename_layers').onclick = () => {
-        send('run-heuristics-rename');
-      };
+
 
       document.getElementById('btn_inspect').onclick = () => {
         send('inspect');
@@ -860,6 +857,10 @@
       const btnCopyManual = document.getElementById('copy-manual');
       let lastPayload = '';
       let fullPayload = '';
+
+
+
+
 
       const fields = {
         use_ai: document.getElementById('use_ai'),
@@ -933,14 +934,14 @@
         if (themeToggle) themeToggle.checked = isDark;
         if (darkSheet) darkSheet.disabled = !isDark;
         if (storage) {
-          try { storage.setItem('figtoel-theme', isDark ? 'dark' : 'light'); } catch (_) { /* ignore */ }
+          try { storage.setItem('figtoel-theme', isDark ? 'dark' : 'light'); } catch (e) { /* ignore */ }
         }
       }
 
       function initTheme(pref) {
         let stored = null;
         if (storage) {
-          try { stored = storage.getItem('figtoel-theme'); } catch (_) { stored = null; }
+          try { stored = storage.getItem('figtoel-theme'); } catch (e) { stored = null; }
         }
         const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (typeof pref === 'boolean') applyTheme(pref);
@@ -968,7 +969,7 @@
         logs.scrollTo(0, logs.scrollHeight);
       }
 
-      async function copyWithFallback(text, label = 'conte�do') {
+      async function copyWithFallback(text, label = 'contedo') {
         if (!text) {
           addLog(`Nenhum ${label} para copiar.`, 'warn');
           return false;
@@ -1146,8 +1147,32 @@
         });
       }
 
+      async function convertToWebP(uint8Array, originalMime) {
+        const blob = new Blob([new Uint8Array(uint8Array)], { type: originalMime });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        return new Promise(resolve => {
+          canvas.toBlob(blob => {
+            URL.revokeObjectURL(url);
+            resolve(blob);
+          }, 'image/webp', 0.85);
+        });
+      }
+
       async function uploadImage(msg) {
-        const { id, name, mimeType, data } = msg;
+        const { id, name, mimeType, data, needsConversion } = msg;
         const url = (fields.wp_url.value || '').replace(/\/$/, '');
         const user = fields.wp_user.value;
         const token = fields.wp_token.value;
@@ -1158,7 +1183,23 @@
         }
 
         try {
-          const blob = new Blob([new Uint8Array(data)], { type: mimeType });
+          let blob;
+          addLog('[UI] Uploading image: ' + name + ' needsConversion: ' + needsConversion, 'info');
+          if (needsConversion) {
+            addLog('[UI] Converting to WebP...', 'info');
+            try {
+              blob = await convertToWebP(data, mimeType);
+            } catch (e) {
+              console.warn('[UI] WebP conversion failed:', e);
+              addLog('[UI] WebP conversion failed. Using original format.', 'warn');
+              blob = new Blob([new Uint8Array(data)], { type: mimeType || 'image/png' });
+            }
+            addLog('[UI] Converted blob type: ' + blob.type + ' size: ' + blob.size, 'info');
+          } else {
+            blob = new Blob([new Uint8Array(data)], { type: mimeType });
+            addLog('[UI] Using original blob type: ' + blob.type, 'info');
+          }
+
           const formData = new FormData();
           formData.append('file', blob, name);
           formData.append('title', name.split('.')[0]);
@@ -1219,7 +1260,7 @@
           case 'generation-start':
             toggleProgress(true);
             updateBridgeOutput('', false);
-            // N�o limpamos o #output (Figma JSON) pois o usu�rio pode querer consult�-lo
+            // No limpamos o #output (Figma JSON) pois o usurio pode querer consult-lo
             toggleResultButtons(false);
             break;
           case 'gemini-status':
@@ -1279,36 +1320,6 @@
         }
       }
 
-      async function copyWithFallback(text, label = 'JSON') {
-        try {
-          await navigator.clipboard.writeText(text);
-          addLog(`${label} copiado.`, 'success');
-          return true;
-        } catch (e) {
-          try {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.style.position = 'fixed';
-            ta.style.opacity = '0';
-            document.body.appendChild(ta);
-            ta.focus();
-            ta.select();
-            const ok = document.execCommand('copy');
-            document.body.removeChild(ta);
-            if (ok) {
-              addLog(`${label} copiado (fallback).`, 'success');
-              return true;
-            }
-          } catch (_) { /* ignore */ }
-          if (bridgeOutput) {
-            bridgeOutput.focus();
-            bridgeOutput.select();
-          }
-          addLog('Falha ao copiar. Selecione o campo e pressione Ctrl+C.', 'warn');
-          return false;
-        }
-      }
-
       const copyToClipboard = (text) => copyWithFallback(text, 'JSON');
 
       function downloadPayload(text) {
@@ -1324,7 +1335,7 @@
         addLog('Download iniciado.', 'info');
       }
 
-      // Resizer handle (drag to resize the plugin window)
+      // Resizer handle
       const resizer = document.getElementById('resizer-handle');
       if (resizer) {
         let startX = 0, startY = 0, startW = window.innerWidth, startH = window.innerHeight;
@@ -1347,7 +1358,6 @@
           window.addEventListener('mousemove', onMouseMove);
           window.addEventListener('mouseup', onMouseUp);
         });
-        // suporte touch
         const onTouchMove = (e) => {
           const t = e.touches[0];
           if (t) onMove(t.clientX, t.clientY);
@@ -1389,6 +1399,7 @@
           bridgeOutput.select();
         });
       }
+
       // Icones SVG otimizados
       const ICONS = {
         text: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>`,
@@ -1428,10 +1439,10 @@
         'Pro': [
           'form', 'login', 'subscription', 'call-to-action', 'media:carousel', 'portfolio', 'gallery-pro',
           'slider:slides', 'slideshow', 'flip-box', 'animated-headline', 'post-navigation', 'share-buttons',
-          'table-of-contents', 'countdown', 'blockquote', 'testimonial-carousel', 'review-box', 'hotspots',
+          'table-of-contents', 'countdown', 'blockquote', 'testimonial-carousel', 'review-box', 'reviews', 'hotspots',
           'sitemap', 'author-box', 'price-table', 'price-list', 'progress-tracker', 'animated-text',
           'nav-menu-pro', 'breadcrumb', 'facebook-button', 'facebook-comments', 'facebook-embed',
-          'facebook-page', 'loop:builder', 'loop:grid-advanced', 'loop:carousel', 'post-excerpt',
+          'facebook-page', 'loop:builder', 'loop:grid-advanced', 'loop-carousel', 'post-excerpt',
           'post-content', 'post-title', 'post-info', 'post-featured-image', 'post-author', 'post-date',
           'post-terms', 'archive-title', 'archive-description', 'site-logo', 'site-title', 'site-tagline',
           'search-results', 'global-widget', 'video-playlist', 'video-gallery'
@@ -1468,7 +1479,6 @@
         const search = filterText.toLowerCase().trim();
         let html = '';
 
-        // Se tiver busca, adiciona header de resultados
         if (search) {
           html += `<div class="search-status">Filtrando por: "<strong>${search}</strong>"</div>`;
         }
@@ -1476,7 +1486,6 @@
         let hasResults = false;
 
         for (const [category, items] of Object.entries(WIDGET_DATA)) {
-          // Filtra itens
           const filteredItems = items.filter(item => {
             if (!search) return true;
             return item.toLowerCase().includes(search);
@@ -1514,10 +1523,8 @@
         container.innerHTML = html;
       }
 
-      // Inicializa a lista
       renderWidgetList();
 
-      // Listener de busca
       const searchInput = document.getElementById('widget-search');
       if (searchInput) {
         searchInput.addEventListener('input', (e) => {
@@ -1525,7 +1532,6 @@
         });
       }
 
-      // Event delegation para botoes de renomear
       document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-rename]');
         if (btn) {

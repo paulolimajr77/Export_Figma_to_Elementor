@@ -10,6 +10,7 @@ import { ImageUploader } from './media/uploader';
 import { createNodeSnapshot } from './heuristics/adapter';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { FileLogger } from './utils/logger';
+import { analyzeFigmaLayout, validateSingleNode } from './linter';
 
 // Save original console.log BEFORE any modifications
 const originalConsoleLog = console.log.bind(console);
@@ -705,6 +706,135 @@ figma.ui.onmessage = async (msg) => {
             }
             break;
 
+        // ========== LINTER HANDLERS ==========
+        case 'analyze-layout':
+            try {
+                const selection = figma.currentPage.selection;
+                if (!selection || selection.length === 0) {
+                    figma.ui.postMessage({
+                        type: 'linter-error',
+                        message: 'Selecione um Frame para analisar'
+                    });
+                    break;
+                }
+
+                const node = selection[0];
+                if (node.type !== 'FRAME') {
+                    figma.ui.postMessage({
+                        type: 'linter-error',
+                        message: 'Selecione um Frame (não um ' + node.type + ')'
+                    });
+                    break;
+                }
+
+                log('Iniciando análise de layout...', 'info');
+                const report = await analyzeFigmaLayout(node, {
+                    aiAssisted: false,
+                    deviceTarget: 'desktop'
+                });
+
+                figma.ui.postMessage({
+                    type: 'linter-report',
+                    report: report
+                });
+
+                log(`Análise concluída: ${report.summary.total} problemas encontrados`, 'success');
+            } catch (error: any) {
+                const message = error?.message || String(error);
+                log(`Erro ao analisar layout: ${message}`, 'error');
+                figma.ui.postMessage({
+                    type: 'linter-error',
+                    message: message
+                });
+            }
+            break;
+
+        case 'select-problem-node':
+            try {
+                const nodeId = msg.nodeId as string;
+                if (!nodeId) {
+                    figma.ui.postMessage({
+                        type: 'linter-error',
+                        message: 'ID do node não fornecido'
+                    });
+                    break;
+                }
+
+                const node = figma.getNodeById(nodeId);
+                if (!node) {
+                    figma.ui.postMessage({
+                        type: 'linter-error',
+                        message: 'Node não encontrado'
+                    });
+                    break;
+                }
+
+                // Seleciona o node
+                figma.currentPage.selection = [node as SceneNode];
+
+                // Faz zoom no node
+                figma.viewport.scrollAndZoomIntoView([node as SceneNode]);
+
+                // Notifica UI
+                figma.ui.postMessage({
+                    type: 'node-selected',
+                    nodeId: nodeId
+                });
+            } catch (error: any) {
+                figma.ui.postMessage({
+                    type: 'linter-error',
+                    message: error?.message || 'Erro ao selecionar node'
+                });
+            }
+            break;
+
+        case 'mark-problem-resolved':
+            try {
+                const nodeId = msg.nodeId as string;
+                if (!nodeId) {
+                    figma.ui.postMessage({
+                        type: 'linter-error',
+                        message: 'ID do node não fornecido'
+                    });
+                    break;
+                }
+
+                const node = figma.getNodeById(nodeId);
+                if (!node) {
+                    figma.ui.postMessage({
+                        type: 'linter-error',
+                        message: 'Node não encontrado'
+                    });
+                    break;
+                }
+
+                // Re-analisa apenas este node
+                const result = await validateSingleNode(node as SceneNode);
+
+                // Salva estado se foi resolvido
+                if (result.isValid) {
+                    await figma.clientStorage.setAsync(`linter-resolved-${nodeId}`, true);
+                }
+
+                figma.ui.postMessage({
+                    type: 'validation-result',
+                    nodeId: nodeId,
+                    isFixed: result.isValid,
+                    issues: result.issues
+                });
+
+                if (result.isValid) {
+                    log('✅ Problema resolvido!', 'success');
+                } else {
+                    log(`⚠️ Problema ainda não resolvido: ${result.issues.join(', ')}`, 'warn');
+                }
+            } catch (error: any) {
+                figma.ui.postMessage({
+                    type: 'linter-error',
+                    message: error?.message || 'Erro ao validar correção'
+                });
+            }
+            break;
 
 
         case 'close':
