@@ -144,6 +144,13 @@ export class WidgetDetector {
         this.addRule('loop:image', 'loop', this.matchImage.bind(this));
         this.addRule('loop:title', 'loop', this.matchHeading.bind(this));
         this.addRule('loop:meta', 'loop', this.matchGenericText.bind(this));
+        this.addRule('loop:terms', 'loop', this.matchGenericText.bind(this));
+        this.addRule('loop:rating', 'loop', this.matchStarRating.bind(this));
+        this.addRule('loop:price', 'loop', this.matchGenericText.bind(this));
+        this.addRule('loop:add-to-cart', 'loop', this.matchButton.bind(this));
+        this.addRule('loop:read-more', 'loop', this.matchButton.bind(this));
+        this.addRule('loop:featured-image', 'loop', this.matchImage.bind(this));
+        this.addRule('loop:pagination', 'loop', this.matchGenericContainer.bind(this));
 
         // === WORDPRESS ===
         this.addRule('w:wp-search', 'wordpress', this.matchSearchForm.bind(this));
@@ -152,8 +159,100 @@ export class WidgetDetector {
         this.addRule('w:wp-categories', 'wordpress', this.matchGenericContainer.bind(this));
         this.addRule('w:wp-calendar', 'wordpress', this.matchGenericContainer.bind(this));
         this.addRule('w:wp-tag-cloud', 'wordpress', this.matchGenericContainer.bind(this));
+        this.addRule('w:wp-recent-comments', 'wordpress', this.matchGenericContainer.bind(this));
+        this.addRule('w:wp-custom-menu', 'wordpress', this.matchNavMenu.bind(this));
 
-        // Mais regras serão adicionadas conforme necessário
+        // === BÁSICOS ADICIONAIS (Fase 1) ===
+        this.addRule('w:gallery', 'basic', this.matchGallery.bind(this));
+        this.addRule('w:image-carousel', 'basic', this.matchImageCarousel.bind(this));
+        this.addRule('w:basic-gallery', 'basic', this.matchGallery.bind(this));
+        this.addRule('w:google-maps', 'basic', this.matchGoogleMaps.bind(this));
+        this.addRule('w:embed', 'basic', this.matchEmbed.bind(this));
+        this.addRule('w:lottie', 'basic', this.matchLottie.bind(this));
+        this.addRule('w:shortcode', 'basic', this.matchShortcode.bind(this));
+        this.addRule('w:html', 'basic', this.matchHTML.bind(this));
+        this.addRule('w:menu-anchor', 'basic', this.matchMenuAnchor.bind(this));
+        this.addRule('w:sidebar', 'basic', this.matchSidebar.bind(this));
+        this.addRule('w:read-more', 'basic', this.matchReadMore.bind(this));
+        this.addRule('w:soundcloud', 'basic', this.matchSoundcloud.bind(this));
+        this.addRule('loop:grid', 'basic', this.matchLoopGrid.bind(this));
+
+        // === WOOCOMMERCE SIMPLES (Fase 1) ===
+        this.addRule('woo:product-breadcrumb', 'woo', this.matchWooBreadcrumb.bind(this));
+        this.addRule('woo:products', 'woo', this.matchWooProducts.bind(this));
+        this.addRule('woo:product-grid', 'woo', this.matchWooProductGrid.bind(this));
+        this.addRule('woo:product-carousel', 'woo', this.matchWooProductCarousel.bind(this));
+        this.addRule('woo:loop-product-title', 'woo', this.matchGenericText.bind(this));
+        this.addRule('woo:loop-product-price', 'woo', this.matchGenericText.bind(this));
+        this.addRule('woo:loop-product-image', 'woo', this.matchImage.bind(this));
+        this.addRule('woo:loop-product-button', 'woo', this.matchButton.bind(this));
+
+        this.addRule('woo:product-data-tabs', 'woo', this.matchWooProductTabs.bind(this));
+        this.addRule('woo:product-excerpt', 'woo', this.matchGenericText.bind(this));
+        this.addRule('woo:product-stock', 'woo', this.matchWooProductStock.bind(this));
+        this.addRule('woo:product-meta', 'woo', this.matchWooProductMeta.bind(this));
+        this.addRule('woo:product-additional-information', 'woo', this.matchGenericContainer.bind(this));
+        this.addRule('woo:product-short-description', 'woo', this.matchGenericText.bind(this));
+        this.addRule('woo:product-related', 'woo', this.matchWooProducts.bind(this));
+        this.addRule('woo:product-upsells', 'woo', this.matchWooProducts.bind(this));
+        this.addRule('woo:product-tabs', 'woo', this.matchWooProductTabs.bind(this));
+        this.addRule('woo:product-gallery', 'woo', this.matchGallery.bind(this));
+        this.addRule('woo:product-loop-item', 'woo', this.matchGenericContainer.bind(this));
+        this.addRule('woo:loop-product-rating', 'woo', this.matchStarRating.bind(this));
+        this.addRule('woo:loop-product-meta', 'woo', this.matchGenericText.bind(this));
+        this.addRule('woo:my-account', 'woo', this.matchForm.bind(this));
+        this.addRule('woo:purchase-summary', 'woo', this.matchGenericContainer.bind(this));
+        this.addRule('woo:order-tracking', 'woo', this.matchForm.bind(this));
+
+        // === PRO AVANÇADO (Fase 3) ===
+        this.addRule('w:subscription', 'pro', this.matchSubscription.bind(this));
+        this.addRule('w:media-carousel', 'pro', this.matchMediaCarousel.bind(this));
+        this.addRule('w:slider-slides', 'pro', this.matchSliderSlides.bind(this));
+        this.addRule('w:post-navigation', 'pro', this.matchPostNavigation.bind(this));
+        this.addRule('w:table-of-contents', 'pro', this.matchTableOfContents.bind(this));
+        this.addRule('w:blockquote', 'pro', this.matchBlockquote.bind(this));
+        this.addRule('w:testimonial-carousel', 'pro', this.matchTestimonialCarousel.bind(this));
+        this.addRule('w:review-box', 'pro', this.matchReviewBox.bind(this));
+        this.addRule('w:reviews', 'pro', this.matchReviews.bind(this));
+        this.addRule('w:hotspots', 'pro', this.matchHotspots.bind(this));
+        this.addRule('w:sitemap', 'pro', this.matchSitemap.bind(this));
+        this.addRule('w:progress-tracker', 'pro', this.matchProgressTracker.bind(this));
+        this.addRule('w:animated-text', 'pro', this.matchAnimatedText.bind(this));
+        this.addRule('w:nav-menu-pro', 'pro', this.matchNavMenu.bind(this));
+        this.addRule('w:breadcrumb', 'pro', this.matchBreadcrumb.bind(this));
+        this.addRule('w:facebook-button', 'pro', this.matchFacebookButton.bind(this));
+        this.addRule('w:facebook-comments', 'pro', this.matchFacebookComments.bind(this));
+        this.addRule('w:facebook-embed', 'pro', this.matchFacebookEmbed.bind(this));
+        this.addRule('w:facebook-page', 'pro', this.matchFacebookPage.bind(this));
+        this.addRule('w:loop-builder', 'pro', this.matchGenericContainer.bind(this));
+        this.addRule('w:loop-grid-advanced', 'pro', this.matchLoopGrid.bind(this));
+        this.addRule('w:loop-carousel', 'pro', this.matchImageCarousel.bind(this));
+        this.addRule('w:post-info', 'pro', this.matchPostInfo.bind(this));
+        this.addRule('w:post-featured-image', 'pro', this.matchImage.bind(this));
+        this.addRule('w:post-author', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:post-date', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:post-terms', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:archive-title', 'pro', this.matchHeading.bind(this));
+        this.addRule('w:archive-description', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:site-logo', 'pro', this.matchImage.bind(this));
+        this.addRule('w:site-title', 'pro', this.matchHeading.bind(this));
+        this.addRule('w:site-tagline', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:search-results', 'pro', this.matchGenericContainer.bind(this));
+        this.addRule('w:global-widget', 'pro', this.matchGenericContainer.bind(this));
+        this.addRule('w:video-playlist', 'pro', this.matchVideoPlaylist.bind(this));
+        this.addRule('w:video-gallery', 'pro', this.matchVideoGallery.bind(this));
+        this.addRule('w:nested-tabs', 'pro', this.matchNestedTabs.bind(this));
+
+        // === EXPERIMENTAIS (Fase 4) ===
+        this.addRule('w:mega-menu', 'experimental', this.matchMegaMenu.bind(this));
+        this.addRule('w:scroll-snap', 'experimental', this.matchScrollSnap.bind(this));
+        this.addRule('w:motion-effects', 'experimental', this.matchMotionEffects.bind(this));
+        this.addRule('w:background-slideshow', 'experimental', this.matchBackgroundSlideshow.bind(this));
+        this.addRule('w:css-transform', 'experimental', this.matchCSSTransform.bind(this));
+        this.addRule('w:custom-position', 'experimental', this.matchCustomPosition.bind(this));
+        this.addRule('w:dynamic-tags', 'experimental', this.matchDynamicTags.bind(this));
+        this.addRule('w:ajax-pagination', 'experimental', this.matchAjaxPagination.bind(this));
+        this.addRule('w:parallax', 'experimental', this.matchParallax.bind(this));
     }
 
     /**
@@ -979,4 +1078,727 @@ export class WidgetDetector {
 
         return Math.min(confidence, 1.0);
     }
+
+
+
+
+    private matchGallery(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('gallery') || name.includes('galeria')) {
+            confidence += 0.6;
+        }
+
+        // Container com múltiplas imagens
+        if (node.type === 'FRAME' && 'children' in node && node.children) {
+            const imageCount = node.children.filter(child => {
+                const childName = child.name.toLowerCase();
+                return childName.includes('image') || childName.includes('img') ||
+                    ('fills' in child && Array.isArray(child.fills) &&
+                        child.fills.some(fill => fill.type === 'IMAGE'));
+            }).length;
+
+            if (imageCount >= 3) {
+                confidence += 0.4;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchImageCarousel(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('carousel') || name.includes('slider') || name.includes('swiper')) {
+            confidence += 0.5;
+        }
+
+        if (name.includes('image')) {
+            confidence += 0.3;
+        }
+
+        // Container horizontal com múltiplas imagens
+        if (node.type === 'FRAME' && 'children' in node && 'layoutMode' in node) {
+            if (node.layoutMode === 'HORIZONTAL') {
+                confidence += 0.2;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchGoogleMaps(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('map') || name.includes('google') || name.includes('location')) {
+            confidence += 0.7;
+        }
+
+        // Frame com aspect ratio próximo de mapa
+        if ('width' in node && 'height' in node) {
+            const ratio = (node.width as number) / (node.height as number);
+            if (ratio >= 1.3 && ratio <= 2.0) {
+                confidence += 0.3;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchEmbed(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('embed') || name.includes('iframe') ||
+            name.includes('youtube') || name.includes('vimeo')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchLottie(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('lottie') || name.includes('animation') || name.includes('animated')) {
+            confidence += 0.7;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchShortcode(node: SceneNode): number {
+        if (node.type !== 'TEXT') return 0;
+        const text = node as TextNode;
+
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('shortcode')) {
+            confidence += 0.6;
+        }
+
+        // Texto com formato [shortcode]
+        if (text.characters && text.characters.includes('[') && text.characters.includes(']')) {
+            confidence += 0.4;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchHTML(node: SceneNode): number {
+        if (node.type !== 'TEXT') return 0;
+        const text = node as TextNode;
+
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('html') || name.includes('code')) {
+            confidence += 0.6;
+        }
+
+        // Texto com tags HTML
+        if (text.characters && text.characters.includes('<') && text.characters.includes('>')) {
+            confidence += 0.4;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchMenuAnchor(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('anchor') || name.includes('menu-anchor')) {
+            confidence += 0.8;
+        }
+
+        // Spacer ou divider pequeno
+        if ('width' in node && 'height' in node) {
+            const width = node.width as number;
+            const height = node.height as number;
+            if (width < 50 && height < 50) {
+                confidence += 0.2;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchSidebar(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('sidebar') || name.includes('aside')) {
+            confidence += 0.7;
+        }
+
+        // Container vertical
+        if (node.type === 'FRAME' && 'layoutMode' in node) {
+            if (node.layoutMode === 'VERTICAL') {
+                confidence += 0.3;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchReadMore(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('read') && name.includes('more')) {
+            confidence += 0.6;
+        }
+
+        if (name.includes('button') || name.includes('link')) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchSoundcloud(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('soundcloud') || name.includes('audio') || name.includes('music')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchLoopGrid(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('grid') || name.includes('loop') || name.includes('repeater')) {
+            confidence += 0.5;
+        }
+
+        // Container com layout grid ou múltiplos filhos repetidos
+        if (node.type === 'FRAME' && 'children' in node && node.children) {
+            if (node.children.length >= 4) {
+                confidence += 0.3;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    // ==================== MATCHERS - WOOCOMMERCE SIMPLES ====================
+
+    private matchWooBreadcrumb(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('breadcrumb') || name.includes('bread')) {
+            confidence += 0.7;
+        }
+
+        if (name.includes('product') || name.includes('woo')) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchWooProducts(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('products') || name.includes('shop')) {
+            confidence += 0.6;
+        }
+
+        // Container com múltiplos itens
+        if (node.type === 'FRAME' && 'children' in node && node.children) {
+            if (node.children.length >= 3) {
+                confidence += 0.4;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchWooProductGrid(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('product') && name.includes('grid')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchWooProductCarousel(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('product') && (name.includes('carousel') || name.includes('slider'))) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchWooProductSingle(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('product') && name.includes('single')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+    private matchWooProductTabs(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('tab') && name.includes('product')) {
+            confidence += 0.7;
+        }
+
+        if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchWooProductStock(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('stock') || name.includes('availability')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchWooProductMeta(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('meta') && name.includes('product')) {
+            confidence += 0.7;
+        }
+
+        if (name.includes('sku') || name.includes('category') || name.includes('tag')) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    // ==================== MATCHERS - PRO AVANÇADO ====================
+
+    private matchSubscription(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('subscription') || name.includes('subscribe') || name.includes('newsletter')) {
+            confidence += 0.7;
+        }
+
+        if (node.type === 'FRAME' && 'children' in node) {
+            const hasInput = node.children?.some(child => child.name.toLowerCase().includes('email'));
+            if (hasInput) confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchMediaCarousel(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('media') && name.includes('carousel')) {
+            confidence += 0.8;
+        }
+
+        if (name.includes('carousel') || name.includes('slider')) {
+            confidence += 0.2;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchSliderSlides(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('slider') || name.includes('slide')) {
+            confidence += 0.7;
+        }
+
+        if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchPostNavigation(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if ((name.includes('prev') || name.includes('next')) && name.includes('post')) {
+            confidence += 0.7;
+        }
+
+        if (name.includes('navigation')) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchTableOfContents(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('toc') || name.includes('table') && name.includes('content')) {
+            confidence += 0.8;
+        }
+
+        if (name.includes('index') || name.includes('summary')) {
+            confidence += 0.2;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchBlockquote(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('blockquote') || name.includes('quote')) {
+            confidence += 0.7;
+        }
+
+        if (node.type === 'TEXT') {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchTestimonialCarousel(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('testimonial') && name.includes('carousel')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchReviewBox(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('review') && name.includes('box')) {
+            confidence += 0.8;
+        }
+
+        if (name.includes('rating')) {
+            confidence += 0.2;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchReviews(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('reviews') || name.includes('rating')) {
+            confidence += 0.7;
+        }
+
+        if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchHotspots(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('hotspot') || name.includes('marker')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchSitemap(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('sitemap')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchProgressTracker(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('progress') || name.includes('tracker') || name.includes('stepper') || name.includes('wizard')) {
+            confidence += 0.7;
+        }
+
+        if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 3) {
+            confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchAnimatedText(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('animated') && name.includes('text')) {
+            confidence += 0.8;
+        }
+
+        if (node.type === 'TEXT') {
+            confidence += 0.2;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchBreadcrumb(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('breadcrumb') || name.includes('bread')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchFacebookButton(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('facebook') && name.includes('button')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchFacebookComments(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('facebook') && name.includes('comment')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchFacebookEmbed(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('facebook') && name.includes('embed')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchFacebookPage(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('facebook') && name.includes('page')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchPostInfo(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('post') && name.includes('info')) {
+            confidence += 0.8;
+        }
+
+        if (name.includes('meta') || name.includes('date') || name.includes('author')) {
+            confidence += 0.2;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchVideoPlaylist(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('video') && name.includes('playlist')) {
+            confidence += 0.8;
+        }
+
+        if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
+            confidence += 0.2;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchVideoGallery(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('video') && name.includes('gallery')) {
+            confidence += 0.8;
+        }
+
+        if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
+            confidence += 0.2;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchNestedTabs(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('nested') && name.includes('tab')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    // ==================== MATCHERS - EXPERIMENTAIS ====================
+
+    private matchMegaMenu(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('mega') && name.includes('menu')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchScrollSnap(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('scroll') && name.includes('snap')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchMotionEffects(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('motion') || name.includes('parallax') || name.includes('effect')) {
+            confidence += 0.6;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchBackgroundSlideshow(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('background') && name.includes('slideshow')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchCSSTransform(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('transform') || name.includes('rotate') || name.includes('scale')) {
+            confidence += 0.7;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchCustomPosition(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('position') || name.includes('absolute') || name.includes('fixed')) {
+            confidence += 0.6;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchDynamicTags(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('dynamic') && name.includes('tag')) {
+            confidence += 0.8;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchAjaxPagination(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('ajax') && name.includes('pagination')) {
+            confidence += 0.9;
+        }
+
+        if (name.includes('load') && name.includes('more')) {
+            confidence += 0.1;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchParallax(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('parallax')) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
 }

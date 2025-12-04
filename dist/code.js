@@ -4884,12 +4884,104 @@ ${refText}` });
       this.addRule("loop:image", "loop", this.matchImage.bind(this));
       this.addRule("loop:title", "loop", this.matchHeading.bind(this));
       this.addRule("loop:meta", "loop", this.matchGenericText.bind(this));
+      this.addRule("loop:terms", "loop", this.matchGenericText.bind(this));
+      this.addRule("loop:rating", "loop", this.matchStarRating.bind(this));
+      this.addRule("loop:price", "loop", this.matchGenericText.bind(this));
+      this.addRule("loop:add-to-cart", "loop", this.matchButton.bind(this));
+      this.addRule("loop:read-more", "loop", this.matchButton.bind(this));
+      this.addRule("loop:featured-image", "loop", this.matchImage.bind(this));
+      this.addRule("loop:pagination", "loop", this.matchGenericContainer.bind(this));
       this.addRule("w:wp-search", "wordpress", this.matchSearchForm.bind(this));
       this.addRule("w:wp-recent-posts", "wordpress", this.matchGenericContainer.bind(this));
       this.addRule("w:wp-archives", "wordpress", this.matchGenericContainer.bind(this));
       this.addRule("w:wp-categories", "wordpress", this.matchGenericContainer.bind(this));
       this.addRule("w:wp-calendar", "wordpress", this.matchGenericContainer.bind(this));
       this.addRule("w:wp-tag-cloud", "wordpress", this.matchGenericContainer.bind(this));
+      this.addRule("w:wp-recent-comments", "wordpress", this.matchGenericContainer.bind(this));
+      this.addRule("w:wp-custom-menu", "wordpress", this.matchNavMenu.bind(this));
+      this.addRule("w:gallery", "basic", this.matchGallery.bind(this));
+      this.addRule("w:image-carousel", "basic", this.matchImageCarousel.bind(this));
+      this.addRule("w:basic-gallery", "basic", this.matchGallery.bind(this));
+      this.addRule("w:google-maps", "basic", this.matchGoogleMaps.bind(this));
+      this.addRule("w:embed", "basic", this.matchEmbed.bind(this));
+      this.addRule("w:lottie", "basic", this.matchLottie.bind(this));
+      this.addRule("w:shortcode", "basic", this.matchShortcode.bind(this));
+      this.addRule("w:html", "basic", this.matchHTML.bind(this));
+      this.addRule("w:menu-anchor", "basic", this.matchMenuAnchor.bind(this));
+      this.addRule("w:sidebar", "basic", this.matchSidebar.bind(this));
+      this.addRule("w:read-more", "basic", this.matchReadMore.bind(this));
+      this.addRule("w:soundcloud", "basic", this.matchSoundcloud.bind(this));
+      this.addRule("loop:grid", "basic", this.matchLoopGrid.bind(this));
+      this.addRule("woo:product-breadcrumb", "woo", this.matchWooBreadcrumb.bind(this));
+      this.addRule("woo:products", "woo", this.matchWooProducts.bind(this));
+      this.addRule("woo:product-grid", "woo", this.matchWooProductGrid.bind(this));
+      this.addRule("woo:product-carousel", "woo", this.matchWooProductCarousel.bind(this));
+      this.addRule("woo:loop-product-title", "woo", this.matchGenericText.bind(this));
+      this.addRule("woo:loop-product-price", "woo", this.matchGenericText.bind(this));
+      this.addRule("woo:loop-product-image", "woo", this.matchImage.bind(this));
+      this.addRule("woo:loop-product-button", "woo", this.matchButton.bind(this));
+      this.addRule("woo:product-data-tabs", "woo", this.matchWooProductTabs.bind(this));
+      this.addRule("woo:product-excerpt", "woo", this.matchGenericText.bind(this));
+      this.addRule("woo:product-stock", "woo", this.matchWooProductStock.bind(this));
+      this.addRule("woo:product-meta", "woo", this.matchWooProductMeta.bind(this));
+      this.addRule("woo:product-additional-information", "woo", this.matchGenericContainer.bind(this));
+      this.addRule("woo:product-short-description", "woo", this.matchGenericText.bind(this));
+      this.addRule("woo:product-related", "woo", this.matchWooProducts.bind(this));
+      this.addRule("woo:product-upsells", "woo", this.matchWooProducts.bind(this));
+      this.addRule("woo:product-tabs", "woo", this.matchWooProductTabs.bind(this));
+      this.addRule("woo:product-gallery", "woo", this.matchGallery.bind(this));
+      this.addRule("woo:product-loop-item", "woo", this.matchGenericContainer.bind(this));
+      this.addRule("woo:loop-product-rating", "woo", this.matchStarRating.bind(this));
+      this.addRule("woo:loop-product-meta", "woo", this.matchGenericText.bind(this));
+      this.addRule("woo:my-account", "woo", this.matchForm.bind(this));
+      this.addRule("woo:purchase-summary", "woo", this.matchGenericContainer.bind(this));
+      this.addRule("woo:order-tracking", "woo", this.matchForm.bind(this));
+      this.addRule("w:subscription", "pro", this.matchSubscription.bind(this));
+      this.addRule("w:media-carousel", "pro", this.matchMediaCarousel.bind(this));
+      this.addRule("w:slider-slides", "pro", this.matchSliderSlides.bind(this));
+      this.addRule("w:post-navigation", "pro", this.matchPostNavigation.bind(this));
+      this.addRule("w:table-of-contents", "pro", this.matchTableOfContents.bind(this));
+      this.addRule("w:blockquote", "pro", this.matchBlockquote.bind(this));
+      this.addRule("w:testimonial-carousel", "pro", this.matchTestimonialCarousel.bind(this));
+      this.addRule("w:review-box", "pro", this.matchReviewBox.bind(this));
+      this.addRule("w:reviews", "pro", this.matchReviews.bind(this));
+      this.addRule("w:hotspots", "pro", this.matchHotspots.bind(this));
+      this.addRule("w:sitemap", "pro", this.matchSitemap.bind(this));
+      this.addRule("w:progress-tracker", "pro", this.matchProgressTracker.bind(this));
+      this.addRule("w:animated-text", "pro", this.matchAnimatedText.bind(this));
+      this.addRule("w:nav-menu-pro", "pro", this.matchNavMenu.bind(this));
+      this.addRule("w:breadcrumb", "pro", this.matchBreadcrumb.bind(this));
+      this.addRule("w:facebook-button", "pro", this.matchFacebookButton.bind(this));
+      this.addRule("w:facebook-comments", "pro", this.matchFacebookComments.bind(this));
+      this.addRule("w:facebook-embed", "pro", this.matchFacebookEmbed.bind(this));
+      this.addRule("w:facebook-page", "pro", this.matchFacebookPage.bind(this));
+      this.addRule("w:loop-builder", "pro", this.matchGenericContainer.bind(this));
+      this.addRule("w:loop-grid-advanced", "pro", this.matchLoopGrid.bind(this));
+      this.addRule("w:loop-carousel", "pro", this.matchImageCarousel.bind(this));
+      this.addRule("w:post-info", "pro", this.matchPostInfo.bind(this));
+      this.addRule("w:post-featured-image", "pro", this.matchImage.bind(this));
+      this.addRule("w:post-author", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:post-date", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:post-terms", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:archive-title", "pro", this.matchHeading.bind(this));
+      this.addRule("w:archive-description", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:site-logo", "pro", this.matchImage.bind(this));
+      this.addRule("w:site-title", "pro", this.matchHeading.bind(this));
+      this.addRule("w:site-tagline", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:search-results", "pro", this.matchGenericContainer.bind(this));
+      this.addRule("w:global-widget", "pro", this.matchGenericContainer.bind(this));
+      this.addRule("w:video-playlist", "pro", this.matchVideoPlaylist.bind(this));
+      this.addRule("w:video-gallery", "pro", this.matchVideoGallery.bind(this));
+      this.addRule("w:nested-tabs", "pro", this.matchNestedTabs.bind(this));
+      this.addRule("w:mega-menu", "experimental", this.matchMegaMenu.bind(this));
+      this.addRule("w:scroll-snap", "experimental", this.matchScrollSnap.bind(this));
+      this.addRule("w:motion-effects", "experimental", this.matchMotionEffects.bind(this));
+      this.addRule("w:background-slideshow", "experimental", this.matchBackgroundSlideshow.bind(this));
+      this.addRule("w:css-transform", "experimental", this.matchCSSTransform.bind(this));
+      this.addRule("w:custom-position", "experimental", this.matchCustomPosition.bind(this));
+      this.addRule("w:dynamic-tags", "experimental", this.matchDynamicTags.bind(this));
+      this.addRule("w:ajax-pagination", "experimental", this.matchAjaxPagination.bind(this));
+      this.addRule("w:parallax", "experimental", this.matchParallax.bind(this));
     }
     /**
      * Adiciona uma regra de detecção
@@ -5473,6 +5565,528 @@ ${refText}` });
       }
       if ("children" in node && node.children && node.children.length > 0) {
         confidence += 0.4;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchGallery(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("gallery") || name.includes("galeria")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const imageCount = node.children.filter((child) => {
+          const childName = child.name.toLowerCase();
+          return childName.includes("image") || childName.includes("img") || "fills" in child && Array.isArray(child.fills) && child.fills.some((fill) => fill.type === "IMAGE");
+        }).length;
+        if (imageCount >= 3) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchImageCarousel(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("carousel") || name.includes("slider") || name.includes("swiper")) {
+        confidence += 0.5;
+      }
+      if (name.includes("image")) {
+        confidence += 0.3;
+      }
+      if (node.type === "FRAME" && "children" in node && "layoutMode" in node) {
+        if (node.layoutMode === "HORIZONTAL") {
+          confidence += 0.2;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchGoogleMaps(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("map") || name.includes("google") || name.includes("location")) {
+        confidence += 0.7;
+      }
+      if ("width" in node && "height" in node) {
+        const ratio = node.width / node.height;
+        if (ratio >= 1.3 && ratio <= 2) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchEmbed(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("embed") || name.includes("iframe") || name.includes("youtube") || name.includes("vimeo")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchLottie(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("lottie") || name.includes("animation") || name.includes("animated")) {
+        confidence += 0.7;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchShortcode(node) {
+      if (node.type !== "TEXT") return 0;
+      const text = node;
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("shortcode")) {
+        confidence += 0.6;
+      }
+      if (text.characters && text.characters.includes("[") && text.characters.includes("]")) {
+        confidence += 0.4;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchHTML(node) {
+      if (node.type !== "TEXT") return 0;
+      const text = node;
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("html") || name.includes("code")) {
+        confidence += 0.6;
+      }
+      if (text.characters && text.characters.includes("<") && text.characters.includes(">")) {
+        confidence += 0.4;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchMenuAnchor(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("anchor") || name.includes("menu-anchor")) {
+        confidence += 0.8;
+      }
+      if ("width" in node && "height" in node) {
+        const width = node.width;
+        const height = node.height;
+        if (width < 50 && height < 50) {
+          confidence += 0.2;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSidebar(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("sidebar") || name.includes("aside")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "layoutMode" in node) {
+        if (node.layoutMode === "VERTICAL") {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchReadMore(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("read") && name.includes("more")) {
+        confidence += 0.6;
+      }
+      if (name.includes("button") || name.includes("link")) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSoundcloud(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("soundcloud") || name.includes("audio") || name.includes("music")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchLoopGrid(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("grid") || name.includes("loop") || name.includes("repeater")) {
+        confidence += 0.5;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        if (node.children.length >= 4) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    // ==================== MATCHERS - WOOCOMMERCE SIMPLES ====================
+    matchWooBreadcrumb(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("breadcrumb") || name.includes("bread")) {
+        confidence += 0.7;
+      }
+      if (name.includes("product") || name.includes("woo")) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProducts(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("products") || name.includes("shop")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        if (node.children.length >= 3) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductGrid(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("product") && name.includes("grid")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductCarousel(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("product") && (name.includes("carousel") || name.includes("slider"))) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductSingle(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("product") && name.includes("single")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductTabs(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("tab") && name.includes("product")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductStock(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("stock") || name.includes("availability")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductMeta(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("meta") && name.includes("product")) {
+        confidence += 0.7;
+      }
+      if (name.includes("sku") || name.includes("category") || name.includes("tag")) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    // ==================== MATCHERS - PRO AVANÇADO ====================
+    matchSubscription(node) {
+      var _a;
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("subscription") || name.includes("subscribe") || name.includes("newsletter")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node) {
+        const hasInput = (_a = node.children) == null ? void 0 : _a.some((child) => child.name.toLowerCase().includes("email"));
+        if (hasInput) confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchMediaCarousel(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("media") && name.includes("carousel")) {
+        confidence += 0.8;
+      }
+      if (name.includes("carousel") || name.includes("slider")) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSliderSlides(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("slider") || name.includes("slide")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchPostNavigation(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if ((name.includes("prev") || name.includes("next")) && name.includes("post")) {
+        confidence += 0.7;
+      }
+      if (name.includes("navigation")) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchTableOfContents(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("toc") || name.includes("table") && name.includes("content")) {
+        confidence += 0.8;
+      }
+      if (name.includes("index") || name.includes("summary")) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchBlockquote(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("blockquote") || name.includes("quote")) {
+        confidence += 0.7;
+      }
+      if (node.type === "TEXT") {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchTestimonialCarousel(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("testimonial") && name.includes("carousel")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchReviewBox(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("review") && name.includes("box")) {
+        confidence += 0.8;
+      }
+      if (name.includes("rating")) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchReviews(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("reviews") || name.includes("rating")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchHotspots(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("hotspot") || name.includes("marker")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSitemap(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("sitemap")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchProgressTracker(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("progress") || name.includes("tracker") || name.includes("stepper") || name.includes("wizard")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 3) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchAnimatedText(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("animated") && name.includes("text")) {
+        confidence += 0.8;
+      }
+      if (node.type === "TEXT") {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchBreadcrumb(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("breadcrumb") || name.includes("bread")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchFacebookButton(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("facebook") && name.includes("button")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchFacebookComments(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("facebook") && name.includes("comment")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchFacebookEmbed(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("facebook") && name.includes("embed")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchFacebookPage(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("facebook") && name.includes("page")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchPostInfo(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("post") && name.includes("info")) {
+        confidence += 0.8;
+      }
+      if (name.includes("meta") || name.includes("date") || name.includes("author")) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchVideoPlaylist(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("video") && name.includes("playlist")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchVideoGallery(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("video") && name.includes("gallery")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchNestedTabs(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("nested") && name.includes("tab")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    // ==================== MATCHERS - EXPERIMENTAIS ====================
+    matchMegaMenu(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("mega") && name.includes("menu")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchScrollSnap(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("scroll") && name.includes("snap")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchMotionEffects(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("motion") || name.includes("parallax") || name.includes("effect")) {
+        confidence += 0.6;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchBackgroundSlideshow(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("background") && name.includes("slideshow")) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchCSSTransform(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("transform") || name.includes("rotate") || name.includes("scale")) {
+        confidence += 0.7;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchCustomPosition(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("position") || name.includes("absolute") || name.includes("fixed")) {
+        confidence += 0.6;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchDynamicTags(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("dynamic") && name.includes("tag")) {
+        confidence += 0.8;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchAjaxPagination(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("ajax") && name.includes("pagination")) {
+        confidence += 0.9;
+      }
+      if (name.includes("load") && name.includes("more")) {
+        confidence += 0.1;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchParallax(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("parallax")) {
+        confidence += 0.9;
       }
       return Math.min(confidence, 1);
     }
@@ -6785,6 +7399,9 @@ ${detection.justification}
       // ========== LINTER HANDLERS ==========
       case "analyze-layout":
         try {
+          console.log("\u26A0\uFE0F\u26A0\uFE0F\u26A0\uFE0F [FORENSIC] analyze-layout HANDLER CHAMADO!");
+          console.log("\u26A0\uFE0F Timestamp:", (/* @__PURE__ */ new Date()).toISOString());
+          console.log("\u26A0\uFE0F Stack trace:", new Error().stack);
           log("\u{1F50D} Handler analyze-layout iniciado", "info");
           const selection = figma.currentPage.selection;
           if (!selection || selection.length === 0) {

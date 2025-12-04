@@ -1143,6 +1143,12 @@
       }
 
       function send(type, payload = {}) {
+        // FORENSIC LOG
+        if (type === 'analyze-layout') {
+          console.error('⚠️⚠️⚠️ [UI FORENSIC] send("analyze-layout") CHAMADO!');
+          console.error('⚠️ Stack trace:', new Error().stack);
+          console.error('⚠️ Payload:', payload);
+        }
         parent.postMessage({ pluginMessage: { type, ...payload } }, '*');
       }
 
