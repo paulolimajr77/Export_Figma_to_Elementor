@@ -1597,21 +1597,6 @@
                   send('download-json');
                 }
                 break;
-              case 'analyze-layout':
-                // Botão "Re-analisar"
-                send('analyze-layout');
-                break;
-
-              case 'copy-linter-report':
-                // Botão "Copiar"
-                const reportText = `Relatório de Análise:\nTotal Issues: ${document.getElementById('linter-total-issues').textContent}\n...`; // Simplificado
-                copyToClipboard(reportText); // Ou apenas notificar que copiou
-                addLog('Relatório copiado para a área de transferência', 'success');
-                break;
-              case 'export-wp': send('export-wp', payload); break;
-              case 'reset':
-                if (output) output.value = '';
-                if (logs) logs.innerHTML = '';
                 if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
                 updateBridgeOutput('', false);
                 updateBridgeOutput('', false);
