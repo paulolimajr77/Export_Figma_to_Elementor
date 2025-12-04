@@ -40,7 +40,7 @@ export function createNodeSnapshot(node: SceneNode): NodeSnapshot {
         const frame = node as FrameNode;
         if (frame.layoutMode !== "NONE") {
             snapshot.isAutoLayout = true;
-            snapshot.direction = frame.layoutMode;
+            snapshot.direction = frame.layoutMode as AxisDirection;
             snapshot.spacing = frame.itemSpacing;
             snapshot.paddingTop = frame.paddingTop;
             snapshot.paddingRight = frame.paddingRight;
@@ -108,7 +108,8 @@ export function createNodeSnapshot(node: SceneNode): NodeSnapshot {
                 imageCount++;
                 snapshot.hasChildImage = true;
             } else if (n.type === "RECTANGLE") {
-                if (Array.isArray((n as RectangleNode).fills) && (n as RectangleNode).fills.some((f: any) => f.type === "IMAGE")) {
+                const fills = (n as RectangleNode).fills;
+                if (Array.isArray(fills) && fills.some((f: any) => f.type === "IMAGE")) {
                     imageCount++;
                     snapshot.hasChildImage = true;
                 }
@@ -140,7 +141,8 @@ export function createNodeSnapshot(node: SceneNode): NodeSnapshot {
                 snapshot.hasChildImage = true;
             }
             if (child.type === "RECTANGLE") {
-                if (Array.isArray((child as RectangleNode).fills) && (child as RectangleNode).fills.some((f: any) => f.type === "IMAGE")) {
+                const fills = (child as RectangleNode).fills;
+                if (Array.isArray(fills) && fills.some((f: any) => f.type === "IMAGE")) {
                     snapshot.hasChildImage = true;
                 }
             }
@@ -163,7 +165,7 @@ export function createNodeSnapshot(node: SceneNode): NodeSnapshot {
             // Let's do a 1-level deep peek for images if not found yet.
             if (!snapshot.hasChildImage && (child.type === "FRAME" || child.type === "INSTANCE" || child.type === "GROUP")) {
                 const grandChildren = (child as any).children;
-                if (grandChildren && grandChildren.some((gc: any) => gc.type === "VECTOR" || (gc.fills && gc.fills.some((f: any) => f.type === 'IMAGE')))) {
+                if (grandChildren && grandChildren.some((gc: any) => gc.type === "VECTOR" || (gc.fills && Array.isArray(gc.fills) && gc.fills.some((f: any) => f.type === 'IMAGE')))) {
                     snapshot.hasChildImage = true;
                 }
             }

@@ -293,10 +293,65 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
 
     const uploadPromises: Promise<void>[] = [];
 
-    const processWidget = async (widget: any) => {
-        if (uploadEnabled && widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'button')) {
+    // Function to recursively correct widget types based on Figma node names
+    const correctWidgetTypes = async (container: any) => {
+        for (const widget of container.widgets || []) {
             try {
-                const node = figma.getNodeById(widget.imageId);
+                const node = await figma.getNodeById(widget.id);
+                if (node) {
+                    // Fix: Force 'image' type if Figma node is named 'w:image'
+                    if (node.name.startsWith('w:image') && !node.name.startsWith('w:image-box') && widget.type !== 'image') {
+                        console.log(`[FIX] Correcting widget type from ${widget.type} to image for node ${node.name}`);
+                        widget.type = 'image';
+                    }
+                    // Fix: Force 'button' type if Figma node is named 'w:button'
+                    if (node.name.startsWith('w:button') && widget.type !== 'button') {
+                        console.log(`[FIX] Correcting widget type from ${widget.type} to button for node ${node.name}`);
+                        widget.type = 'button';
+                    }
+                }
+            } catch (e) {
+                console.error(`[FIX] Error checking node ${widget.id}:`, e);
+            }
+
+            if (widget.children && Array.isArray(widget.children)) {
+                // Recursively correct children (e.g. icons inside buttons)
+                for (const child of widget.children) {
+                    if (child.id) {
+                        try {
+                            const childNode = await figma.getNodeById(child.id);
+                            if (childNode) {
+                                // Fix: Ensure icons are typed as icons
+                                if ((childNode.type === 'VECTOR' || childNode.name === 'Icon') && child.type !== 'icon') {
+                                    console.log(`[FIX] Correcting child widget type to icon for node ${childNode.name}`);
+                                    child.type = 'icon';
+                                }
+                            }
+                        } catch (e) { }
+                    }
+                }
+            }
+        }
+        for (const child of container.children || []) {
+            await correctWidgetTypes(child);
+        }
+    };
+
+    // Apply corrections before processing uploads
+    for (const container of schema.containers) {
+        await correctWidgetTypes(container);
+    }
+
+    const processWidget = async (widget: any) => {
+        // Ensure we use the ID from the widget if imageId is missing
+        const nodeId = widget.imageId || widget.id;
+
+        console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
+
+        if (uploadEnabled && nodeId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'button')) {
+            console.log(`[NO-AI UPLOAD] ✅ Widget ${widget.type} (${nodeId}) will be uploaded`);
+            try {
+                const node = await figma.getNodeById(nodeId);
                 if (node) {
                     let format = (widget.type === 'icon' || widget.type === 'icon-box') ? 'SVG' : 'WEBP';
 
@@ -334,6 +389,12 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                     } else if (hasVectorChildren(node as SceneNode)) {
                         format = 'SVG';
                     }
+
+                    // Force SVG for Icon nodes inside buttons or explicit icon widgets
+                    if (node.name === 'Icon' || widget.type === 'icon') {
+                        format = 'SVG';
+                    }
+
                     const result = await noaiUploader.uploadToWordPress(node as SceneNode, format as any);
                     if (result) {
                         if (widget.type === 'image-box') {
@@ -345,15 +406,16 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                         } else if (widget.type === 'button') {
                             if (!widget.styles) widget.styles = {};
                             widget.styles.selected_icon = { value: result.url, library: 'svg' };
+                            widget.imageId = result.id.toString(); // Update imageId with WordPress ID
                             console.log('[BUTTON UPLOAD] Icon uploaded:', result.url, 'ID:', result.id);
                         } else {
                             widget.content = result.url;
+                            widget.imageId = result.id.toString();
                         }
-                        widget.imageId = result.id.toString();
                     }
                 }
             } catch (e) {
-                console.error(`[NO-AI] Erro ao processar imagem ${widget.imageId}:`, e);
+                console.error(`[NO-AI] Erro ao processar imagem ${nodeId}:`, e);
             }
         }
     };
@@ -361,6 +423,12 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
     const collectUploads = (container: any) => {
         for (const widget of container.widgets || []) {
             uploadPromises.push(processWidget(widget));
+            // Process child widgets recursively (e.g., button with icon + text children)
+            if (widget.children && Array.isArray(widget.children)) {
+                for (const childWidget of widget.children) {
+                    uploadPromises.push(processWidget(childWidget));
+                }
+            }
         }
         for (const child of container.children || []) {
             collectUploads(child);
@@ -428,32 +496,7 @@ figma.ui.onmessage = async (msg) => {
     if (!msg || typeof msg !== 'object') return;
 
     switch (msg.type) {
-        case 'save-logs':
-            try {
-                const logs = logger.getLogs();
-                const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
-                const filename = `test-logs-${timestamp}.txt`;
 
-                figma.ui.postMessage({
-                    type: 'download-logs',
-                    content: logs,
-                    filename
-                });
-
-                figma.notify(`Logs salvos: ${filename}`, { timeout: 3000 });
-            } catch (error: any) {
-                figma.notify('Erro ao salvar logs', { timeout: 3000 });
-            }
-            break;
-
-        case 'clear-logs':
-            try {
-                logger.clear();
-                figma.notify('Logs limpos', { timeout: 2000 });
-            } catch (error: any) {
-                figma.notify('Erro ao limpar logs', { timeout: 3000 });
-            }
-            break;
 
         case 'inspect':
             try {
@@ -661,6 +704,8 @@ figma.ui.onmessage = async (msg) => {
                 figma.notify(e?.message || 'Erro ao organizar layers');
             }
             break;
+
+
 
         case 'close':
             figma.closePlugin();

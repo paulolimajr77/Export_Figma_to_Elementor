@@ -47,10 +47,10 @@ export class ElementorCompiler {
             flex_direction: flexDirection,
             flex__is_row: 'row',
             flex__is_column: 'column',
-            ...this.mapContainerStyles(container.styles)
+            ...this.mapContainerStyles(container.styles, container.width !== 'full')
         };
         if (!settings.flex_gap) {
-            settings.flex_gap = { unit: 'px', size: 0, column: '0', row: '0', isLinked: true };
+            settings.flex_gap = { unit: 'px', column: '', row: '', isLinked: true };
         }
         if (!settings.justify_content) settings.justify_content = 'flex-start';
         if (!settings.align_items) settings.align_items = 'flex-start';
@@ -74,8 +74,9 @@ export class ElementorCompiler {
         };
     }
 
-    private mapContainerStyles(styles: Record<string, any>): ElementorSettings {
+    private mapContainerStyles(styles: Record<string, any>, isBoxed: boolean = false): ElementorSettings {
         const settings: ElementorSettings = {};
+        settings.overflow = 'hidden'; // Fix: Prevent unwanted scrollbars
         if (!styles) return settings;
 
         const normalizeFlexValue = (value?: string): string | undefined => {
@@ -97,7 +98,6 @@ export class ElementorCompiler {
         if (styles.gap !== undefined) {
             settings.flex_gap = {
                 unit: 'px',
-                size: styles.gap,
                 column: String(styles.gap),
                 row: String(styles.gap),
                 isLinked: true
@@ -137,11 +137,20 @@ export class ElementorCompiler {
         }
 
         if (styles.width) {
-            settings.width = { unit: 'px', size: styles.width, sizes: [] };
+            if (isBoxed) {
+                settings.boxed_width = { unit: 'px', size: styles.width, sizes: [] };
+                settings.width = { unit: '%', size: '', sizes: [] };
+            } else {
+                settings.width = { unit: 'px', size: styles.width, sizes: [] };
+            }
+        } else {
+            settings.width = { unit: '%', size: '', sizes: [] };
         }
 
         if (styles.minHeight) {
             settings.min_height = { unit: 'px', size: styles.minHeight, sizes: [] };
+        } else {
+            settings.min_height = { unit: 'px', size: '', sizes: [] };
         }
 
         if (styles.primaryAxisAlignItems) {

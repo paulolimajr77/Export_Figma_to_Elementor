@@ -257,20 +257,51 @@ ${JSON.stringify(baseSchema, null, 2)}
 
                 // Se a IA definiu widgets para este container, usamos estes widgets
                 if (Array.isArray(ai.widgets)) { // Allow empty array to override
-                    merged.widgets = ai.widgets.map(w => ({
-                        ...w,
-                        styles: {
-                            ...(w.styles || {}),
-                            sourceId: (w.styles as any)?.sourceId || (w as any).sourceId || (base.styles as any)?.sourceId || base.id
-                        }
-                    }));
+                    // SAFEGUARD: If base container has children with explicit 'w:' prefix OR are detected widgets,
+                    // DO NOT allow AI to replace them with a single widget (like image-box) unless it's a wrapper.
+                    const hasExplicitChildren = base.children?.some(c => 
+                        (c.styles?.sourceName && (c.styles.sourceName.startsWith('w:') || c.styles.sourceName.startsWith('c:'))) ||
+                        (c.widgets && c.widgets.length > 0)
+                    );
+
+                    // If explicit children exist, and AI tries to return widgets but NO children (collapse), 
+                    // we might want to ignore AI widgets and keep base children structure.
+                    const isCollapsing = (base.children?.length || 0) > 1 && ai.widgets.length === 1;
+                    const isGenericWidget = ['image-box', 'icon-box'].includes(ai.widgets[0]?.type);
+
+                    if (hasExplicitChildren && isCollapsing && isGenericWidget) {
+                        console.warn(`[Merge] Preventing AI from collapsing explicit children of ${base.id} into ${ai.widgets[0].type}`);
+                        // Ignore AI widgets, fall through to process base children
+                    } else {
+                        merged.widgets = ai.widgets.map(w => ({
+                            ...w,
+                            styles: {
+                                ...(w.styles || {}),
+                                sourceId: (w.styles as any)?.sourceId || (w as any).sourceId || (base.styles as any)?.sourceId || base.id
+                            }
+                        }));
+                    }
                 }
 
                 // Se a IA definiu children, usamos estes. Essencial para remover filhos otimizados.
                 if (Array.isArray(ai.children)) {
-                    merged.children = ai.children.map(child => mergeContainer(child));
-                    // Early exit to prevent re-processing base.children
-                    return merged;
+                    // SAFEGUARD: If base is identified as a specific widget (e.g. button), DO NOT allow AI to turn it into a container with children.
+                    // This forces the use of the detected widget (e.g. w:button) instead of breaking it down.
+                    const isBaseWidget = base.widgets?.some(w => ['button', 'video', 'image', 'icon'].includes(w.type));
+                    
+                    if (isBaseWidget && ai.children.length > 0) {
+                        console.warn(`[Merge] Ignoring AI children for widget-container ${base.id} (${base.widgets?.[0]?.type}). Keeping as widget.`);
+                        // Do not process ai.children. The function will continue and likely use base.children or just the widget.
+                        // If we have merged.widgets (from AI or Base), that's good.
+                        // If AI didn't return widgets but returned children, we might need to fallback to base widgets.
+                        if (!merged.widgets && base.widgets) {
+                             merged.widgets = base.widgets;
+                        }
+                    } else {
+                        merged.children = ai.children.map(child => mergeContainer(child));
+                        // Early exit to prevent re-processing base.children
+                        return merged;
+                    }
                 }
             }
 
@@ -391,9 +422,9 @@ ${JSON.stringify(baseSchema, null, 2)}
         const processWidget = async (widget: PipelineWidget) => {
 
             // Widgets simples com imageId
-            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box')) {
+            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'icon-list')) {
                 try {
-                    const result = await uploadNodeImage(widget.imageId, widget.type === 'icon' || widget.type === 'icon-box');
+                    const result = await uploadNodeImage(widget.imageId, widget.type === 'icon' || widget.type === 'icon-box' || widget.type === 'icon-list');
                     if (result) {
                         if (widget.type === 'image-box') {
                             if (!widget.styles) widget.styles = {};
@@ -406,7 +437,8 @@ ${JSON.stringify(baseSchema, null, 2)}
                             // Keep widget.content as Title
                         } else if (widget.type === 'icon') {
                             // Correção para widget de ícone simples
-                            widget.content = { value: { id: result.id, url: result.url }, library: 'svg' };
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: 'svg' };
                         } else if (widget.styles?.icon && widget.type === 'icon-list') {
                             // Correção para itens de lista de ícones
                             widget.styles.icon = { value: { id: result.id, url: result.url }, library: 'svg' };
@@ -461,6 +493,54 @@ ${JSON.stringify(baseSchema, null, 2)}
 
                 // Filtra itens que falharam no upload para não gerar lixo no JSON
                 widget.styles.gallery = widget.styles.gallery.filter((item: any) => item.url && item.id);
+            }
+
+            // Button Icon Upload
+            if (widget.type === 'button') {
+                // Check if button has an icon URL that needs uploading (from child extraction)
+                // The registry might have set selected_icon.value to { url: "Icon", id: 6090 } where "Icon" is the name
+                // We need to find the actual child node ID if possible, or use the ID provided if it's a valid node ID.
+                const iconValue = widget.styles?.selected_icon?.value;
+                if (iconValue && typeof iconValue === 'object' && iconValue.id) {
+                    // If ID is a number, it might be already uploaded or a partial Figma ID (if parsed).
+                    // If it's a string like "6090:5830", it's a Figma ID.
+                    // The registry currently parses it to int. We might need to look at children to find the real ID if it's missing.
+
+                    // However, let's try to find the icon child in the widget's children if available
+                    // The pipeline widget might not have children populated if it came from AI, 
+                    // but if it came from Heuristics/Base, it might.
+                    // Actually, 'processWidget' receives the widget from the schema.
+
+                    // If we can't find the child, we rely on the ID in selected_icon.
+                    // But if registry parsed "6090:5830" to 6090, we can't use it for uploadNodeImage easily if we need the full ID.
+                    // Let's assume for now we can try to find the child by type 'icon' or 'vector' in the container's original node?
+                    // No, we don't have easy access to the node here without looking it up.
+
+                    // Workaround: If we have a numeric ID that matches a node in Figma (partial match?), we could try.
+                    // But better: let's try to upload using the ID we have, assuming it might be valid or we can find it.
+                    // If iconValue.url is "Icon" (name), we definitely need to upload.
+
+                    // Let's try to find the original node using the widget.imageId if available, or look up children.
+                    // But widget.imageId for button is usually the button frame itself.
+
+                    // Let's try to find a child of the button node that is a vector/icon.
+                    if (widget.styles?.sourceId) {
+                        const buttonNode = figma.getNodeById(widget.styles.sourceId);
+                        if (buttonNode && 'children' in buttonNode) {
+                            const iconChild = (buttonNode as any).children.find((c: any) => c.name === 'Icon' || c.type === 'VECTOR' || c.name.toLowerCase().includes('icon'));
+                            if (iconChild) {
+                                try {
+                                    const result = await uploadNodeImage(iconChild.id, true);
+                                    if (result) {
+                                        widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: 'svg' };
+                                    }
+                                } catch (e) {
+                                    console.error(`[Pipeline] Failed to upload button icon ${iconChild.id}:`, e);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         };
 

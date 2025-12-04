@@ -1,20 +1,28 @@
 {
   "type": "elementor",
+  "version": "0.4",
   "siteurl": "",
   "elements": [
     {
-      "id": "gpwpt1q",
+      "id": "8baaa29",
       "elType": "container",
       "isInner": false,
+      "isLocked": false,
       "settings": {
-        "_element_id": "gpwpt1q",
+        "_element_id": "8baaa29",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
+        "flex__is_row": "row",
+        "flex__is_column": "column",
+        "justify_content": "flex-start",
+        "flex_justify_content": "flex-start",
+        "align_items": "center",
+        "flex_align_items": "center",
         "flex_gap": {
           "unit": "px",
-          "column": 0,
-          "row": 0,
+          "column": "0",
+          "row": "0",
           "isLinked": true
         },
         "padding": {
@@ -25,23 +33,41 @@
           "left": 0,
           "isLinked": false
         },
-        "justify_content": "start",
-        "align_items": "start"
+        "width": {
+          "unit": "%",
+          "size": "",
+          "sizes": []
+        },
+        "min_height": {
+          "unit": "px",
+          "size": 7267,
+          "sizes": []
+        }
+      },
+      "defaultEditSettings": {
+        "defaultEditRoute": "content"
       },
       "elements": [
         {
-          "id": "yoxcape",
+          "id": "459ce27",
           "elType": "container",
           "isInner": true,
+          "isLocked": false,
           "settings": {
-            "_element_id": "yoxcape",
+            "_element_id": "459ce27",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
+            "flex__is_row": "row",
+            "flex__is_column": "column",
+            "justify_content": "flex-start",
+            "flex_justify_content": "flex-start",
+            "align_items": "center",
+            "flex_align_items": "center",
             "flex_gap": {
               "unit": "px",
-              "column": 10,
-              "row": 10,
+              "column": "10",
+              "row": "10",
               "isLinked": true
             },
             "padding": {
@@ -52,53 +78,51 @@
               "left": 0,
               "isLinked": false
             },
-            "justify_content": "start",
-            "align_items": "start"
+            "width": {
+              "unit": "%",
+              "size": "",
+              "sizes": []
+            },
+            "min_height": {
+              "unit": "px",
+              "size": 1165,
+              "sizes": []
+            }
+          },
+          "defaultEditSettings": {
+            "defaultEditRoute": "content"
           },
           "elements": [
             {
-              "id": "k8iybiw",
+              "id": "a57feec",
               "elType": "widget",
+              "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "k8iybiw",
-                "sourceId": "6011:370",
-                "sourceName": "w:image",
-                "_order": 0,
+                "_element_id": "a57feec",
+                "minHeight": 690,
+                "justify_content": "flex-start",
+                "align_items": "flex-start",
                 "image": {
                   "url": "",
-                  "id": null
+                  "id": 0
                 }
+              },
+              "defaultEditSettings": {
+                "defaultEditRoute": "content"
               },
               "elements": []
             },
             {
-              "id": "n2muj9k",
+              "id": "5e114b7",
               "elType": "widget",
+              "isLocked": false,
               "widgetType": "heading",
               "settings": {
-                "_element_id": "n2muj9k",
-                "sourceId": "6011:369",
-                "sourceName": "The Perfect sport drink",
-                "fontSize": 146,
-                "fontName": {
-                  "family": "Figtree",
-                  "style": "Medium"
-                },
-                "fontWeight": 500,
-                "textDecoration": "NONE",
-                "textCase": "ORIGINAL",
-                "lineHeight": {
-                  "unit": "PIXELS",
-                  "value": 130
-                },
-                "letterSpacing": {
-                  "unit": "PIXELS",
-                  "value": -3
-                },
+                "_element_id": "5e114b7",
+                "minHeight": 260,
                 "align": "center",
                 "customCss": ".color-949494 { color: rgba(148, 148, 148, 1); }\n.color-fafafa { color: rgba(250, 250, 250, 1); }",
-                "_order": 1,
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",
                 "typography_font_weight": 500,
@@ -117,7 +141,10 @@
                 "typography_text_decoration": "none",
                 "typography_text_transform": "none",
                 "custom_css": ".color-949494 { color: rgba(148, 148, 148, 1); }\n.color-fafafa { color: rgba(250, 250, 250, 1); }",
-                "title": "<span class=\"color-949494\">The </span><span class=\"color-fafafa\">Perfect<br></span><span class=\"color-949494\">sport drink</span>"
+                "title": "The Perfect\nsport drink"
+              },
+              "defaultEditSettings": {
+                "defaultEditRoute": "content"
               },
               "elements": []
             }

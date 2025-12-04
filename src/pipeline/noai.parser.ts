@@ -1,5 +1,6 @@
 import { rgbToHex, SerializedNode } from '../utils/serialization_utils';
 import { extractWidgetStyles, extractContainerStyles, buildHtmlFromSegments } from '../utils/style_utils';
+import { findWidgetDefinition } from '../config/widget.registry';
 
 // Import heuristics system
 import { evaluateNode, DEFAULT_HEURISTICS } from '../heuristics';
@@ -459,11 +460,14 @@ function detectWidget(node: SerializedNode): MaybeWidget {
         // Fall through to manual detection
     }
 
-    // **PHASE 2: Explicit overrides by name (Level 1 Intelligence)** (EXISTING)
-    if (name.startsWith('w:')) {
-        const boxContent = extractBoxContent(node);
+    // **PHASE 2: Explicit overrides by name (Registry & Aliases)**
+    const registryDef = findWidgetDefinition(name, node.type);
+    if (registryDef) {
+        const widgetType = registryDef.widgetType;
+        console.log(`[DETECT WIDGET] Found explicit widget via registry: ${node.name} -> ${widgetType}`);
 
-        if (name.includes('image-box')) {
+        if (widgetType === 'image-box') {
+            const boxContent = extractBoxContent(node);
             return {
                 type: 'image-box',
                 content: boxContent.title || node.name,
@@ -471,7 +475,8 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
             };
         }
-        if (name.includes('icon-box')) {
+        if (widgetType === 'icon-box') {
+            const boxContent = extractBoxContent(node);
             return {
                 type: 'icon-box',
                 content: boxContent.title || node.name,
@@ -479,38 +484,115 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
             };
         }
-        if (name.includes('button')) {
-            console.log('[BUTTON DETECT] Found button by name:', node.name);
-
-            // Structural analysis - extract from children
+        if (widgetType === 'button') {
             const buttonData = analyzeButtonStructure(node);
-
-            // Buttons are FRAMEs, so we need container styles for padding/fills
             const containerStyles = extractContainerStyles(node);
             const mergedStyles = { ...styles, ...containerStyles, ...buttonData.textStyles };
-
-            console.log('[BUTTON DETECT] Button data:', JSON.stringify(buttonData, null, 2));
-            console.log('[BUTTON DETECT] Merged styles:', JSON.stringify(mergedStyles, null, 2));
-
-            // If no fills, set transparent white background
             if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
-                mergedStyles.fills = [{
-                    type: 'SOLID',
-                    color: { r: 1, g: 1, b: 1 },
-                    opacity: 0,
-                    visible: true
-                }];
+                mergedStyles.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, opacity: 0, visible: true }];
+            }
+            return { type: 'button', content: buttonData.text || node.name, imageId: buttonData.iconId, styles: mergedStyles };
+        }
+        if (widgetType === 'slides') {
+            const slides = children.map((child, i) => {
+                // Extract slide content from child container
+                let heading = '';
+                let description = '';
+                let button_text = '';
+                let imageId = findFirstImageId(child);
+
+                // Analyze child's children
+                if ((child as any).children) {
+                    const slideChildren = (child as any).children as SerializedNode[];
+
+                    // 1. Heading/Title
+                    const headingNode = slideChildren.find(c => c.name.toLowerCase().includes('heading') || c.name.toLowerCase().includes('title'));
+                    if (headingNode && headingNode.type === 'TEXT') heading = (headingNode as any).characters;
+
+                    // 2. Description/Text
+                    const descNode = slideChildren.find(c => c.name.toLowerCase().includes('description') || c.name.toLowerCase().includes('text') || c.name.toLowerCase().includes('content'));
+                    if (descNode && descNode.type === 'TEXT') description = (descNode as any).characters;
+
+                    // 3. Button
+                    const btnNode = slideChildren.find(c => c.name.toLowerCase().includes('button') || c.name.toLowerCase().includes('btn'));
+                    if (btnNode) {
+                        if (btnNode.type === 'TEXT') button_text = (btnNode as any).characters;
+                        else if ((btnNode as any).children) {
+                            const btnText = (btnNode as any).children.find((c: any) => c.type === 'TEXT');
+                            if (btnText) button_text = btnText.characters;
+                        }
+                    }
+
+                    // Fallback: if no explicit names, use order
+                    const textNodes = slideChildren.filter(c => c.type === 'TEXT');
+                    if (!heading && textNodes.length > 0) heading = (textNodes[0] as any).characters;
+                    if (!description && textNodes.length > 1) description = (textNodes[1] as any).characters;
+                }
+
+                return {
+                    _id: `slide_${i + 1}`,
+                    heading,
+                    description,
+                    button_text,
+                    background_color: '',
+                    background_image: { url: '', id: imageId ? parseInt(imageId) : '' }
+                };
+            });
+            return { type: 'slides', content: null, imageId: null, styles: { ...styles, slides } };
+        }
+        if (widgetType === 'image-carousel') {
+            const slides = children
+                .filter(c => isImageFill(c) || vectorTypes.includes(c.type) || c.type === 'IMAGE')
+                .map((img, i) => ({ id: img.id, url: '', _id: `slide_${i + 1} ` }));
+            return { type: 'image-carousel', content: null, imageId: null, styles: { ...styles, slides } };
+        }
+        if (widgetType === 'basic-gallery') {
+            return { type: 'basic-gallery', content: null, imageId: null, styles };
+        }
+        if (widgetType === 'video') {
+            return { type: 'video', content: '', imageId: null, styles };
+        }
+        if (widgetType === 'image') {
+            // For explicit w:image widgets, use the node's ID as imageId
+            return { type: 'image', content: null, imageId: node.id, styles };
+        }
+        if (widgetType === 'icon') {
+            // For explicit w:icon widgets, use the node's ID as imageId
+            return { type: 'icon', content: null, imageId: node.id, styles };
+        }
+        if (widgetType === 'text-editor') {
+            // For explicit w:text widgets, extract actual text content and styles
+            const extractedStyles = extractWidgetStyles(node);
+            Object.assign(styles, extractedStyles);
+
+            let textContent = (node as any).characters || node.name;
+
+            // Handle rich text with multiple colors/styles
+            if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+                const rich = buildHtmlFromSegments(node);
+                textContent = rich.html;
             }
 
-            return {
-                type: 'button',
-                content: buttonData.text || node.name,
-                imageId: buttonData.iconId,
-                styles: mergedStyles
-            };
+            return { type: 'text-editor', content: textContent, imageId: null, styles };
         }
-        if (name.includes('video')) return { type: 'video', content: '', imageId: null, styles };
-        // ... allow others to pass through to be caught by scoring or default logic
+        if (widgetType === 'heading') {
+            // For explicit w:heading widgets, extract actual text content and styles
+            const extractedStyles = extractWidgetStyles(node);
+            Object.assign(styles, extractedStyles);
+
+            let headingContent = (node as any).characters || node.name;
+
+            // Handle rich text with multiple colors/styles
+            if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+                const rich = buildHtmlFromSegments(node);
+                headingContent = rich.html;
+            }
+
+            return { type: 'heading', content: headingContent, imageId: null, styles };
+        }
+
+        // Generic fallback for other registry widgets
+        return { type: widgetType, content: node.name, imageId: null, styles };
     }
 
     // Scoring System (Level 2 Intelligence)
@@ -681,63 +763,7 @@ function detectWidget(node: SerializedNode): MaybeWidget {
     return null;
 }
 
-/**
- * Determines if a node is a redundant wrapper that should be flattened.
- * Criteria:
- * 1. Is a FRAME, INSTANCE, or GROUP.
- * 2. Has exactly ONE child.
- * 3. Is visually transparent (no fills, strokes, effects).
- * 4. Has no padding (if it's a frame).
- * 5. Is NOT a marked widget (w:...).
- */
-function shouldFlattenNode(node: SerializedNode): boolean {
-    // 1. Check type
-    if (node.type !== 'FRAME' && node.type !== 'INSTANCE' && node.type !== 'GROUP') return false;
 
-    // 2. Check name (exclude explicit widgets)
-    const name = (node.name || '').toLowerCase();
-    if (name.startsWith('w:')) return false;
-
-    // 3. Check child count (Safe Mode: Only flatten single-child wrappers)
-    const children = (node as any).children || [];
-    if (children.length !== 1) return false;
-
-    // 4. Check visual properties (Must be invisible)
-    const hasFills = node.fills && node.fills.some((f: any) => f.visible && f.opacity > 0);
-    const hasStrokes = node.strokes && node.strokes.length > 0;
-    const hasEffects = node.effects && node.effects.length > 0;
-    if (hasFills || hasStrokes || hasEffects) return false;
-
-    // 5. Check padding (Must be 0 to preserve layout)
-    const pTop = (node as any).paddingTop || 0;
-    const pRight = (node as any).paddingRight || 0;
-    const pBottom = (node as any).paddingBottom || 0;
-    const pLeft = (node as any).paddingLeft || 0;
-    if (pTop > 0 || pRight > 0 || pBottom > 0 || pLeft > 0) return false;
-
-    return true;
-}
-
-/**
- * Recursively flattens children that meet the flattening criteria.
- */
-function flattenChildren(nodes: SerializedNode[], parentX: number = 0, parentY: number = 0): SerializedNode[] {
-    return nodes.reduce((acc: SerializedNode[], node) => {
-        if (shouldFlattenNode(node)) {
-            console.log('[FLATTENING] Flattening redundant node:', node.name, 'ID:', node.id);
-            const children = (node as any).children || [];
-            // Adjust coordinates of children relative to the new parent
-            // Note: For Auto Layout parents, this might be ignored, but good for absolute positioning fallback
-            const flattenedChildren = children.map((c: SerializedNode) => ({
-                ...c,
-                x: (c.x || 0) + (node.x || 0),
-                y: (c.y || 0) + (node.y || 0)
-            }));
-            return acc.concat(flattenChildren(flattenedChildren, parentX, parentY));
-        }
-        return acc.concat([node]);
-    }, []);
-}
 
 function toContainer(node: SerializedNode): PipelineContainer {
     let direction: 'row' | 'column' = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
@@ -789,11 +815,7 @@ function toContainer(node: SerializedNode): PipelineContainer {
         });
     }
 
-    // **PHASE 3: Smart Flattening**
-    // Pre-process children to remove redundant wrappers
-    const flattenedChildNodes = flattenChildren(childNodes, node.x || 0, node.y || 0);
-
-    flattenedChildNodes.forEach((child, idx) => {
+    childNodes.forEach((child, idx) => {
         const w = detectWidget(child);
         const childHasChildren = Array.isArray((child as any).children) && (child as any).children.length > 0;
         const orderMark = idx;
