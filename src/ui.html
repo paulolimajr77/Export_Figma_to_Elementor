@@ -2204,6 +2204,8 @@
             </div>`;
         } else {
           report.analysis.forEach(issue => {
+            // console.log('📊 [DEBUG] Relatório completo:', report);
+            // console.log('📊 [DEBUG] Primeiro issue:', report.analysis[0]);
             const card = document.createElement('div');
             card.className = 'linter-issue-card';
 
@@ -2222,8 +2224,8 @@
               </div>
               <div class="issue-desc">${issue.message}</div>
               <div class="issue-actions">
-                <button class="btn tiny secondary" onclick="send('focus-node', { nodeId: '${issue.nodeId}' })">
-                  📍 Ver no Figma
+                <button class="btn tiny secondary" onclick="if('${issue.nodeId || issue.node_id}' && '${issue.nodeId || issue.node_id}'!=='undefined'){send('focus-node',{nodeId:'${issue.nodeId || issue.node_id}'})}else{alert('Node não encontrado: ${issue.nodeName || issue.node_name}')}">
+                    📍 Ver no Figma
                 </button>
               </div>
             `;
