@@ -667,14 +667,43 @@ figma.ui.onmessage = async (msg) => {
 
         case 'rename-layer':
             try {
-                const selection = figma.currentPage.selection;
-                if (!selection || selection.length === 0) throw new Error('Nenhum layer selecionado.');
-                const node = selection[0];
+                let node: SceneNode | null = null;
+
+                // Prefer nodeId if provided (safer for programmatic renaming)
+                if (msg.nodeId) {
+                    const foundNode = figma.getNodeById(msg.nodeId);
+                    if (foundNode && 'name' in foundNode) {
+                        node = foundNode as SceneNode;
+                    } else {
+                        throw new Error('Node não encontrado ou não pode ser renomeado');
+                    }
+                } else {
+                    // Fallback to selection
+                    const selection = figma.currentPage.selection;
+                    if (!selection || selection.length === 0) {
+                        throw new Error('Nenhum layer selecionado.');
+                    }
+                    node = selection[0];
+                }
+
                 const name = msg.name as string;
-                if (name) node.name = name;
-                figma.notify(`Layer renomeada para ${name}`);
+                if (!name) throw new Error('Nome não fornecido');
+
+                node.name = name;
+                figma.notify(`✅ Layer renomeada para "${name}"`);
+
+                // Send confirmation to UI
+                figma.ui.postMessage({
+                    type: 'rename-success',
+                    nodeId: node.id,
+                    newName: name
+                });
             } catch (e: any) {
                 figma.notify(e?.message || 'Falha ao renomear layer');
+                figma.ui.postMessage({
+                    type: 'rename-error',
+                    message: e?.message || 'Falha ao renomear layer'
+                });
             }
             break;
 
@@ -720,29 +749,40 @@ figma.ui.onmessage = async (msg) => {
         // ========== LINTER HANDLERS ==========
         case 'analyze-layout':
             try {
+                console.log('🔍 [LINTER] Handler analyze-layout iniciado');
                 log('🔍 Handler analyze-layout iniciado', 'info');
 
                 const selection = figma.currentPage.selection;
+                console.log('[LINTER] Selection:', selection);
+
                 if (!selection || selection.length === 0) {
+                    console.log('[LINTER] ❌ Nenhum node selecionado');
                     figma.ui.postMessage({
                         type: 'linter-error',
                         message: 'Selecione um Frame para analisar'
                     });
+                    log('❌ Nenhum Frame selecionado', 'error');
                     break;
                 }
 
                 const node = selection[0];
+                console.log(`[LINTER] Node selecionado: ${node.name} (${node.type})`);
                 log(`Node selecionado: ${node.name} (${node.type})`, 'info');
 
                 if (node.type !== 'FRAME') {
+                    console.log(`[LINTER] ❌ Node não é FRAME: ${node.type}`);
                     figma.ui.postMessage({
                         type: 'linter-error',
                         message: 'Selecione um Frame (não um ' + node.type + ')'
                     });
+                    log(`❌ Selecione um Frame (não ${node.type})`, 'error');
                     break;
                 }
 
+                console.log('[LINTER] Iniciando análise de layout...');
                 log('Iniciando análise de layout...', 'info');
+
+                console.log('[LINTER] Chamando analyzeFigmaLayout...');
                 log('Chamando analyzeFigmaLayout...', 'info');
 
                 const report = await analyzeFigmaLayout(node, {
@@ -750,6 +790,7 @@ figma.ui.onmessage = async (msg) => {
                     deviceTarget: 'desktop'
                 });
 
+                console.log('[LINTER] ✅ Relatório gerado:', report);
                 log('Relatório gerado com sucesso', 'info');
                 log(`Total de issues: ${report.analysis.length}`, 'info');
                 log(`Total de widgets detectados: ${report.widgets.length}`, 'info');
@@ -759,10 +800,13 @@ figma.ui.onmessage = async (msg) => {
                     payload: report
                 });
 
+                console.log('[LINTER] ✅ Mensagem enviada para UI');
                 log(`Análise concluída: ${report.summary.total} problemas encontrados`, 'success');
             } catch (error: any) {
                 const message = error?.message || String(error);
                 const stack = error?.stack || 'No stack trace';
+                console.error('[LINTER] ❌ ERRO:', message);
+                console.error('[LINTER] Stack:', stack);
                 log(`❌ ERRO ao analisar layout: ${message}`, 'error');
                 log(`Stack: ${stack}`, 'error');
                 figma.ui.postMessage({

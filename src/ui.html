@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -1051,6 +1051,162 @@
       font-size: 24px;
       margin-bottom: 8px;
     }
+
+    /* ========== PROBLEM DETAILS PANEL STYLES ========== */
+    .problem-details-panel {
+      background: var(--figma-color-bg-secondary);
+      border: 1px solid var(--figma-color-border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--figma-color-border);
+    }
+
+    .panel-header h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--figma-color-text);
+    }
+
+    .panel-content {
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .problem-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .problem-severity {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      width: fit-content;
+    }
+
+    .problem-severity.critical {
+      background: #fadbd8;
+      color: #c0392b;
+    }
+
+    .problem-severity.major {
+      background: #fcf3cf;
+      color: #d68910;
+    }
+
+    .problem-severity.minor {
+      background: #d6eaf8;
+      color: #2980b9;
+    }
+
+    .problem-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--figma-color-text);
+      line-height: 1.4;
+    }
+
+    .problem-location {
+      font-size: 10px;
+      color: var(--figma-color-text-secondary);
+      padding: 6px 0;
+      border-bottom: 1px solid var(--figma-color-border);
+      margin-bottom: 12px;
+    }
+
+    .problem-tip {
+      background: var(--figma-color-bg);
+      border-left: 3px solid var(--figma-color-border-brand);
+      padding: 8px 10px;
+      margin: 12px 0;
+      border-radius: 4px;
+    }
+
+    .problem-tip p {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--figma-color-text-secondary);
+    }
+
+    .problem-tip strong {
+      color: var(--figma-color-text);
+    }
+
+    .problem-guide {
+      margin-top: 12px;
+    }
+
+    .problem-guide h4 {
+      font-size: 11px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+      color: var(--figma-color-text);
+    }
+
+    .guide-steps {
+      margin: 0;
+      padding-left: 20px;
+      list-style: none;
+      counter-reset: step-counter;
+    }
+
+    .guide-steps li {
+      counter-increment: step-counter;
+      margin-bottom: 6px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--figma-color-text-secondary);
+      position: relative;
+    }
+
+    .guide-steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: -20px;
+      top: 0;
+      width: 16px;
+      height: 16px;
+      background: var(--figma-color-bg-brand);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--figma-color-border);
+    }
+
+    .panel-actions .btn {
+      flex: 1;
+      font-size: 11px;
+      padding: 6px 10px;
+    }
   </style>
 </head>
 
@@ -1148,14 +1304,21 @@
                 <span class="stat-label">Minor</span>
               </div>
             </div>
+          </div> <!-- Educational Banner -->
+          <div class="linter-education-banner"
+            style="background: var(--figma-color-bg-brand-tertiary); border-left: 3px solid var(--figma-color-border-brand); padding: 10px 12px; margin: 12px 0; border-radius: 4px;">
+            <p style="margin: 0; font-size: 11px; line-height: 1.5; color: var(--figma-color-text-secondary);">
+              <strong style="color: var(--figma-color-text);">Por que nomenclatura importa:</strong><br>Facilita
+              manutenção Melhora detecção automática Gera código Elementor mais legível Reduz erros na exportação
+
+            </p>
           </div>
+
 
           <!-- Actions Bar -->
           <div class="linter-actions-bar">
-            <button class="btn secondary small" id="btn-reanalyze" data-action="analyze-layout">
-              <span class="icon">🔄</span> Re-analisar
-            </button>
-            <button class="btn secondary small" id="btn-copy-report" data-action="copy-linter-report">
+            <button class="btn secondary small" id="btn-copy-report" style="display:none"
+              data-action="copy-linter-report">
               <span class="icon">📋</span> Copiar
             </button>
           </div>
@@ -1170,6 +1333,31 @@
                 <p>Seu layout parece estar seguindo todas as boas práticas!</p>
               </div>
             </div>
+
+            <!-- Problem Details Panel (Hidden by default) -->
+            <div id="problem-details-panel" class="problem-details-panel" style="display:none;">
+              <div class="panel-header">
+                <h3>🎯 Problema Selecionado</h3>
+                <button id="btn-close-details" class="btn tiny ghost">✖</button>
+              </div>
+
+              <div id="problem-details-content" class="panel-content">
+                <!-- Content will be injected here -->
+              </div>
+
+              <div class="panel-actions">
+                <button id="btn-mark-resolved" class="btn primary small">
+                  ✅ Marcar como Resolvido
+                </button>
+                <button id="btn-next-problem" class="btn secondary small">
+                  ⏭️ Próximo
+                </button>
+                <button id="btn-ignore-problem" class="btn ghost small">
+                  ❌ Ignorar
+                </button>
+              </div>
+            </div>
+
 
             <!-- Widgets Table -->
             <div class="widgets-section">
@@ -1596,6 +1784,19 @@
                 } else {
                   send('download-json');
                 }
+                break;
+              case 'reset':
+                if (output) output.value = '';
+                if (logs) logs.innerHTML = '';
+                if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
+                updateBridgeOutput('', false);
+                updateBridgeOutput('', false);
+                lastPayload = '';
+                fullPayload = '';
+                toggleProgress(false);
+                toggleResultButtons(false);
+                addLog('Sessao reiniciada.', 'info');
+                send('reset');
                 break;
                 if (fields.gemini_model) fields.gemini_model.value = fields.gemini_model.options[0]?.value || '';
                 updateBridgeOutput('', false);
@@ -2199,22 +2400,55 @@
             if (issue.ruleId === 'auto-layout-required') icon = '📐';
             if (issue.ruleId === 'widget-naming') icon = '🏷️';
             if (issue.ruleId === 'spacer-detected') icon = '📏';
+            // Check if naming issue
+            // Check if naming issue
+            const isNamingIssue = issue.rule === 'widget-naming' || issue.rule === 'generic-name-detected';
+            let suggestedName = '';
+            if (isNamingIssue) {
+              const match = issue.message.match(/"([^"]+)"/);
+              if (match) suggestedName = match[1];
+            }
+
             card.innerHTML = `
               <div class="issue-header">
                 <div class="issue-title">
                   <span>${icon}</span>
-                  <span>${issue.nodeName || 'Node'}</span>
+                  <span>${issue.nodeName || issue.node_name || 'Node'}</span>
                 </div>
                 <span class="issue-badge ${issue.severity}">${issue.severity}</span>
               </div>
               <div class="issue-desc">${issue.message}</div>
-              <div class="issue-actions">
-                <button class="btn tiny secondary" onclick="if('${issue.nodeId || issue.node_id}' && '${issue.nodeId || issue.node_id}'!=='undefined'){send('focus-node',{nodeId:'${issue.nodeId || issue.node_id}'})}else{alert('Node não encontrado: ${issue.nodeName || issue.node_name}')}">
-                    📍 Ver no Figma
+              <div class="issue-actions" style="display: flex; gap: 6px; margin-top: 8px;">
+                <button class="btn tiny secondary issue-btn-focus" data-node-id="${issue.nodeId || issue.node_id}">
+                  📍 Ver no Figma
                 </button>
+                ${isNamingIssue && suggestedName ? `
+                  <button class="btn tiny primary issue-btn-rename" data-node-id="${issue.nodeId || issue.node_id}" data-name="${suggestedName}">
+                    ✨ Renomear
+                  </button>
+                ` : ''}
               </div>
             `;
+
             issuesList.appendChild(card);
+
+            // Add click handlers
+            const btnFocus = card.querySelector('.issue-btn-focus');
+            if (btnFocus) {
+              btnFocus.onclick = (e) => {
+                e.stopPropagation();
+                send('focus-node', { nodeId: btnFocus.dataset.nodeId });
+              };
+            }
+
+            const btnRename = card.querySelector('.issue-btn-rename');
+            if (btnRename) {
+              btnRename.onclick = (e) => {
+                e.stopPropagation();
+                send('rename-layer', { nodeId: btnRename.dataset.nodeId, name: btnRename.dataset.name });
+                addLog(`Renomeando para "${btnRename.dataset.name}"...`, 'info');
+              };
+            }
           });
         }
         // 3. Renderizar Tabela de Widgets
@@ -2229,7 +2463,7 @@
             const row = document.createElement('tr');
             row.innerHTML = `
               <td><strong>${widget.widget}</strong></td>
-              <td>${widget.nodeName}</td>
+              <td>${widget.node_name}</td>
               <td>${widget.confidence}</td>
             `;
             widgetsBody.appendChild(row);
@@ -2245,7 +2479,241 @@
           row.innerHTML = `<td colspan="3" style="text-align:center; padding: 12px;">Nenhum widget detectado</td>`;
           widgetsBody.appendChild(row);
         }
+
+        // 4. Adicionar handlers para clique nos issues
+        const issueCards = document.querySelectorAll('.linter-issue-card');
+        issueCards.forEach((card, index) => {
+          card.addEventListener('click', () => {
+            showProblemDetails(report.analysis[index], index, report);
+          });
+        });
       }
+
+      // ========== PROBLEM DETAILS PANEL LOGIC ==========
+
+      let currentProblemIndex = -1;
+      let currentReport = null;
+
+      function showProblemDetails(issue, index, report) {
+        currentProblemIndex = index;
+        currentReport = report;
+
+        const panel = document.getElementById('problem-details-panel');
+        const content = document.getElementById('problem-details-content');
+
+        if (!panel || !content) return;
+
+        // Seleciona o node no Figma
+        send('select-problem-node', { nodeId: issue.node_id });
+
+        // Gera o guia passo-a-passo baseado na regra
+        const guide = generateGuideForRule(issue.rule, issue);
+
+        // Check if this is a naming issue and extract suggested name
+
+
+        const isNamingIssue = issue.rule === 'widget-naming' || issue.rule === 'generic-name-detected';
+
+
+        let suggestedName = '';
+
+
+        if (isNamingIssue) {
+
+
+          const match = issue.message.match(/"([^"]+)"/);
+
+
+          if (match) suggestedName = match[1];
+
+
+        }
+
+
+
+        // Renderiza o conteúdo do painel
+        content.innerHTML = `
+          <div class="problem-header">
+            <div class="problem-severity ${issue.severity}">
+              ${getSeverityIcon(issue.severity)} ${getSeverityLabel(issue.severity)}
+            </div>
+            <div class="problem-title">${issue.message}</div>
+          </div>
+
+          <div class="problem-location">
+            📍 <strong>Localização:</strong> ${issue.node_name} (${issue.node_id})
+          </div>
+
+          ${isNamingIssue && suggestedName ? `
+            <div style="margin: 12px 0;">
+              <button id="btn-auto-rename" class="btn primary small" style="width: 100%;">
+                âœ¨ Renomear para "${suggestedName}"
+              </button>
+            </div>
+          ` : ''}
+
+          
+
+          <div class="problem-guide">
+            <h4>✅ COMO CORRIGIR (⏱️ ${guide.estimated_time}):</h4>
+            <ol class="guide-steps">
+              ${guide.steps.map((step, i) => `
+                <li>
+                  <span class="step-number">${i + 1}</span>
+                  <span class="step-action">${step}</span>
+                </li>
+              `).join('')
+          }
+            </ol >
+        
+          </div >
+        `;
+
+        // Mostra o painel
+        panel.style.display = 'block';
+
+        // Scroll para o painel
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+
+
+        // Add handler for auto-rename button
+
+
+        if (isNamingIssue && suggestedName) {
+
+
+          const btnAutoRename = document.getElementById('btn-auto-rename');
+
+
+          if (btnAutoRename) {
+
+
+            btnAutoRename.onclick = () => {
+
+
+              send('rename-layer', { nodeId: issue.node_id, name: suggestedName });
+
+
+              addLog(`Renomeando para "${suggestedName}"...`, 'info');
+
+
+            };
+
+
+          }
+
+
+        }
+      }
+
+      function getSeverityIcon(severity) {
+        const icons = {
+          critical: '🔴',
+          major: '🟡',
+          minor: '🔵',
+          info: 'ℹ️'
+        };
+        return icons[severity] || '⚠️';
+      }
+
+      function getSeverityLabel(severity) {
+        const labels = {
+          critical: 'Crítico',
+          major: 'Importante',
+          minor: 'Menor',
+          info: 'Informação'
+        };
+        return labels[severity] || severity;
+      }
+
+      function getDifficultyLabel(difficulty) {
+        const labels = {
+          easy: 'Fácil',
+          medium: 'Médio',
+          hard: 'Difícil'
+        };
+        return labels[difficulty] || difficulty;
+      }
+
+      function generateGuideForRule(ruleId, issue) {
+        // Mapeamento de regras para guias passo-a-passo
+        const guides = {
+          'auto-layout-required': {
+            steps: [
+              'Selecione o frame',
+              'Pressione Shift + A',
+              'Configure direÃ§Ã£o e espaÃ§amento'
+            ]
+          },
+          'spacer-detected': {
+            steps: [
+              'Selecione o frame pai',
+              'Aumente o Gap',
+              'Delete o spacer'
+            ]
+          },
+          'generic-name-detected': {
+            steps: [
+              'Use o botÃ£o "Renomear" acima',
+              'Ou clique 2x no nome da camada'
+            ]
+          },
+          'widget-naming': {
+            steps: [
+              'Use o botÃ£o "Renomear" acima',
+              'Ou clique 2x no nome da camada'
+            ]
+          }
+        };
+
+        return guides[ruleId] || {
+          steps: ['Corrija manualmente no Figma']
+        };
+      }
+
+      // Handlers dos botões do painel
+      const btnCloseDetails = document.getElementById('btn-close-details');
+      const btnMarkResolved = document.getElementById('btn-mark-resolved');
+      const btnNextProblem = document.getElementById('btn-next-problem');
+      const btnIgnoreProblem = document.getElementById('btn-ignore-problem');
+
+      if (btnCloseDetails) {
+        btnCloseDetails.onclick = () => {
+          const panel = document.getElementById('problem-details-panel');
+          if (panel) panel.style.display = 'none';
+        };
+      }
+
+      if (btnMarkResolved) {
+        btnMarkResolved.onclick = () => {
+          if (currentReport && currentProblemIndex >= 0) {
+            const issue = currentReport.analysis[currentProblemIndex];
+            send('mark-problem-resolved', { nodeId: issue.node_id });
+            addLog('Validando correção...', 'info');
+          }
+        };
+      }
+
+      if (btnNextProblem) {
+        btnNextProblem.onclick = () => {
+          if (currentReport && currentProblemIndex < currentReport.analysis.length - 1) {
+            const nextIndex = currentProblemIndex + 1;
+            showProblemDetails(currentReport.analysis[nextIndex], nextIndex, currentReport);
+          } else {
+            addLog('Você chegou ao último problema!', 'info');
+          }
+        };
+      }
+
+      if (btnIgnoreProblem) {
+        btnIgnoreProblem.onclick = () => {
+          const panel = document.getElementById('problem-details-panel');
+          if (panel) panel.style.display = 'none';
+          addLog('Problema ignorado', 'info');
+        };
+      }
+
     })();
   </script>
 </body>

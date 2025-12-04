@@ -7355,14 +7355,36 @@ ${detection.justification}
         break;
       case "rename-layer":
         try {
-          const selection = figma.currentPage.selection;
-          if (!selection || selection.length === 0) throw new Error("Nenhum layer selecionado.");
-          const node = selection[0];
+          let node = null;
+          if (msg.nodeId) {
+            const foundNode = figma.getNodeById(msg.nodeId);
+            if (foundNode && "name" in foundNode) {
+              node = foundNode;
+            } else {
+              throw new Error("Node n\xE3o encontrado ou n\xE3o pode ser renomeado");
+            }
+          } else {
+            const selection = figma.currentPage.selection;
+            if (!selection || selection.length === 0) {
+              throw new Error("Nenhum layer selecionado.");
+            }
+            node = selection[0];
+          }
           const name = msg.name;
-          if (name) node.name = name;
-          figma.notify(`Layer renomeada para ${name}`);
+          if (!name) throw new Error("Nome n\xE3o fornecido");
+          node.name = name;
+          figma.notify(`\u2705 Layer renomeada para "${name}"`);
+          figma.ui.postMessage({
+            type: "rename-success",
+            nodeId: node.id,
+            newName: name
+          });
         } catch (e) {
           figma.notify((e == null ? void 0 : e.message) || "Falha ao renomear layer");
+          figma.ui.postMessage({
+            type: "rename-error",
+            message: (e == null ? void 0 : e.message) || "Falha ao renomear layer"
+          });
         }
         break;
       case "run-heuristics-rename":
@@ -7399,30 +7421,40 @@ ${detection.justification}
       // ========== LINTER HANDLERS ==========
       case "analyze-layout":
         try {
+          console.log("\u{1F50D} [LINTER] Handler analyze-layout iniciado");
           log("\u{1F50D} Handler analyze-layout iniciado", "info");
           const selection = figma.currentPage.selection;
+          console.log("[LINTER] Selection:", selection);
           if (!selection || selection.length === 0) {
+            console.log("[LINTER] \u274C Nenhum node selecionado");
             figma.ui.postMessage({
               type: "linter-error",
               message: "Selecione um Frame para analisar"
             });
+            log("\u274C Nenhum Frame selecionado", "error");
             break;
           }
           const node = selection[0];
+          console.log(`[LINTER] Node selecionado: ${node.name} (${node.type})`);
           log(`Node selecionado: ${node.name} (${node.type})`, "info");
           if (node.type !== "FRAME") {
+            console.log(`[LINTER] \u274C Node n\xE3o \xE9 FRAME: ${node.type}`);
             figma.ui.postMessage({
               type: "linter-error",
               message: "Selecione um Frame (n\xE3o um " + node.type + ")"
             });
+            log(`\u274C Selecione um Frame (n\xE3o ${node.type})`, "error");
             break;
           }
+          console.log("[LINTER] Iniciando an\xE1lise de layout...");
           log("Iniciando an\xE1lise de layout...", "info");
+          console.log("[LINTER] Chamando analyzeFigmaLayout...");
           log("Chamando analyzeFigmaLayout...", "info");
           const report = yield analyzeFigmaLayout(node, {
             aiAssisted: false,
             deviceTarget: "desktop"
           });
+          console.log("[LINTER] \u2705 Relat\xF3rio gerado:", report);
           log("Relat\xF3rio gerado com sucesso", "info");
           log(`Total de issues: ${report.analysis.length}`, "info");
           log(`Total de widgets detectados: ${report.widgets.length}`, "info");
@@ -7430,10 +7462,13 @@ ${detection.justification}
             type: "linter-report",
             payload: report
           });
+          console.log("[LINTER] \u2705 Mensagem enviada para UI");
           log(`An\xE1lise conclu\xEDda: ${report.summary.total} problemas encontrados`, "success");
         } catch (error) {
           const message = (error == null ? void 0 : error.message) || String(error);
           const stack = (error == null ? void 0 : error.stack) || "No stack trace";
+          console.error("[LINTER] \u274C ERRO:", message);
+          console.error("[LINTER] Stack:", stack);
           log(`\u274C ERRO ao analisar layout: ${message}`, "error");
           log(`Stack: ${stack}`, "error");
           figma.ui.postMessage({
