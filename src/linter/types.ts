@@ -13,6 +13,18 @@ export interface LintResult {
     rule: string;
     message: string;
     educational_tip: string;
+    fixAvailable?: boolean;
+}
+
+// ... (existing code)
+
+export interface Rule {
+    id: string;
+    category: Category;
+    severity: Severity;
+    validate(node: SceneNode): Promise<LintResult | null>;
+    fix?(node: SceneNode): Promise<boolean>;
+    generateGuide?(node: SceneNode): ManualFixGuide;
 }
 
 export interface WidgetDetection {

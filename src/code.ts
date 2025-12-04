@@ -10,7 +10,7 @@ import { ImageUploader } from './media/uploader';
 import { createNodeSnapshot } from './heuristics/adapter';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { FileLogger } from './utils/logger';
-import { analyzeFigmaLayout, validateSingleNode } from './linter';
+import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } from './linter';
 
 // Save original console.log BEFORE any modifications
 const originalConsoleLog = console.log.bind(console);
@@ -832,6 +832,56 @@ figma.ui.onmessage = async (msg) => {
                 figma.ui.postMessage({
                     type: 'linter-error',
                     message: error?.message || 'Erro ao validar correção'
+                });
+            }
+            break;
+
+        case 'fix-issue':
+            try {
+                const { nodeId, ruleId } = msg;
+                const node = figma.getNodeById(nodeId);
+
+                if (!node) {
+                    throw new Error('Node não encontrado');
+                }
+
+                // Instancia registro para buscar a regra
+                const registry = new RuleRegistry();
+                registry.register(new AutoLayoutRule());
+                // Adicionar outras regras aqui conforme forem implementadas com fix
+
+                const rule = registry.get(ruleId);
+                if (!rule) {
+                    throw new Error(`Regra ${ruleId} não encontrada ou não suporta correção automática`);
+                }
+
+                if (!rule.fix) {
+                    throw new Error(`Regra ${ruleId} não possui correção automática implementada`);
+                }
+
+                const success = await rule.fix(node as SceneNode);
+
+                if (success) {
+                    log(`✅ Correção aplicada com sucesso para ${ruleId}`, 'success');
+
+                    // Re-validar node
+                    const result = await validateSingleNode(node as SceneNode);
+
+                    figma.ui.postMessage({
+                        type: 'validation-result',
+                        nodeId: nodeId,
+                        isFixed: result.isValid,
+                        issues: result.issues
+                    });
+                } else {
+                    throw new Error('Falha ao aplicar correção automática');
+                }
+
+            } catch (error: any) {
+                log(`Erro ao aplicar correção: ${error.message}`, 'error');
+                figma.ui.postMessage({
+                    type: 'linter-error',
+                    message: error.message
                 });
             }
             break;

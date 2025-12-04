@@ -26,6 +26,7 @@ export class AutoLayoutRule implements Rule {
                 category: this.category,
                 rule: this.id,
                 message: `Frame "${frame.name}" possui ${frame.children.length} filhos mas não usa Auto Layout`,
+                fixAvailable: true,
                 educational_tip: `
 ⚠️ Por que isso é crítico?
 
@@ -41,6 +42,27 @@ Aplicar Auto Layout permite que o Elementor entenda a estrutura e gere container
         }
 
         return null;
+    }
+
+    async fix(node: SceneNode): Promise<boolean> {
+        if (node.type !== 'FRAME') return false;
+        const frame = node as FrameNode;
+
+        try {
+            // Aplica Auto Layout Vertical por padrão
+            frame.layoutMode = 'VERTICAL';
+            frame.primaryAxisSizingMode = 'AUTO';
+            frame.counterAxisSizingMode = 'AUTO';
+            frame.itemSpacing = 20;
+            frame.paddingLeft = 20;
+            frame.paddingRight = 20;
+            frame.paddingTop = 20;
+            frame.paddingBottom = 20;
+            return true;
+        } catch (e) {
+            console.error('Erro ao aplicar Auto Layout:', e);
+            return false;
+        }
     }
 
     generateGuide(node: SceneNode): ManualFixGuide {
