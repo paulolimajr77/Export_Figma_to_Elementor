@@ -452,6 +452,8 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
 }
 
 async function sendStoredSettings() {
+    console.log('🔧 [sendStoredSettings] Carregando configurações salvas...');
+
     let geminiKey = await loadSetting<string>('gptel_gemini_key', '');
     if (!geminiKey) {
         geminiKey = await loadSetting<string>('gemini_api_key', '');
@@ -470,6 +472,13 @@ async function sendStoredSettings() {
     const includeScreenshot = await loadSetting<boolean>('gptel_include_screenshot', true);
     const includeReferences = await loadSetting<boolean>('gptel_include_references', true);
     const autoRename = await loadSetting<boolean>('gptel_auto_rename', false);
+
+    console.log('🔧 [sendStoredSettings] Configurações carregadas:', {
+        geminiKey: geminiKey ? '***' + geminiKey.slice(-4) : 'vazio',
+        gptKey: gptKey ? '***' + gptKey.slice(-4) : 'vazio',
+        wpUrl,
+        providerAi
+    });
 
     figma.ui.postMessage({
         type: 'load-settings',
@@ -491,6 +500,8 @@ async function sendStoredSettings() {
             autoRename
         }
     });
+
+    console.log('🔧 [sendStoredSettings] Mensagem enviada para UI');
 }
 
 figma.ui.onmessage = async (msg) => {
@@ -709,6 +720,8 @@ figma.ui.onmessage = async (msg) => {
         // ========== LINTER HANDLERS ==========
         case 'analyze-layout':
             try {
+                log('🔍 Handler analyze-layout iniciado', 'info');
+
                 const selection = figma.currentPage.selection;
                 if (!selection || selection.length === 0) {
                     figma.ui.postMessage({
@@ -719,6 +732,8 @@ figma.ui.onmessage = async (msg) => {
                 }
 
                 const node = selection[0];
+                log(`Node selecionado: ${node.name} (${node.type})`, 'info');
+
                 if (node.type !== 'FRAME') {
                     figma.ui.postMessage({
                         type: 'linter-error',
@@ -728,20 +743,28 @@ figma.ui.onmessage = async (msg) => {
                 }
 
                 log('Iniciando análise de layout...', 'info');
+                log('Chamando analyzeFigmaLayout...', 'info');
+
                 const report = await analyzeFigmaLayout(node, {
                     aiAssisted: false,
                     deviceTarget: 'desktop'
                 });
 
+                log('Relatório gerado com sucesso', 'info');
+                log(`Total de issues: ${report.analysis.length}`, 'info');
+                log(`Total de widgets detectados: ${report.widgets.length}`, 'info');
+
                 figma.ui.postMessage({
                     type: 'linter-report',
-                    report: report
+                    payload: report
                 });
 
                 log(`Análise concluída: ${report.summary.total} problemas encontrados`, 'success');
             } catch (error: any) {
                 const message = error?.message || String(error);
-                log(`Erro ao analisar layout: ${message}`, 'error');
+                const stack = error?.stack || 'No stack trace';
+                log(`❌ ERRO ao analisar layout: ${message}`, 'error');
+                log(`Stack: ${stack}`, 'error');
                 figma.ui.postMessage({
                     type: 'linter-error',
                     message: message

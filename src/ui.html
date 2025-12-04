@@ -1463,6 +1463,117 @@
           case 'upload-image-request':
             uploadImage(msg);
             break;
+          case 'load-settings':
+            console.log('📥 [UI] Recebendo configurações:', msg.payload);
+            if (msg.payload) {
+              // Gemini
+              if (msg.payload.geminiKey && fields.gemini_api_key) {
+                fields.gemini_api_key.value = msg.payload.geminiKey;
+                console.log('✅ Gemini Key carregada');
+              }
+              if (msg.payload.geminiModel && fields.gemini_model) {
+                fields.gemini_model.value = msg.payload.geminiModel;
+              }
+
+              // GPT
+              if (msg.payload.gptKey && fields.gpt_api_key) {
+                fields.gpt_api_key.value = msg.payload.gptKey;
+                console.log('✅ GPT Key carregada');
+              }
+              if (msg.payload.gptModel && fields.gpt_model) {
+                fields.gpt_model.value = msg.payload.gptModel;
+              }
+
+              // WordPress
+              if (msg.payload.wpUrl && fields.wp_url) {
+                fields.wp_url.value = msg.payload.wpUrl;
+                console.log('✅ WP URL carregada:', msg.payload.wpUrl);
+              }
+              if (msg.payload.wpUser && fields.wp_user) {
+                fields.wp_user.value = msg.payload.wpUser;
+                console.log('✅ WP User carregado');
+              }
+              if (msg.payload.wpToken && fields.wp_token) {
+                fields.wp_token.value = msg.payload.wpToken;
+                console.log('✅ WP Token carregado');
+              }
+
+              // Provider
+              if (msg.payload.providerAi) {
+                if (fields.provider_ai) {
+                  fields.provider_ai.value = msg.payload.providerAi;
+                }
+                setProvider(msg.payload.providerAi);
+                console.log('✅ Provider setado:', msg.payload.providerAi);
+              }
+
+              // Checkboxes
+              if (fields.use_ai !== undefined) {
+                fields.use_ai.checked = msg.payload.useAI !== false;
+              }
+              if (fields.export_images !== undefined) {
+                fields.export_images.checked = msg.payload.exportImages === true;
+              }
+              if (fields.auto_page !== undefined) {
+                fields.auto_page.checked = msg.payload.autoPage === true;
+              }
+
+              console.log('✅ [UI] Todas as configurações aplicadas!');
+              addLog('Configurações carregadas com sucesso', 'success');
+            }
+            break;
+
+          case 'linter-report':
+            console.log('📊 [UI] Recebendo relatório do Linter:', msg.payload);
+            if (msg.payload) {
+              const report = msg.payload;
+
+              // Exibe no console para DEBUG
+              console.log(`📊 Total de issues: ${report.summary.total}`);
+              console.log(`📊 Widgets detectados: ${report.widgets.length}`);
+
+              // Exibe relatório completo no console
+              console.table(report.analysis.map(issue => ({
+                'Node': issue.node_name,
+                'Regra': issue.rule,
+                'Severidade': issue.severity,
+                'Mensagem': issue.message
+              })));
+
+              // Exibe widgets detectados
+              if (report.widgets.length > 0) {
+                console.log('🎨 Widgets detectados:');
+                console.table(report.widgets.map(w => ({
+                  'Widget': w.widget,
+                  'Node': w.node_name,
+                  'Confiança': `${Math.round(w.confidence * 100)}%`,
+                  'Categoria': w.category
+                })));
+              }
+
+              // Conta issues por severidade
+              const critical = report.analysis.filter(i => i.severity === 'critical').length;
+              const major = report.analysis.filter(i => i.severity === 'major').length;
+              const minor = report.analysis.filter(i => i.severity === 'minor').length;
+              const info = report.analysis.filter(i => i.severity === 'info').length;
+
+              // Mostra alerta com resumo
+              const summary = `RELATÓRIO LINTER ✅
+
+              Total de issues: ${report.summary.total}
+              - Critical: ${critical}
+              - Major: ${major}
+              - Minor: ${minor}
+              - Info: ${info}
+
+              Widgets detectados: ${report.widgets.length}
+
+              Veja o console para detalhes completos!`;
+
+              alert(summary);
+              addLog('Análise concluída! Veja o console.', 'success');
+            }
+            break;
         }
       };
 

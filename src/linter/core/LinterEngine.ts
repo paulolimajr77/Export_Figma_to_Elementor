@@ -1,5 +1,6 @@
 import { Rule, LintResult, LinterOptions, LinterReport, ManualFixGuide } from '../types';
 import { RuleRegistry } from './RuleRegistry';
+import { WidgetDetector } from '../detectors/WidgetDetector';
 
 /**
  * Motor principal do Linter
@@ -48,18 +49,30 @@ export class LinterEngine {
      * Analisa um único node (sem recursão)
      */
     async analyzeNode(node: SceneNode, registry: RuleRegistry): Promise<LintResult[]> {
+        console.log(`🔍 [analyzeNode] Analisando: ${node.name} (${node.type})`);
         const results: LintResult[] = [];
         const rules = registry.getAll();
 
+        console.log(`🔍 [analyzeNode] ${rules.length} regras para executar`);
+
         for (const rule of rules) {
-            const result = await rule.validate(node);
-            if (result) {
-                results.push(result);
+            console.log(`  ⚙️ Executando regra: ${rule.id}`);
+            try {
+                const result = await rule.validate(node);
+                if (result) {
+                    results.push(result);
+                    console.log(`    ✅ Regra ${rule.id}: Issue encontrado`);
+                } else {
+                    console.log(`    ✅ Regra ${rule.id}: OK`);
+                }
+            } catch (error) {
+                console.error(`    ❌ ERRO na regra ${rule.id}:`, error);
             }
         }
 
         // Analisa filhos recursivamente
         if ('children' in node && node.children) {
+            console.log(`🔍 [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
             for (const child of node.children) {
                 const childResults = await this.analyzeNode(child as SceneNode, registry);
                 results.push(...childResults);
@@ -75,15 +88,34 @@ export class LinterEngine {
     generateReport(
         results: LintResult[],
         registry: RuleRegistry,
-        options: LinterOptions = {}
+        options: LinterOptions = {},
+        rootNode?: SceneNode
     ): LinterReport {
         const summary = this.generateSummary(results);
+        console.log('📊 [generateReport] Summary gerado');
+
         const guides = this.generateGuides(results, registry);
+        console.log('📊 [generateReport] Guides gerados');
+
+        // Detecção de widgets (Fase 2)
+        let widgets: any[] = [];
+        if (rootNode) {
+            console.log('📊 [generateReport] Iniciando detecção de widgets...');
+            try {
+                const detector = new WidgetDetector();
+                console.log('📊 [generateReport] WidgetDetector criado');
+                widgets = detector.detectAll(rootNode);
+                console.log(`📊 [generateReport] ${widgets.length} widgets detectados`);
+            } catch (error) {
+                console.error('❌ ERRO ao detectar widgets:', error);
+                widgets = [];
+            }
+        }
 
         return {
             summary,
             analysis: results,
-            widgets: [], // Será implementado na Fase 2
+            widgets,
             guides,
             metadata: {
                 duration: this.getDuration(),

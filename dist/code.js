@@ -4777,6 +4777,707 @@ ${refText}` });
     }
   };
 
+  // src/linter/detectors/WidgetDetector.ts
+  var WidgetDetector = class {
+    constructor() {
+      this.rules = [];
+      this.initializeRules();
+    }
+    /**
+     * Detecta qual widget Elementor melhor representa o node
+     */
+    detect(node) {
+      const detections = [];
+      for (const rule of this.rules) {
+        const confidence = rule.matcher(node);
+        if (confidence > 0) {
+          detections.push({
+            widget: rule.widget,
+            confidence,
+            justification: this.generateJustification(node, rule.widget, confidence)
+          });
+        }
+      }
+      detections.sort((a, b) => b.confidence - a.confidence);
+      const best = detections[0];
+      if (!best || best.confidence < 0.3) {
+        return null;
+      }
+      return {
+        node_id: node.id,
+        node_name: node.name,
+        widget: best.widget,
+        confidence: best.confidence,
+        justification: best.justification
+      };
+    }
+    /**
+     * Detecta múltiplos widgets em uma árvore
+     */
+    detectAll(root) {
+      const results = [];
+      const traverse = (node) => {
+        const detection = this.detect(node);
+        if (detection) {
+          results.push(detection);
+        }
+        if ("children" in node && node.children) {
+          for (const child of node.children) {
+            traverse(child);
+          }
+        }
+      };
+      traverse(root);
+      return results;
+    }
+    /**
+     * Inicializa todas as regras de detecção
+     */
+    initializeRules() {
+      this.addRule("w:heading", "basic", this.matchHeading.bind(this));
+      this.addRule("w:text-editor", "basic", this.matchTextEditor.bind(this));
+      this.addRule("w:button", "basic", this.matchButton.bind(this));
+      this.addRule("w:image", "basic", this.matchImage.bind(this));
+      this.addRule("w:icon", "basic", this.matchIcon.bind(this));
+      this.addRule("w:video", "basic", this.matchVideo.bind(this));
+      this.addRule("w:divider", "basic", this.matchDivider.bind(this));
+      this.addRule("w:spacer", "basic", this.matchSpacer.bind(this));
+      this.addRule("w:image-box", "basic", this.matchImageBox.bind(this));
+      this.addRule("w:icon-box", "basic", this.matchIconBox.bind(this));
+      this.addRule("w:star-rating", "basic", this.matchStarRating.bind(this));
+      this.addRule("w:counter", "basic", this.matchCounter.bind(this));
+      this.addRule("w:progress", "basic", this.matchProgress.bind(this));
+      this.addRule("w:tabs", "basic", this.matchTabs.bind(this));
+      this.addRule("w:accordion", "basic", this.matchAccordion.bind(this));
+      this.addRule("w:toggle", "basic", this.matchToggle.bind(this));
+      this.addRule("w:alert", "basic", this.matchAlert.bind(this));
+      this.addRule("w:social-icons", "basic", this.matchSocialIcons.bind(this));
+      this.addRule("w:icon-list", "basic", this.matchIconList.bind(this));
+      this.addRule("w:nav-menu", "basic", this.matchNavMenu.bind(this));
+      this.addRule("w:search-form", "basic", this.matchSearchForm.bind(this));
+      this.addRule("w:testimonial", "basic", this.matchTestimonial.bind(this));
+      this.addRule("w:container", "basic", this.matchContainer.bind(this));
+      this.addRule("w:form", "pro", this.matchForm.bind(this));
+      this.addRule("w:login", "pro", this.matchLogin.bind(this));
+      this.addRule("w:call-to-action", "pro", this.matchCTA.bind(this));
+      this.addRule("w:portfolio", "pro", this.matchPortfolio.bind(this));
+      this.addRule("w:flip-box", "pro", this.matchFlipBox.bind(this));
+      this.addRule("w:animated-headline", "pro", this.matchAnimatedHeadline.bind(this));
+      this.addRule("w:countdown", "pro", this.matchCountdown.bind(this));
+      this.addRule("w:price-table", "pro", this.matchPriceTable.bind(this));
+      this.addRule("w:price-list", "pro", this.matchPriceList.bind(this));
+      this.addRule("w:post-title", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:post-excerpt", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:post-content", "pro", this.matchGenericText.bind(this));
+      this.addRule("w:author-box", "pro", this.matchGenericContainer.bind(this));
+      this.addRule("w:share-buttons", "pro", this.matchSocialIcons.bind(this));
+      this.addRule("w:slideshow", "pro", this.matchPortfolio.bind(this));
+      this.addRule("w:gallery-pro", "pro", this.matchPortfolio.bind(this));
+      this.addRule("woo:product-title", "woo", this.matchWooProductTitle.bind(this));
+      this.addRule("woo:product-image", "woo", this.matchWooProductImage.bind(this));
+      this.addRule("woo:product-price", "woo", this.matchWooProductPrice.bind(this));
+      this.addRule("woo:product-add-to-cart", "woo", this.matchWooAddToCart.bind(this));
+      this.addRule("woo:product-rating", "woo", this.matchWooProductRating.bind(this));
+      this.addRule("woo:cart", "woo", this.matchGenericContainer.bind(this));
+      this.addRule("woo:checkout", "woo", this.matchForm.bind(this));
+      this.addRule("loop:item", "loop", this.matchGenericContainer.bind(this));
+      this.addRule("loop:image", "loop", this.matchImage.bind(this));
+      this.addRule("loop:title", "loop", this.matchHeading.bind(this));
+      this.addRule("loop:meta", "loop", this.matchGenericText.bind(this));
+      this.addRule("w:wp-search", "wordpress", this.matchSearchForm.bind(this));
+      this.addRule("w:wp-recent-posts", "wordpress", this.matchGenericContainer.bind(this));
+      this.addRule("w:wp-archives", "wordpress", this.matchGenericContainer.bind(this));
+      this.addRule("w:wp-categories", "wordpress", this.matchGenericContainer.bind(this));
+      this.addRule("w:wp-calendar", "wordpress", this.matchGenericContainer.bind(this));
+      this.addRule("w:wp-tag-cloud", "wordpress", this.matchGenericContainer.bind(this));
+    }
+    /**
+     * Adiciona uma regra de detecção
+     */
+    addRule(widget, category, matcher) {
+      this.rules.push({ widget, category, matcher });
+    }
+    /**
+     * Gera justificativa para a detecção
+     */
+    generateJustification(node, widget, confidence) {
+      const reasons = [];
+      if (node.name.toLowerCase().includes(widget.replace(/^w:|^woo:|^loop:/, ""))) {
+        reasons.push("Nome do layer corresponde ao widget");
+      }
+      if (node.type === "TEXT") {
+        reasons.push("\xC9 um elemento de texto");
+      } else if (node.type === "RECTANGLE" || node.type === "FRAME") {
+        reasons.push("Estrutura compat\xEDvel com o widget");
+      }
+      if (confidence >= 0.8) {
+        reasons.push("Alta confian\xE7a na detec\xE7\xE3o");
+      } else if (confidence >= 0.5) {
+        reasons.push("Confian\xE7a moderada");
+      }
+      return reasons.join("; ");
+    }
+    // ==================== MATCHERS - BÁSICOS ====================
+    matchHeading(node) {
+      if (node.type !== "TEXT") return 0;
+      const text = node;
+      let confidence = 0.4;
+      const name = node.name.toLowerCase();
+      if (name.includes("heading") || name.includes("t\xEDtulo") || /^h[1-6]$/i.test(name)) {
+        confidence += 0.3;
+      }
+      if (text.fontSize && typeof text.fontSize === "number" && text.fontSize > 24) {
+        confidence += 0.2;
+      }
+      if (text.fontWeight && typeof text.fontWeight === "number" && text.fontWeight >= 700) {
+        confidence += 0.1;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchTextEditor(node) {
+      if (node.type !== "TEXT") return 0;
+      const text = node;
+      let confidence = 0.3;
+      const name = node.name.toLowerCase();
+      if (name.includes("text") || name.includes("paragraph") || name.includes("description")) {
+        confidence += 0.3;
+      }
+      if (text.characters && text.characters.length > 50) {
+        confidence += 0.2;
+      }
+      if (text.fontSize && typeof text.fontSize === "number" && text.fontSize >= 14 && text.fontSize <= 18) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchButton(node) {
+      var _a;
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("button") || name.includes("btn") || name.includes("cta")) {
+        confidence += 0.5;
+      }
+      if (node.type === "FRAME" && "children" in node) {
+        const hasText = (_a = node.children) == null ? void 0 : _a.some((child) => child.type === "TEXT");
+        if (hasText) {
+          confidence += 0.3;
+        }
+      }
+      if ("cornerRadius" in node && node.cornerRadius && node.cornerRadius > 0) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchImage(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("image") || name.includes("img") || name.includes("photo") || name.includes("picture")) {
+        confidence += 0.5;
+      }
+      if ("fills" in node && node.fills && Array.isArray(node.fills)) {
+        const hasImageFill = node.fills.some((fill) => fill.type === "IMAGE");
+        if (hasImageFill) {
+          confidence += 0.5;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchIcon(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("icon") || name.includes("svg")) {
+        confidence += 0.5;
+      }
+      if ("width" in node && "height" in node) {
+        if (node.width < 100 && node.height < 100) {
+          confidence += 0.3;
+        }
+      }
+      if (node.type === "VECTOR" || node.type === "BOOLEAN_OPERATION") {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchVideo(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("video") || name.includes("youtube") || name.includes("vimeo") || name.includes("player")) {
+        confidence += 0.6;
+      }
+      if ("width" in node && "height" in node) {
+        const ratio = node.width / node.height;
+        if (Math.abs(ratio - 16 / 9) < 0.1) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchDivider(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("divider") || name.includes("separator") || name.includes("line")) {
+        confidence += 0.5;
+      }
+      if ("width" in node && "height" in node) {
+        const width = node.width;
+        const height = node.height;
+        if (height < 5 && width > 50 || width < 5 && height > 50) {
+          confidence += 0.5;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSpacer(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("spacer") || name.includes("space") || name === "gap") {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && (!node.children || node.children.length === 0)) {
+        confidence += 0.4;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchImageBox(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("image-box") || name.includes("image box")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasImage = node.children.some(
+          (child) => child.name.toLowerCase().includes("image") || "fills" in child && Array.isArray(child.fills) && child.fills.some((f) => f.type === "IMAGE")
+        );
+        const hasText = node.children.some((child) => child.type === "TEXT");
+        if (hasImage && hasText) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchIconBox(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("icon-box") || name.includes("icon box")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasIcon = node.children.some(
+          (child) => child.name.toLowerCase().includes("icon") || child.type === "VECTOR"
+        );
+        const hasText = node.children.some((child) => child.type === "TEXT");
+        if (hasIcon && hasText) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchStarRating(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("star") || name.includes("rating") || name.includes("review")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const starCount = node.children.filter(
+          (child) => child.name.toLowerCase().includes("star") || child.type === "VECTOR"
+        ).length;
+        if (starCount >= 3 && starCount <= 5) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchCounter(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("counter") || name.includes("count") || name.includes("number")) {
+        confidence += 0.6;
+      }
+      if (node.type === "TEXT") {
+        const text = node;
+        if (text.characters && /^\d+/.test(text.characters)) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchProgress(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("progress") || name.includes("bar")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "width" in node && "height" in node) {
+        const ratio = node.width / node.height;
+        if (ratio > 3) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchTabs(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("tabs") || name.includes("tab")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        const hasMultipleSections = node.children.filter((child) => child.type === "FRAME").length >= 2;
+        if (hasMultipleSections) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchAccordion(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("accordion") || name.includes("collapse") || name.includes("expand")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchToggle(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("toggle") || name.includes("switch")) {
+        confidence += 0.7;
+      }
+      if ("width" in node && "height" in node && "cornerRadius" in node) {
+        const width = node.width;
+        const height = node.height;
+        if (width < 100 && height < 50 && node.cornerRadius) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchAlert(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("alert") || name.includes("notification") || name.includes("message")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasText = node.children.some((child) => child.type === "TEXT");
+        if (hasText && "fills" in node && node.fills) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSocialIcons(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("social") || name.includes("share")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const iconCount = node.children.filter(
+          (child) => child.type === "VECTOR" || child.name.toLowerCase().includes("icon")
+        ).length;
+        if (iconCount >= 2) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchIconList(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("icon-list") || name.includes("list")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.4;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchNavMenu(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("nav") || name.includes("menu") || name.includes("navigation")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 3) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSearchForm(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("search") || name.includes("busca")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasInput = node.children.some(
+          (child) => child.name.toLowerCase().includes("input") || child.type === "RECTANGLE"
+        );
+        const hasButton = node.children.some(
+          (child) => child.name.toLowerCase().includes("button")
+        );
+        if (hasInput && hasButton) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchTestimonial(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("testimonial") || name.includes("review") || name.includes("depoimento")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasText = node.children.filter((child) => child.type === "TEXT").length >= 2;
+        if (hasText) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchContainer(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("container") || name.includes("section") || name.includes("wrapper")) {
+        confidence += 0.5;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length > 0) {
+        confidence += 0.3;
+      }
+      if ("layoutMode" in node && node.layoutMode !== "NONE") {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    // ==================== MATCHERS - PRO ====================
+    matchForm(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("form") || name.includes("formulario")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const inputCount = node.children.filter(
+          (child) => child.name.toLowerCase().includes("input") || child.name.toLowerCase().includes("field")
+        ).length;
+        if (inputCount >= 2) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchLogin(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("login") || name.includes("sign-in") || name.includes("auth")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasInputs = node.children.filter(
+          (child) => child.name.toLowerCase().includes("input") || child.name.toLowerCase().includes("password") || child.name.toLowerCase().includes("email")
+        ).length >= 2;
+        if (hasInputs) {
+          confidence += 0.2;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchCTA(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("cta") || name.includes("call-to-action")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasText = node.children.filter((child) => child.type === "TEXT").length >= 2;
+        const hasButton = node.children.some(
+          (child) => child.name.toLowerCase().includes("button")
+        );
+        if (hasText && hasButton) {
+          confidence += 0.2;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchPortfolio(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("portfolio") || name.includes("gallery") || name.includes("grid")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const imageCount = node.children.filter(
+          (child) => child.name.toLowerCase().includes("image") || "fills" in child && Array.isArray(child.fills) && child.fills.some((f) => f.type === "IMAGE")
+        ).length;
+        if (imageCount >= 3) {
+          confidence += 0.4;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchFlipBox(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("flip-box") || name.includes("flip")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length === 2) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchAnimatedHeadline(node) {
+      var _a;
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("animated") && name.includes("headline")) {
+        confidence += 0.9;
+      }
+      if (node.type === "TEXT" || node.type === "FRAME" && "children" in node && ((_a = node.children) == null ? void 0 : _a.some((c) => c.type === "TEXT"))) {
+        confidence += 0.1;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchCountdown(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("countdown") || name.includes("timer")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const numberCount = node.children.filter(
+          (child) => child.type === "TEXT" && /\d/.test(child.name)
+        ).length;
+        if (numberCount >= 2) {
+          confidence += 0.2;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchPriceTable(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("price") || name.includes("pricing") || name.includes("plan")) {
+        confidence += 0.6;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 3) {
+        confidence += 0.4;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchPriceList(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("price-list") || name.includes("menu")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children && node.children.length >= 2) {
+        confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    // ==================== MATCHERS - WOOCOMMERCE ====================
+    matchWooProductTitle(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("product") && name.includes("title")) {
+        confidence += 0.8;
+      }
+      if (node.type === "TEXT") {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductImage(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("product") && name.includes("image")) {
+        confidence += 0.8;
+      }
+      if ("fills" in node && Array.isArray(node.fills) && node.fills.some((f) => f.type === "IMAGE")) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductPrice(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("price") || name.includes("preco")) {
+        confidence += 0.7;
+      }
+      if (node.type === "TEXT") {
+        const text = node;
+        if (text.characters && (/\$|R\$|€/.test(text.characters) || /\d+[.,]\d+/.test(text.characters))) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooAddToCart(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("add-to-cart") || name.includes("cart") || name.includes("buy")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" || "cornerRadius" in node && node.cornerRadius) {
+        confidence += 0.2;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductRating(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("rating") || name.includes("star")) {
+        confidence += 0.7;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const starCount = node.children.filter(
+          (child) => child.type === "VECTOR" || child.name.toLowerCase().includes("star")
+        ).length;
+        if (starCount >= 3) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    // ==================== MATCHERS - GENÉRICOS ====================
+    /**
+     * Matcher genérico para texto (usado para widgets simples de texto)
+     */
+    matchGenericText(node) {
+      let confidence = 0;
+      if (node.type === "TEXT") {
+        confidence += 0.5;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasText = node.children.some((child) => child.type === "TEXT");
+        if (hasText) {
+          confidence += 0.3;
+        }
+      }
+      return Math.min(confidence, 1);
+    }
+    /**
+     * Matcher genérico para containers (usado para widgets que são apenas wrappers)
+     */
+    matchGenericContainer(node) {
+      let confidence = 0;
+      if (node.type === "FRAME") {
+        confidence += 0.3;
+      }
+      if ("children" in node && node.children && node.children.length > 0) {
+        confidence += 0.4;
+      }
+      return Math.min(confidence, 1);
+    }
+  };
+
   // src/linter/core/LinterEngine.ts
   var LinterEngine = class {
     constructor() {
@@ -4814,15 +5515,26 @@ ${refText}` });
      */
     analyzeNode(node, registry2) {
       return __async(this, null, function* () {
+        console.log(`\u{1F50D} [analyzeNode] Analisando: ${node.name} (${node.type})`);
         const results = [];
         const rules = registry2.getAll();
+        console.log(`\u{1F50D} [analyzeNode] ${rules.length} regras para executar`);
         for (const rule of rules) {
-          const result = yield rule.validate(node);
-          if (result) {
-            results.push(result);
+          console.log(`  \u2699\uFE0F Executando regra: ${rule.id}`);
+          try {
+            const result = yield rule.validate(node);
+            if (result) {
+              results.push(result);
+              console.log(`    \u2705 Regra ${rule.id}: Issue encontrado`);
+            } else {
+              console.log(`    \u2705 Regra ${rule.id}: OK`);
+            }
+          } catch (error) {
+            console.error(`    \u274C ERRO na regra ${rule.id}:`, error);
           }
         }
         if ("children" in node && node.children) {
+          console.log(`\u{1F50D} [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
           for (const child of node.children) {
             const childResults = yield this.analyzeNode(child, registry2);
             results.push(...childResults);
@@ -4834,14 +5546,28 @@ ${refText}` });
     /**
      * Gera relatório completo
      */
-    generateReport(results, registry2, options = {}) {
+    generateReport(results, registry2, options = {}, rootNode) {
       const summary = this.generateSummary(results);
+      console.log("\u{1F4CA} [generateReport] Summary gerado");
       const guides = this.generateGuides(results, registry2);
+      console.log("\u{1F4CA} [generateReport] Guides gerados");
+      let widgets = [];
+      if (rootNode) {
+        console.log("\u{1F4CA} [generateReport] Iniciando detec\xE7\xE3o de widgets...");
+        try {
+          const detector = new WidgetDetector();
+          console.log("\u{1F4CA} [generateReport] WidgetDetector criado");
+          widgets = detector.detectAll(rootNode);
+          console.log(`\u{1F4CA} [generateReport] ${widgets.length} widgets detectados`);
+        } catch (error) {
+          console.error("\u274C ERRO ao detectar widgets:", error);
+          widgets = [];
+        }
+      }
       return {
         summary,
         analysis: results,
-        widgets: [],
-        // Será implementado na Fase 2
+        widgets,
         guides,
         metadata: {
           duration: this.getDuration(),
@@ -5328,6 +6054,93 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
     }
   };
 
+  // src/linter/rules/naming/WidgetNamingRule.ts
+  var WidgetNamingRule = class {
+    constructor() {
+      this.id = "widget-naming";
+      this.category = "naming";
+      this.severity = "major";
+      this.detector = new WidgetDetector();
+    }
+    validate(node) {
+      return __async(this, null, function* () {
+        const detection = this.detector.detect(node);
+        if (!detection) {
+          return null;
+        }
+        const currentName = node.name;
+        const suggestedWidget = detection.widget;
+        const confidence = detection.confidence;
+        if (confidence < 0.6) {
+          return null;
+        }
+        const isCorrectlyNamed = currentName.toLowerCase().includes(suggestedWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
+        if (isCorrectlyNamed) {
+          return null;
+        }
+        return {
+          node_id: node.id,
+          node_name: node.name,
+          severity: this.severity,
+          category: this.category,
+          rule: this.id,
+          message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
+          educational_tip: `
+\u{1F4A1} Widget Detection
+
+O Linter detectou que este elemento corresponde ao widget "${suggestedWidget}" do Elementor.
+
+\u{1F4CB} Por que nomenclatura correta importa:
+\u2022 Facilita identifica\xE7\xE3o visual no Figma
+\u2022 Melhora convers\xE3o autom\xE1tica para Elementor
+\u2022 Reduz erros na exporta\xE7\xE3o
+\u2022 Torna o design system mais consistente
+
+\u2705 Nomenclatura recomendada:
+${this.getSuggestions(suggestedWidget, currentName).join("\n")}
+
+\u{1F3AF} Justificativa da detec\xE7\xE3o:
+${detection.justification}
+            `.trim(),
+          fixAvailable: false
+          // Naming não tem auto-fix (usuário deve decidir)
+        };
+      });
+    }
+    generateGuide(node) {
+      const detection = this.detector.detect(node);
+      const suggestedWidget = (detection == null ? void 0 : detection.widget) || "w:unknown";
+      return {
+        node_id: node.id,
+        problem: `Nome n\xE3o reflete o widget detectado (${suggestedWidget})`,
+        severity: this.severity,
+        step_by_step: [
+          { step: 1, action: "Selecione o layer no Figma" },
+          { step: 2, action: `Renomeie para "${suggestedWidget}"` },
+          { step: 3, action: "Ou use um nome descritivo que inclua o tipo de widget" },
+          { step: 4, action: 'Exemplo: "Hero CTA Button" ou "w:button"' }
+        ],
+        before_after_example: {
+          before: `Nome gen\xE9rico: "${node.name}"`,
+          after: `Nome correto: "${suggestedWidget}" ou "Hero ${suggestedWidget}"`
+        },
+        estimated_time: "30 segundos",
+        difficulty: "easy"
+      };
+    }
+    getSuggestions(widget, currentName) {
+      const suggestions = [];
+      suggestions.push(`\u2022 "${widget}" (padr\xE3o t\xE9cnico)`);
+      const context = currentName.replace(/frame|rectangle|group|\d+/gi, "").trim();
+      if (context) {
+        suggestions.push(`\u2022 "${context} ${widget}" (nome descritivo)`);
+      }
+      const widgetType = widget.split(":")[1] || widget;
+      suggestions.push(`\u2022 "Hero ${widgetType}" ou "Footer ${widgetType}" (nome funcional)`);
+      return suggestions;
+    }
+  };
+
   // src/linter/index.ts
   function analyzeFigmaLayout(_0) {
     return __async(this, arguments, function* (node, options = {
@@ -5335,15 +6148,26 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
       aiProvider: "none",
       deviceTarget: "desktop"
     }) {
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Iniciando...");
       const engine = new LinterEngine();
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Engine criado");
       const registry2 = new RuleRegistry();
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Registry criado");
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Registrando regras...");
       registry2.registerAll([
         new AutoLayoutRule(),
         new SpacerDetectionRule(),
-        new GenericNameRule()
+        new GenericNameRule(),
+        new WidgetNamingRule()
       ]);
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Regras registradas");
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Iniciando engine.analyze...");
       const results = yield engine.analyze(node, registry2, options);
-      return engine.generateReport(results, registry2, options);
+      console.log(`\u{1F4CD} [analyzeFigmaLayout] An\xE1lise completa. ${results.length} resultados`);
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Gerando relat\xF3rio...");
+      const report = engine.generateReport(results, registry2, options, node);
+      console.log("\u{1F4CD} [analyzeFigmaLayout] Relat\xF3rio gerado com sucesso");
+      return report;
     });
   }
   function validateSingleNode(node) {
@@ -5721,6 +6545,7 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
   }
   function sendStoredSettings() {
     return __async(this, null, function* () {
+      console.log("\u{1F527} [sendStoredSettings] Carregando configura\xE7\xF5es salvas...");
       let geminiKey = yield loadSetting("gptel_gemini_key", "");
       if (!geminiKey) {
         geminiKey = yield loadSetting("gemini_api_key", "");
@@ -5739,6 +6564,12 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
       const includeScreenshot = yield loadSetting("gptel_include_screenshot", true);
       const includeReferences = yield loadSetting("gptel_include_references", true);
       const autoRename = yield loadSetting("gptel_auto_rename", false);
+      console.log("\u{1F527} [sendStoredSettings] Configura\xE7\xF5es carregadas:", {
+        geminiKey: geminiKey ? "***" + geminiKey.slice(-4) : "vazio",
+        gptKey: gptKey ? "***" + gptKey.slice(-4) : "vazio",
+        wpUrl,
+        providerAi
+      });
       figma.ui.postMessage({
         type: "load-settings",
         payload: {
@@ -5759,6 +6590,7 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
           autoRename
         }
       });
+      console.log("\u{1F527} [sendStoredSettings] Mensagem enviada para UI");
     });
   }
   figma.ui.onmessage = (msg) => __async(null, null, function* () {
@@ -5953,6 +6785,7 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
       // ========== LINTER HANDLERS ==========
       case "analyze-layout":
         try {
+          log("\u{1F50D} Handler analyze-layout iniciado", "info");
           const selection = figma.currentPage.selection;
           if (!selection || selection.length === 0) {
             figma.ui.postMessage({
@@ -5962,6 +6795,7 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
             break;
           }
           const node = selection[0];
+          log(`Node selecionado: ${node.name} (${node.type})`, "info");
           if (node.type !== "FRAME") {
             figma.ui.postMessage({
               type: "linter-error",
@@ -5970,18 +6804,24 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
             break;
           }
           log("Iniciando an\xE1lise de layout...", "info");
+          log("Chamando analyzeFigmaLayout...", "info");
           const report = yield analyzeFigmaLayout(node, {
             aiAssisted: false,
             deviceTarget: "desktop"
           });
+          log("Relat\xF3rio gerado com sucesso", "info");
+          log(`Total de issues: ${report.analysis.length}`, "info");
+          log(`Total de widgets detectados: ${report.widgets.length}`, "info");
           figma.ui.postMessage({
             type: "linter-report",
-            report
+            payload: report
           });
           log(`An\xE1lise conclu\xEDda: ${report.summary.total} problemas encontrados`, "success");
         } catch (error) {
           const message = (error == null ? void 0 : error.message) || String(error);
-          log(`Erro ao analisar layout: ${message}`, "error");
+          const stack = (error == null ? void 0 : error.stack) || "No stack trace";
+          log(`\u274C ERRO ao analisar layout: ${message}`, "error");
+          log(`Stack: ${stack}`, "error");
           figma.ui.postMessage({
             type: "linter-error",
             message

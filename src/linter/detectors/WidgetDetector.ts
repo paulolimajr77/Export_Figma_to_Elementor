@@ -122,6 +122,13 @@ export class WidgetDetector {
         this.addRule('w:countdown', 'pro', this.matchCountdown.bind(this));
         this.addRule('w:price-table', 'pro', this.matchPriceTable.bind(this));
         this.addRule('w:price-list', 'pro', this.matchPriceList.bind(this));
+        this.addRule('w:post-title', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:post-excerpt', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:post-content', 'pro', this.matchGenericText.bind(this));
+        this.addRule('w:author-box', 'pro', this.matchGenericContainer.bind(this));
+        this.addRule('w:share-buttons', 'pro', this.matchSocialIcons.bind(this));
+        this.addRule('w:slideshow', 'pro', this.matchPortfolio.bind(this));
+        this.addRule('w:gallery-pro', 'pro', this.matchPortfolio.bind(this));
 
         // === WOOCOMMERCE ===
         this.addRule('woo:product-title', 'woo', this.matchWooProductTitle.bind(this));
@@ -129,6 +136,22 @@ export class WidgetDetector {
         this.addRule('woo:product-price', 'woo', this.matchWooProductPrice.bind(this));
         this.addRule('woo:product-add-to-cart', 'woo', this.matchWooAddToCart.bind(this));
         this.addRule('woo:product-rating', 'woo', this.matchWooProductRating.bind(this));
+        this.addRule('woo:cart', 'woo', this.matchGenericContainer.bind(this));
+        this.addRule('woo:checkout', 'woo', this.matchForm.bind(this));
+
+        // === LOOP BUILDER ===
+        this.addRule('loop:item', 'loop', this.matchGenericContainer.bind(this));
+        this.addRule('loop:image', 'loop', this.matchImage.bind(this));
+        this.addRule('loop:title', 'loop', this.matchHeading.bind(this));
+        this.addRule('loop:meta', 'loop', this.matchGenericText.bind(this));
+
+        // === WORDPRESS ===
+        this.addRule('w:wp-search', 'wordpress', this.matchSearchForm.bind(this));
+        this.addRule('w:wp-recent-posts', 'wordpress', this.matchGenericContainer.bind(this));
+        this.addRule('w:wp-archives', 'wordpress', this.matchGenericContainer.bind(this));
+        this.addRule('w:wp-categories', 'wordpress', this.matchGenericContainer.bind(this));
+        this.addRule('w:wp-calendar', 'wordpress', this.matchGenericContainer.bind(this));
+        this.addRule('w:wp-tag-cloud', 'wordpress', this.matchGenericContainer.bind(this));
 
         // Mais regras serão adicionadas conforme necessário
     }
@@ -183,12 +206,12 @@ export class WidgetDetector {
         }
 
         // Tamanho de fonte grande (> 24px)
-        if (text.fontSize && (text.fontSize as number) > 24) {
+        if (text.fontSize && typeof text.fontSize === 'number' && text.fontSize > 24) {
             confidence += 0.2;
         }
 
         // Font weight bold
-        if (text.fontWeight && (text.fontWeight as number) >= 700) {
+        if (text.fontWeight && typeof text.fontWeight === 'number' && text.fontWeight >= 700) {
             confidence += 0.1;
         }
 
@@ -212,7 +235,7 @@ export class WidgetDetector {
         }
 
         // Tamanho de fonte normal (14-18px)
-        if (text.fontSize && (text.fontSize as number) >= 14 && (text.fontSize as number) <= 18) {
+        if (text.fontSize && typeof text.fontSize === 'number' && text.fontSize >= 14 && text.fontSize <= 18) {
             confidence += 0.2;
         }
 
@@ -911,6 +934,47 @@ export class WidgetDetector {
             if (starCount >= 3) {
                 confidence += 0.3;
             }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    // ==================== MATCHERS - GENÉRICOS ====================
+
+    /**
+     * Matcher genérico para texto (usado para widgets simples de texto)
+     */
+    private matchGenericText(node: SceneNode): number {
+        let confidence = 0;
+
+        if (node.type === 'TEXT') {
+            confidence += 0.5;
+        }
+
+        // Frame contendo texto
+        if (node.type === 'FRAME' && 'children' in node && node.children) {
+            const hasText = node.children.some(child => child.type === 'TEXT');
+            if (hasText) {
+                confidence += 0.3;
+            }
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    /**
+     * Matcher genérico para containers (usado para widgets que são apenas wrappers)
+     */
+    private matchGenericContainer(node: SceneNode): number {
+        let confidence = 0;
+
+        if (node.type === 'FRAME') {
+            confidence += 0.3;
+        }
+
+        // Frame com filhos
+        if ('children' in node && node.children && node.children.length > 0) {
+            confidence += 0.4;
         }
 
         return Math.min(confidence, 1.0);

@@ -657,6 +657,184 @@
         transform: translateX(100%);
       }
     }
+
+    /* Linter Styles */
+    #linter-panel {
+      margin-top: 16px;
+      border-top: 1px solid var(--color-border);
+      padding-top: 16px;
+    }
+
+    .linter-summary {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: var(--color-bg);
+      border-radius: var(--radius);
+      align-items: center;
+    }
+
+    .linter-score {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid var(--color-border);
+      font-weight: 700;
+    }
+
+    .linter-score.success {
+      border-color: #2ecc71;
+      color: #2ecc71;
+    }
+
+    .linter-score.warning {
+      border-color: #f1c40f;
+      color: #f39c12;
+    }
+
+    .linter-score.error {
+      border-color: #e74c3c;
+      color: #e74c3c;
+    }
+
+    .score-value {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .score-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+      margin-top: 2px;
+    }
+
+    .linter-stats {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+    }
+
+    .stat-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+    }
+
+    .stat-item .count {
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .stat-item .label {
+      font-size: 10px;
+      color: var(--color-text-secondary);
+    }
+
+    .stat-item.error .count {
+      color: #e74c3c;
+    }
+
+    .stat-item.warning .count {
+      color: #f39c12;
+    }
+
+    .linter-issues {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .linter-issue {
+      background: #fff;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 10px;
+      cursor: pointer;
+      transition: var(--anim);
+      border-left: 3px solid transparent;
+    }
+
+    .linter-issue:hover {
+      transform: translateX(2px);
+      box-shadow: var(--shadow-1);
+    }
+
+    .linter-issue.error {
+      border-left-color: #e74c3c;
+    }
+
+    .linter-issue.warning {
+      border-left-color: #f1c40f;
+    }
+
+    .issue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .issue-severity {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .issue-severity.error {
+      background: #fadbd8;
+      color: #c0392b;
+    }
+
+    .issue-severity.warning {
+      background: #fcf3cf;
+      color: #d68910;
+    }
+
+    .issue-message {
+      font-size: 12px;
+      font-weight: 500;
+      flex: 1;
+      margin-left: 8px;
+    }
+
+    .issue-details {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .issue-suggestion {
+      color: var(--color-primary);
+      font-style: italic;
+    }
+
+    .linter-empty {
+      text-align: center;
+      padding: 20px;
+      color: var(--color-text-secondary);
+      font-style: italic;
+    }
   </style>
 </head>
 
@@ -692,14 +870,23 @@
           <div class="card-title">A&#231;&#245;es r&#225;pidas</div>
           <div class="row">
             <button id="btn_inspect" class="btn secondary">Inspecionar Layout</button>
+            <button id="btn_analyze" class="btn secondary">🔍 Analisar Layout</button>
             <button id="btn_generate" class="btn primary">Gerar JSON</button>
             <button id="btn_reset" class="btn secondary" data-action="reset">Reiniciar</button>
           </div>
         </div>
 
+        <!-- Linter Panel -->
+        <div id="linter-panel" class="card" style="display: none;">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Relatório de Análise</span>
+            <button id="btn_close_linter" class="btn tiny secondary">Fechar</button>
+          </div>
 
+          <div id="linter-summary" class="linter-summary"></div>
+          <div id="linter-issues" class="linter-issues"></div>
+        </div>
         <div class="card">
-          <div class="card-title">Sa&#237;da / Logs</div>
           <div id="progress" class="progress hidden">
             <div class="progress-bar"></div>
             <span class="progress-text">Processando pipeline...</span>
@@ -1273,22 +1460,119 @@
             const gptStatus = document.getElementById('gpt-status');
             if (gptStatus) gptStatus.textContent = msg.message;
             break;
-          case 'wp-status':
-            addLog(msg.message || 'Status WP', msg.success ? 'success' : 'error');
-            const ws = document.getElementById('wp-status');
-            if (ws) ws.textContent = msg.message;
-            break;
-          case 'log':
-            if (typeof msg.message === 'string' && msg.message.includes('Iniciando pipeline')) {
-              toggleProgress(true);
-            }
-            addLog(msg.message, msg.level);
-            break;
-          case 'load-settings':
-            loadStoredSettings(msg.payload);
-            break;
           case 'upload-image-request':
             uploadImage(msg);
+            break;
+          case 'load-settings':
+            console.log('📥 [UI] Recebendo configurações:', msg.payload);
+            if (msg.payload) {
+              // Gemini
+              if (msg.payload.geminiKey && fields.gemini_api_key) {
+                fields.gemini_api_key.value = msg.payload.geminiKey;
+                console.log('✅ Gemini Key carregada');
+              }
+              if (msg.payload.geminiModel && fields.gemini_model) {
+                fields.gemini_model.value = msg.payload.geminiModel;
+              }
+
+              // GPT
+              if (msg.payload.gptKey && fields.gpt_api_key) {
+                fields.gpt_api_key.value = msg.payload.gptKey;
+                console.log('✅ GPT Key carregada');
+              }
+              if (msg.payload.gptModel && fields.gpt_model) {
+                fields.gpt_model.value = msg.payload.gptModel;
+              }
+
+              // WordPress
+              if (msg.payload.wpUrl && fields.wp_url) {
+                fields.wp_url.value = msg.payload.wpUrl;
+                console.log('✅ WP URL carregada:', msg.payload.wpUrl);
+              }
+              if (msg.payload.wpUser && fields.wp_user) {
+                fields.wp_user.value = msg.payload.wpUser;
+                console.log('✅ WP User carregado');
+              }
+              if (msg.payload.wpToken && fields.wp_token) {
+                fields.wp_token.value = msg.payload.wpToken;
+                console.log('✅ WP Token carregado');
+              }
+
+              // Provider
+              if (msg.payload.providerAi) {
+                if (fields.provider_ai) {
+                  fields.provider_ai.value = msg.payload.providerAi;
+                }
+                setProvider(msg.payload.providerAi);
+                console.log('✅ Provider setado:', msg.payload.providerAi);
+              }
+
+              // Checkboxes
+              if (fields.use_ai !== undefined) {
+                fields.use_ai.checked = msg.payload.useAI !== false;
+              }
+              if (fields.export_images !== undefined) {
+                fields.export_images.checked = msg.payload.exportImages === true;
+              }
+              if (fields.auto_page !== undefined) {
+                fields.auto_page.checked = msg.payload.autoPage === true;
+              }
+
+              console.log('✅ [UI] Todas as configurações aplicadas!');
+              addLog('Configurações carregadas com sucesso', 'success');
+            }
+            break;
+
+          case 'linter-report':
+            console.log('📊 [UI] Recebendo relatório do Linter:', msg.payload);
+            if (msg.payload) {
+              const report = msg.payload;
+
+              // Exibe no console para DEBUG
+              console.log(`📊 Total de issues: ${report.summary.total}`);
+              console.log(`📊 Widgets detectados: ${report.widgets.length}`);
+
+              // Exibe relatório completo no console
+              console.table(report.analysis.map(issue => ({
+                'Node': issue.node_name,
+                'Regra': issue.rule,
+                'Severidade': issue.severity,
+                'Mensagem': issue.message
+              })));
+
+              // Exibe widgets detectados
+              if (report.widgets.length > 0) {
+                console.log('🎨 Widgets detectados:');
+                console.table(report.widgets.map(w => ({
+                  'Widget': w.widget,
+                  'Node': w.node_name,
+                  'Confiança': `${Math.round(w.confidence * 100)}%`,
+                  'Categoria': w.category
+                })));
+              }
+
+              // Conta issues por severidade
+              const critical = report.analysis.filter(i => i.severity === 'critical').length;
+              const major = report.analysis.filter(i => i.severity === 'major').length;
+              const minor = report.analysis.filter(i => i.severity === 'minor').length;
+              const info = report.analysis.filter(i => i.severity === 'info').length;
+
+              // Mostra alerta com resumo
+              const summary = `RELATÓRIO LINTER ✅
+
+              Total de issues: ${report.summary.total}
+              - Critical: ${critical}
+              - Major: ${major}
+              - Minor: ${minor}
+              - Info: ${info}
+
+              Widgets detectados: ${report.widgets.length}
+
+              Veja o console para detalhes completos!`;
+
+              alert(summary);
+              addLog('Análise concluída! Veja o console.', 'success');
+            }
             break;
         }
       };
@@ -1539,6 +1823,97 @@
           send('rename-layer', { name });
         }
       });
+
+      // Linter Logic
+      const linterPanel = document.getElementById('linter-panel');
+      const linterSummary = document.getElementById('linter-summary');
+      const linterIssues = document.getElementById('linter-issues');
+      const btnAnalyze = document.getElementById('btn_analyze');
+      const btnCloseLinter = document.getElementById('btn_close_linter');
+
+      if (btnAnalyze) {
+        btnAnalyze.onclick = () => {
+          send('analyze-layout');
+          addLog('Iniciando análise de layout...', 'info');
+        };
+      }
+
+      if (btnCloseLinter) {
+        btnCloseLinter.onclick = () => {
+          if (linterPanel) linterPanel.style.display = 'none';
+        };
+      }
+
+      function renderLinterReport(report) {
+        if (!linterPanel || !linterSummary || !linterIssues) return;
+
+        linterPanel.style.display = 'block';
+        linterIssues.innerHTML = '';
+        linterSummary.innerHTML = '';
+
+        if (!report) {
+          linterSummary.innerHTML = '<div class="linter-empty">Erro ao gerar relatório.</div>';
+          return;
+        }
+
+        // Render Summary
+        const scoreColor = report.score >= 90 ? 'success' : report.score >= 70 ? 'warning' : 'error';
+        linterSummary.innerHTML = `
+          <div class="linter-score ${scoreColor}">
+            <div class="score-value">${report.score}</div>
+            <div class="score-label">Score</div>
+          </div>
+          <div class="linter-stats">
+            <div class="stat-item error">
+              <span class="count">${report.stats.errors}</span>
+              <span class="label">Erros</span>
+            </div>
+            <div class="stat-item warning">
+              <span class="count">${report.stats.warnings}</span>
+              <span class="label">Alertas</span>
+            </div>
+          </div>
+        `;
+
+        // Render Issues
+        if (report.issues.length === 0) {
+          linterIssues.innerHTML = '<div class="linter-empty">Nenhum problema encontrado! 🎉</div>';
+        } else {
+          report.issues.forEach(issue => {
+            const issueEl = document.createElement('div');
+            issueEl.className = `linter-issue ${issue.severity}`;
+            issueEl.innerHTML = `
+              <div class="issue-header">
+                <span class="issue-severity ${issue.severity}">${issue.severity === 'error' ? 'Erro' : 'Alerta'}</span>
+                <span class="issue-message">${issue.message}</span>
+              </div>
+              <div class="issue-details">
+                <div class="issue-node">Camada: ${issue.nodeName} (${issue.nodeType})</div>
+                ${issue.suggestion ? `<div class="issue-suggestion">💡 ${issue.suggestion}</div>` : ''}
+                ${issue.fixAvailable ? `<button class="btn tiny primary" data-fix="${issue.ruleId}" data-node="${issue.nodeId}">Corrigir</button>` : ''}
+              </div>
+            `;
+
+            // Add click handler for selection
+            issueEl.addEventListener('click', (e) => {
+              if (e.target.tagName !== 'BUTTON') {
+                send('select-node', { nodeId: issue.nodeId });
+              }
+            });
+
+            // Add fix handler
+            const fixBtn = issueEl.querySelector('[data-fix]');
+            if (fixBtn) {
+              fixBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                send('fix-issue', { ruleId: issue.ruleId, nodeId: issue.nodeId });
+              });
+            }
+
+            linterIssues.appendChild(issueEl);
+          });
+        }
+      }
 
     })();
   </script>
