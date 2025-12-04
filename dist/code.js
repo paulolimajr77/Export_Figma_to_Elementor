@@ -4777,530 +4777,11 @@ ${refText}` });
     }
   };
 
-  // src/linter/detectors/WidgetDetector.ts
-  var _WidgetDetector = class _WidgetDetector {
-    /**
-     * Detecta o widget mais provável para um node
-     */
-    detect(node) {
-      if (!node.visible) return null;
-      if (this.isImage(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:image",
-          confidence: 0.9,
-          justification: "Possui preenchimento de imagem"
-        };
-      }
-      if (this.isHeading(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:heading",
-          confidence: 0.8,
-          justification: "Texto com tamanho de fonte > 20px"
-        };
-      }
-      if (this.isButton(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:button",
-          confidence: 0.85,
-          justification: "Frame com Auto Layout e Texto centralizado"
-        };
-      }
-      if (this.isIcon(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:icon",
-          confidence: 0.7,
-          justification: 'Vetor pequeno ou nome cont\xE9m "icon"'
-        };
-      }
-      if (this.isTextEditor(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:text-editor",
-          confidence: 0.8,
-          justification: "Texto longo ou multilinha"
-        };
-      }
-      if (this.isContainer(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:container",
-          confidence: 0.7,
-          justification: "Frame estrutural com Auto Layout"
-        };
-      }
-      if (this.isVideo(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:video",
-          confidence: 0.9,
-          justification: 'Nome cont\xE9m "video" ou \xEDcone de play'
-        };
-      }
-      if (this.isDivider(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:divider",
-          confidence: 0.85,
-          justification: "Linha horizontal ou ret\xE2ngulo fino"
-        };
-      }
-      if (this.isSpacer(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "w:spacer",
-          confidence: 0.75,
-          justification: "Ret\xE2ngulo vazio usado para espa\xE7amento"
-        };
-      }
-      const nameDetection = this.detectByName(node);
-      if (nameDetection) {
-        return nameDetection;
-      }
-      return null;
-    }
-    /**
-     * Detecta widgets baseando-se estritamente na nomenclatura
-     * Cobre a lista completa de widgets suportados
-     */
-    detectByName(node) {
-      const name = node.name.toLowerCase();
-      for (const key of _WidgetDetector.SORTED_KEYS) {
-        if (name.includes(key)) {
-          return {
-            node_id: node.id,
-            node_name: node.name,
-            widget: _WidgetDetector.WIDGET_MAP[key],
-            confidence: 1,
-            justification: `Nome da camada cont\xE9m "${key}"`
-          };
-        }
-      }
-      return null;
-    }
-    isImage(node) {
-      if ("fills" in node) {
-        const fills = node.fills;
-        if (Array.isArray(fills) && fills.some((f) => f.type === "IMAGE")) {
-          return true;
-        }
-      }
-      return false;
-    }
-    isHeading(node) {
-      if (node.type !== "TEXT") return false;
-      if (node.fontSize !== figma.mixed && node.fontSize > 20) {
-        return true;
-      }
-      const name = node.name.toLowerCase();
-      if (name.includes("heading") || name.includes("title") || name.includes("h1") || name.includes("h2")) {
-        return true;
-      }
-      return false;
-    }
-    isTextEditor(node) {
-      if (node.type !== "TEXT") return false;
-      if (this.isHeading(node)) return false;
-      const textNode = node;
-      if (textNode.characters.length > 60 || textNode.characters.includes("\n")) {
-        return true;
-      }
-      return true;
-    }
-    isButton(node) {
-      if (node.type !== "FRAME" && node.type !== "INSTANCE") return false;
-      if (node.layoutMode === "NONE") return false;
-      const fills = node.fills;
-      if (!Array.isArray(fills) || fills.length === 0 || !fills.some((f) => f.visible)) return false;
-      const textChildren = node.findAll((n) => n.type === "TEXT");
-      if (textChildren.length === 0) return false;
-      const name = node.name.toLowerCase();
-      if (name.includes("btn") || name.includes("button")) return true;
-      return true;
-    }
-    isIcon(node) {
-      if (node.type === "VECTOR" || node.type === "BOOLEAN_OPERATION" || node.type === "FRAME" && node.children.every((c) => c.type === "VECTOR")) {
-        if (node.width <= 48 && node.height <= 48) {
-          return true;
-        }
-      }
-      const name = node.name.toLowerCase();
-      if (name.includes("icon") || name.includes("ico")) return true;
-      return false;
-    }
-    isContainer(node) {
-      if (node.type !== "FRAME") return false;
-      if (node.layoutMode === "NONE") return false;
-      if ("children" in node && node.children.length > 0 && !this.isButton(node)) {
-        return true;
-      }
-      const name = node.name.toLowerCase();
-      if (name.includes("container") || name.includes("section") || name.includes("row") || name.includes("col")) {
-        return true;
-      }
-      return false;
-    }
-    isVideo(node) {
-      const name = node.name.toLowerCase();
-      if (name.includes("video") || name.includes("youtube") || name.includes("vimeo")) return true;
-      return false;
-    }
-    isDivider(node) {
-      if (node.type === "LINE") return true;
-      if (node.type === "RECTANGLE" || node.type === "FRAME") {
-        if (node.width > 50 && node.height <= 5) return true;
-        if (node.height > 50 && node.width <= 5) return true;
-      }
-      const name = node.name.toLowerCase();
-      if (name.includes("divider") || name.includes("separator") || name.includes("linha")) return true;
-      return false;
-    }
-    isSpacer(node) {
-      if (node.type === "RECTANGLE" || node.type === "FRAME") {
-        const fills = node.fills;
-        if (!Array.isArray(fills) || fills.length === 0 || !fills.some((f) => f.visible)) {
-          return true;
-        }
-      }
-      const name = node.name.toLowerCase();
-      if (name.includes("spacer") || name.includes("gap")) return true;
-      return false;
-    }
-  };
-  // Cache estático para evitar recriação a cada chamada
-  _WidgetDetector.WIDGET_MAP = {
-    // WooCommerce
-    "woo:product-title": "woo:product-title",
-    "woo:product-image": "woo:product-image",
-    "woo:product-price": "woo:product-price",
-    "woo:product-add-to-cart": "woo:product-add-to-cart",
-    "woo:product-data-tabs": "woo:product-data-tabs",
-    "woo:product-excerpt": "woo:product-excerpt",
-    "woo:product-rating": "woo:product-rating",
-    "woo:product-stock": "woo:product-stock",
-    "woo:product-meta": "woo:product-meta",
-    "woo:product-additional-information": "woo:product-additional-information",
-    "woo:product-short-description": "woo:product-short-description",
-    "woo:product-related": "woo:product-related",
-    "woo:product-upsells": "woo:product-upsells",
-    "woo:product-tabs": "woo:product-tabs",
-    "woo:product-breadcrumb": "woo:product-breadcrumb",
-    "woo:product-gallery": "woo:product-gallery",
-    "woo:products": "woo:products",
-    "woo:product-grid": "woo:product-grid",
-    "woo:product-carousel": "woo:product-carousel",
-    "woo:product-loop-item": "woo:product-loop-item",
-    "woo:loop-product-title": "woo:loop-product-title",
-    "woo:loop-product-price": "woo:loop-product-price",
-    "woo:loop-product-rating": "woo:loop-product-rating",
-    "woo:loop-product-image": "woo:loop-product-image",
-    "woo:loop-product-button": "woo:loop-product-button",
-    "woo:loop-product-meta": "woo:loop-product-meta",
-    "woo:cart": "woo:cart",
-    "woo:checkout": "woo:checkout",
-    "woo:my-account": "woo:my-account",
-    "woo:purchase-summary": "woo:purchase-summary",
-    "woo:order-tracking": "woo:order-tracking",
-    // Pro
-    "form": "form",
-    "login": "login",
-    "subscription": "subscription",
-    "call-to-action": "call-to-action",
-    "media:carousel": "media:carousel",
-    "portfolio": "portfolio",
-    "gallery-pro": "gallery-pro",
-    "slider:slides": "slider:slides",
-    "slideshow": "slideshow",
-    "flip-box": "flip-box",
-    "animated-headline": "animated-headline",
-    "post-navigation": "post-navigation",
-    "share-buttons": "share-buttons",
-    "table-of-contents": "table-of-contents",
-    "countdown": "countdown",
-    "blockquote": "blockquote",
-    "testimonial-carousel": "testimonial-carousel",
-    "review-box": "review-box",
-    "reviews": "reviews",
-    "hotspots": "hotspots",
-    "sitemap": "sitemap",
-    "author-box": "author-box",
-    "price-table": "price-table",
-    "price-list": "price-list",
-    "progress-tracker": "progress-tracker",
-    "animated-text": "animated-text",
-    "nav-menu-pro": "nav-menu-pro",
-    "breadcrumb": "breadcrumb",
-    "facebook-button": "facebook-button",
-    "facebook-comments": "facebook-comments",
-    "facebook-embed": "facebook-embed",
-    "facebook-page": "facebook-page",
-    "loop:builder": "loop:builder",
-    "loop:grid-advanced": "loop:grid-advanced",
-    "loop-carousel": "loop-carousel",
-    "post-excerpt": "post-excerpt",
-    "post-content": "post-content",
-    "post-title": "post-title",
-    "post-info": "post-info",
-    "post-featured-image": "post-featured-image",
-    "post-author": "post-author",
-    "post-date": "post-date",
-    "post-terms": "post-terms",
-    "archive-title": "archive-title",
-    "archive-description": "archive-description",
-    "site-logo": "site-logo",
-    "site-title": "site-title",
-    "site-tagline": "site-tagline",
-    "search-results": "search-results",
-    "global-widget": "global-widget",
-    "video-playlist": "video-playlist",
-    "video-gallery": "video-gallery",
-    // Loop Builder
-    "loop:item": "loop:item",
-    "loop:image": "loop:image",
-    "loop:title": "loop:title",
-    "loop:meta": "loop:meta",
-    "loop:terms": "loop:terms",
-    "loop:rating": "loop:rating",
-    "loop:price": "loop:price",
-    "loop:add-to-cart": "loop:add-to-cart",
-    "loop:read-more": "loop:read-more",
-    "loop:featured-image": "loop:featured-image",
-    "loop:pagination": "loop:pagination",
-    // Experimentais
-    "w:nested-tabs": "w:nested-tabs",
-    "w:mega-menu": "w:mega-menu",
-    "w:scroll-snap": "w:scroll-snap",
-    "w:motion-effects": "w:motion-effects",
-    "w:background-slideshow": "w:background-slideshow",
-    "w:css-transform": "w:css-transform",
-    "w:custom-position": "w:custom-position",
-    "w:dynamic-tags": "w:dynamic-tags",
-    "w:ajax-pagination": "w:ajax-pagination",
-    // WordPress
-    "w:wp-search": "w:wp-search",
-    "w:wp-recent-posts": "w:wp-recent-posts",
-    "w:wp-recent-comments": "w:wp-recent-comments",
-    "w:wp-archives": "w:wp-archives",
-    "w:wp-categories": "w:wp-categories",
-    "w:wp-calendar": "w:wp-calendar",
-    "w:wp-tag-cloud": "w:wp-tag-cloud",
-    "w:wp-custom-menu": "w:wp-custom-menu",
-    // Básicos (Restantes)
-    "image-box": "image-box",
-    "icon-box": "icon-box",
-    "star-rating": "star-rating",
-    "counter": "counter",
-    "progress": "progress",
-    "tabs": "tabs",
-    "accordion": "accordion",
-    "toggle": "toggle",
-    "alert": "alert",
-    "social-icons": "social-icons",
-    "soundcloud": "soundcloud",
-    "shortcode": "shortcode",
-    "html": "html",
-    "menu-anchor": "menu-anchor",
-    "sidebar": "sidebar",
-    "read-more": "read-more",
-    "image-carousel": "image-carousel",
-    "basic-gallery": "basic-gallery",
-    "gallery": "gallery",
-    "icon-list": "icon-list",
-    "nav-menu": "nav-menu",
-    "search-form": "search-form",
-    "google-maps": "google-maps",
-    "testimonial": "testimonial",
-    "embed": "embed",
-    "lottie": "lottie",
-    "loop:grid": "loop:grid",
-    "w:inner-container": "w:inner-container"
-  };
-  // Cache das chaves ordenadas
-  _WidgetDetector.SORTED_KEYS = Object.keys(_WidgetDetector.WIDGET_MAP).sort((a, b) => b.length - a.length);
-  var WidgetDetector = _WidgetDetector;
-
-  // src/linter/detectors/PatternDetector.ts
-  var PatternDetector = class {
-    constructor(widgetDetector) {
-      this.widgetDetector = widgetDetector;
-    }
-    detect(node) {
-      if (!node.visible) return null;
-      if (this.isCard(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "pattern:card",
-          confidence: 0.85,
-          justification: "Container com estrutura t\xEDpica de Card (Imagem + T\xEDtulo + Texto/A\xE7\xE3o)"
-        };
-      }
-      if (this.isGrid(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "pattern:grid",
-          confidence: 0.9,
-          justification: "Container com m\xFAltiplos filhos similares repetidos"
-        };
-      }
-      if (this.isHero(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "pattern:hero",
-          confidence: 0.8,
-          justification: "Se\xE7\xE3o de destaque com T\xEDtulo e CTA"
-        };
-      }
-      return null;
-    }
-    isCard(node) {
-      if (node.type !== "FRAME" || node.layoutMode !== "VERTICAL") return false;
-      if (node.children.length < 2) return false;
-      const hasBackground = Array.isArray(node.fills) && node.fills.length > 0 && node.fills.some((f) => f.visible);
-      const hasEffects = node.effects && node.effects.length > 0 && node.effects.some((e) => e.visible);
-      const hasStroke = node.strokes && node.strokes.length > 0;
-      if (!hasBackground && !hasEffects && !hasStroke) return false;
-      let hasImage = false;
-      let hasText = false;
-      let hasAction = false;
-      for (const child of node.children) {
-        const detection = this.widgetDetector.detect(child);
-        if ((detection == null ? void 0 : detection.widget) === "w:image") hasImage = true;
-        if ((detection == null ? void 0 : detection.widget) === "w:heading" || (detection == null ? void 0 : detection.widget) === "w:text-editor") hasText = true;
-        if ((detection == null ? void 0 : detection.widget) === "w:button") hasAction = true;
-      }
-      return hasImage && hasText || hasText && hasAction;
-    }
-    isGrid(node) {
-      if (node.type !== "FRAME") return false;
-      if (node.children.length < 3) return false;
-      const firstChild = node.children[0];
-      let similarCount = 0;
-      for (let i = 1; i < node.children.length; i++) {
-        const child = node.children[i];
-        const widthDiff = Math.abs(child.width - firstChild.width);
-        const heightDiff = Math.abs(child.height - firstChild.height);
-        if (child.type === firstChild.type && widthDiff < 5 && heightDiff < 5) {
-          similarCount++;
-        }
-      }
-      return similarCount / (node.children.length - 1) > 0.7;
-    }
-    isHero(node) {
-      if (node.type !== "FRAME") return false;
-      if (node.width < 800 || node.height < 300) return false;
-      let hasHeading = false;
-      let hasButton = false;
-      const checkChildren = (children) => {
-        for (const child of children) {
-          const detection = this.widgetDetector.detect(child);
-          if ((detection == null ? void 0 : detection.widget) === "w:heading") hasHeading = true;
-          if ((detection == null ? void 0 : detection.widget) === "w:button") hasButton = true;
-          if (child.type === "FRAME" || child.type === "GROUP") {
-            if ("children" in child) {
-              for (const grandChild of child.children) {
-                const gcDetection = this.widgetDetector.detect(grandChild);
-                if ((gcDetection == null ? void 0 : gcDetection.widget) === "w:heading") hasHeading = true;
-                if ((gcDetection == null ? void 0 : gcDetection.widget) === "w:button") hasButton = true;
-              }
-            }
-          }
-        }
-      };
-      if ("children" in node) {
-        checkChildren(node.children);
-      }
-      return hasHeading && hasButton;
-    }
-  };
-
-  // src/linter/detectors/JetEngineDetector.ts
-  var JetEngineDetector = class {
-    detect(node) {
-      if (!node.visible) return null;
-      if (this.isListingRepeater(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "jet:listing-grid",
-          confidence: 0.85,
-          justification: "Estrutura repetitiva compat\xEDvel com Listing Grid"
-        };
-      }
-      if (this.isDynamicField(node)) {
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          widget: "jet:dynamic-field",
-          confidence: 0.9,
-          justification: "Nomenclatura ou formato indica campo din\xE2mico"
-        };
-      }
-      return null;
-    }
-    isListingRepeater(node) {
-      var _a;
-      if (node.type !== "FRAME") return false;
-      if (node.children.length < 2) return false;
-      const name = node.name.toLowerCase();
-      if (name.includes("loop") || name.includes("listing") || name.includes("repeater")) {
-        return true;
-      }
-      const firstChild = node.children[0];
-      if (firstChild.type === "INSTANCE") {
-        const masterId = (_a = firstChild.mainComponent) == null ? void 0 : _a.id;
-        if (masterId) {
-          const allSameMaster = node.children.every(
-            (c) => {
-              var _a2;
-              return c.type === "INSTANCE" && ((_a2 = c.mainComponent) == null ? void 0 : _a2.id) === masterId;
-            }
-          );
-          if (allSameMaster) return true;
-        }
-      }
-      const similarChildren = node.children.every(
-        (c) => c.type === firstChild.type && Math.abs(c.width - firstChild.width) < 2 && Math.abs(c.height - firstChild.height) < 2
-      );
-      return similarChildren;
-    }
-    isDynamicField(node) {
-      if (node.type === "TEXT") {
-        const text = node.characters;
-        if (/^\{.+\}$/.test(text) || /^\[.+\]$/.test(text) || /^%.+%$/.test(text)) {
-          return true;
-        }
-        const name = node.name.toLowerCase();
-        if (name.startsWith("jet:") || name.includes("dynamic")) {
-          return true;
-        }
-      }
-      return false;
-    }
-  };
-
   // src/linter/core/LinterEngine.ts
   var LinterEngine = class {
     constructor() {
       this.startTime = 0;
       this.endTime = 0;
-      this.widgetDetector = new WidgetDetector();
-      this.patternDetector = new PatternDetector(this.widgetDetector);
-      this.jetEngineDetector = new JetEngineDetector();
     }
     /**
      * Analisa um node do Figma
@@ -5309,43 +4790,28 @@ ${refText}` });
       return __async(this, arguments, function* (node, registry2, options = {}) {
         this.startTime = Date.now();
         registry2.resetExecutedRules();
-        const lintResults = [];
-        const widgetDetections = [];
+        const results = [];
         const rules = this.getApplicableRules(registry2, options);
-        const processNode = (currentNode) => __async(this, null, function* () {
-          for (const rule of rules) {
-            const result = yield rule.validate(currentNode);
-            if (result) {
-              lintResults.push(result);
-            }
-            registry2.markAsExecuted(rule.id);
+        for (const rule of rules) {
+          const result = yield rule.validate(node);
+          if (result) {
+            results.push(result);
           }
-          const widgetDetection = this.widgetDetector.detect(currentNode);
-          if (widgetDetection) {
-            widgetDetections.push(widgetDetection);
-          } else {
-            const patternDetection = this.patternDetector.detect(currentNode);
-            if (patternDetection) {
-              widgetDetections.push(patternDetection);
-            } else {
-              const jetDetection = this.jetEngineDetector.detect(currentNode);
-              if (jetDetection) {
-                widgetDetections.push(jetDetection);
-              }
-            }
+          registry2.markAsExecuted(rule.id);
+        }
+        if ("children" in node && node.children) {
+          for (const child of node.children) {
+            const childResults = yield this.analyzeNode(child, registry2);
+            results.push(...childResults);
           }
-          if ("children" in currentNode && currentNode.children) {
-            for (const child of currentNode.children) {
-              yield processNode(child);
-            }
-          }
-        });
-        yield processNode(node);
+        }
         this.endTime = Date.now();
-        return { lintResults, widgetDetections };
+        return results;
       });
     }
-    // ... (analyzeNode mantido para compatibilidade, mas idealmente deveria ser atualizado também)
+    /**
+     * Analisa um único node (sem recursão)
+     */
     analyzeNode(node, registry2) {
       return __async(this, null, function* () {
         const results = [];
@@ -5356,27 +4822,26 @@ ${refText}` });
             results.push(result);
           }
         }
+        if ("children" in node && node.children) {
+          for (const child of node.children) {
+            const childResults = yield this.analyzeNode(child, registry2);
+            results.push(...childResults);
+          }
+        }
         return results;
       });
     }
     /**
      * Gera relatório completo
      */
-    generateReport(data, registry2, options = {}) {
-      let results;
-      let widgets = [];
-      if (Array.isArray(data)) {
-        results = data;
-      } else {
-        results = data.lintResults;
-        widgets = data.widgetDetections;
-      }
+    generateReport(results, registry2, options = {}) {
       const summary = this.generateSummary(results);
       const guides = this.generateGuides(results, registry2);
       return {
         summary,
         analysis: results,
-        widgets,
+        widgets: [],
+        // Será implementado na Fase 2
         guides,
         metadata: {
           duration: this.getDuration(),
