@@ -228,6 +228,20 @@
     return repaired;
   }
 
+  // src/utils/style_normalizer.ts
+  function normalizeColor(color) {
+    if (!color) return void 0;
+    if (typeof color === "string") return color;
+    if (typeof color === "object" && "r" in color) {
+      const r = Math.round((color.r || 0) * 255);
+      const g = Math.round((color.g || 0) * 255);
+      const b = Math.round((color.b || 0) * 255);
+      const a = color.a !== void 0 ? color.a : color.opacity !== void 0 ? color.opacity : 1;
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+    return void 0;
+  }
+
   // src/utils/style_utils.ts
   function buildHtmlFromSegments(node) {
     if (!node.styledTextSegments || node.styledTextSegments.length === 0) return { html: node.characters || "", css: "" };
@@ -331,7 +345,7 @@
       } else {
         const solid = node.fills.find((f) => f.type === "SOLID");
         if (solid && solid.color) {
-          styles.color = solid.color;
+          styles.color = normalizeColor(solid.color);
         }
       }
     }
@@ -367,11 +381,35 @@
     }
     const fills = node.fills;
     if (Array.isArray(fills) && fills.length > 0) {
-      const solid = fills.find((f) => f.type === "SOLID" && f.color);
-      if (solid) {
-        const { r, g, b } = solid.color;
-        const a = solid.opacity !== void 0 ? solid.opacity : 1;
-        styles.background = { color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})` };
+      const visibleFills = fills.filter((f) => f.visible !== false);
+      if (visibleFills.length > 0) {
+        const fill = visibleFills[visibleFills.length - 1];
+        if (fill.type === "SOLID" && fill.color) {
+          const { r, g, b } = fill.color;
+          const a = fill.opacity !== void 0 ? fill.opacity : 1;
+          styles.background = {
+            type: "solid",
+            color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`
+          };
+        } else if (fill.type === "GRADIENT_LINEAR" || fill.type === "GRADIENT_RADIAL" || fill.type === "GRADIENT_ANGULAR" || fill.type === "GRADIENT_DIAMOND") {
+          const stops = (fill.gradientStops || []).map((stop) => {
+            const c = stop.color || { r: 0, g: 0, b: 0, a: 1 };
+            return {
+              position: Math.round(stop.position * 100),
+              color: `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${c.a || 1})`
+            };
+          });
+          styles.background = {
+            type: "gradient",
+            gradientType: fill.type === "GRADIENT_RADIAL" ? "radial" : "linear",
+            stops
+          };
+        } else if (fill.type === "IMAGE") {
+          styles.background = {
+            type: "image",
+            imageHash: fill.imageHash || null
+          };
+        }
       }
     }
     if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
@@ -819,14 +857,18 @@ ${refText}` });
       widgetType: "icon-box",
       family: "media",
       aliases: generateAliases("icon-box", ["caixa de \xEDcone", "box \xEDcone", "card com \xEDcone"], ["icon box", "box icon", "card icon", "feature icon"]),
-      compile: (w, base) => ({
-        widgetType: "icon-box",
-        settings: __spreadProps(__spreadValues({}, base), {
-          selected_icon: base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
-          title_text: w.content || base.title_text || "Title",
-          description_text: base.description_text || ""
-        })
-      })
+      compile: (w, base) => {
+        var _a, _b, _c;
+        return {
+          widgetType: "icon-box",
+          settings: __spreadProps(__spreadValues({}, base), {
+            // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
+            selected_icon: ((_a = w.styles) == null ? void 0 : _a.selected_icon) || base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
+            title_text: w.content || base.title_text || ((_b = w.styles) == null ? void 0 : _b.title_text) || "Title",
+            description_text: base.description_text || ((_c = w.styles) == null ? void 0 : _c.description_text) || ""
+          })
+        };
+      }
     },
     {
       key: "icon_list",
@@ -929,18 +971,6 @@ ${refText}` });
       aliases: generateAliases("countdown", ["contagem regressiva", "timer"], ["timer", "count down", "clock"]),
       compile: (w, base) => {
         const settings = __spreadValues({}, base);
-        const colorToRgba = (color) => {
-          if (!color) return void 0;
-          if (typeof color === "string") return color;
-          if (typeof color === "object" && "r" in color) {
-            const r = Math.round((color.r || 0) * 255);
-            const g = Math.round((color.g || 0) * 255);
-            const b = Math.round((color.b || 0) * 255);
-            const a = color.a !== void 0 ? color.a : 1;
-            return `rgba(${r}, ${g}, ${b}, ${a})`;
-          }
-          return void 0;
-        };
         const children = w.children || [];
         const timeData = {};
         const labels = {};
@@ -955,7 +985,7 @@ ${refText}` });
           const numValue = parseInt(text, 10);
           if (!isNaN(numValue) && text.match(/^\d+$/)) {
             if (!digitsColor && ((_a = child.styles) == null ? void 0 : _a.color)) {
-              digitsColor = colorToRgba(child.styles.color);
+              digitsColor = normalizeColor(child.styles.color);
             }
             if (!digitsFontSize && ((_b = child.styles) == null ? void 0 : _b.fontSize)) {
               digitsFontSize = child.styles.fontSize;
@@ -969,7 +999,7 @@ ${refText}` });
                 timeData.days = numValue;
                 labels.days = nextChild.content;
                 if (!labelColor && ((_c = nextChild.styles) == null ? void 0 : _c.color)) {
-                  labelColor = colorToRgba(nextChild.styles.color);
+                  labelColor = normalizeColor(nextChild.styles.color);
                 }
                 if (!labelFontSize && ((_d = nextChild.styles) == null ? void 0 : _d.fontSize)) {
                   labelFontSize = nextChild.styles.fontSize;
@@ -978,7 +1008,7 @@ ${refText}` });
                 timeData.hours = numValue;
                 labels.hours = nextChild.content;
                 if (!labelColor && ((_e = nextChild.styles) == null ? void 0 : _e.color)) {
-                  labelColor = colorToRgba(nextChild.styles.color);
+                  labelColor = normalizeColor(nextChild.styles.color);
                 }
                 if (!labelFontSize && ((_f = nextChild.styles) == null ? void 0 : _f.fontSize)) {
                   labelFontSize = nextChild.styles.fontSize;
@@ -987,7 +1017,7 @@ ${refText}` });
                 timeData.minutes = numValue;
                 labels.minutes = nextChild.content;
                 if (!labelColor && ((_g = nextChild.styles) == null ? void 0 : _g.color)) {
-                  labelColor = colorToRgba(nextChild.styles.color);
+                  labelColor = normalizeColor(nextChild.styles.color);
                 }
                 if (!labelFontSize && ((_h = nextChild.styles) == null ? void 0 : _h.fontSize)) {
                   labelFontSize = nextChild.styles.fontSize;
@@ -996,7 +1026,7 @@ ${refText}` });
                 timeData.seconds = numValue;
                 labels.seconds = nextChild.content;
                 if (!labelColor && ((_i = nextChild.styles) == null ? void 0 : _i.color)) {
-                  labelColor = colorToRgba(nextChild.styles.color);
+                  labelColor = normalizeColor(nextChild.styles.color);
                 }
                 if (!labelFontSize && ((_j = nextChild.styles) == null ? void 0 : _j.fontSize)) {
                   labelFontSize = nextChild.styles.fontSize;
@@ -1099,24 +1129,65 @@ ${refText}` });
       widgetType: "accordion",
       family: "misc",
       aliases: generateAliases("accordion", ["acorde\xE3o", "sanfona"], ["collapse", "faq"]),
-      compile: (w, base) => ({
-        widgetType: "accordion",
-        settings: __spreadProps(__spreadValues({}, base), {
-          accordion: base.accordion || [{ _id: "acc1", title: "Item 1", content: w.content || "Conte\xFAdo" }]
-        })
-      })
+      compile: (w, base) => {
+        var _a;
+        let items = base.accordion || [];
+        if (w.children && w.children.length > 0) {
+          items = w.children.map((child, i) => {
+            var _a2, _b;
+            const title = ((_a2 = child.styles) == null ? void 0 : _a2.title) || child.content || `Item ${i + 1}`;
+            const content = ((_b = child.styles) == null ? void 0 : _b.content) || "Conte\xFAdo do item";
+            return {
+              _id: `acc${i + 1}`,
+              title,
+              content
+            };
+          });
+        }
+        if (items.length === 0) {
+          items = [{ _id: "acc1", title: "Item 1", content: w.content || "Conte\xFAdo" }];
+        }
+        const settings = __spreadProps(__spreadValues({}, base), {
+          accordion: items
+        });
+        if ((_a = w.styles) == null ? void 0 : _a.selected_icon) {
+          settings.selected_icon = w.styles.selected_icon;
+        }
+        return {
+          widgetType: "accordion",
+          settings
+        };
+      }
     },
     {
       key: "toggle",
       widgetType: "toggle",
       family: "misc",
       aliases: generateAliases("toggle", ["alternar", "toggle"], []),
-      compile: (w, base) => ({
-        widgetType: "toggle",
-        settings: __spreadProps(__spreadValues({}, base), {
-          toggle: base.toggle || [{ _id: "tog1", title: "Item 1", content: w.content || "Conte\xFAdo" }]
-        })
-      })
+      compile: (w, base) => {
+        let items = base.toggle || [];
+        if (w.children && w.children.length > 0) {
+          items = w.children.map((child, i) => {
+            var _a, _b;
+            const title = ((_a = child.styles) == null ? void 0 : _a.title) || child.content || `Item ${i + 1}`;
+            const content = ((_b = child.styles) == null ? void 0 : _b.content) || "Conte\xFAdo do item";
+            return {
+              _id: `tog${i + 1}`,
+              title,
+              content
+            };
+          });
+        }
+        if (items.length === 0) {
+          items = [{ _id: "tog1", title: "Item 1", content: w.content || "Conte\xFAdo" }];
+        }
+        return {
+          widgetType: "toggle",
+          settings: __spreadProps(__spreadValues({}, base), {
+            toggle: items
+          })
+        };
+      }
     },
     {
       key: "alert",
@@ -1845,16 +1916,7 @@ ${refText}` });
       this.wpConfig = config;
     }
     sanitizeColor(value) {
-      if (!value) return void 0;
-      if (typeof value === "string") return value;
-      if (typeof value === "object" && value.r !== void 0 && value.g !== void 0 && value.b !== void 0) {
-        const r = Math.round((value.r || 0) * 255);
-        const g = Math.round((value.g || 0) * 255);
-        const b = Math.round((value.b || 0) * 255);
-        const a = value.a !== void 0 ? value.a : 1;
-        return `rgba(${r}, ${g}, ${b}, ${a})`;
-      }
-      return void 0;
+      return normalizeColor(value);
     }
     compile(schema) {
       var _a;
@@ -1954,17 +2016,25 @@ ${refText}` });
       }
       if (styles.background) {
         const bg = styles.background;
-        const sanitizedColor = this.sanitizeColor(bg.color);
-        if (sanitizedColor) {
-          settings.background_background = "classic";
-          settings.background_color = sanitizedColor;
-        }
-        if (bg.image) {
-          settings.background_background = "classic";
-          settings.background_image = { url: bg.image, id: 0 };
-        }
-        if (bg.gradient) {
+        if (bg.type === "solid" || bg.color) {
+          const sanitizedColor = this.sanitizeColor(bg.color);
+          if (sanitizedColor) {
+            settings.background_background = "classic";
+            settings.background_color = sanitizedColor;
+          }
+        } else if (bg.type === "gradient" && bg.stops && bg.stops.length >= 2) {
           settings.background_background = "gradient";
+          settings.background_gradient_type = bg.gradientType || "linear";
+          settings.background_color = bg.stops[0].color;
+          settings.background_color_stop = { unit: "%", size: bg.stops[0].position, sizes: [] };
+          if (bg.stops.length >= 2) {
+            settings.background_color_b = bg.stops[bg.stops.length - 1].color;
+            settings.background_color_b_stop = { unit: "%", size: bg.stops[bg.stops.length - 1].position, sizes: [] };
+          }
+          settings.background_gradient_angle = { unit: "deg", size: 180, sizes: [] };
+        } else if (bg.type === "image" && bg.imageHash) {
+          settings.background_background = "classic";
+          settings.background_image = { url: "", id: 0, imageHash: bg.imageHash };
         }
       }
       if (styles.width) {
@@ -2297,12 +2367,45 @@ ${refText}` });
   }
 
   // src/media/image.exporter.ts
+  function bytesToString(bytes) {
+    let result = "";
+    for (let i = 0; i < bytes.length; i++) {
+      result += String.fromCharCode(bytes[i]);
+    }
+    return result;
+  }
+  function stringToBytes(str) {
+    const bytes = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) {
+      bytes[i] = str.charCodeAt(i) & 255;
+    }
+    return bytes;
+  }
+  function sanitizeSvg(svgBytes) {
+    let svgString = bytesToString(svgBytes);
+    svgString = svgString.replace(/<filter[^>]*>\s*<\/filter>/gi, "");
+    svgString = svgString.replace(/<filter[^>]*\/>/gi, "");
+    const filterRefs = svgString.match(/filter="url\(#([^)]+)\)"/gi) || [];
+    filterRefs.forEach((ref) => {
+      const match = ref.match(/url\(#([^)]+)\)/);
+      if (match) {
+        const filterId = match[1];
+        const filterRegex = new RegExp(`<filter[^>]*id=["']${filterId}["'][^>]*>[\\s\\S]+?<\\/filter>`, "i");
+        if (!filterRegex.test(svgString)) {
+          svgString = svgString.replace(new RegExp(`filter="url\\(#${filterId}\\)"`, "gi"), "");
+        }
+      }
+    });
+    svgString = svgString.replace(/<defs>\s*<\/defs>/gi, "");
+    return stringToBytes(svgString);
+  }
   function exportNodeAsImage(node, format, quality = 0.85) {
     return __async(this, null, function* () {
       try {
         if (format === "SVG") {
           const bytes2 = yield node.exportAsync({ format: "SVG" });
-          return { bytes: bytes2, mime: "image/svg+xml", ext: "svg" };
+          const sanitizedBytes = sanitizeSvg(bytes2);
+          return { bytes: sanitizedBytes, mime: "image/svg+xml", ext: "svg" };
         }
         if (format === "WEBP") {
           const bytes2 = yield node.exportAsync({
@@ -3470,7 +3573,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const children = hasChildren ? node.children : [];
     const firstImageDeep = findFirstImageId(node);
-    const hasExplicitName = /^(w:|woo:|loop:)/.test(name);
+    const hasExplicitName = /^(w:|woo:|loop:|media:|e:)/.test(name);
     if (!hasExplicitName) {
       try {
         const snapshot = toNodeSnapshot(node);
@@ -3594,6 +3697,83 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           imageId: null,
           styles,
           children: listItems
+        };
+      }
+      if (widgetType === "media-carousel" || widgetType === "image-carousel") {
+        const imageChildren = children.filter(
+          (c) => isImageFill(c) || c.type === "IMAGE" || c.type === "FRAME" && findFirstImageId(c)
+        );
+        const childWidgets = imageChildren.map((child, i) => {
+          const imageId = child.type === "IMAGE" ? child.id : findFirstImageId(child);
+          return {
+            type: "image",
+            content: null,
+            imageId: imageId || child.id,
+            styles: {}
+          };
+        });
+        console.log(`[NOAI ${widgetType.toUpperCase()}] Extracted ${childWidgets.length} image children`);
+        return {
+          type: widgetType,
+          content: null,
+          imageId: null,
+          styles,
+          children: childWidgets
+        };
+      }
+      if (widgetType === "accordion" || widgetType === "toggle") {
+        const toggleItems = children.filter((c) => {
+          var _a2;
+          const n = c.name.toLowerCase();
+          return n.includes("toggle") || n.includes("item") || n.includes("faq") || c.type === "FRAME" && ((_a2 = c.children) == null ? void 0 : _a2.length) > 0;
+        });
+        let accordionIconId = null;
+        const items = toggleItems.map((child, i) => {
+          let title = "";
+          let content = "";
+          let iconId = null;
+          if (child.children) {
+            const childNodes = child.children;
+            const textNodes = childNodes.filter((c) => c.type === "TEXT");
+            if (textNodes.length >= 1) {
+              title = textNodes[0].characters || "";
+            }
+            if (textNodes.length >= 2) {
+              content = textNodes[1].characters || "";
+            }
+            const iconNode = childNodes.find(
+              (c) => c.type === "VECTOR" || c.type === "IMAGE" || c.name.toLowerCase().includes("icon") && c.type === "FRAME"
+            );
+            if (iconNode) {
+              iconId = iconNode.type === "FRAME" ? findFirstImageId(iconNode) : iconNode.id;
+              if (!accordionIconId && iconId) {
+                accordionIconId = iconId;
+              }
+            }
+            if (!title && child.name) {
+              const cleanName = child.name.replace(/^w:(toggle|item|faq)-?/i, "").trim();
+              if (cleanName && !cleanName.match(/^\d+$/)) {
+                title = cleanName;
+              }
+            }
+          }
+          return {
+            type: "toggle-item",
+            content: title,
+            imageId: iconId,
+            styles: {
+              title: title || `Item ${i + 1}`,
+              content: content || "Conte\xFAdo do item"
+            }
+          };
+        });
+        console.log(`[NOAI ${widgetType.toUpperCase()}] Extracted ${items.length} items, iconId: ${accordionIconId}`);
+        return {
+          type: widgetType,
+          content: null,
+          imageId: accordionIconId,
+          styles,
+          children: items
         };
       }
       if (widgetType === "button") {
@@ -7854,6 +8034,7 @@ ${detection.justification}
         yield correctWidgetTypes(container);
       }
       const processWidget = (widget) => __async(null, null, function* () {
+        var _a;
         const nodeId = widget.imageId || widget.id;
         console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
         if (uploadEnabled && nodeId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button" || widget.type === "list-item" || widget.type === "icon-list")) {
@@ -7900,10 +8081,11 @@ ${detection.justification}
                   widget.styles.image_url = result.url;
                 } else if (widget.type === "icon-box") {
                   if (!widget.styles) widget.styles = {};
-                  widget.styles.selected_icon = { value: result.url, library: "svg" };
+                  widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
+                  widget.imageId = result.id.toString();
                 } else if (widget.type === "button") {
                   if (!widget.styles) widget.styles = {};
-                  widget.styles.selected_icon = { value: result.url, library: "svg" };
+                  widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
                   widget.imageId = result.id.toString();
                   console.log("[BUTTON UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
                 } else if (widget.type === "list-item") {
@@ -7915,6 +8097,11 @@ ${detection.justification}
                   if (!widget.styles) widget.styles = {};
                   widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
                   widget.imageId = result.id.toString();
+                } else if (widget.type === "accordion" || widget.type === "toggle") {
+                  if (!widget.styles) widget.styles = {};
+                  widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
+                  widget.imageId = result.id.toString();
+                  console.log("[ACCORDION UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
                 } else {
                   widget.content = result.url;
                   widget.imageId = result.id.toString();
@@ -7924,6 +8111,40 @@ ${detection.justification}
           } catch (e) {
             console.error(`[NO-AI] Erro ao processar imagem ${nodeId}:`, e);
           }
+        }
+        if (uploadEnabled && widget.type === "image-carousel" && ((_a = widget.styles) == null ? void 0 : _a.slides)) {
+          console.log(`[NO-AI UPLOAD] \u{1F3A0} Processing image-carousel with ${widget.styles.slides.length} slides`);
+          const updatedSlides = [];
+          for (const slide of widget.styles.slides) {
+            const slideNodeId = slide.id;
+            if (slideNodeId) {
+              try {
+                const node = yield figma.getNodeById(slideNodeId);
+                if (node) {
+                  const result = yield noaiUploader.uploadToWordPress(node, "WEBP");
+                  if (result) {
+                    console.log(`[NO-AI UPLOAD] \u{1F3A0} Slide uploaded: ${result.url}, ID: ${result.id}`);
+                    updatedSlides.push({
+                      _id: slide._id,
+                      id: result.id,
+                      url: result.url,
+                      image: { url: result.url, id: result.id }
+                    });
+                  } else {
+                    updatedSlides.push(slide);
+                  }
+                } else {
+                  updatedSlides.push(slide);
+                }
+              } catch (e) {
+                console.error(`[NO-AI] Erro ao processar slide ${slideNodeId}:`, e);
+                updatedSlides.push(slide);
+              }
+            } else {
+              updatedSlides.push(slide);
+            }
+          }
+          widget.styles.slides = updatedSlides;
         }
       });
       const collectUploads = (container) => {

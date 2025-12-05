@@ -94,9 +94,11 @@
       border: 1px solid var(--color-border);
       border-radius: var(--radius);
       padding: 10px 14px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       transition: transform var(--anim), box-shadow var(--anim), background var(--anim);
+      font-size: 0.7em !important;
+      text-wrap: nowrap;
     }
 
     .btn:hover {
@@ -223,11 +225,13 @@
       padding: var(--space-2);
       border: none;
       background: transparent;
-      font-weight: 600;
+      font-weight: 400;
       color: var(--color-text-secondary);
       cursor: pointer;
       position: relative;
       transition: color var(--anim), background var(--anim);
+      font-size: 0.75em !important;
+      text-wrap: nowrap;
     }
 
     .tab-btn.active {
@@ -289,15 +293,25 @@
     }
 
     .card-title {
-      font-weight: 700;
+      font-weight: 900;
       margin-bottom: var(--space-2);
       color: var(--color-text);
+      font-size: 0.75em !important;
     }
 
     .actions {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: var(--space-2);
+    }
+
+    select {
+      padding: 6px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: #fff;
+      color: var(--color-text);
     }
 
     .input-label {
@@ -310,7 +324,7 @@
     input[type="text"],
     input[type="password"] {
       width: 100%;
-      padding: 12px;
+      padding: 6px 12px;
       border: 1px solid var(--color-border);
       border-radius: var(--radius);
       font-size: 14px;
@@ -1042,7 +1056,7 @@
 
     .linter-empty-state {
       text-align: center;
-      padding: 32px;
+      padding: 16px;
       background: var(--figma-color-bg-secondary);
       border-radius: 8px;
     }

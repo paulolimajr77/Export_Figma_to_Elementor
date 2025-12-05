@@ -1,5 +1,6 @@
 ﻿import type { PipelineWidget } from '../types/pipeline.schema';
 import type { ElementorSettings } from '../types/elementor.types';
+import { normalizeColor, normalizeElementorSettings } from '../utils/style_normalizer';
 
 export interface WidgetDefinition {
     key: string;
@@ -325,9 +326,10 @@ const registry: WidgetDefinition[] = [
             widgetType: 'icon-box',
             settings: {
                 ...base,
-                selected_icon: base.selected_icon || { value: 'fas fa-star', library: 'fa-solid' },
-                title_text: w.content || base.title_text || 'Title',
-                description_text: base.description_text || ''
+                // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
+                selected_icon: w.styles?.selected_icon || base.selected_icon || { value: 'fas fa-star', library: 'fa-solid' },
+                title_text: w.content || base.title_text || w.styles?.title_text || 'Title',
+                description_text: base.description_text || w.styles?.description_text || ''
             }
         })
     },
@@ -442,20 +444,6 @@ const registry: WidgetDefinition[] = [
         compile: (w, base) => {
             const settings: ElementorSettings = { ...base };
 
-            // Helper to convert color object to rgba string
-            const colorToRgba = (color: any): string | undefined => {
-                if (!color) return undefined;
-                if (typeof color === 'string') return color;
-                if (typeof color === 'object' && 'r' in color) {
-                    const r = Math.round((color.r || 0) * 255);
-                    const g = Math.round((color.g || 0) * 255);
-                    const b = Math.round((color.b || 0) * 255);
-                    const a = color.a !== undefined ? color.a : 1;
-                    return `rgba(${r}, ${g}, ${b}, ${a})`;
-                }
-                return undefined;
-            };
-
             // Extract time values and labels from children
             const children = w.children || [];
             const timeData: { days?: number; hours?: number; minutes?: number; seconds?: number } = {};
@@ -475,7 +463,7 @@ const registry: WidgetDefinition[] = [
                 if (!isNaN(numValue) && text.match(/^\d+$/)) {
                     // Extract digit color and font size from first numeric child
                     if (!digitsColor && child.styles?.color) {
-                        digitsColor = colorToRgba(child.styles.color);
+                        digitsColor = normalizeColor(child.styles.color);
                     }
                     if (!digitsFontSize && child.styles?.fontSize) {
                         digitsFontSize = child.styles.fontSize;
@@ -495,7 +483,7 @@ const registry: WidgetDefinition[] = [
                             labels.days = nextChild.content;
                             // Extract label color from first label
                             if (!labelColor && nextChild.styles?.color) {
-                                labelColor = colorToRgba(nextChild.styles.color);
+                                labelColor = normalizeColor(nextChild.styles.color);
                             }
                             if (!labelFontSize && nextChild.styles?.fontSize) {
                                 labelFontSize = nextChild.styles.fontSize;
@@ -504,7 +492,7 @@ const registry: WidgetDefinition[] = [
                             timeData.hours = numValue;
                             labels.hours = nextChild.content;
                             if (!labelColor && nextChild.styles?.color) {
-                                labelColor = colorToRgba(nextChild.styles.color);
+                                labelColor = normalizeColor(nextChild.styles.color);
                             }
                             if (!labelFontSize && nextChild.styles?.fontSize) {
                                 labelFontSize = nextChild.styles.fontSize;
@@ -513,7 +501,7 @@ const registry: WidgetDefinition[] = [
                             timeData.minutes = numValue;
                             labels.minutes = nextChild.content;
                             if (!labelColor && nextChild.styles?.color) {
-                                labelColor = colorToRgba(nextChild.styles.color);
+                                labelColor = normalizeColor(nextChild.styles.color);
                             }
                             if (!labelFontSize && nextChild.styles?.fontSize) {
                                 labelFontSize = nextChild.styles.fontSize;
@@ -522,7 +510,7 @@ const registry: WidgetDefinition[] = [
                             timeData.seconds = numValue;
                             labels.seconds = nextChild.content;
                             if (!labelColor && nextChild.styles?.color) {
-                                labelColor = colorToRgba(nextChild.styles.color);
+                                labelColor = normalizeColor(nextChild.styles.color);
                             }
                             if (!labelFontSize && nextChild.styles?.fontSize) {
                                 labelFontSize = nextChild.styles.fontSize;
@@ -651,26 +639,75 @@ const registry: WidgetDefinition[] = [
         widgetType: 'accordion',
         family: 'misc',
         aliases: generateAliases('accordion', ['acordeão', 'sanfona'], ['collapse', 'faq']),
-        compile: (w, base) => ({
-            widgetType: 'accordion',
-            settings: {
-                ...base,
-                accordion: base.accordion || [{ _id: 'acc1', title: 'Item 1', content: w.content || 'Conteúdo' }]
+        compile: (w, base) => {
+            // Build items from children (toggle items)
+            let items = base.accordion || [];
+
+            if (w.children && w.children.length > 0) {
+                items = w.children.map((child: any, i: number) => {
+                    const title = child.styles?.title || child.content || `Item ${i + 1}`;
+                    const content = child.styles?.content || 'Conteúdo do item';
+                    return {
+                        _id: `acc${i + 1}`,
+                        title: title,
+                        content: content
+                    };
+                });
             }
-        })
+
+            // Fallback if no items
+            if (items.length === 0) {
+                items = [{ _id: 'acc1', title: 'Item 1', content: w.content || 'Conteúdo' }];
+            }
+
+            const settings: any = {
+                ...base,
+                accordion: items
+            };
+
+            // Add selected_icon if available (populated after upload)
+            if (w.styles?.selected_icon) {
+                settings.selected_icon = w.styles.selected_icon;
+            }
+
+            return {
+                widgetType: 'accordion',
+                settings
+            };
+        }
     },
     {
         key: 'toggle',
         widgetType: 'toggle',
         family: 'misc',
         aliases: generateAliases('toggle', ['alternar', 'toggle'], []),
-        compile: (w, base) => ({
-            widgetType: 'toggle',
-            settings: {
-                ...base,
-                toggle: base.toggle || [{ _id: 'tog1', title: 'Item 1', content: w.content || 'Conteúdo' }]
+        compile: (w, base) => {
+            let items = base.toggle || [];
+
+            if (w.children && w.children.length > 0) {
+                items = w.children.map((child: any, i: number) => {
+                    const title = child.styles?.title || child.content || `Item ${i + 1}`;
+                    const content = child.styles?.content || 'Conteúdo do item';
+                    return {
+                        _id: `tog${i + 1}`,
+                        title: title,
+                        content: content
+                    };
+                });
             }
-        })
+
+            if (items.length === 0) {
+                items = [{ _id: 'tog1', title: 'Item 1', content: w.content || 'Conteúdo' }];
+            }
+
+            return {
+                widgetType: 'toggle',
+                settings: {
+                    ...base,
+                    toggle: items
+                }
+            };
+        }
     },
     {
         key: 'alert',

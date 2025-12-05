@@ -1,4 +1,5 @@
 import { SerializedNode, rgbToHex } from './serialization_utils';
+import { normalizeColor } from './style_normalizer';
 
 export function buildHtmlFromSegments(node: SerializedNode): { html: string, css: string } {
     if (!node.styledTextSegments || node.styledTextSegments.length === 0) return { html: node.characters || '', css: '' };
@@ -139,7 +140,7 @@ export function extractWidgetStyles(node: SerializedNode): Record<string, any> {
             // Fallback to solid color
             const solid = node.fills.find((f: any) => f.type === 'SOLID');
             if (solid && solid.color) {
-                styles.color = solid.color;
+                styles.color = normalizeColor(solid.color);
             }
         }
     }
@@ -192,14 +193,42 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
         styles.paddingLeft = node.paddingLeft || 0;
     }
 
-    // Background
+    // Background (solid or gradient)
     const fills = node.fills;
     if (Array.isArray(fills) && fills.length > 0) {
-        const solid = fills.find((f: any) => f.type === 'SOLID' && f.color);
-        if (solid) {
-            const { r, g, b } = solid.color;
-            const a = solid.opacity !== undefined ? solid.opacity : 1;
-            styles.background = { color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})` };
+        const visibleFills = fills.filter((f: any) => f.visible !== false);
+        if (visibleFills.length > 0) {
+            // Use the top-most visible fill
+            const fill = visibleFills[visibleFills.length - 1];
+
+            if (fill.type === 'SOLID' && fill.color) {
+                const { r, g, b } = fill.color;
+                const a = fill.opacity !== undefined ? fill.opacity : 1;
+                styles.background = {
+                    type: 'solid',
+                    color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`
+                };
+            } else if (fill.type === 'GRADIENT_LINEAR' || fill.type === 'GRADIENT_RADIAL' ||
+                fill.type === 'GRADIENT_ANGULAR' || fill.type === 'GRADIENT_DIAMOND') {
+                // Extract gradient stops
+                const stops = (fill.gradientStops || []).map((stop: any) => {
+                    const c = stop.color || { r: 0, g: 0, b: 0, a: 1 };
+                    return {
+                        position: Math.round(stop.position * 100),
+                        color: `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${c.a || 1})`
+                    };
+                });
+                styles.background = {
+                    type: 'gradient',
+                    gradientType: fill.type === 'GRADIENT_RADIAL' ? 'radial' : 'linear',
+                    stops: stops
+                };
+            } else if (fill.type === 'IMAGE') {
+                styles.background = {
+                    type: 'image',
+                    imageHash: fill.imageHash || null
+                };
+            }
         }
     }
 

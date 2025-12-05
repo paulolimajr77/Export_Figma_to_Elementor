@@ -463,7 +463,7 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
     // **PHASE 1: Try Heuristics First** (NEW!)
     // SKIP heuristics if user explicitly named the widget
-    const hasExplicitName = /^(w:|woo:|loop:)/.test(name);
+    const hasExplicitName = /^(w:|woo:|loop:|media:|e:)/.test(name);
     if (!hasExplicitName) {
         try {
             const snapshot = toNodeSnapshot(node);
@@ -631,6 +631,106 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 imageId: null,
                 styles: styles,
                 children: listItems as any
+            };
+        }
+        // Handle media-carousel and image-carousel: extract children as slides
+        if (widgetType === 'media-carousel' || widgetType === 'image-carousel') {
+            const imageChildren = children.filter(c =>
+                isImageFill(c) || c.type === 'IMAGE' ||
+                (c.type === 'FRAME' && findFirstImageId(c))
+            );
+
+            const childWidgets = imageChildren.map((child, i) => {
+                const imageId = child.type === 'IMAGE' ? child.id : findFirstImageId(child);
+                return {
+                    type: 'image',
+                    content: null,
+                    imageId: imageId || child.id,
+                    styles: {}
+                };
+            });
+
+            console.log(`[NOAI ${widgetType.toUpperCase()}] Extracted ${childWidgets.length} image children`);
+            return {
+                type: widgetType,
+                content: null,
+                imageId: null,
+                styles: styles,
+                children: childWidgets as any
+            };
+        }
+        // Handle accordion: extract children as toggle items
+        if (widgetType === 'accordion' || widgetType === 'toggle') {
+            const toggleItems = children.filter(c => {
+                const n = c.name.toLowerCase();
+                return n.includes('toggle') || n.includes('item') || n.includes('faq') ||
+                    (c.type === 'FRAME' && (c as any).children?.length > 0);
+            });
+
+            // Find the first icon in the toggle items (for selected_icon)
+            let accordionIconId: string | null = null;
+
+            const items = toggleItems.map((child, i) => {
+                let title = '';
+                let content = '';
+                let iconId: string | null = null;
+
+                // Try to find title, content and icon from child's children
+                if ((child as any).children) {
+                    const childNodes = (child as any).children as SerializedNode[];
+
+                    // Find text nodes
+                    const textNodes = childNodes.filter(c => c.type === 'TEXT');
+                    if (textNodes.length >= 1) {
+                        // First text is usually the title
+                        title = (textNodes[0] as any).characters || '';
+                    }
+                    if (textNodes.length >= 2) {
+                        // Second text is content
+                        content = (textNodes[1] as any).characters || '';
+                    }
+
+                    // Find icon (VECTOR, IMAGE, or frame with icon/vector)
+                    const iconNode = childNodes.find(c =>
+                        c.type === 'VECTOR' ||
+                        c.type === 'IMAGE' ||
+                        (c.name.toLowerCase().includes('icon') && c.type === 'FRAME')
+                    );
+                    if (iconNode) {
+                        iconId = iconNode.type === 'FRAME' ? findFirstImageId(iconNode) : iconNode.id;
+                        // Use first icon found as the accordion's selected_icon
+                        if (!accordionIconId && iconId) {
+                            accordionIconId = iconId;
+                        }
+                    }
+
+                    // If no title, check the child node's name
+                    if (!title && child.name) {
+                        const cleanName = child.name.replace(/^w:(toggle|item|faq)-?/i, '').trim();
+                        if (cleanName && !cleanName.match(/^\d+$/)) {
+                            title = cleanName;
+                        }
+                    }
+                }
+
+                return {
+                    type: 'toggle-item',
+                    content: title,
+                    imageId: iconId,
+                    styles: {
+                        title: title || `Item ${i + 1}`,
+                        content: content || 'Conteúdo do item'
+                    }
+                };
+            });
+
+            console.log(`[NOAI ${widgetType.toUpperCase()}] Extracted ${items.length} items, iconId: ${accordionIconId}`);
+            return {
+                type: widgetType,
+                content: null,
+                imageId: accordionIconId,
+                styles: styles,
+                children: items as any
             };
         }
         if (widgetType === 'button') {

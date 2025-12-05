@@ -2,6 +2,7 @@
 import { ElementorJSON, ElementorElement, ElementorSettings, WPConfig } from '../types/elementor.types';
 import { generateGUID } from '../utils/guid';
 import { compileWithRegistry } from '../config/widget.registry';
+import { normalizeColor, normalizeElementorSettings } from '../utils/style_normalizer';
 
 /**
  * Compilador Elementor para Flexbox Containers (Elementor 3.19+)
@@ -14,16 +15,7 @@ export class ElementorCompiler {
     }
 
     private sanitizeColor(value: any): string | undefined {
-        if (!value) return undefined;
-        if (typeof value === 'string') return value;
-        if (typeof value === 'object' && value.r !== undefined && value.g !== undefined && value.b !== undefined) {
-            const r = Math.round((value.r || 0) * 255);
-            const g = Math.round((value.g || 0) * 255);
-            const b = Math.round((value.b || 0) * 255);
-            const a = value.a !== undefined ? value.a : 1;
-            return `rgba(${r}, ${g}, ${b}, ${a})`;
-        }
-        return undefined;
+        return normalizeColor(value);
     }
 
     public compile(schema: PipelineSchema): ElementorJSON {
@@ -135,17 +127,35 @@ export class ElementorCompiler {
 
         if (styles.background) {
             const bg = styles.background;
-            const sanitizedColor = this.sanitizeColor(bg.color);
-            if (sanitizedColor) {
-                settings.background_background = 'classic';
-                settings.background_color = sanitizedColor;
-            }
-            if (bg.image) {
-                settings.background_background = 'classic';
-                settings.background_image = { url: bg.image, id: 0 };
-            }
-            if (bg.gradient) {
+
+            if (bg.type === 'solid' || bg.color) {
+                // Handle solid color background
+                const sanitizedColor = this.sanitizeColor(bg.color);
+                if (sanitizedColor) {
+                    settings.background_background = 'classic';
+                    settings.background_color = sanitizedColor;
+                }
+            } else if (bg.type === 'gradient' && bg.stops && bg.stops.length >= 2) {
+                // Handle gradient background
                 settings.background_background = 'gradient';
+                settings.background_gradient_type = bg.gradientType || 'linear';
+
+                // Set first color (color)
+                settings.background_color = bg.stops[0].color;
+                settings.background_color_stop = { unit: '%', size: bg.stops[0].position, sizes: [] };
+
+                // Set second color (color_b)
+                if (bg.stops.length >= 2) {
+                    settings.background_color_b = bg.stops[bg.stops.length - 1].color;
+                    settings.background_color_b_stop = { unit: '%', size: bg.stops[bg.stops.length - 1].position, sizes: [] };
+                }
+
+                // Set gradient angle (default 180deg for top-to-bottom)
+                settings.background_gradient_angle = { unit: 'deg', size: 180, sizes: [] };
+            } else if (bg.type === 'image' && bg.imageHash) {
+                settings.background_background = 'classic';
+                // Image URL will be resolved by uploader
+                settings.background_image = { url: '', id: 0, imageHash: bg.imageHash };
             }
         }
 

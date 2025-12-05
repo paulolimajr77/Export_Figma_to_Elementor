@@ -403,11 +403,12 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                             widget.styles.image_url = result.url;
                         } else if (widget.type === 'icon-box') {
                             if (!widget.styles) widget.styles = {};
-                            widget.styles.selected_icon = { value: result.url, library: 'svg' };
+                            widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: 'svg' };
+                            widget.imageId = result.id.toString();
                         } else if (widget.type === 'button') {
                             if (!widget.styles) widget.styles = {};
-                            widget.styles.selected_icon = { value: result.url, library: 'svg' };
-                            widget.imageId = result.id.toString(); // Update imageId with WordPress ID
+                            widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: 'svg' };
+                            widget.imageId = result.id.toString();
                             console.log('[BUTTON UPLOAD] Icon uploaded:', result.url, 'ID:', result.id);
                         } else if (widget.type === 'list-item') {
                             if (!widget.styles) widget.styles = {};
@@ -418,6 +419,11 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                             if (!widget.styles) widget.styles = {};
                             widget.styles.icon = { value: { id: result.id, url: result.url }, library: 'svg' };
                             widget.imageId = result.id.toString();
+                        } else if (widget.type === 'accordion' || widget.type === 'toggle') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: 'svg' };
+                            widget.imageId = result.id.toString();
+                            console.log('[ACCORDION UPLOAD] Icon uploaded:', result.url, 'ID:', result.id);
                         } else {
                             widget.content = result.url;
                             widget.imageId = result.id.toString();
@@ -427,6 +433,42 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
             } catch (e) {
                 console.error(`[NO-AI] Erro ao processar imagem ${nodeId}:`, e);
             }
+        }
+
+        // Handle image-carousel: upload each slide
+        if (uploadEnabled && widget.type === 'image-carousel' && widget.styles?.slides) {
+            console.log(`[NO-AI UPLOAD] 🎠 Processing image-carousel with ${widget.styles.slides.length} slides`);
+            const updatedSlides = [];
+            for (const slide of widget.styles.slides) {
+                const slideNodeId = slide.id;
+                if (slideNodeId) {
+                    try {
+                        const node = await figma.getNodeById(slideNodeId);
+                        if (node) {
+                            const result = await noaiUploader.uploadToWordPress(node as SceneNode, 'WEBP');
+                            if (result) {
+                                console.log(`[NO-AI UPLOAD] 🎠 Slide uploaded: ${result.url}, ID: ${result.id}`);
+                                updatedSlides.push({
+                                    _id: slide._id,
+                                    id: result.id,
+                                    url: result.url,
+                                    image: { url: result.url, id: result.id }
+                                });
+                            } else {
+                                updatedSlides.push(slide); // Keep original if upload fails
+                            }
+                        } else {
+                            updatedSlides.push(slide);
+                        }
+                    } catch (e) {
+                        console.error(`[NO-AI] Erro ao processar slide ${slideNodeId}:`, e);
+                        updatedSlides.push(slide);
+                    }
+                } else {
+                    updatedSlides.push(slide);
+                }
+            }
+            widget.styles.slides = updatedSlides;
         }
     };
 
