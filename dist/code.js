@@ -929,14 +929,37 @@ ${refText}` });
       aliases: generateAliases("countdown", ["contagem regressiva", "timer"], ["timer", "count down", "clock"]),
       compile: (w, base) => {
         const settings = __spreadValues({}, base);
+        const colorToRgba = (color) => {
+          if (!color) return void 0;
+          if (typeof color === "string") return color;
+          if (typeof color === "object" && "r" in color) {
+            const r = Math.round((color.r || 0) * 255);
+            const g = Math.round((color.g || 0) * 255);
+            const b = Math.round((color.b || 0) * 255);
+            const a = color.a !== void 0 ? color.a : 1;
+            return `rgba(${r}, ${g}, ${b}, ${a})`;
+          }
+          return void 0;
+        };
         const children = w.children || [];
         const timeData = {};
         const labels = {};
+        let digitsColor;
+        let labelColor;
+        let digitsFontSize;
+        let labelFontSize;
         children.forEach((child) => {
+          var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
           const text = (child.content || "").toString().trim();
           const lowerText = text.toLowerCase();
           const numValue = parseInt(text, 10);
           if (!isNaN(numValue) && text.match(/^\d+$/)) {
+            if (!digitsColor && ((_a = child.styles) == null ? void 0 : _a.color)) {
+              digitsColor = colorToRgba(child.styles.color);
+            }
+            if (!digitsFontSize && ((_b = child.styles) == null ? void 0 : _b.fontSize)) {
+              digitsFontSize = child.styles.fontSize;
+            }
             const childIndex = children.indexOf(child);
             for (let i = childIndex + 1; i < children.length; i++) {
               const nextChild = children[i];
@@ -945,15 +968,39 @@ ${refText}` });
               if (nextText.includes("dia") || nextText.includes("day")) {
                 timeData.days = numValue;
                 labels.days = nextChild.content;
+                if (!labelColor && ((_c = nextChild.styles) == null ? void 0 : _c.color)) {
+                  labelColor = colorToRgba(nextChild.styles.color);
+                }
+                if (!labelFontSize && ((_d = nextChild.styles) == null ? void 0 : _d.fontSize)) {
+                  labelFontSize = nextChild.styles.fontSize;
+                }
               } else if (nextText.includes("hr") || nextText.includes("hour") || nextText.includes("hora")) {
                 timeData.hours = numValue;
                 labels.hours = nextChild.content;
+                if (!labelColor && ((_e = nextChild.styles) == null ? void 0 : _e.color)) {
+                  labelColor = colorToRgba(nextChild.styles.color);
+                }
+                if (!labelFontSize && ((_f = nextChild.styles) == null ? void 0 : _f.fontSize)) {
+                  labelFontSize = nextChild.styles.fontSize;
+                }
               } else if (nextText.includes("min") || nextText.includes("minute")) {
                 timeData.minutes = numValue;
                 labels.minutes = nextChild.content;
+                if (!labelColor && ((_g = nextChild.styles) == null ? void 0 : _g.color)) {
+                  labelColor = colorToRgba(nextChild.styles.color);
+                }
+                if (!labelFontSize && ((_h = nextChild.styles) == null ? void 0 : _h.fontSize)) {
+                  labelFontSize = nextChild.styles.fontSize;
+                }
               } else if (nextText.includes("seg") || nextText.includes("sec") || nextText.includes("second")) {
                 timeData.seconds = numValue;
                 labels.seconds = nextChild.content;
+                if (!labelColor && ((_i = nextChild.styles) == null ? void 0 : _i.color)) {
+                  labelColor = colorToRgba(nextChild.styles.color);
+                }
+                if (!labelFontSize && ((_j = nextChild.styles) == null ? void 0 : _j.fontSize)) {
+                  labelFontSize = nextChild.styles.fontSize;
+                }
               }
               break;
             }
@@ -961,6 +1008,7 @@ ${refText}` });
         });
         console.log("[COUNTDOWN] Extracted time data:", timeData);
         console.log("[COUNTDOWN] Extracted labels:", labels);
+        console.log("[COUNTDOWN] Extracted colors - digits:", digitsColor, "labels:", labelColor);
         const now = /* @__PURE__ */ new Date();
         const futureDate = new Date(now);
         if (timeData.days) futureDate.setDate(futureDate.getDate() + timeData.days);
@@ -989,8 +1037,35 @@ ${refText}` });
         if (base.background_color) {
           settings.box_background_color = base.background_color;
         }
+        if (base.border_color && base.border_width) {
+          settings.box_border_border = "solid";
+          settings.box_border_color = base.border_color;
+          settings.box_border_width = base.border_width;
+        }
         if (base.border_radius) {
           settings.box_border_radius = base.border_radius;
+        }
+        if (digitsColor) {
+          settings.digits_color = digitsColor;
+        }
+        if (labelColor) {
+          settings.label_color = labelColor;
+        }
+        if (digitsFontSize) {
+          settings.digits_typography_typography = "custom";
+          settings.digits_typography_font_size = {
+            unit: "px",
+            size: digitsFontSize,
+            sizes: []
+          };
+        }
+        if (labelFontSize) {
+          settings.label_typography_typography = "custom";
+          settings.label_typography_font_size = {
+            unit: "px",
+            size: labelFontSize,
+            sizes: []
+          };
         }
         console.log("[COUNTDOWN] Generated due_date:", dueDate);
         console.log("[COUNTDOWN] Final settings:", settings);
@@ -3607,6 +3682,31 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           headingContent = rich.html;
         }
         return { type: "heading", content: headingContent, imageId: null, styles };
+      }
+      if (widgetType === "countdown" || widgetType === "icon-list") {
+        const children2 = node.children || [];
+        const childWidgets = [];
+        children2.forEach((child) => {
+          if (child.type === "TEXT") {
+            const textContent = child.characters || child.name || "";
+            const textStyles = extractWidgetStyles(child);
+            childWidgets.push({
+              type: "text",
+              content: textContent,
+              imageId: null,
+              styles: textStyles
+            });
+          } else if (isImageFill(child) || child.type === "VECTOR" || child.type === "IMAGE") {
+            childWidgets.push({
+              type: "icon",
+              content: null,
+              imageId: child.id,
+              styles: {}
+            });
+          }
+        });
+        console.log(`[NOAI ${widgetType.toUpperCase()}] Processed ${childWidgets.length} children`);
+        return { type: widgetType, content: node.name, imageId: null, styles, children: childWidgets };
       }
       return { type: widgetType, content: node.name, imageId: null, styles };
     }

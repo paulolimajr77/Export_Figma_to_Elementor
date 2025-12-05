@@ -442,10 +442,28 @@ const registry: WidgetDefinition[] = [
         compile: (w, base) => {
             const settings: ElementorSettings = { ...base };
 
+            // Helper to convert color object to rgba string
+            const colorToRgba = (color: any): string | undefined => {
+                if (!color) return undefined;
+                if (typeof color === 'string') return color;
+                if (typeof color === 'object' && 'r' in color) {
+                    const r = Math.round((color.r || 0) * 255);
+                    const g = Math.round((color.g || 0) * 255);
+                    const b = Math.round((color.b || 0) * 255);
+                    const a = color.a !== undefined ? color.a : 1;
+                    return `rgba(${r}, ${g}, ${b}, ${a})`;
+                }
+                return undefined;
+            };
+
             // Extract time values and labels from children
             const children = w.children || [];
             const timeData: { days?: number; hours?: number; minutes?: number; seconds?: number } = {};
             const labels: { days?: string; hours?: string; minutes?: string; seconds?: string } = {};
+            let digitsColor: string | undefined;
+            let labelColor: string | undefined;
+            let digitsFontSize: number | undefined;
+            let labelFontSize: number | undefined;
 
             // Parse children to find numeric values and labels
             children.forEach((child: any) => {
@@ -455,6 +473,14 @@ const registry: WidgetDefinition[] = [
                 // Check if it's a numeric value
                 const numValue = parseInt(text, 10);
                 if (!isNaN(numValue) && text.match(/^\d+$/)) {
+                    // Extract digit color and font size from first numeric child
+                    if (!digitsColor && child.styles?.color) {
+                        digitsColor = colorToRgba(child.styles.color);
+                    }
+                    if (!digitsFontSize && child.styles?.fontSize) {
+                        digitsFontSize = child.styles.fontSize;
+                    }
+
                     // Look ahead to find the label (next non-separator child)
                     const childIndex = children.indexOf(child);
                     for (let i = childIndex + 1; i < children.length; i++) {
@@ -467,15 +493,40 @@ const registry: WidgetDefinition[] = [
                         if (nextText.includes('dia') || nextText.includes('day')) {
                             timeData.days = numValue;
                             labels.days = nextChild.content;
+                            // Extract label color from first label
+                            if (!labelColor && nextChild.styles?.color) {
+                                labelColor = colorToRgba(nextChild.styles.color);
+                            }
+                            if (!labelFontSize && nextChild.styles?.fontSize) {
+                                labelFontSize = nextChild.styles.fontSize;
+                            }
                         } else if (nextText.includes('hr') || nextText.includes('hour') || nextText.includes('hora')) {
                             timeData.hours = numValue;
                             labels.hours = nextChild.content;
+                            if (!labelColor && nextChild.styles?.color) {
+                                labelColor = colorToRgba(nextChild.styles.color);
+                            }
+                            if (!labelFontSize && nextChild.styles?.fontSize) {
+                                labelFontSize = nextChild.styles.fontSize;
+                            }
                         } else if (nextText.includes('min') || nextText.includes('minute')) {
                             timeData.minutes = numValue;
                             labels.minutes = nextChild.content;
+                            if (!labelColor && nextChild.styles?.color) {
+                                labelColor = colorToRgba(nextChild.styles.color);
+                            }
+                            if (!labelFontSize && nextChild.styles?.fontSize) {
+                                labelFontSize = nextChild.styles.fontSize;
+                            }
                         } else if (nextText.includes('seg') || nextText.includes('sec') || nextText.includes('second')) {
                             timeData.seconds = numValue;
                             labels.seconds = nextChild.content;
+                            if (!labelColor && nextChild.styles?.color) {
+                                labelColor = colorToRgba(nextChild.styles.color);
+                            }
+                            if (!labelFontSize && nextChild.styles?.fontSize) {
+                                labelFontSize = nextChild.styles.fontSize;
+                            }
                         }
                         break;
                     }
@@ -484,6 +535,7 @@ const registry: WidgetDefinition[] = [
 
             console.log('[COUNTDOWN] Extracted time data:', timeData);
             console.log('[COUNTDOWN] Extracted labels:', labels);
+            console.log('[COUNTDOWN] Extracted colors - digits:', digitsColor, 'labels:', labelColor);
 
             // Calculate due_date (current time + extracted time)
             const now = new Date();
@@ -521,12 +573,48 @@ const registry: WidgetDefinition[] = [
             if (labels.minutes) settings.label_minutes = labels.minutes;
             if (labels.seconds) settings.label_seconds = labels.seconds;
 
-            // Default styling from Figma (if available)
+            // Apply visual styling from Figma
+            // Background - Convert rgba to hex format
             if (base.background_color) {
                 settings.box_background_color = base.background_color;
             }
+
+            // Border - Only set if border exists
+            if (base.border_color && base.border_width) {
+                settings.box_border_border = 'solid';
+                settings.box_border_color = base.border_color;
+                settings.box_border_width = base.border_width;
+            }
+
+            // Border Radius
             if (base.border_radius) {
                 settings.box_border_radius = base.border_radius;
+            }
+
+            // Text Colors - Apply directly (compiler will handle conversion)
+            if (digitsColor) {
+                settings.digits_color = digitsColor;
+            }
+            if (labelColor) {
+                settings.label_color = labelColor;
+            }
+
+            // Typography - Match Elementor structure
+            if (digitsFontSize) {
+                settings.digits_typography_typography = 'custom';
+                settings.digits_typography_font_size = {
+                    unit: 'px',
+                    size: digitsFontSize,
+                    sizes: []
+                };
+            }
+            if (labelFontSize) {
+                settings.label_typography_typography = 'custom';
+                settings.label_typography_font_size = {
+                    unit: 'px',
+                    size: labelFontSize,
+                    sizes: []
+                };
             }
 
             console.log('[COUNTDOWN] Generated due_date:', dueDate);

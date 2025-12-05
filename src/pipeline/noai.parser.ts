@@ -748,6 +748,36 @@ function detectWidget(node: SerializedNode): MaybeWidget {
             return { type: 'heading', content: headingContent, imageId: null, styles };
         }
 
+        // Special handling for widgets that need children (countdown, icon-list)
+        if (widgetType === 'countdown' || widgetType === 'icon-list') {
+            const children = (node as any).children || [];
+            const childWidgets: PipelineWidget[] = [];
+
+            // Process each child as a simple widget (text nodes become content)
+            children.forEach((child: SerializedNode) => {
+                if (child.type === 'TEXT') {
+                    const textContent = (child as any).characters || child.name || '';
+                    const textStyles = extractWidgetStyles(child);
+                    childWidgets.push({
+                        type: 'text',
+                        content: textContent,
+                        imageId: null,
+                        styles: textStyles
+                    });
+                } else if (isImageFill(child) || child.type === 'VECTOR' || child.type === 'IMAGE') {
+                    childWidgets.push({
+                        type: 'icon',
+                        content: null,
+                        imageId: child.id,
+                        styles: {}
+                    });
+                }
+            });
+
+            console.log(`[NOAI ${widgetType.toUpperCase()}] Processed ${childWidgets.length} children`);
+            return { type: widgetType, content: node.name, imageId: null, styles, children: childWidgets };
+        }
+
         // Generic fallback for other registry widgets
         return { type: widgetType, content: node.name, imageId: null, styles };
     }
