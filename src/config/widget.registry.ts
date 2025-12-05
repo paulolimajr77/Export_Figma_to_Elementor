@@ -839,7 +839,6 @@ const registry: WidgetDefinition[] = [
 
 const basicWidgets = [
     'w:container',
-    'w:inner-container',
     'w:video',
     'w:divider',
     'w:spacer',
@@ -998,7 +997,6 @@ const wpWidgets = [
 
 const widgetAliases: Record<string, { pt: string[], en: string[] }> = {
     'w:container': { pt: ['container', 'seção', 'coluna', 'linha'], en: ['section', 'row', 'column', 'full container', 'container 100%', 'boxed container', 'inner container'] },
-    'w:inner-container': { pt: ['container interno'], en: ['inner container'] },
     'w:form': { pt: ['formulário', 'contato', 'campos', 'form de contato', 'newsletter'], en: ['form', 'contact form', 'input'] },
     'w:login': { pt: ['login', 'entrar', 'acesso', 'login form'], en: ['login', 'signin', 'sign in'] },
     'w:subscription': { pt: ['inscrição', 'newsletter'], en: ['subscription', 'newsletter'] },

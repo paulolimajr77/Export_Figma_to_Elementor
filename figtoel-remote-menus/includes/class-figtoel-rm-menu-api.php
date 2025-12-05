@@ -269,7 +269,8 @@ class FIGTOEL_RM_Menu_API {
             }
 
             $target      = isset( $item['target'] ) ? sanitize_text_field( $item['target'] ) : '';
-            $classes     = isset( $item['classes'] ) ? ( is_array( $item['classes'] ) ? $item['classes'] : explode( ' ', sanitize_text_field( $item['classes'] ) ) ) : [];
+            $classes_raw = isset( $item['classes'] ) ? ( is_array( $item['classes'] ) ? $item['classes'] : explode( ' ', sanitize_text_field( $item['classes'] ) ) ) : [];
+            $classes     = implode( ' ', $classes_raw ); // Convert array to space-separated string
             $attr_title  = isset( $item['attr_title'] ) ? sanitize_text_field( $item['attr_title'] ) : '';
             $description = isset( $item['description'] ) ? sanitize_textarea_field( $item['description'] ) : '';
 

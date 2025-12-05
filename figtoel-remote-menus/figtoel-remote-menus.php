@@ -2,8 +2,9 @@
 /**
  * Plugin Name: Figtoel Remote Menus
  * Description: Criação e sincronização de menus via REST API para integração com Figma → Elementor.
- * Version: 1.0.0
- * Author: Paulo
+ * Version: 1.0.4
+ * Author: Paulo Lima Jr
+ * Author URI: https://pljr.com.br/plugins/figtoel-remote-menus
  * Text Domain: figtoel-remote-menus
  */
 
@@ -42,6 +43,19 @@ if ( ! defined( 'FIGTOEL_RM_PREFIX' ) ) {
 
 // Carrega as classes.
 require_once FIGTOEL_RM_PATH . 'includes/class-figtoel-rm-menu-api.php';
+
+/**
+ * Adiciona headers CORS para REST API.
+ *
+ * @return void
+ */
+function figtoel_rm_add_cors_headers() {
+    header( 'Access-Control-Allow-Origin: *' );
+    header( 'Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE' );
+    header( 'Access-Control-Allow-Credentials: true' );
+    header( 'Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce' );
+}
+add_action( 'rest_api_init', 'figtoel_rm_add_cors_headers' );
 
 /**
  * Inicializa o plugin Figtoel Remote Menus.

@@ -297,9 +297,36 @@
       styles.align = map[node.textAlignHorizontal] || "left";
     }
     if (node.fills && Array.isArray(node.fills)) {
-      const solid = node.fills.find((f) => f.type === "SOLID");
-      if (solid && solid.color) {
-        styles.color = solid.color;
+      const gradient = node.fills.find(
+        (f) => f.type === "GRADIENT_RADIAL" || f.type === "GRADIENT_LINEAR"
+      );
+      if (gradient && gradient.gradientStops) {
+        const stops = gradient.gradientStops.map((stop) => {
+          const r = Math.round((stop.color.r || 0) * 255);
+          const g = Math.round((stop.color.g || 0) * 255);
+          const b = Math.round((stop.color.b || 0) * 255);
+          const toHex = (n) => {
+            const hex2 = n.toString(16);
+            return hex2.length === 1 ? "0" + hex2 : hex2;
+          };
+          const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+          const pos = Math.round((stop.position || 0) * 100);
+          return `${hex} ${pos}%`;
+        }).join(", ");
+        const gradType = gradient.type === "GRADIENT_RADIAL" ? "radial-gradient" : "linear-gradient";
+        const gradParams = gradient.type === "GRADIENT_RADIAL" ? "circle at center" : "180deg";
+        styles.customCss = `selector {
+    background: ${gradType}(${gradParams}, ${stops});
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}`;
+        console.log("[GRADIENT TEXT] Generated CSS for", gradient.type);
+      } else {
+        const solid = node.fills.find((f) => f.type === "SOLID");
+        if (solid && solid.color) {
+          styles.color = solid.color;
+        }
       }
     }
     if (node.styledTextSegments && node.styledTextSegments.length > 1) {
@@ -1262,7 +1289,6 @@ ${refText}` });
   ];
   var basicWidgets = [
     "w:container",
-    "w:inner-container",
     "w:video",
     "w:divider",
     "w:spacer",
@@ -1415,7 +1441,6 @@ ${refText}` });
   ];
   var widgetAliases = {
     "w:container": { pt: ["container", "se\xE7\xE3o", "coluna", "linha"], en: ["section", "row", "column", "full container", "container 100%", "boxed container", "inner container"] },
-    "w:inner-container": { pt: ["container interno"], en: ["inner container"] },
     "w:form": { pt: ["formul\xE1rio", "contato", "campos", "form de contato", "newsletter"], en: ["form", "contact form", "input"] },
     "w:login": { pt: ["login", "entrar", "acesso", "login form"], en: ["login", "signin", "sign in"] },
     "w:subscription": { pt: ["inscri\xE7\xE3o", "newsletter"], en: ["subscription", "newsletter"] },
@@ -2974,27 +2999,24 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const to255 = (v) => Math.round((v || 0) * 255);
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
   }
-  var BOXED_MIN_PARENT_WIDTH = 1440;
-  var BOXED_MIN_WIDTH_DELTA = 40;
-  function isContainerLike(node) {
-    const containerTypes = ["FRAME", "GROUP", "SECTION", "INSTANCE", "COMPONENT"];
-    return containerTypes.includes(node.type);
-  }
   function unwrapBoxedInner(node) {
     const rawChildren = Array.isArray(node.children) ? node.children : [];
-    if (node.width < BOXED_MIN_PARENT_WIDTH || rawChildren.length === 0) {
+    if (rawChildren.length === 0) {
       return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
     }
-    const candidate = rawChildren.find(
-      (child) => isContainerLike(child) && typeof child.width === "number" && child.width > 0 && child.width < node.width && node.width - child.width >= BOXED_MIN_WIDTH_DELTA
-    );
+    const candidate = rawChildren.find((child) => {
+      const childName = (child.name || "").toLowerCase();
+      return childName === "w:inner-container" || childName === "c:inner-container";
+    });
     if (!candidate) {
       return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
     }
+    console.log("[UNWRAP BOXED] \u2705 Found w:inner-container:", candidate.name, "Width:", candidate.width);
     const innerChildren = Array.isArray(candidate.children) ? candidate.children : [];
     const idx = rawChildren.indexOf(candidate);
     const before = idx >= 0 ? rawChildren.slice(0, idx) : [];
     const after = idx >= 0 ? rawChildren.slice(idx + 1) : [];
+    console.log(`[UNWRAP BOXED] \u2705 Flattening children. Before: ${before.length}, Inner: ${innerChildren.length}, After: ${after.length}`);
     return { isBoxed: true, inner: candidate, flattenedChildren: [...before, ...innerChildren, ...after] };
   }
   function calculateWidgetScore(node) {
@@ -3002,6 +3024,16 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const name = (node.name || "").toLowerCase();
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const children = hasChildren ? node.children : [];
+    const widgetPrefixes = ["w:", "woo:", "e:", "wp:", "loop:", "c:"];
+    for (const prefix of widgetPrefixes) {
+      if (name.startsWith(prefix)) {
+        const explicitType = name.substring(prefix.length).trim();
+        if (explicitType) {
+          console.log(`[WIDGET SCORE] \u{1F3AF} Explicit widget detected: "${node.name}" \u2192 type: "${explicitType}"`);
+          return [{ type: explicitType, score: 1e3, matchedFeatures: ["explicit-name"] }];
+        }
+      }
+    }
     const hasImage = children.some((c) => isImageFill(c) || findFirstImageId(c));
     const hasText = children.some((c) => hasTextDeep(c));
     const hasIcon = children.some((c) => hasIconDeep(c));
@@ -3122,6 +3154,47 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     var _a, _b;
     const name = (node.name || "").toLowerCase();
     console.log("[DETECT WIDGET] Processing node:", node.name, "Type:", node.type, "Name (lowercase):", name);
+    if (/^(w:|woo:|loop:)/.test(name)) {
+      const widgetType = name.replace(/^(w:|woo:|loop:)/, "");
+      console.log("[DETECT WIDGET] \u2705 Explicit widget name detected:", node.name, "\u2192", widgetType);
+      if (widgetType === "container" || widgetType === "section") {
+        console.log("[DETECT WIDGET] Ignoring container:", node.name);
+        return null;
+      }
+      const registryDef2 = findWidgetDefinition(name, node.type);
+      if (registryDef2) {
+        console.log("[DETECT WIDGET] Found in registry, delegating to registry handler");
+      } else {
+        console.log("[DETECT WIDGET] Not in registry, creating basic widget");
+        const styles2 = {
+          sourceId: node.id,
+          sourceName: node.name
+        };
+        let content = node.name;
+        let imageId = null;
+        if (widgetType === "heading" || widgetType === "text-editor" || widgetType === "text") {
+          if (node.type === "TEXT") {
+            content = node.characters || node.name;
+            const extractedStyles = extractWidgetStyles(node);
+            Object.assign(styles2, extractedStyles);
+          }
+        } else if (widgetType === "image" || widgetType === "icon") {
+          imageId = node.id;
+          content = null;
+        } else if (widgetType === "image-box" || widgetType === "icon-box") {
+          const boxContent = extractBoxContent(node);
+          content = boxContent.title || node.name;
+          imageId = boxContent.imageId || findFirstImageId(node) || null;
+          Object.assign(styles2, { title_text: boxContent.title, description_text: boxContent.description });
+        }
+        return {
+          type: widgetType,
+          content,
+          imageId,
+          styles: styles2
+        };
+      }
+    }
     if (name.startsWith("c:container") || name.startsWith("w:container")) {
       console.log("[DETECT WIDGET] Ignoring container:", node.name);
       return null;
@@ -3133,46 +3206,49 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const children = hasChildren ? node.children : [];
     const firstImageDeep = findFirstImageId(node);
-    try {
-      const snapshot = toNodeSnapshot(node);
-      const heuristicResults = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
-      if (heuristicResults.length > 0) {
-        const best = heuristicResults[0];
-        console.log("[HEURISTICS] Matched:", best.widget, "Confidence:", best.confidence, "Pattern:", best.patternId);
-        const widgetType = best.widget.replace(/^w:/, "");
-        const analysis = analyzeWidgetStructure(node, widgetType);
-        if ((widgetType === "section" || widgetType === "container") && analysis.childWidgets.length > 0) {
-          console.log("[HEURISTICS] Container with", analysis.childWidgets.length, "child widgets - delegating to toContainer");
-          return null;
-        }
-        const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), analysis.containerStyles), analysis.textStyles);
-        if (widgetType === "button" && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
-          mergedStyles.fills = [{
-            type: "SOLID",
-            color: { r: 1, g: 1, b: 1 },
-            opacity: 0,
-            visible: true
-          }];
-        }
-        let content = analysis.text;
-        if (!content) {
-          const isTechnicalName = node.name.includes(":") || node.name.startsWith("w-") || node.name.startsWith("Frame ") || node.name.startsWith("Group ");
-          if (!isTechnicalName) {
-            content = node.name;
-          } else {
-            content = widgetType === "heading" ? "Heading" : widgetType === "button" ? "Button" : widgetType === "text" ? "Text Block" : "";
+    const hasExplicitName = /^(w:|woo:|loop:)/.test(name);
+    if (!hasExplicitName) {
+      try {
+        const snapshot = toNodeSnapshot(node);
+        const heuristicResults = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
+        if (heuristicResults.length > 0) {
+          const best = heuristicResults[0];
+          console.log("[HEURISTICS] Matched:", best.widget, "Confidence:", best.confidence, "Pattern:", best.patternId);
+          const widgetType = best.widget.replace(/^w:/, "");
+          const analysis = analyzeWidgetStructure(node, widgetType);
+          if ((widgetType === "section" || widgetType === "container") && analysis.childWidgets.length > 0) {
+            console.log("[HEURISTICS] Container with", analysis.childWidgets.length, "child widgets - delegating to toContainer");
+            return null;
           }
+          const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), analysis.containerStyles), analysis.textStyles);
+          if (widgetType === "button" && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+            mergedStyles.fills = [{
+              type: "SOLID",
+              color: { r: 1, g: 1, b: 1 },
+              opacity: 0,
+              visible: true
+            }];
+          }
+          let content = analysis.text;
+          if (!content) {
+            const isTechnicalName = node.name.includes(":") || node.name.startsWith("w-") || node.name.startsWith("Frame ") || node.name.startsWith("Group ");
+            if (!isTechnicalName) {
+              content = node.name;
+            } else {
+              content = widgetType === "heading" ? "Heading" : widgetType === "button" ? "Button" : widgetType === "text" ? "Text Block" : "";
+            }
+          }
+          return {
+            type: widgetType,
+            content,
+            imageId: analysis.iconId,
+            styles: mergedStyles,
+            children: analysis.childWidgets
+          };
         }
-        return {
-          type: widgetType,
-          content,
-          imageId: analysis.iconId,
-          styles: mergedStyles,
-          children: analysis.childWidgets
-        };
+      } catch (error) {
+        console.log("[HEURISTICS] Error evaluating node:", error);
       }
-    } catch (error) {
-      console.log("[HEURISTICS] Error evaluating node:", error);
     }
     const registryDef = findWidgetDefinition(name, node.type);
     if (registryDef) {
@@ -3423,6 +3499,30 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return null;
   }
   function toContainer(node) {
+    console.log("[TO CONTAINER] \u{1F680} Processing node:", node.name, "Type:", node.type);
+    const nodeName = (node.name || "").toLowerCase();
+    if (/^(w:|woo:|loop:)/.test(nodeName)) {
+      const widgetType = nodeName.replace(/^(w:|woo:|loop:)/, "");
+      if (widgetType !== "container" && widgetType !== "inner-container" && widgetType !== "section") {
+        console.log("[TO CONTAINER] \u2705 Detected explicit widget:", node.name, "\u2192 Processing as single widget");
+        const widget = detectWidget(node);
+        console.log("[TO CONTAINER] detectWidget returned:", widget ? `type=${widget.type}, content=${widget.content}` : "NULL");
+        if (widget) {
+          const styles2 = extractContainerStyles(node);
+          console.log("[TO CONTAINER] Creating container with single widget:", widget.type);
+          return {
+            id: node.id,
+            direction: node.layoutMode === "HORIZONTAL" ? "row" : "column",
+            width: "full",
+            styles: styles2,
+            widgets: [widget],
+            children: []
+          };
+        } else {
+          console.log("[TO CONTAINER] \u26A0\uFE0F detectWidget returned null, falling through to normal container processing");
+        }
+      }
+    }
     let direction = node.layoutMode === "HORIZONTAL" ? "row" : "column";
     const styles = extractContainerStyles(node);
     const widgets = [];
@@ -3451,34 +3551,50 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       styles._boxedInnerSourceId = boxed.inner.id;
     }
     if (!Array.isArray(childNodes)) childNodes = [];
+    console.log("[TO CONTAINER] \u{1F4CB} After unwrapBoxedInner, processing", childNodes.length, "children:", childNodes.map((c) => c.name));
+    childNodes.forEach((child) => {
+      console.log("[TO CONTAINER] \u{1F50D} Processing child:", child.name, "Type:", child.type);
+    });
+    const processedChildNodes = childNodes;
+    if (!Array.isArray(processedChildNodes)) {
+      console.error("[TO CONTAINER] \u274C processedChildNodes is not an array");
+      return {
+        id: node.id,
+        direction: direction === "row" ? "row" : "column",
+        width: containerWidth,
+        styles,
+        widgets: [],
+        children: []
+      };
+    }
     const hasInnerAutoLayout = boxed.isBoxed && boxed.inner && (boxed.inner.layoutMode === "HORIZONTAL" || boxed.inner.layoutMode === "VERTICAL");
     if (node.layoutMode !== "HORIZONTAL" && node.layoutMode !== "VERTICAL" && !hasInnerAutoLayout) {
-      childNodes.sort((a, b) => {
+      processedChildNodes.sort((a, b) => {
         const yDiff = (a.y || 0) - (b.y || 0);
         if (Math.abs(yDiff) > 5) return yDiff;
         return (a.x || 0) - (b.x || 0);
       });
     }
-    childNodes.forEach((child, idx) => {
+    processedChildNodes.forEach((child, idx) => {
       const w = detectWidget(child);
       const childHasChildren = Array.isArray(child.children) && child.children.length > 0;
       const orderMark = idx;
       if (w) {
         w.styles = __spreadProps(__spreadValues({}, w.styles || {}), { _order: orderMark });
         widgets.push(w);
+        console.log("[TO CONTAINER] \u2705 Added as widget:", child.name, "Type:", w.type);
+      } else if (childHasChildren) {
+        const childContainer = toContainer(child);
+        childContainer.styles = __spreadProps(__spreadValues({}, childContainer.styles || {}), { _order: orderMark });
+        childrenContainers.push(childContainer);
+        console.log("[TO CONTAINER] \u2705 Added as container:", child.name);
       } else {
-        if (childHasChildren) {
-          const childContainer = toContainer(child);
-          childContainer.styles = __spreadProps(__spreadValues({}, childContainer.styles || {}), { _order: orderMark });
-          childrenContainers.push(childContainer);
-        } else {
-          widgets.push({
-            type: "custom",
-            content: child.name || "",
-            imageId: null,
-            styles: { sourceId: child.id, sourceName: child.name, _order: orderMark }
-          });
-        }
+        widgets.push({
+          type: "custom",
+          content: child.name || "",
+          imageId: null,
+          styles: { sourceId: child.id, sourceName: child.name, _order: orderMark }
+        });
       }
     });
     return {
@@ -3590,8 +3706,16 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return tree;
   }
   function convertToFlexSchema(analyzedTree) {
+    var _a, _b, _c, _d;
     const rootContainer = toContainer(analyzedTree);
     const tokens = { primaryColor: "#000000", secondaryColor: "#FFFFFF" };
+    console.log("[convertToFlexSchema] Root container after toContainer:", JSON.stringify({
+      id: rootContainer.id,
+      widgets: ((_a = rootContainer.widgets) == null ? void 0 : _a.length) || 0,
+      widgetTypes: ((_b = rootContainer.widgets) == null ? void 0 : _b.map((w) => w.type)) || [],
+      children: ((_c = rootContainer.children) == null ? void 0 : _c.length) || 0,
+      childrenIds: ((_d = rootContainer.children) == null ? void 0 : _d.map((c) => c.id)) || []
+    }, null, 2));
     return {
       page: { title: analyzedTree.name || "Layout importado", tokens },
       containers: [rootContainer]
@@ -3602,50 +3726,87 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     let imageId = null;
     let title = "";
     let description = "";
-    function findIconDeep(n) {
-      if (isImageFill(n) || n.type === "IMAGE" || n.type === "VECTOR") {
-        return n.id;
+    console.log("[EXTRACT BOX] Processing node:", node.name, "with", children.length, "children");
+    for (const child of children) {
+      const childName = (child.name || "").toLowerCase();
+      console.log("[EXTRACT BOX] Checking child:", child.name, "Type:", child.type);
+      if (childName.startsWith("w:image") || childName.startsWith("w:icon")) {
+        imageId = child.id;
+        console.log("[EXTRACT BOX] \u2705 Found explicit image/icon:", child.name, "ID:", imageId);
+        break;
       }
-      if (n.children) {
-        for (const child of n.children) {
-          const found = findIconDeep(child);
-          if (found) return found;
-        }
-      }
-      return null;
     }
-    const imgNode = children.find((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
-    if (imgNode) {
-      imageId = imgNode.id;
-    } else {
-      for (const child of children) {
-        imageId = findIconDeep(child);
-        if (imageId) break;
+    if (!imageId) {
+      let findIconDeep = function(n) {
+        if (isImageFill(n) || n.type === "IMAGE" || n.type === "VECTOR") {
+          return n.id;
+        }
+        if (n.children) {
+          for (const child of n.children) {
+            const found = findIconDeep(child);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const imgNode = children.find((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
+      if (imgNode) {
+        imageId = imgNode.id;
+        console.log("[EXTRACT BOX] \u2705 Found image via type:", imageId);
+      } else {
+        for (const child of children) {
+          imageId = findIconDeep(child);
+          if (imageId) {
+            console.log("[EXTRACT BOX] \u2705 Found image via deep search:", imageId);
+            break;
+          }
+        }
       }
     }
     const textNodes = [];
-    function collectTexts(n) {
-      if (n.type === "TEXT") {
-        textNodes.push(n);
-        return;
-      }
-      if (n.children) {
-        for (const child of n.children) {
-          collectTexts(child);
-          if (textNodes.length >= 2) return;
-        }
-      }
-    }
     for (const child of children) {
-      collectTexts(child);
-      if (textNodes.length >= 2) break;
+      const childName = (child.name || "").toLowerCase();
+      if (childName.startsWith("w:heading") || childName.includes("title") || childName.includes("heading")) {
+        if (child.type === "TEXT") {
+          title = child.characters || child.name;
+          console.log("[EXTRACT BOX] \u2705 Found title:", title);
+        }
+      } else if (childName.startsWith("w:text-editor") || childName.startsWith("w:text") || childName.includes("description") || childName.includes("desc")) {
+        if (child.type === "TEXT") {
+          description = child.characters || child.name;
+          console.log("[EXTRACT BOX] \u2705 Found description:", description.substring(0, 50) + "...");
+        }
+      } else if (child.type === "TEXT" && !title && !description) {
+        textNodes.push(child);
+      }
     }
-    if (textNodes.length > 0) {
-      title = textNodes[0].characters || textNodes[0].name;
+    if (!title && !description) {
+      let collectTexts = function(n) {
+        if (n.type === "TEXT") {
+          textNodes.push(n);
+          return;
+        }
+        if (n.children) {
+          for (const child of n.children) {
+            collectTexts(child);
+            if (textNodes.length >= 2) break;
+          }
+        }
+      };
+      for (const child of children) {
+        collectTexts(child);
+        if (textNodes.length >= 2) break;
+      }
+      if (textNodes.length > 0) {
+        title = textNodes[0].characters || textNodes[0].name;
+        console.log("[EXTRACT BOX] \u2705 Fallback title:", title);
+      }
+      if (textNodes.length > 1) {
+        description = textNodes[1].characters || textNodes[1].name;
+        console.log("[EXTRACT BOX] \u2705 Fallback description:", description.substring(0, 50) + "...");
+      }
     }
-    if (textNodes.length > 1) {
-      description = textNodes[1].characters || textNodes[1].name;
-    }
+    console.log("[EXTRACT BOX] Final result - imageId:", imageId, "title:", title, "description:", description ? description.substring(0, 30) + "..." : "empty");
     return { imageId, title, description };
   }
 
@@ -3820,6 +3981,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     }
     run(_0) {
       return __async(this, arguments, function* (node, wpConfig = {}, options) {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i;
         const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token) });
         this.compiler.setWPConfig(normalizedWP);
         this.imageUploader.setWPConfig(normalizedWP);
@@ -3836,6 +3998,14 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         validatePipelineSchema(schema);
         this.hydrateStyles(schema, preprocessed.flatNodes);
         yield this.resolveImages(schema, normalizedWP);
+        yield this.syncNavMenus(schema, preprocessed.serializedRoot, normalizedWP);
+        console.log("[PIPELINE] Schema root container:", JSON.stringify({
+          id: (_a = schema.containers[0]) == null ? void 0 : _a.id,
+          widgets: ((_c = (_b = schema.containers[0]) == null ? void 0 : _b.widgets) == null ? void 0 : _c.length) || 0,
+          widgetTypes: ((_e = (_d = schema.containers[0]) == null ? void 0 : _d.widgets) == null ? void 0 : _e.map((w) => w.type)) || [],
+          children: ((_g = (_f = schema.containers[0]) == null ? void 0 : _f.children) == null ? void 0 : _g.length) || 0,
+          childrenIds: ((_i = (_h = schema.containers[0]) == null ? void 0 : _h.children) == null ? void 0 : _i.map((c) => c.id)) || []
+        }, null, 2));
         const elementorJson = this.compiler.compile(schema);
         if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
         validateElementorJSON(elementorJson);
@@ -4413,6 +4583,10 @@ ${JSON.stringify(baseSchema, null, 2)}
           const existingIds = /* @__PURE__ */ new Set();
           collectIds(c, existingIds);
           for (const child of node.children) {
+            const childNameLower = (child.name || "").toLowerCase();
+            if (childNameLower === "w:inner-container" || childNameLower === "c:inner-container") {
+              continue;
+            }
             if (!existingIds.has(child.id) && child.visible) {
               if (child.type === "TEXT") {
                 c.widgets.push({
@@ -4505,6 +4679,132 @@ ${JSON.stringify(baseSchema, null, 2)}
         }
       }
       return order.map((id) => map.get(id));
+    }
+    /**
+     * Sync nav-menus to WordPress via figtoel-remote-menus plugin
+     */
+    syncNavMenus(schema, root, wpConfig) {
+      return __async(this, null, function* () {
+        var _a;
+        console.log("[NAV MENU SYNC] ========== START ==========");
+        console.log("[NAV MENU SYNC] WPConfig:", { url: wpConfig.url, user: wpConfig.user, hasPassword: !!(wpConfig.password || wpConfig.token) });
+        const syncEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token));
+        if (!syncEnabled) {
+          console.log("[NAV MENU SYNC] \u274C Skipped: WordPress config not provided.");
+          return;
+        }
+        const navMenus = [];
+        const collect = (container) => {
+          if (container.widgets) {
+            for (const widget of container.widgets) {
+              if (widget.type === "nav-menu") {
+                navMenus.push({ widget, container });
+              }
+            }
+          }
+          if (container.children) {
+            for (const child of container.children) {
+              collect(child);
+            }
+          }
+        };
+        schema.containers.forEach((c) => collect(c));
+        console.log(`[NAV MENU SYNC] Collected ${navMenus.length} nav-menu widget(s):`, navMenus.map((m) => ({ widgetType: m.widget.type, content: m.widget.content })));
+        if (navMenus.length === 0) {
+          console.log("[NAV MENU SYNC] No nav-menu widgets found.");
+          return;
+        }
+        console.log(`[NAV MENU SYNC] Found ${navMenus.length} nav-menu(s). Syncing to WordPress...`);
+        for (const { widget, container } of navMenus) {
+          try {
+            const sourceId = ((_a = widget.styles) == null ? void 0 : _a.sourceId) || container.id;
+            const figmaNode = figma.getNodeById(sourceId);
+            if (!figmaNode || !("children" in figmaNode)) {
+              console.warn(`[NAV MENU SYNC] Cannot find Figma node for nav-menu: ${sourceId}`);
+              continue;
+            }
+            const items = this.extractMenuItems(figmaNode);
+            const menuName = widget.content || figmaNode.name || "Menu Principal";
+            const payload = {
+              menu_name: menuName,
+              menu_location: "primary",
+              // Default location
+              replace_existing: true,
+              items
+            };
+            const url = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
+            const btoaPolyfill = (str) => {
+              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+              let output = "";
+              let i = 0;
+              while (i < str.length) {
+                const a = str.charCodeAt(i++);
+                const b = i < str.length ? str.charCodeAt(i++) : 0;
+                const c = i < str.length ? str.charCodeAt(i++) : 0;
+                const bitmap = a << 16 | b << 8 | c;
+                output += chars.charAt(bitmap >> 18 & 63);
+                output += chars.charAt(bitmap >> 12 & 63);
+                output += chars.charAt(b ? bitmap >> 6 & 63 : 64);
+                output += chars.charAt(c ? bitmap & 63 : 64);
+              }
+              return output;
+            };
+            const auth = "Basic " + btoaPolyfill(`${wpConfig.user}:${wpConfig.password || wpConfig.token}`);
+            console.log(`[NAV MENU SYNC] Posting to ${url}...`, payload);
+            const response = yield fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": auth
+              },
+              body: JSON.stringify(payload)
+            });
+            const result = yield response.json();
+            if (response.ok && result.success) {
+              console.log(`[NAV MENU SYNC] \u2705 Menu "${menuName}" synced successfully. Items created: ${result.items_created}`);
+              figma.ui.postMessage({ type: "log", level: "success", message: `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.` });
+            } else {
+              console.error(`[NAV MENU SYNC] \u274C Failed to sync menu "${menuName}":`, result);
+              figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao criar menu "${menuName}": ${result.error || "Desconhecido"}` });
+            }
+          } catch (error) {
+            console.error(`[NAV MENU SYNC] Exception:`, error);
+            figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao sincronizar menu: ${error}` });
+          }
+        }
+      });
+    }
+    /**
+     * Extract menu items from a nav-menu Figma node
+     */
+    extractMenuItems(navMenuNode) {
+      const items = [];
+      if (!navMenuNode.children) return items;
+      console.log(`[NAV MENU SYNC] Nav menu has ${navMenuNode.children.length} children`);
+      for (const child of navMenuNode.children) {
+        console.log(`[NAV MENU SYNC] Processing child: ${child.name} Type: ${child.type}`);
+        if (child.type === "TEXT") {
+          const title = child.characters;
+          const url = "#";
+          items.push({ title, url });
+          console.log(`[NAV MENU SYNC] \u2705 Added TEXT menu item: ${title}`);
+          continue;
+        }
+        if (child.type === "FRAME" || child.type === "GROUP") {
+          let title = child.name;
+          if ("children" in child) {
+            const textChild = child.children.find((c) => c.type === "TEXT");
+            if (textChild) {
+              title = textChild.characters;
+            }
+          }
+          const url = "#";
+          items.push({ title, url });
+          console.log(`[NAV MENU SYNC] \u2705 Added ${child.type} menu item: ${title}`);
+        }
+      }
+      console.log(`[NAV MENU SYNC] Extracted ${items.length} menu items from ${navMenuNode.name}`);
+      return items;
     }
   };
 
@@ -4869,7 +5169,6 @@ ${refText}` });
       this.addRule("w:post-title", "pro", this.matchGenericText.bind(this));
       this.addRule("w:post-excerpt", "pro", this.matchGenericText.bind(this));
       this.addRule("w:post-content", "pro", this.matchGenericText.bind(this));
-      this.addRule("w:author-box", "pro", this.matchGenericContainer.bind(this));
       this.addRule("w:share-buttons", "pro", this.matchSocialIcons.bind(this));
       this.addRule("w:slideshow", "pro", this.matchPortfolio.bind(this));
       this.addRule("w:gallery-pro", "pro", this.matchPortfolio.bind(this));
@@ -4878,9 +5177,7 @@ ${refText}` });
       this.addRule("woo:product-price", "woo", this.matchWooProductPrice.bind(this));
       this.addRule("woo:product-add-to-cart", "woo", this.matchWooAddToCart.bind(this));
       this.addRule("woo:product-rating", "woo", this.matchWooProductRating.bind(this));
-      this.addRule("woo:cart", "woo", this.matchGenericContainer.bind(this));
       this.addRule("woo:checkout", "woo", this.matchForm.bind(this));
-      this.addRule("loop:item", "loop", this.matchGenericContainer.bind(this));
       this.addRule("loop:image", "loop", this.matchImage.bind(this));
       this.addRule("loop:title", "loop", this.matchHeading.bind(this));
       this.addRule("loop:meta", "loop", this.matchGenericText.bind(this));
@@ -4890,14 +5187,7 @@ ${refText}` });
       this.addRule("loop:add-to-cart", "loop", this.matchButton.bind(this));
       this.addRule("loop:read-more", "loop", this.matchButton.bind(this));
       this.addRule("loop:featured-image", "loop", this.matchImage.bind(this));
-      this.addRule("loop:pagination", "loop", this.matchGenericContainer.bind(this));
       this.addRule("w:wp-search", "wordpress", this.matchSearchForm.bind(this));
-      this.addRule("w:wp-recent-posts", "wordpress", this.matchGenericContainer.bind(this));
-      this.addRule("w:wp-archives", "wordpress", this.matchGenericContainer.bind(this));
-      this.addRule("w:wp-categories", "wordpress", this.matchGenericContainer.bind(this));
-      this.addRule("w:wp-calendar", "wordpress", this.matchGenericContainer.bind(this));
-      this.addRule("w:wp-tag-cloud", "wordpress", this.matchGenericContainer.bind(this));
-      this.addRule("w:wp-recent-comments", "wordpress", this.matchGenericContainer.bind(this));
       this.addRule("w:wp-custom-menu", "wordpress", this.matchNavMenu.bind(this));
       this.addRule("w:gallery", "basic", this.matchGallery.bind(this));
       this.addRule("w:image-carousel", "basic", this.matchImageCarousel.bind(this));
@@ -4924,18 +5214,6 @@ ${refText}` });
       this.addRule("woo:product-excerpt", "woo", this.matchGenericText.bind(this));
       this.addRule("woo:product-stock", "woo", this.matchWooProductStock.bind(this));
       this.addRule("woo:product-meta", "woo", this.matchWooProductMeta.bind(this));
-      this.addRule("woo:product-additional-information", "woo", this.matchGenericContainer.bind(this));
-      this.addRule("woo:product-short-description", "woo", this.matchGenericText.bind(this));
-      this.addRule("woo:product-related", "woo", this.matchWooProducts.bind(this));
-      this.addRule("woo:product-upsells", "woo", this.matchWooProducts.bind(this));
-      this.addRule("woo:product-tabs", "woo", this.matchWooProductTabs.bind(this));
-      this.addRule("woo:product-gallery", "woo", this.matchGallery.bind(this));
-      this.addRule("woo:product-loop-item", "woo", this.matchGenericContainer.bind(this));
-      this.addRule("woo:loop-product-rating", "woo", this.matchStarRating.bind(this));
-      this.addRule("woo:loop-product-meta", "woo", this.matchGenericText.bind(this));
-      this.addRule("woo:my-account", "woo", this.matchForm.bind(this));
-      this.addRule("woo:purchase-summary", "woo", this.matchGenericContainer.bind(this));
-      this.addRule("woo:order-tracking", "woo", this.matchForm.bind(this));
       this.addRule("w:subscription", "pro", this.matchSubscription.bind(this));
       this.addRule("w:media-carousel", "pro", this.matchMediaCarousel.bind(this));
       this.addRule("w:slider-slides", "pro", this.matchSliderSlides.bind(this));
@@ -4955,7 +5233,7 @@ ${refText}` });
       this.addRule("w:facebook-comments", "pro", this.matchFacebookComments.bind(this));
       this.addRule("w:facebook-embed", "pro", this.matchFacebookEmbed.bind(this));
       this.addRule("w:facebook-page", "pro", this.matchFacebookPage.bind(this));
-      this.addRule("w:loop-builder", "pro", this.matchGenericContainer.bind(this));
+      this.addRule("w:loop-builder", "pro", this.matchLoopBuilder.bind(this));
       this.addRule("w:loop-grid-advanced", "pro", this.matchLoopGrid.bind(this));
       this.addRule("w:loop-carousel", "pro", this.matchImageCarousel.bind(this));
       this.addRule("w:post-info", "pro", this.matchPostInfo.bind(this));
@@ -4968,8 +5246,8 @@ ${refText}` });
       this.addRule("w:site-logo", "pro", this.matchImage.bind(this));
       this.addRule("w:site-title", "pro", this.matchHeading.bind(this));
       this.addRule("w:site-tagline", "pro", this.matchGenericText.bind(this));
-      this.addRule("w:search-results", "pro", this.matchGenericContainer.bind(this));
-      this.addRule("w:global-widget", "pro", this.matchGenericContainer.bind(this));
+      this.addRule("w:search-results", "pro", this.matchSearchResults.bind(this));
+      this.addRule("w:global-widget", "pro", this.matchGlobalWidget.bind(this));
       this.addRule("w:video-playlist", "pro", this.matchVideoPlaylist.bind(this));
       this.addRule("w:video-gallery", "pro", this.matchVideoGallery.bind(this));
       this.addRule("w:nested-tabs", "pro", this.matchNestedTabs.bind(this));
@@ -5009,6 +5287,83 @@ ${refText}` });
       }
       return reasons.join("; ");
     }
+    /**
+     * Helper: Analisa contexto visual do node
+     */
+    analyzeVisualContext(node) {
+      var _a;
+      const width = "width" in node ? node.width : 0;
+      const height = "height" in node ? node.height : 0;
+      const aspectRatio = height > 0 ? width / height : 0;
+      const hasBackground = "fills" in node && Array.isArray(node.fills) && node.fills.length > 0 && node.fills.some((f) => f.visible !== false);
+      const hasBorder = "strokes" in node && Array.isArray(node.strokes) && node.strokes.length > 0 && node.strokes.some((s) => s.visible !== false);
+      let hasIcon = false;
+      let hasImage = false;
+      let textCount = 0;
+      let totalTextLength = 0;
+      if ("children" in node && node.children) {
+        for (const child of node.children) {
+          if (child.type === "VECTOR" || child.type === "STAR" || child.type === "ELLIPSE" || child.type === "POLYGON" || child.type === "BOOLEAN_OPERATION") {
+            hasIcon = true;
+          }
+          if (child.name.toLowerCase().includes("icon")) {
+            hasIcon = true;
+          }
+          if ("fills" in child && Array.isArray(child.fills)) {
+            if (child.fills.some((f) => f.type === "IMAGE")) {
+              hasImage = true;
+            }
+          }
+          if (child.type === "TEXT" && "characters" in child) {
+            textCount++;
+            totalTextLength += ((_a = child.characters) == null ? void 0 : _a.length) || 0;
+          }
+        }
+      }
+      return {
+        aspectRatio,
+        hasBackground,
+        hasBorder,
+        hasIcon,
+        hasImage,
+        textCount,
+        avgTextLength: textCount > 0 ? totalTextLength / textCount : 0
+      };
+    }
+    /**
+     * Helper: Analisa conteúdo de texto
+     */
+    analyzeTextContent(node) {
+      let hasQuote = false;
+      let hasAuthor = false;
+      let isLongText = false;
+      let hasTitle = false;
+      let hasDescription = false;
+      if ("children" in node && node.children) {
+        const texts = node.children.filter((child) => child.type === "TEXT");
+        hasQuote = texts.some((t) => t.characters.includes('"') || t.characters.includes("\u201C") || t.characters.includes("\u201D") || t.name.toLowerCase().includes("quote"));
+        hasAuthor = texts.some((t) => t.name.toLowerCase().includes("author") || t.name.toLowerCase().includes("autor") || t.name.toLowerCase().includes("role") || t.name.toLowerCase().includes("cargo"));
+        isLongText = texts.some((t) => t.characters.length > 100);
+        hasTitle = texts.some((t) => typeof t.fontSize === "number" && t.fontSize > 16 || t.fontWeight === 700 || t.name.toLowerCase().includes("title") || t.name.toLowerCase().includes("heading"));
+        hasDescription = texts.some((t) => t.characters.length > 40 || t.name.toLowerCase().includes("desc") || t.name.toLowerCase().includes("text"));
+      }
+      return { hasQuote, hasAuthor, isLongText, hasTitle, hasDescription };
+    }
+    /**
+     * Helper: Calcula confiança final
+     */
+    calculateConfidence(baseScore, visualMatch, contentMatch, nameMatch) {
+      const weights = {
+        visual: 0.4,
+        content: 0.3,
+        name: 0.2,
+        base: 0.1
+      };
+      return Math.min(
+        baseScore * weights.base + visualMatch * weights.visual + contentMatch * weights.content + nameMatch * weights.name,
+        1
+      );
+    }
     // ==================== MATCHERS - BÁSICOS ====================
     matchHeading(node) {
       if (node.type !== "TEXT") return 0;
@@ -5043,22 +5398,18 @@ ${refText}` });
       return Math.min(confidence, 1);
     }
     matchButton(node) {
-      var _a;
-      let confidence = 0;
+      const visual = this.analyzeVisualContext(node);
       const name = node.name.toLowerCase();
-      if (name.includes("button") || name.includes("btn") || name.includes("cta")) {
-        confidence += 0.5;
-      }
-      if (node.type === "FRAME" && "children" in node) {
-        const hasText = (_a = node.children) == null ? void 0 : _a.some((child) => child.type === "TEXT");
-        if (hasText) {
-          confidence += 0.3;
-        }
-      }
-      if ("cornerRadius" in node && node.cornerRadius && node.cornerRadius > 0) {
-        confidence += 0.2;
-      }
-      return Math.min(confidence, 1);
+      let nameMatch = 0;
+      if (name.includes("button") || name.includes("btn") || name.includes("botao")) nameMatch = 1;
+      let visualMatch = 0;
+      if (visual.aspectRatio > 1.5 && visual.aspectRatio < 6) visualMatch += 0.3;
+      if (visual.hasBackground || visual.hasBorder) visualMatch += 0.4;
+      if (visual.textCount === 1 && visual.avgTextLength < 30) visualMatch += 0.3;
+      if (visual.hasIcon) visualMatch += 0.2;
+      let contentMatch = 0;
+      if (visual.textCount >= 1 && visual.textCount <= 2) contentMatch = 1;
+      return this.calculateConfidence(0.4, Math.min(visualMatch, 1), contentMatch, nameMatch);
     }
     matchImage(node) {
       let confidence = 0;
@@ -5131,38 +5482,34 @@ ${refText}` });
       return Math.min(confidence, 1);
     }
     matchImageBox(node) {
-      let confidence = 0;
+      const visual = this.analyzeVisualContext(node);
+      const content = this.analyzeTextContent(node);
       const name = node.name.toLowerCase();
-      if (name.includes("image-box") || name.includes("image box")) {
-        confidence += 0.6;
-      }
-      if (node.type === "FRAME" && "children" in node && node.children) {
-        const hasImage = node.children.some(
-          (child) => child.name.toLowerCase().includes("image") || "fills" in child && Array.isArray(child.fills) && child.fills.some((f) => f.type === "IMAGE")
-        );
-        const hasText = node.children.some((child) => child.type === "TEXT");
-        if (hasImage && hasText) {
-          confidence += 0.4;
-        }
-      }
-      return Math.min(confidence, 1);
+      let nameMatch = 0;
+      if (name.includes("image-box") || name.includes("image box")) nameMatch = 1;
+      let visualMatch = 0;
+      if (visual.hasImage) visualMatch += 0.6;
+      if (visual.textCount >= 1) visualMatch += 0.4;
+      let contentMatch = 0;
+      if (content.hasTitle || content.hasDescription) contentMatch += 0.5;
+      if (content.hasTitle && content.hasDescription) contentMatch += 0.5;
+      if (visual.textCount > 4) contentMatch -= 0.5;
+      return this.calculateConfidence(0.3, Math.min(visualMatch, 1), Math.max(contentMatch, 0), nameMatch);
     }
     matchIconBox(node) {
-      let confidence = 0;
+      const visual = this.analyzeVisualContext(node);
+      const content = this.analyzeTextContent(node);
       const name = node.name.toLowerCase();
-      if (name.includes("icon-box") || name.includes("icon box")) {
-        confidence += 0.6;
-      }
-      if (node.type === "FRAME" && "children" in node && node.children) {
-        const hasIcon = node.children.some(
-          (child) => child.name.toLowerCase().includes("icon") || child.type === "VECTOR"
-        );
-        const hasText = node.children.some((child) => child.type === "TEXT");
-        if (hasIcon && hasText) {
-          confidence += 0.4;
-        }
-      }
-      return Math.min(confidence, 1);
+      let nameMatch = 0;
+      if (name.includes("icon-box") || name.includes("icon box")) nameMatch = 1;
+      let visualMatch = 0;
+      if (visual.hasIcon) visualMatch += 0.6;
+      if (visual.textCount >= 1) visualMatch += 0.4;
+      let contentMatch = 0;
+      if (content.hasTitle || content.hasDescription) contentMatch += 0.5;
+      if (content.hasTitle && content.hasDescription) contentMatch += 0.5;
+      if (visual.textCount > 4) contentMatch -= 0.5;
+      return this.calculateConfidence(0.3, Math.min(visualMatch, 1), Math.max(contentMatch, 0), nameMatch);
     }
     matchStarRating(node) {
       let confidence = 0;
@@ -5320,18 +5667,19 @@ ${refText}` });
       return Math.min(confidence, 1);
     }
     matchTestimonial(node) {
-      let confidence = 0;
+      const visual = this.analyzeVisualContext(node);
+      const content = this.analyzeTextContent(node);
       const name = node.name.toLowerCase();
-      if (name.includes("testimonial") || name.includes("review") || name.includes("depoimento")) {
-        confidence += 0.7;
-      }
-      if (node.type === "FRAME" && "children" in node && node.children) {
-        const hasText = node.children.filter((child) => child.type === "TEXT").length >= 2;
-        if (hasText) {
-          confidence += 0.3;
-        }
-      }
-      return Math.min(confidence, 1);
+      let nameMatch = 0;
+      if (name.includes("testimonial") || name.includes("review") || name.includes("depoimento")) nameMatch = 1;
+      let visualMatch = 0;
+      if (visual.hasImage) visualMatch += 0.3;
+      if (visual.textCount >= 2) visualMatch += 0.3;
+      let contentMatch = 0;
+      if (content.hasQuote) contentMatch += 0.4;
+      if (content.hasAuthor) contentMatch += 0.3;
+      if (content.isLongText) contentMatch += 0.3;
+      return this.calculateConfidence(0.3, Math.min(visualMatch, 1), Math.min(contentMatch, 1), nameMatch);
     }
     matchContainer(node) {
       let confidence = 0;
@@ -5718,6 +6066,39 @@ ${refText}` });
       return Math.min(confidence, 1);
     }
     // ==================== MATCHERS - WOOCOMMERCE SIMPLES ====================
+    matchLoopBuilder(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("loop") && (name.includes("builder") || name.includes("grid") || name.includes("carousel"))) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME") {
+        confidence += 0.1;
+      }
+      if (name.includes("link") || name.includes("item") || name.includes("menu")) {
+        confidence -= 0.5;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchSearchResults(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("search") && name.includes("result")) {
+        confidence += 0.9;
+      }
+      if (name === "link" || name.includes("menu item")) {
+        confidence -= 0.5;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchGlobalWidget(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("global") && (name.includes("widget") || name.includes("template"))) {
+        confidence += 0.9;
+      }
+      return Math.min(confidence, 1);
+    }
     matchWooBreadcrumb(node) {
       let confidence = 0;
       const name = node.name.toLowerCase();
@@ -5793,6 +6174,35 @@ ${refText}` });
       }
       if (name.includes("sku") || name.includes("category") || name.includes("tag")) {
         confidence += 0.3;
+      }
+      return Math.min(confidence, 1);
+    }
+    matchWooProductAdditionalInformation(node) {
+      let confidence = 0;
+      const name = node.name.toLowerCase();
+      if (name.includes("additional") && name.includes("information")) {
+        confidence += 0.8;
+      }
+      if (node.type === "FRAME" && "children" in node && node.children) {
+        const hasAttributeTerms = node.children.some((child) => {
+          if (child.type === "TEXT") {
+            const text = child.characters.toLowerCase();
+            return text.includes("weight") || text.includes("dimensions") || text.includes("peso") || text.includes("dimens\xF5es") || text.includes("attributes") || text.includes("atributos");
+          }
+          if ("children" in child) {
+            return child.children.some((grandChild) => {
+              if (grandChild.type === "TEXT") {
+                const text = grandChild.characters.toLowerCase();
+                return text.includes("weight") || text.includes("dimensions") || text.includes("peso") || text.includes("dimens\xF5es");
+              }
+              return false;
+            });
+          }
+          return false;
+        });
+        if (hasAttributeTerms) {
+          confidence += 0.4;
+        }
       }
       return Math.min(confidence, 1);
     }
@@ -6131,6 +6541,18 @@ ${refText}` });
       return __async(this, null, function* () {
         console.log(`\u{1F50D} [analyzeNode] Analisando: ${node.name} (${node.type})`);
         const results = [];
+        const hasValidWidgetName = /^(w:|woo:|loop:)/.test(node.name);
+        if (hasValidWidgetName) {
+          console.log(`  \u23ED\uFE0F Pulando ${node.name}: j\xE1 tem nome de widget v\xE1lido`);
+          if ("children" in node && node.children) {
+            console.log(`\u{1F50D} [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
+            for (const child of node.children) {
+              const childResults = yield this.analyzeNode(child, registry2);
+              results.push(...childResults);
+            }
+          }
+          return results;
+        }
         const rules = registry2.getAll();
         console.log(`\u{1F50D} [analyzeNode] ${rules.length} regras para executar`);
         for (const rule of rules) {

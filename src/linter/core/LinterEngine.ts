@@ -51,6 +51,22 @@ export class LinterEngine {
     async analyzeNode(node: SceneNode, registry: RuleRegistry): Promise<LintResult[]> {
         console.log(`🔍 [analyzeNode] Analisando: ${node.name} (${node.type})`);
         const results: LintResult[] = [];
+
+        // Skip widget naming validation if node already has a valid widget name
+        const hasValidWidgetName = /^(w:|woo:|loop:)/.test(node.name);
+        if (hasValidWidgetName) {
+            console.log(`  ⏭️ Pulando ${node.name}: já tem nome de widget válido`);
+            // Still analyze children, but skip rules for this node
+            if ('children' in node && node.children) {
+                console.log(`🔍 [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
+                for (const child of node.children) {
+                    const childResults = await this.analyzeNode(child as SceneNode, registry);
+                    results.push(...childResults);
+                }
+            }
+            return results;
+        }
+
         const rules = registry.getAll();
 
         console.log(`🔍 [analyzeNode] ${rules.length} regras para executar`);

@@ -94,11 +94,45 @@ export function extractWidgetStyles(node: SerializedNode): Record<string, any> {
         styles.align = map[node.textAlignHorizontal] || 'left';
     }
 
-    // Color
+    // Color & Gradients
     if (node.fills && Array.isArray(node.fills)) {
-        const solid = node.fills.find((f: any) => f.type === 'SOLID');
-        if (solid && solid.color) {
-            styles.color = solid.color;
+        // Check for gradient fills first
+        const gradient = node.fills.find((f: any) =>
+            f.type === 'GRADIENT_RADIAL' ||
+            f.type === 'GRADIENT_LINEAR'
+        );
+
+        if (gradient && gradient.gradientStops) {
+            // Generate CSS for gradient text
+            const stops = gradient.gradientStops.map((stop: any) => {
+                const r = Math.round((stop.color.r || 0) * 255);
+                const g = Math.round((stop.color.g || 0) * 255);
+                const b = Math.round((stop.color.b || 0) * 255);
+                const toHex = (n: number) => {
+                    const hex = n.toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                };
+                const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+                const pos = Math.round((stop.position || 0) * 100);
+                return `${hex} ${pos}%`;
+            }).join(', ');
+
+            const gradType = gradient.type === 'GRADIENT_RADIAL' ? 'radial-gradient' : 'linear-gradient';
+            const gradParams = gradient.type === 'GRADIENT_RADIAL' ? 'circle at center' : '180deg';
+
+            styles.customCss = `selector {
+    background: ${gradType}(${gradParams}, ${stops});
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}`;
+            console.log('[GRADIENT TEXT] Generated CSS for', gradient.type);
+        } else {
+            // Fallback to solid color
+            const solid = node.fills.find((f: any) => f.type === 'SOLID');
+            if (solid && solid.color) {
+                styles.color = solid.color;
+            }
         }
     }
 

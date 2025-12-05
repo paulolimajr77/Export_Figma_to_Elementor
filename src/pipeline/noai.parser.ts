@@ -151,26 +151,28 @@ function isContainerLike(node: SerializedNode): boolean {
 
 function unwrapBoxedInner(node: SerializedNode): { isBoxed: boolean; inner: SerializedNode | null; flattenedChildren: SerializedNode[] } {
     const rawChildren = Array.isArray((node as any).children) ? ((node as any).children as SerializedNode[]) : [];
-    if (node.width < BOXED_MIN_PARENT_WIDTH || rawChildren.length === 0) {
+    if (rawChildren.length === 0) {
         return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
     }
 
-    const candidate = rawChildren.find(child =>
-        isContainerLike(child) &&
-        typeof child.width === 'number' &&
-        child.width > 0 &&
-        child.width < node.width &&
-        (node.width - child.width) >= BOXED_MIN_WIDTH_DELTA
-    );
+    // **ONLY detect explicitly named w:inner-container or c:inner-container**
+    const candidate = rawChildren.find(child => {
+        const childName = (child.name || '').toLowerCase();
+        return childName === 'w:inner-container' || childName === 'c:inner-container';
+    });
 
     if (!candidate) {
         return { isBoxed: false, inner: null, flattenedChildren: rawChildren };
     }
 
+    console.log('[UNWRAP BOXED] ✅ Found w:inner-container:', candidate.name, 'Width:', candidate.width);
+
     const innerChildren = Array.isArray((candidate as any).children) ? (candidate as any).children as SerializedNode[] : [];
     const idx = rawChildren.indexOf(candidate);
     const before = idx >= 0 ? rawChildren.slice(0, idx) : [];
     const after = idx >= 0 ? rawChildren.slice(idx + 1) : [];
+
+    console.log(`[UNWRAP BOXED] ✅ Flattening children. Before: ${before.length}, Inner: ${innerChildren.length}, After: ${after.length}`);
 
     return { isBoxed: true, inner: candidate, flattenedChildren: [...before, ...innerChildren, ...after] };
 }
@@ -187,6 +189,20 @@ function calculateWidgetScore(node: SerializedNode): WidgetScore[] {
     const name = (node.name || '').toLowerCase();
     const hasChildren = Array.isArray((node as any).children) && (node as any).children.length > 0;
     const children = hasChildren ? ((node as any).children as SerializedNode[]) : [];
+
+    // 🎯 PRIORITY: Check for explicit widget prefix in name
+    // If the user explicitly named a node with w:button, w:nav-menu, etc., respect that choice
+    const widgetPrefixes = ['w:', 'woo:', 'e:', 'wp:', 'loop:', 'c:'];
+    for (const prefix of widgetPrefixes) {
+        if (name.startsWith(prefix)) {
+            const explicitType = name.substring(prefix.length).trim();
+            if (explicitType) {
+                console.log(`[WIDGET SCORE] 🎯 Explicit widget detected: "${node.name}" → type: "${explicitType}"`);
+                // Return with max score to ensure it wins over heuristics
+                return [{ type: explicitType, score: 1000, matchedFeatures: ['explicit-name'] }];
+            }
+        }
+    }
 
     // Helper checks
     const hasImage = children.some(c => isImageFill(c) || findFirstImageId(c));
@@ -376,6 +392,60 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
     console.log('[DETECT WIDGET] Processing node:', node.name, 'Type:', node.type, 'Name (lowercase):', name);
 
+    // **PRIORITY 1: Respect explicit widget names (w:, woo:, loop:)**
+    // If user manually named the widget, use that name directly
+    if (/^(w:|woo:|loop:)/.test(name)) {
+        const widgetType = name.replace(/^(w:|woo:|loop:)/, '');
+        console.log('[DETECT WIDGET] ✅ Explicit widget name detected:', node.name, '→', widgetType);
+
+        // Skip containers - let toContainer handle them
+        if (widgetType === 'container' || widgetType === 'section') {
+            console.log('[DETECT WIDGET] Ignoring container:', node.name);
+            return null;
+        }
+
+        // Use registry to process the widget with proper structure
+        const registryDef = findWidgetDefinition(name, node.type);
+        if (registryDef) {
+            console.log('[DETECT WIDGET] Found in registry, delegating to registry handler');
+            // Fall through to registry processing below (line ~464)
+        } else {
+            // Widget name is valid but not in registry - create basic widget
+            console.log('[DETECT WIDGET] Not in registry, creating basic widget');
+            const styles: Record<string, any> = {
+                sourceId: node.id,
+                sourceName: node.name
+            };
+
+            // Extract content based on widget type
+            let content = node.name;
+            let imageId = null;
+
+            if (widgetType === 'heading' || widgetType === 'text-editor' || widgetType === 'text') {
+                if (node.type === 'TEXT') {
+                    content = (node as any).characters || node.name;
+                    const extractedStyles = extractWidgetStyles(node);
+                    Object.assign(styles, extractedStyles);
+                }
+            } else if (widgetType === 'image' || widgetType === 'icon') {
+                imageId = node.id;
+                content = null;
+            } else if (widgetType === 'image-box' || widgetType === 'icon-box') {
+                const boxContent = extractBoxContent(node);
+                content = boxContent.title || node.name;
+                imageId = boxContent.imageId || findFirstImageId(node) || null;
+                Object.assign(styles, { title_text: boxContent.title, description_text: boxContent.description });
+            }
+
+            return {
+                type: widgetType,
+                content,
+                imageId,
+                styles
+            };
+        }
+    }
+
     // Explicitly ignore containers so they are processed as containers by the recursive logic
     if (name.startsWith('c:container') || name.startsWith('w:container')) {
         console.log('[DETECT WIDGET] Ignoring container:', node.name);
@@ -392,73 +462,77 @@ function detectWidget(node: SerializedNode): MaybeWidget {
     const firstImageDeep = findFirstImageId(node);
 
     // **PHASE 1: Try Heuristics First** (NEW!)
-    try {
-        const snapshot = toNodeSnapshot(node);
-        const heuristicResults = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
+    // SKIP heuristics if user explicitly named the widget
+    const hasExplicitName = /^(w:|woo:|loop:)/.test(name);
+    if (!hasExplicitName) {
+        try {
+            const snapshot = toNodeSnapshot(node);
+            const heuristicResults = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
 
-        if (heuristicResults.length > 0) {
-            const best = heuristicResults[0];
-            console.log('[HEURISTICS] Matched:', best.widget, 'Confidence:', best.confidence, 'Pattern:', best.patternId);
+            if (heuristicResults.length > 0) {
+                const best = heuristicResults[0];
+                console.log('[HEURISTICS] Matched:', best.widget, 'Confidence:', best.confidence, 'Pattern:', best.patternId);
 
-            // Use generic structural analysis for all widgets
-            const widgetType = best.widget.replace(/^w:/, '');
-            const analysis = analyzeWidgetStructure(node, widgetType);
+                // Use generic structural analysis for all widgets
+                const widgetType = best.widget.replace(/^w:/, '');
+                const analysis = analyzeWidgetStructure(node, widgetType);
 
-            // **NEW: If this is a container/section with child widgets, return null**
-            // This allows toContainer to process it properly with hierarchy
-            if ((widgetType === 'section' || widgetType === 'container') && analysis.childWidgets.length > 0) {
-                console.log('[HEURISTICS] Container with', analysis.childWidgets.length, 'child widgets - delegating to toContainer');
-                return null;  // Let toContainer handle it
-            }
-
-            // Merge all styles
-            const mergedStyles = {
-                ...styles,
-                ...analysis.containerStyles,
-                ...analysis.textStyles
-            };
-
-            // Add transparent background fallback for buttons
-            if (widgetType === 'button' && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
-                mergedStyles.fills = [{
-                    type: 'SOLID',
-                    color: { r: 1, g: 1, b: 1 },
-                    opacity: 0,
-                    visible: true
-                }];
-            }
-
-            // Determine content fallback
-            let content = analysis.text;
-            if (!content) {
-                // Only use node.name if it's NOT a technical identifier
-                const isTechnicalName = node.name.includes(':') ||
-                    node.name.startsWith('w-') ||
-                    node.name.startsWith('Frame ') ||
-                    node.name.startsWith('Group ');
-
-                if (!isTechnicalName) {
-                    content = node.name;
-                } else {
-                    // Generic fallback based on type
-                    content = widgetType === 'heading' ? 'Heading' :
-                        widgetType === 'button' ? 'Button' :
-                            widgetType === 'text' ? 'Text Block' : '';
+                // **NEW: If this is a container/section with child widgets, return null**
+                // This allows toContainer to process it properly with hierarchy
+                if ((widgetType === 'section' || widgetType === 'container') && analysis.childWidgets.length > 0) {
+                    console.log('[HEURISTICS] Container with', analysis.childWidgets.length, 'child widgets - delegating to toContainer');
+                    return null;  // Let toContainer handle it
                 }
-            }
 
-            return {
-                type: widgetType,
-                content: content,
-                imageId: analysis.iconId,
-                styles: mergedStyles,
-                children: analysis.childWidgets
-            };
+                // Merge all styles
+                const mergedStyles = {
+                    ...styles,
+                    ...analysis.containerStyles,
+                    ...analysis.textStyles
+                };
+
+                // Add transparent background fallback for buttons
+                if (widgetType === 'button' && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+                    mergedStyles.fills = [{
+                        type: 'SOLID',
+                        color: { r: 1, g: 1, b: 1 },
+                        opacity: 0,
+                        visible: true
+                    }];
+                }
+
+                // Determine content fallback
+                let content = analysis.text;
+                if (!content) {
+                    // Only use node.name if it's NOT a technical identifier
+                    const isTechnicalName = node.name.includes(':') ||
+                        node.name.startsWith('w-') ||
+                        node.name.startsWith('Frame ') ||
+                        node.name.startsWith('Group ');
+
+                    if (!isTechnicalName) {
+                        content = node.name;
+                    } else {
+                        // Generic fallback based on type
+                        content = widgetType === 'heading' ? 'Heading' :
+                            widgetType === 'button' ? 'Button' :
+                                widgetType === 'text' ? 'Text Block' : '';
+                    }
+                }
+
+                return {
+                    type: widgetType,
+                    content: content,
+                    imageId: analysis.iconId,
+                    styles: mergedStyles,
+                    children: analysis.childWidgets
+                };
+            }
+        } catch (error) {
+            console.log('[HEURISTICS] Error evaluating node:', error);
+            // Fall through to manual detection
         }
-    } catch (error) {
-        console.log('[HEURISTICS] Error evaluating node:', error);
-        // Fall through to manual detection
-    }
+    } // End of if (!hasExplicitName)
 
     // **PHASE 2: Explicit overrides by name (Registry & Aliases)**
     const registryDef = findWidgetDefinition(name, node.type);
@@ -766,6 +840,34 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
 
 function toContainer(node: SerializedNode): PipelineContainer {
+    console.log('[TO CONTAINER] 🚀 Processing node:', node.name, 'Type:', node.type);
+
+    // **PRIORITY CHECK: If this node is an explicit widget (w:image-box, etc), treat it as a single widget**
+    const nodeName = (node.name || '').toLowerCase();
+    if (/^(w:|woo:|loop:)/.test(nodeName)) {
+        const widgetType = nodeName.replace(/^(w:|woo:|loop:)/, '');
+        // Only process as widget if it's NOT a container type
+        if (widgetType !== 'container' && widgetType !== 'inner-container' && widgetType !== 'section') {
+            console.log('[TO CONTAINER] ✅ Detected explicit widget:', node.name, '→ Processing as single widget');
+            const widget = detectWidget(node);
+            console.log('[TO CONTAINER] detectWidget returned:', widget ? `type=${widget.type}, content=${widget.content}` : 'NULL');
+            if (widget) {
+                const styles = extractContainerStyles(node);
+                console.log('[TO CONTAINER] Creating container with single widget:', widget.type);
+                return {
+                    id: node.id,
+                    direction: node.layoutMode === 'HORIZONTAL' ? 'row' : 'column',
+                    width: 'full',
+                    styles,
+                    widgets: [widget],
+                    children: []
+                };
+            } else {
+                console.log('[TO CONTAINER] ⚠️ detectWidget returned null, falling through to normal container processing');
+            }
+        }
+    }
+
     let direction: 'row' | 'column' = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
     const styles = extractContainerStyles(node);
 
@@ -804,38 +906,61 @@ function toContainer(node: SerializedNode): PipelineContainer {
 
     if (!Array.isArray(childNodes)) childNodes = [];
 
+    // Log each child being processed
+    console.log('[TO CONTAINER] 📋 After unwrapBoxedInner, processing', childNodes.length, 'children:', childNodes.map(c => c.name));
+    childNodes.forEach(child => {
+        console.log('[TO CONTAINER] 🔍 Processing child:', child.name, 'Type:', child.type);
+    });
+
+    const processedChildNodes = childNodes;
+
+    if (!Array.isArray(processedChildNodes)) {
+        console.error('[TO CONTAINER] ❌ processedChildNodes is not an array');
+        return {
+            id: node.id,
+            direction: direction === 'row' ? 'row' : 'column',
+            width: containerWidth,
+            styles,
+            widgets: [],
+            children: []
+        };
+    }
+
     // Se não tiver Auto Layout, ordenar visualmente (Top -> Bottom, Left -> Right)
     // Isso garante que elementos soltos fiquem em uma ordem lógica na coluna
     const hasInnerAutoLayout = boxed.isBoxed && boxed.inner && (boxed.inner.layoutMode === 'HORIZONTAL' || boxed.inner.layoutMode === 'VERTICAL');
     if (node.layoutMode !== 'HORIZONTAL' && node.layoutMode !== 'VERTICAL' && !hasInnerAutoLayout) {
-        childNodes.sort((a, b) => {
+        processedChildNodes.sort((a, b) => {
             const yDiff = (a.y || 0) - (b.y || 0);
             if (Math.abs(yDiff) > 5) return yDiff; // Tolerância de 5px para linhas
             return (a.x || 0) - (b.x || 0);
         });
     }
 
-    childNodes.forEach((child, idx) => {
+    processedChildNodes.forEach((child, idx) => {
         const w = detectWidget(child);
         const childHasChildren = Array.isArray((child as any).children) && (child as any).children.length > 0;
         const orderMark = idx;
 
         if (w) {
+            // If detected as widget, add it as widget and SKIP container processing
             w.styles = { ...(w.styles || {}), _order: orderMark };
             widgets.push(w);
+            console.log('[TO CONTAINER] ✅ Added as widget:', child.name, 'Type:', w.type);
+        } else if (childHasChildren) {
+            // Only process as container if NOT detected as widget
+            const childContainer = toContainer(child);
+            childContainer.styles = { ...(childContainer.styles || {}), _order: orderMark };
+            childrenContainers.push(childContainer);
+            console.log('[TO CONTAINER] ✅ Added as container:', child.name);
         } else {
-            if (childHasChildren) {
-                const childContainer = toContainer(child);
-                childContainer.styles = { ...(childContainer.styles || {}), _order: orderMark };
-                childrenContainers.push(childContainer);
-            } else {
-                widgets.push({
-                    type: 'custom',
-                    content: child.name || '',
-                    imageId: null,
-                    styles: { sourceId: child.id, sourceName: child.name, _order: orderMark }
-                });
-            }
+            // Leaf node without widget match - create fallback widget
+            widgets.push({
+                type: 'custom',
+                content: child.name || '',
+                imageId: null,
+                styles: { sourceId: child.id, sourceName: child.name, _order: orderMark }
+            });
         }
     });
 
@@ -988,6 +1113,16 @@ export function analyzeTreeWithHeuristics(tree: SerializedNode): SerializedNode 
 export function convertToFlexSchema(analyzedTree: SerializedNode): PipelineSchema {
     const rootContainer = toContainer(analyzedTree);
     const tokens = { primaryColor: '#000000', secondaryColor: '#FFFFFF' };
+
+    // Debug: Log schema IMMEDIATELY after toContainer, BEFORE any merge/normalize
+    console.log('[convertToFlexSchema] Root container after toContainer:', JSON.stringify({
+        id: rootContainer.id,
+        widgets: rootContainer.widgets?.length || 0,
+        widgetTypes: rootContainer.widgets?.map(w => w.type) || [],
+        children: rootContainer.children?.length || 0,
+        childrenIds: rootContainer.children?.map(c => c.id) || []
+    }, null, 2));
+
     return {
         page: { title: analyzedTree.name || 'Layout importado', tokens },
         containers: [rootContainer]
@@ -1000,61 +1135,102 @@ function extractBoxContent(node: SerializedNode): { imageId: string | null, titl
     let title = '';
     let description = '';
 
-    // Find Image/Icon - Deep recursive search
-    function findIconDeep(n: SerializedNode): string | null {
-        if (isImageFill(n) || n.type === 'IMAGE' || n.type === 'VECTOR') {
-            return n.id;
+    console.log('[EXTRACT BOX] Processing node:', node.name, 'with', children.length, 'children');
+
+    // Find Image/Icon - Check for explicitly named w:image or w:icon first
+    for (const child of children) {
+        const childName = (child.name || '').toLowerCase();
+        console.log('[EXTRACT BOX] Checking child:', child.name, 'Type:', child.type);
+
+        if (childName.startsWith('w:image') || childName.startsWith('w:icon')) {
+            imageId = child.id;
+            console.log('[EXTRACT BOX] ✅ Found explicit image/icon:', child.name, 'ID:', imageId);
+            break;
         }
-        if ((n as any).children) {
-            for (const child of (n as any).children) {
-                const found = findIconDeep(child);
-                if (found) return found;
+    }
+
+    // If no explicit name, do deep search
+    if (!imageId) {
+        function findIconDeep(n: SerializedNode): string | null {
+            if (isImageFill(n) || n.type === 'IMAGE' || n.type === 'VECTOR') {
+                return n.id;
+            }
+            if ((n as any).children) {
+                for (const child of (n as any).children) {
+                    const found = findIconDeep(child);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        const imgNode = children.find((c: SerializedNode) => isImageFill(c) || c.type === 'IMAGE' || c.type === 'VECTOR');
+        if (imgNode) {
+            imageId = imgNode.id;
+            console.log('[EXTRACT BOX] ✅ Found image via type:', imageId);
+        } else {
+            for (const child of children) {
+                imageId = findIconDeep(child);
+                if (imageId) {
+                    console.log('[EXTRACT BOX] ✅ Found image via deep search:', imageId);
+                    break;
+                }
             }
         }
-        return null;
     }
 
-    // Check direct children first
-    const imgNode = children.find((c: SerializedNode) => isImageFill(c) || c.type === 'IMAGE' || c.type === 'VECTOR');
-    if (imgNode) {
-        imageId = imgNode.id;
-    } else {
-        // Deep search through all descendants
-        for (const child of children) {
-            imageId = findIconDeep(child);
-            if (imageId) break;
-        }
-    }
-
-    // Find Texts
-    // We want to find the first two significant text nodes
+    // Find Texts - Check for explicitly named w:heading and w:text-editor first
     const textNodes: SerializedNode[] = [];
 
-    function collectTexts(n: SerializedNode) {
-        if (n.type === 'TEXT') {
-            textNodes.push(n);
-            return;
+    for (const child of children) {
+        const childName = (child.name || '').toLowerCase();
+
+        if (childName.startsWith('w:heading') || childName.includes('title') || childName.includes('heading')) {
+            if (child.type === 'TEXT') {
+                title = (child as any).characters || child.name;
+                console.log('[EXTRACT BOX] ✅ Found title:', title);
+            }
+        } else if (childName.startsWith('w:text-editor') || childName.startsWith('w:text') || childName.includes('description') || childName.includes('desc')) {
+            if (child.type === 'TEXT') {
+                description = (child as any).characters || child.name;
+                console.log('[EXTRACT BOX] ✅ Found description:', description.substring(0, 50) + '...');
+            }
+        } else if (child.type === 'TEXT' && !title && !description) {
+            // Fallback: collect all text nodes
+            textNodes.push(child);
         }
-        if ((n as any).children) {
-            for (const child of (n as any).children) {
-                collectTexts(child);
-                if (textNodes.length >= 2) return; // Stop if we found 2 texts
+    }
+
+    // If no explicit names found, use fallback logic
+    if (!title && !description) {
+        function collectTexts(n: SerializedNode) {
+            if (n.type === 'TEXT') {
+                textNodes.push(n);
+                return;
+            }
+            if ((n as any).children) {
+                for (const child of (n as any).children) {
+                    collectTexts(child);
+                    if (textNodes.length >= 2) break;
+                }
             }
         }
+
+        for (const child of children) {
+            collectTexts(child);
+            if (textNodes.length >= 2) break;
+        }
+
+        if (textNodes.length > 0) {
+            title = (textNodes[0] as any).characters || textNodes[0].name;
+            console.log('[EXTRACT BOX] ✅ Fallback title:', title);
+        }
+        if (textNodes.length > 1) {
+            description = (textNodes[1] as any).characters || textNodes[1].name;
+            console.log('[EXTRACT BOX] ✅ Fallback description:', description.substring(0, 50) + '...');
+        }
     }
 
-    // Collect texts from children (in order)
-    for (const child of children) {
-        collectTexts(child);
-        if (textNodes.length >= 2) break;
-    }
-
-    if (textNodes.length > 0) {
-        title = (textNodes[0] as any).characters || textNodes[0].name;
-    }
-    if (textNodes.length > 1) {
-        description = (textNodes[1] as any).characters || textNodes[1].name;
-    }
-
+    console.log('[EXTRACT BOX] Final result - imageId:', imageId, 'title:', title, 'description:', description ? description.substring(0, 30) + '...' : 'empty');
     return { imageId, title, description };
 }

@@ -65,6 +65,18 @@ export class ConversionPipeline {
         this.hydrateStyles(schema, preprocessed.flatNodes);
         await this.resolveImages(schema, normalizedWP);
 
+        // Sync nav-menus to WordPress via figtoel-remote-menus plugin
+        await this.syncNavMenus(schema, preprocessed.serializedRoot, normalizedWP);
+
+        // Debug: Show schema structure before elementor compilation
+        console.log('[PIPELINE] Schema root container:', JSON.stringify({
+            id: schema.containers[0]?.id,
+            widgets: schema.containers[0]?.widgets?.length || 0,
+            widgetTypes: schema.containers[0]?.widgets?.map(w => w.type) || [],
+            children: schema.containers[0]?.children?.length || 0,
+            childrenIds: schema.containers[0]?.children?.map(c => c.id) || []
+        }, null, 2));
+
         const elementorJson = this.compiler.compile(schema);
         if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
         validateElementorJSON(elementorJson);
@@ -259,7 +271,7 @@ ${JSON.stringify(baseSchema, null, 2)}
                 if (Array.isArray(ai.widgets)) { // Allow empty array to override
                     // SAFEGUARD: If base container has children with explicit 'w:' prefix OR are detected widgets,
                     // DO NOT allow AI to replace them with a single widget (like image-box) unless it's a wrapper.
-                    const hasExplicitChildren = base.children?.some(c => 
+                    const hasExplicitChildren = base.children?.some(c =>
                         (c.styles?.sourceName && (c.styles.sourceName.startsWith('w:') || c.styles.sourceName.startsWith('c:'))) ||
                         (c.widgets && c.widgets.length > 0)
                     );
@@ -288,14 +300,14 @@ ${JSON.stringify(baseSchema, null, 2)}
                     // SAFEGUARD: If base is identified as a specific widget (e.g. button), DO NOT allow AI to turn it into a container with children.
                     // This forces the use of the detected widget (e.g. w:button) instead of breaking it down.
                     const isBaseWidget = base.widgets?.some(w => ['button', 'video', 'image', 'icon'].includes(w.type));
-                    
+
                     if (isBaseWidget && ai.children.length > 0) {
                         console.warn(`[Merge] Ignoring AI children for widget-container ${base.id} (${base.widgets?.[0]?.type}). Keeping as widget.`);
                         // Do not process ai.children. The function will continue and likely use base.children or just the widget.
                         // If we have merged.widgets (from AI or Base), that's good.
                         // If AI didn't return widgets but returned children, we might need to fallback to base widgets.
                         if (!merged.widgets && base.widgets) {
-                             merged.widgets = base.widgets;
+                            merged.widgets = base.widgets;
                         }
                     } else {
                         merged.children = ai.children.map(child => mergeContainer(child));
@@ -827,6 +839,12 @@ ${JSON.stringify(baseSchema, null, 2)}
                 collectIds(c, existingIds);
 
                 for (const child of node.children) {
+                    // SKIP w:inner-container - these are intentionally flattened by unwrapBoxedInner
+                    const childNameLower = (child.name || '').toLowerCase();
+                    if (childNameLower === 'w:inner-container' || childNameLower === 'c:inner-container') {
+                        continue; // Do NOT rescue inner-containers, they were intentionally removed
+                    }
+
                     if (!existingIds.has(child.id) && child.visible) {
                         // Log rescue (optional, good for debugging)
                         // console.log(`[Rescue] Rescuing missing node: ${child.name} (${child.type})`);
@@ -946,6 +964,172 @@ ${JSON.stringify(baseSchema, null, 2)}
         }
 
         return order.map(id => map.get(id)!);
+    }
+
+    /**
+     * Sync nav-menus to WordPress via figtoel-remote-menus plugin
+     */
+    private async syncNavMenus(schema: PipelineSchema, root: SerializedNode, wpConfig: WPConfig): Promise<void> {
+        console.log('[NAV MENU SYNC] ========== START ==========');
+        console.log('[NAV MENU SYNC] WPConfig:', { url: wpConfig.url, user: (wpConfig as any).user, hasPassword: !!((wpConfig as any).password || (wpConfig as any).token) });
+
+        const syncEnabled = !!(wpConfig && wpConfig.url && (wpConfig as any).user && ((wpConfig as any).password || (wpConfig as any).token));
+        if (!syncEnabled) {
+            console.log('[NAV MENU SYNC] ❌ Skipped: WordPress config not provided.');
+            return;
+        }
+
+        // Collect all nav-menu widgets from schema
+        const navMenus: Array<{ widget: PipelineWidget; container: PipelineContainer }> = [];
+
+        const collect = (container: PipelineContainer) => {
+            if (container.widgets) {
+                for (const widget of container.widgets) {
+                    if (widget.type === 'nav-menu') {
+                        navMenus.push({ widget, container });
+                    }
+                }
+            }
+            if (container.children) {
+                for (const child of container.children) {
+                    collect(child);
+                }
+            }
+        };
+
+        schema.containers.forEach(c => collect(c));
+
+        console.log(`[NAV MENU SYNC] Collected ${navMenus.length} nav-menu widget(s):`, navMenus.map(m => ({ widgetType: m.widget.type, content: m.widget.content })));
+
+        if (navMenus.length === 0) {
+            console.log('[NAV MENU SYNC] No nav-menu widgets found.');
+            return;
+        }
+
+        console.log(`[NAV MENU SYNC] Found ${navMenus.length} nav-menu(s). Syncing to WordPress...`);
+
+        // For each nav-menu, extract items and sync
+        for (const { widget, container } of navMenus) {
+            try {
+                // Find the original Figma node by sourceId
+                const sourceId = widget.styles?.sourceId || container.id;
+                const figmaNode = figma.getNodeById(sourceId);
+
+                if (!figmaNode || !('children' in figmaNode)) {
+                    console.warn(`[NAV MENU SYNC] Cannot find Figma node for nav-menu: ${sourceId}`);
+                    continue;
+                }
+
+                // Extract menu items from children
+                const items = this.extractMenuItems(figmaNode as FrameNode);
+
+                // Menu name from widget content or Figma node name
+                const menuName = widget.content || figmaNode.name || 'Menu Principal';
+
+                // POST to figtoel-remote-menus API
+                const payload = {
+                    menu_name: menuName,
+                    menu_location: 'primary', // Default location
+                    replace_existing: true,
+                    items
+                };
+
+                const url = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
+
+                // Pure JavaScript btoa polyfill (Figma doesn't have Buffer or btoa)
+                const btoaPolyfill = (str: string): string => {
+                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+                    let output = '';
+                    let i = 0;
+
+                    while (i < str.length) {
+                        const a = str.charCodeAt(i++);
+                        const b = i < str.length ? str.charCodeAt(i++) : 0;
+                        const c = i < str.length ? str.charCodeAt(i++) : 0;
+
+                        const bitmap = (a << 16) | (b << 8) | c;
+
+                        output += chars.charAt((bitmap >> 18) & 63);
+                        output += chars.charAt((bitmap >> 12) & 63);
+                        output += chars.charAt(b ? (bitmap >> 6) & 63 : 64);
+                        output += chars.charAt(c ? bitmap & 63 : 64);
+                    }
+
+                    return output;
+                };
+
+                const auth = 'Basic ' + btoaPolyfill(`${(wpConfig as any).user}:${(wpConfig as any).password || (wpConfig as any).token}`);
+
+                console.log(`[NAV MENU SYNC] Posting to ${url}...`, payload);
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': auth
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    console.log(`[NAV MENU SYNC] ✅ Menu "${menuName}" synced successfully. Items created: ${result.items_created}`);
+                    figma.ui.postMessage({ type: 'log', level: 'success', message: `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.` });
+                } else {
+                    console.error(`[NAV MENU SYNC] ❌ Failed to sync menu "${menuName}":`, result);
+                    figma.ui.postMessage({ type: 'log', level: 'error', message: `Erro ao criar menu "${menuName}": ${result.error || 'Desconhecido'}` });
+                }
+
+            } catch (error) {
+                console.error(`[NAV MENU SYNC] Exception:`, error);
+                figma.ui.postMessage({ type: 'log', level: 'error', message: `Erro ao sincronizar menu: ${error}` });
+            }
+        }
+    }
+
+    /**
+     * Extract menu items from a nav-menu Figma node
+     */
+    private extractMenuItems(navMenuNode: FrameNode): Array<{ title: string; url: string; children?: any[] }> {
+        const items: Array<{ title: string; url: string; children?: any[] }> = [];
+
+        if (!navMenuNode.children) return items;
+
+        console.log(`[NAV MENU SYNC] Nav menu has ${navMenuNode.children.length} children`);
+
+        for (const child of navMenuNode.children) {
+            console.log(`[NAV MENU SYNC] Processing child: ${child.name} Type: ${child.type}`);
+
+            // Extract title from TEXT nodes directly
+            if (child.type === 'TEXT') {
+                const title = (child as TextNode).characters;
+                const url = '#'; // Default URL
+                items.push({ title, url });
+                console.log(`[NAV MENU SYNC] ✅ Added TEXT menu item: ${title}`);
+                continue;
+            }
+
+            // Extract title from FRAME or GROUP children
+            if (child.type === 'FRAME' || child.type === 'GROUP') {
+                let title = child.name;
+
+                // Look for TEXT child
+                if ('children' in child) {
+                    const textChild = (child as FrameNode).children.find(c => c.type === 'TEXT');
+                    if (textChild) {
+                        title = (textChild as TextNode).characters;
+                    }
+                }
+
+                const url = '#'; // Default URL
+                items.push({ title, url });
+                console.log(`[NAV MENU SYNC] ✅ Added ${child.type} menu item: ${title}`);
+            }
+        }
+
+        console.log(`[NAV MENU SYNC] Extracted ${items.length} menu items from ${navMenuNode.name}`);
+        return items;
     }
 
 }

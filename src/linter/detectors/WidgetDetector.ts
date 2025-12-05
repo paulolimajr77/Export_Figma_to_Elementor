@@ -125,7 +125,7 @@ export class WidgetDetector {
         this.addRule('w:post-title', 'pro', this.matchGenericText.bind(this));
         this.addRule('w:post-excerpt', 'pro', this.matchGenericText.bind(this));
         this.addRule('w:post-content', 'pro', this.matchGenericText.bind(this));
-        this.addRule('w:author-box', 'pro', this.matchGenericContainer.bind(this));
+        // this.addRule('w:author-box', 'pro', this.matchGenericContainer.bind(this)); // DISABLED: too generic, causing false positives
         this.addRule('w:share-buttons', 'pro', this.matchSocialIcons.bind(this));
         this.addRule('w:slideshow', 'pro', this.matchPortfolio.bind(this));
         this.addRule('w:gallery-pro', 'pro', this.matchPortfolio.bind(this));
@@ -136,11 +136,11 @@ export class WidgetDetector {
         this.addRule('woo:product-price', 'woo', this.matchWooProductPrice.bind(this));
         this.addRule('woo:product-add-to-cart', 'woo', this.matchWooAddToCart.bind(this));
         this.addRule('woo:product-rating', 'woo', this.matchWooProductRating.bind(this));
-        this.addRule('woo:cart', 'woo', this.matchGenericContainer.bind(this));
+        // this.addRule('woo:cart', 'woo', this.matchGenericContainer.bind(this)); // DISABLED: too generic
         this.addRule('woo:checkout', 'woo', this.matchForm.bind(this));
 
         // === LOOP BUILDER ===
-        this.addRule('loop:item', 'loop', this.matchGenericContainer.bind(this));
+        // this.addRule('loop:item', 'loop', this.matchGenericContainer.bind(this)); // DISABLED: too generic
         this.addRule('loop:image', 'loop', this.matchImage.bind(this));
         this.addRule('loop:title', 'loop', this.matchHeading.bind(this));
         this.addRule('loop:meta', 'loop', this.matchGenericText.bind(this));
@@ -150,16 +150,16 @@ export class WidgetDetector {
         this.addRule('loop:add-to-cart', 'loop', this.matchButton.bind(this));
         this.addRule('loop:read-more', 'loop', this.matchButton.bind(this));
         this.addRule('loop:featured-image', 'loop', this.matchImage.bind(this));
-        this.addRule('loop:pagination', 'loop', this.matchGenericContainer.bind(this));
+        // this.addRule('loop:pagination', 'loop', this.matchGenericContainer.bind(this)); // DISABLED: too generic
 
         // === WORDPRESS ===
         this.addRule('w:wp-search', 'wordpress', this.matchSearchForm.bind(this));
-        this.addRule('w:wp-recent-posts', 'wordpress', this.matchGenericContainer.bind(this));
-        this.addRule('w:wp-archives', 'wordpress', this.matchGenericContainer.bind(this));
-        this.addRule('w:wp-categories', 'wordpress', this.matchGenericContainer.bind(this));
-        this.addRule('w:wp-calendar', 'wordpress', this.matchGenericContainer.bind(this));
-        this.addRule('w:wp-tag-cloud', 'wordpress', this.matchGenericContainer.bind(this));
-        this.addRule('w:wp-recent-comments', 'wordpress', this.matchGenericContainer.bind(this));
+        // this.addRule('w:wp-recent-posts', 'wordpress', this.matchGenericContainer.bind(this)); // DISABLED: too generic
+        // this.addRule('w:wp-archives', 'wordpress', this.matchGenericContainer.bind(this)); // DISABLED: too generic
+        // this.addRule('w:wp-categories', 'wordpress', this.matchGenericContainer.bind(this)); // DISABLED: too generic
+        // this.addRule('w:wp-calendar', 'wordpress', this.matchGenericContainer.bind(this)); // DISABLED: too generic
+        // this.addRule('w:wp-tag-cloud', 'wordpress', this.matchGenericContainer.bind(this)); // DISABLED: too generic
+        // this.addRule('w:wp-recent-comments', 'wordpress', this.matchGenericContainer.bind(this)); // DISABLED: too generic
         this.addRule('w:wp-custom-menu', 'wordpress', this.matchNavMenu.bind(this));
 
         // === BÁSICOS ADICIONAIS (Fase 1) ===
@@ -191,18 +191,6 @@ export class WidgetDetector {
         this.addRule('woo:product-excerpt', 'woo', this.matchGenericText.bind(this));
         this.addRule('woo:product-stock', 'woo', this.matchWooProductStock.bind(this));
         this.addRule('woo:product-meta', 'woo', this.matchWooProductMeta.bind(this));
-        this.addRule('woo:product-additional-information', 'woo', this.matchGenericContainer.bind(this));
-        this.addRule('woo:product-short-description', 'woo', this.matchGenericText.bind(this));
-        this.addRule('woo:product-related', 'woo', this.matchWooProducts.bind(this));
-        this.addRule('woo:product-upsells', 'woo', this.matchWooProducts.bind(this));
-        this.addRule('woo:product-tabs', 'woo', this.matchWooProductTabs.bind(this));
-        this.addRule('woo:product-gallery', 'woo', this.matchGallery.bind(this));
-        this.addRule('woo:product-loop-item', 'woo', this.matchGenericContainer.bind(this));
-        this.addRule('woo:loop-product-rating', 'woo', this.matchStarRating.bind(this));
-        this.addRule('woo:loop-product-meta', 'woo', this.matchGenericText.bind(this));
-        this.addRule('woo:my-account', 'woo', this.matchForm.bind(this));
-        this.addRule('woo:purchase-summary', 'woo', this.matchGenericContainer.bind(this));
-        this.addRule('woo:order-tracking', 'woo', this.matchForm.bind(this));
 
         // === PRO AVANÇADO (Fase 3) ===
         this.addRule('w:subscription', 'pro', this.matchSubscription.bind(this));
@@ -224,7 +212,7 @@ export class WidgetDetector {
         this.addRule('w:facebook-comments', 'pro', this.matchFacebookComments.bind(this));
         this.addRule('w:facebook-embed', 'pro', this.matchFacebookEmbed.bind(this));
         this.addRule('w:facebook-page', 'pro', this.matchFacebookPage.bind(this));
-        this.addRule('w:loop-builder', 'pro', this.matchGenericContainer.bind(this));
+        this.addRule('w:loop-builder', 'pro', this.matchLoopBuilder.bind(this));
         this.addRule('w:loop-grid-advanced', 'pro', this.matchLoopGrid.bind(this));
         this.addRule('w:loop-carousel', 'pro', this.matchImageCarousel.bind(this));
         this.addRule('w:post-info', 'pro', this.matchPostInfo.bind(this));
@@ -237,8 +225,8 @@ export class WidgetDetector {
         this.addRule('w:site-logo', 'pro', this.matchImage.bind(this));
         this.addRule('w:site-title', 'pro', this.matchHeading.bind(this));
         this.addRule('w:site-tagline', 'pro', this.matchGenericText.bind(this));
-        this.addRule('w:search-results', 'pro', this.matchGenericContainer.bind(this));
-        this.addRule('w:global-widget', 'pro', this.matchGenericContainer.bind(this));
+        this.addRule('w:search-results', 'pro', this.matchSearchResults.bind(this));
+        this.addRule('w:global-widget', 'pro', this.matchGlobalWidget.bind(this));
         this.addRule('w:video-playlist', 'pro', this.matchVideoPlaylist.bind(this));
         this.addRule('w:video-gallery', 'pro', this.matchVideoGallery.bind(this));
         this.addRule('w:nested-tabs', 'pro', this.matchNestedTabs.bind(this));
@@ -288,6 +276,119 @@ export class WidgetDetector {
         }
 
         return reasons.join('; ');
+    }
+
+    /**
+     * Helper: Analisa contexto visual do node
+     */
+    private analyzeVisualContext(node: SceneNode): {
+        aspectRatio: number;
+        hasBackground: boolean;
+        hasBorder: boolean;
+        hasIcon: boolean;
+        hasImage: boolean;
+        textCount: number;
+        avgTextLength: number;
+    } {
+        const width = 'width' in node ? node.width : 0;
+        const height = 'height' in node ? node.height : 0;
+        const aspectRatio = height > 0 ? width / height : 0;
+
+        const hasBackground = 'fills' in node && Array.isArray(node.fills) && node.fills.length > 0 && node.fills.some(f => f.visible !== false);
+        const hasBorder = 'strokes' in node && Array.isArray(node.strokes) && node.strokes.length > 0 && node.strokes.some(s => s.visible !== false);
+
+        let hasIcon = false;
+        let hasImage = false;
+        let textCount = 0;
+        let totalTextLength = 0;
+
+        if ('children' in node && node.children) {
+            for (const child of node.children) {
+                if (child.type === 'VECTOR' || child.type === 'STAR' || child.type === 'ELLIPSE' || child.type === 'POLYGON' || child.type === 'BOOLEAN_OPERATION') {
+                    hasIcon = true;
+                }
+                if (child.name.toLowerCase().includes('icon')) {
+                    hasIcon = true;
+                }
+
+
+                if ('fills' in child && Array.isArray(child.fills)) {
+                    if (child.fills.some(f => f.type === 'IMAGE')) {
+                        hasImage = true;
+                    }
+                }
+
+                if (child.type === 'TEXT' && 'characters' in child) {
+                    textCount++;
+                    totalTextLength += (child.characters?.length || 0);
+                }
+            }
+        }
+
+        return {
+            aspectRatio,
+            hasBackground,
+            hasBorder,
+            hasIcon,
+            hasImage,
+            textCount,
+            avgTextLength: textCount > 0 ? totalTextLength / textCount : 0
+        };
+    }
+
+    /**
+     * Helper: Analisa conteúdo de texto
+     */
+    private analyzeTextContent(node: SceneNode): {
+        hasQuote: boolean;
+        hasAuthor: boolean;
+        isLongText: boolean;
+        hasTitle: boolean;
+        hasDescription: boolean;
+    } {
+        let hasQuote = false;
+        let hasAuthor = false;
+        let isLongText = false;
+        let hasTitle = false;
+        let hasDescription = false;
+
+        if ('children' in node && node.children) {
+            const texts = node.children.filter(child => child.type === 'TEXT') as TextNode[];
+
+            hasQuote = texts.some(t => t.characters.includes('"') || t.characters.includes('“') || t.characters.includes('”') || t.name.toLowerCase().includes('quote'));
+            hasAuthor = texts.some(t => t.name.toLowerCase().includes('author') || t.name.toLowerCase().includes('autor') || t.name.toLowerCase().includes('role') || t.name.toLowerCase().includes('cargo'));
+            isLongText = texts.some(t => t.characters.length > 100);
+
+            hasTitle = texts.some(t => (typeof t.fontSize === 'number' && t.fontSize > 16) || t.fontWeight === 700 || t.name.toLowerCase().includes('title') || t.name.toLowerCase().includes('heading'));
+            hasDescription = texts.some(t => t.characters.length > 40 || t.name.toLowerCase().includes('desc') || t.name.toLowerCase().includes('text'));
+        }
+
+        return { hasQuote, hasAuthor, isLongText, hasTitle, hasDescription };
+    }
+
+    /**
+     * Helper: Calcula confiança final
+     */
+    private calculateConfidence(
+        baseScore: number,
+        visualMatch: number,
+        contentMatch: number,
+        nameMatch: number
+    ): number {
+        const weights = {
+            visual: 0.4,
+            content: 0.3,
+            name: 0.2,
+            base: 0.1
+        };
+
+        return Math.min(
+            baseScore * weights.base +
+            visualMatch * weights.visual +
+            contentMatch * weights.content +
+            nameMatch * weights.name,
+            1.0
+        );
     }
 
     // ==================== MATCHERS - BÁSICOS ====================
@@ -342,27 +443,27 @@ export class WidgetDetector {
     }
 
     private matchButton(node: SceneNode): number {
-        let confidence = 0;
-
+        const visual = this.analyzeVisualContext(node);
         const name = node.name.toLowerCase();
-        if (name.includes('button') || name.includes('btn') || name.includes('cta')) {
-            confidence += 0.5;
-        }
 
-        // Frame com texto filho
-        if (node.type === 'FRAME' && 'children' in node) {
-            const hasText = node.children?.some(child => child.type === 'TEXT');
-            if (hasText) {
-                confidence += 0.3;
-            }
-        }
+        let nameMatch = 0;
+        if (name.includes('button') || name.includes('btn') || name.includes('botao')) nameMatch = 1.0;
 
-        // Possui border radius
-        if ('cornerRadius' in node && node.cornerRadius && (node.cornerRadius as number) > 0) {
-            confidence += 0.2;
-        }
+        let visualMatch = 0;
+        // Buttons usually have landscape aspect ratio
+        if (visual.aspectRatio > 1.5 && visual.aspectRatio < 6) visualMatch += 0.3;
+        // Buttons usually have background or border
+        if (visual.hasBackground || visual.hasBorder) visualMatch += 0.4;
+        // Buttons usually have short text
+        if (visual.textCount === 1 && visual.avgTextLength < 30) visualMatch += 0.3;
+        // Buttons can have icons
+        if (visual.hasIcon) visualMatch += 0.2;
 
-        return Math.min(confidence, 1.0);
+        // Content check
+        let contentMatch = 0;
+        if (visual.textCount >= 1 && visual.textCount <= 2) contentMatch = 1.0;
+
+        return this.calculateConfidence(0.4, Math.min(visualMatch, 1.0), contentMatch, nameMatch);
     }
 
     private matchImage(node: SceneNode): number {
@@ -464,51 +565,52 @@ export class WidgetDetector {
     }
 
     private matchImageBox(node: SceneNode): number {
-        let confidence = 0;
-
+        const visual = this.analyzeVisualContext(node);
+        const content = this.analyzeTextContent(node);
         const name = node.name.toLowerCase();
-        if (name.includes('image-box') || name.includes('image box')) {
-            confidence += 0.6;
-        }
 
-        // Frame com imagem + texto
-        if (node.type === 'FRAME' && 'children' in node && node.children) {
-            const hasImage = node.children.some(child =>
-                child.name.toLowerCase().includes('image') ||
-                ('fills' in child && Array.isArray(child.fills) && child.fills.some(f => f.type === 'IMAGE'))
-            );
-            const hasText = node.children.some(child => child.type === 'TEXT');
+        let nameMatch = 0;
+        if (name.includes('image-box') || name.includes('image box')) nameMatch = 1.0;
 
-            if (hasImage && hasText) {
-                confidence += 0.4;
-            }
-        }
+        let visualMatch = 0;
+        if (visual.hasImage) visualMatch += 0.6;
+        if (visual.textCount >= 1) visualMatch += 0.4;
 
-        return Math.min(confidence, 1.0);
+        let contentMatch = 0;
+        // Flexible combinations:
+        // 1. Image + Title + Description
+        // 2. Title + Description (sometimes image is background or separate)
+        // 3. Image + Title
+        // 4. Image + Description
+        if (content.hasTitle || content.hasDescription) contentMatch += 0.5;
+        if (content.hasTitle && content.hasDescription) contentMatch += 0.5;
+
+        // Penalize if too many elements (likely a complex section, not a widget)
+        if (visual.textCount > 4) contentMatch -= 0.5;
+
+        return this.calculateConfidence(0.3, Math.min(visualMatch, 1.0), Math.max(contentMatch, 0), nameMatch);
     }
 
     private matchIconBox(node: SceneNode): number {
-        let confidence = 0;
-
+        const visual = this.analyzeVisualContext(node);
+        const content = this.analyzeTextContent(node);
         const name = node.name.toLowerCase();
-        if (name.includes('icon-box') || name.includes('icon box')) {
-            confidence += 0.6;
-        }
 
-        // Frame com icon + texto
-        if (node.type === 'FRAME' && 'children' in node && node.children) {
-            const hasIcon = node.children.some(child =>
-                child.name.toLowerCase().includes('icon') ||
-                child.type === 'VECTOR'
-            );
-            const hasText = node.children.some(child => child.type === 'TEXT');
+        let nameMatch = 0;
+        if (name.includes('icon-box') || name.includes('icon box')) nameMatch = 1.0;
 
-            if (hasIcon && hasText) {
-                confidence += 0.4;
-            }
-        }
+        let visualMatch = 0;
+        if (visual.hasIcon) visualMatch += 0.6;
+        if (visual.textCount >= 1) visualMatch += 0.4;
 
-        return Math.min(confidence, 1.0);
+        let contentMatch = 0;
+        // Flexible combinations similar to ImageBox
+        if (content.hasTitle || content.hasDescription) contentMatch += 0.5;
+        if (content.hasTitle && content.hasDescription) contentMatch += 0.5;
+
+        if (visual.textCount > 4) contentMatch -= 0.5;
+
+        return this.calculateConfidence(0.3, Math.min(visualMatch, 1.0), Math.max(contentMatch, 0), nameMatch);
     }
 
     private matchStarRating(node: SceneNode): number {
@@ -728,22 +830,23 @@ export class WidgetDetector {
     }
 
     private matchTestimonial(node: SceneNode): number {
-        let confidence = 0;
-
+        const visual = this.analyzeVisualContext(node);
+        const content = this.analyzeTextContent(node);
         const name = node.name.toLowerCase();
-        if (name.includes('testimonial') || name.includes('review') || name.includes('depoimento')) {
-            confidence += 0.7;
-        }
 
-        // Frame com quote + author
-        if (node.type === 'FRAME' && 'children' in node && node.children) {
-            const hasText = node.children.filter(child => child.type === 'TEXT').length >= 2;
-            if (hasText) {
-                confidence += 0.3;
-            }
-        }
+        let nameMatch = 0;
+        if (name.includes('testimonial') || name.includes('review') || name.includes('depoimento')) nameMatch = 1.0;
 
-        return Math.min(confidence, 1.0);
+        let visualMatch = 0;
+        if (visual.hasImage) visualMatch += 0.3; // Avatar
+        if (visual.textCount >= 2) visualMatch += 0.3;
+
+        let contentMatch = 0;
+        if (content.hasQuote) contentMatch += 0.4;
+        if (content.hasAuthor) contentMatch += 0.3;
+        if (content.isLongText) contentMatch += 0.3;
+
+        return this.calculateConfidence(0.3, Math.min(visualMatch, 1.0), Math.min(contentMatch, 1.0), nameMatch);
     }
 
     private matchContainer(node: SceneNode): number {
@@ -1293,6 +1396,56 @@ export class WidgetDetector {
 
     // ==================== MATCHERS - WOOCOMMERCE SIMPLES ====================
 
+    private matchLoopBuilder(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        // Loop Builder geralmente é um container wrapper de um template
+        if (name.includes('loop') && (name.includes('builder') || name.includes('grid') || name.includes('carousel'))) {
+            confidence += 0.8;
+        }
+
+        // Deve ser um frame
+        if (node.type === 'FRAME') {
+            confidence += 0.1;
+        }
+
+        // Penaliza se for muito simples (ex: apenas um link de menu)
+        if (name.includes('link') || name.includes('item') || name.includes('menu')) {
+            confidence -= 0.5;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchSearchResults(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('search') && name.includes('result')) {
+            confidence += 0.9;
+        }
+
+        // Penaliza links comuns
+        if (name === 'link' || name.includes('menu item')) {
+            confidence -= 0.5;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchGlobalWidget(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        // Global widget só deve ser detectado se explicitamente nomeado
+        if (name.includes('global') && (name.includes('widget') || name.includes('template'))) {
+            confidence += 0.9;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
     private matchWooBreadcrumb(node: SceneNode): number {
         let confidence = 0;
         const name = node.name.toLowerCase();
@@ -1394,6 +1547,45 @@ export class WidgetDetector {
 
         if (name.includes('sku') || name.includes('category') || name.includes('tag')) {
             confidence += 0.3;
+        }
+
+        return Math.min(confidence, 1.0);
+    }
+
+    private matchWooProductAdditionalInformation(node: SceneNode): number {
+        let confidence = 0;
+        const name = node.name.toLowerCase();
+
+        if (name.includes('additional') && name.includes('information')) {
+            confidence += 0.8;
+        }
+
+        // Deve conter termos específicos de atributos de produto
+        if (node.type === 'FRAME' && 'children' in node && node.children) {
+            const hasAttributeTerms = node.children.some(child => {
+                if (child.type === 'TEXT') {
+                    const text = (child as TextNode).characters.toLowerCase();
+                    return text.includes('weight') || text.includes('dimensions') ||
+                        text.includes('peso') || text.includes('dimensões') ||
+                        text.includes('attributes') || text.includes('atributos');
+                }
+                // Recursivo para estruturas mais complexas (tabelas)
+                if ('children' in child) {
+                    return (child as any).children.some((grandChild: any) => {
+                        if (grandChild.type === 'TEXT') {
+                            const text = grandChild.characters.toLowerCase();
+                            return text.includes('weight') || text.includes('dimensions') ||
+                                text.includes('peso') || text.includes('dimensões');
+                        }
+                        return false;
+                    });
+                }
+                return false;
+            });
+
+            if (hasAttributeTerms) {
+                confidence += 0.4;
+            }
         }
 
         return Math.min(confidence, 1.0);
