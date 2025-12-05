@@ -491,6 +491,10 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                     ...analysis.textStyles
                 };
 
+                // Add node dimensions for image/icon widgets
+                if (typeof node.width === 'number') mergedStyles.width = node.width;
+                if (typeof node.height === 'number') mergedStyles.height = node.height;
+
                 // Add transparent background fallback for buttons
                 if (widgetType === 'button' && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
                     mergedStyles.fills = [{
@@ -556,6 +560,77 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 content: boxContent.title || node.name,
                 imageId: boxContent.imageId || findFirstImageId(node) || null,
                 styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
+            };
+        }
+        if (widgetType === 'icon-list') {
+            let listItems: any[] = [];
+
+            // Check for "Single Item Split" pattern: 1 Icon + 1 Text as direct children
+            const iconChildren = children.filter(c => isImageFill(c) || c.type === 'IMAGE' || c.type === 'VECTOR');
+            const textChildren = children.filter(c => c.type === 'TEXT');
+
+            if (children.length === 2 && iconChildren.length === 1 && textChildren.length === 1) {
+                console.log('[NOAI ICON-LIST] Detected Single Item Split pattern (1 Icon + 1 Text)');
+                const textNode = textChildren[0];
+                const iconNode = iconChildren[0];
+                const text = (textNode as any).characters || textNode.name;
+
+                listItems.push({
+                    type: 'list-item',
+                    content: text,
+                    imageId: iconNode.id,
+                    styles: { sourceName: text }
+                });
+            } else {
+                // Process children normally
+                listItems = children.map((child) => {
+                    // 1. Direct Text Node
+                    if (child.type === 'TEXT') {
+                        return {
+                            type: 'list-item',
+                            content: (child as any).characters || child.name,
+                            imageId: null,
+                            styles: { sourceName: child.name }
+                        };
+                    }
+
+                    // 2. Direct Icon/Image Node
+                    if (isImageFill(child) || child.type === 'IMAGE' || child.type === 'VECTOR') {
+                        return {
+                            type: 'list-item',
+                            content: child.name,
+                            imageId: child.id,
+                            styles: { sourceName: child.name }
+                        };
+                    }
+
+                    // 3. Container (Frame/Group) - Extract content
+                    const itemContent = extractBoxContent(child);
+                    let text = itemContent.title;
+
+                    // Fallback: try to find text inside if extractBoxContent failed
+                    if (!text) {
+                        const textNode = (child as any).children?.find((c: any) => c.type === 'TEXT');
+                        if (textNode) text = textNode.characters || textNode.name;
+                        else text = child.name;
+                    }
+
+                    return {
+                        type: 'list-item',
+                        content: text,
+                        imageId: itemContent.imageId || findFirstImageId(child),
+                        styles: { sourceName: text }
+                    };
+                });
+            }
+
+            console.log('[NOAI ICON-LIST] Extracted', listItems.length, 'items');
+            return {
+                type: 'icon-list',
+                content: null,
+                imageId: null,
+                styles: styles,
+                children: listItems as any
             };
         }
         if (widgetType === 'button') {
@@ -628,11 +703,19 @@ function detectWidget(node: SerializedNode): MaybeWidget {
         }
         if (widgetType === 'image') {
             // For explicit w:image widgets, use the node's ID as imageId
-            return { type: 'image', content: null, imageId: node.id, styles };
+            // Include width from node dimensions
+            const imageStyles = { ...styles };
+            if (typeof node.width === 'number') imageStyles.width = node.width;
+            if (typeof node.height === 'number') imageStyles.height = node.height;
+            console.log('[NOAI IMAGE] Creating image widget with dimensions:', { width: node.width, height: node.height });
+            return { type: 'image', content: null, imageId: node.id, styles: imageStyles };
         }
         if (widgetType === 'icon') {
             // For explicit w:icon widgets, use the node's ID as imageId
-            return { type: 'icon', content: null, imageId: node.id, styles };
+            const iconStyles = { ...styles };
+            if (typeof node.width === 'number') iconStyles.width = node.width;
+            if (typeof node.height === 'number') iconStyles.height = node.height;
+            return { type: 'icon', content: null, imageId: node.id, styles: iconStyles };
         }
         if (widgetType === 'text-editor') {
             // For explicit w:text widgets, extract actual text content and styles

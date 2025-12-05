@@ -349,12 +349,12 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
 
         console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
 
-        if (uploadEnabled && nodeId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'button')) {
+        if (uploadEnabled && nodeId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'button' || widget.type === 'list-item' || widget.type === 'icon-list')) {
             console.log(`[NO-AI UPLOAD] ✅ Widget ${widget.type} (${nodeId}) will be uploaded`);
             try {
                 const node = await figma.getNodeById(nodeId);
                 if (node) {
-                    let format = (widget.type === 'icon' || widget.type === 'icon-box') ? 'SVG' : 'WEBP';
+                    let format = (widget.type === 'icon' || widget.type === 'icon-box' || widget.type === 'list-item' || widget.type === 'icon-list') ? 'SVG' : 'WEBP';
 
                     // Smart Format Detection (Mirroring Pipeline logic)
                     const isVectorNode = (n: SceneNode) =>
@@ -392,7 +392,7 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                     }
 
                     // Force SVG for Icon nodes inside buttons or explicit icon widgets
-                    if (node.name === 'Icon' || widget.type === 'icon') {
+                    if (node.name === 'Icon' || widget.type === 'icon' || widget.type === 'list-item') {
                         format = 'SVG';
                     }
 
@@ -409,6 +409,15 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                             widget.styles.selected_icon = { value: result.url, library: 'svg' };
                             widget.imageId = result.id.toString(); // Update imageId with WordPress ID
                             console.log('[BUTTON UPLOAD] Icon uploaded:', result.url, 'ID:', result.id);
+                        } else if (widget.type === 'list-item') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.icon_url = result.url;
+                            widget.imageId = result.id.toString();
+                            console.log('[LIST-ITEM UPLOAD] Icon uploaded:', result.url, 'ID:', result.id);
+                        } else if (widget.type === 'icon-list') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.icon = { value: { id: result.id, url: result.url }, library: 'svg' };
+                            widget.imageId = result.id.toString();
                         } else {
                             widget.content = result.url;
                             widget.imageId = result.id.toString();

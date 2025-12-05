@@ -79,6 +79,16 @@ export class ElementorCompiler {
         settings.overflow = 'hidden'; // Fix: Prevent unwanted scrollbars
         if (!styles) return settings;
 
+        // DEBUG: Log incoming styles
+        console.log('[CONTAINER STYLES DEBUG]', {
+            gap: styles.gap,
+            paddingTop: styles.paddingTop,
+            paddingRight: styles.paddingRight,
+            paddingBottom: styles.paddingBottom,
+            paddingLeft: styles.paddingLeft,
+            sourceName: styles.sourceName
+        });
+
         const normalizeFlexValue = (value?: string): string | undefined => {
             if (!value) return undefined;
             if (value === 'start') return 'flex-start';
@@ -95,7 +105,8 @@ export class ElementorCompiler {
             settings.flex_align_items = settings.align_items;
         }
 
-        if (styles.gap !== undefined) {
+        // Only set gap if it's a valid number > 0 (ignore auto/undefined)
+        if (typeof styles.gap === 'number' && styles.gap > 0) {
             settings.flex_gap = {
                 unit: 'px',
                 column: String(styles.gap),
@@ -104,19 +115,21 @@ export class ElementorCompiler {
             };
         }
 
-        if (
-            typeof styles.paddingTop === 'number' ||
-            typeof styles.paddingRight === 'number' ||
-            typeof styles.paddingBottom === 'number' ||
-            typeof styles.paddingLeft === 'number'
-        ) {
+        // Only set padding if at least one value is non-zero
+        const pTop = typeof styles.paddingTop === 'number' ? styles.paddingTop : 0;
+        const pRight = typeof styles.paddingRight === 'number' ? styles.paddingRight : 0;
+        const pBottom = typeof styles.paddingBottom === 'number' ? styles.paddingBottom : 0;
+        const pLeft = typeof styles.paddingLeft === 'number' ? styles.paddingLeft : 0;
+
+        // Only set padding if at least one value is non-zero
+        if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
             settings.padding = {
                 unit: 'px',
-                top: styles.paddingTop || 0,
-                right: styles.paddingRight || 0,
-                bottom: styles.paddingBottom || 0,
-                left: styles.paddingLeft || 0,
-                isLinked: false
+                top: pTop,
+                right: pRight,
+                bottom: pBottom,
+                left: pLeft,
+                isLinked: pTop === pRight && pTop === pBottom && pTop === pLeft
             };
         }
 
@@ -233,7 +246,7 @@ export class ElementorCompiler {
         if (!icon) return { ...fallback };
 
         // Safety check: if icon is already a normalized SVG object, return it to prevent double nesting
-        if (icon.value && icon.library === 'svg' && typeof icon.value === 'object' && icon.value.url) {
+        if (icon.value && icon.library === 'svg' && typeof icon.value === 'object' && 'url' in icon.value) {
             return icon;
         }
 
@@ -266,7 +279,6 @@ export class ElementorCompiler {
             return {
                 _id: item._id || `icon_item_${idx + 1}`,
                 ...item,
-                icon: normalizedIcon,
                 selected_icon: normalizedIcon
             };
         });

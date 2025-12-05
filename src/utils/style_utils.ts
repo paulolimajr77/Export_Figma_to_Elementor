@@ -94,6 +94,14 @@ export function extractWidgetStyles(node: SerializedNode): Record<string, any> {
         styles.align = map[node.textAlignHorizontal] || 'left';
     }
 
+    // Dimensions (for images, icons, etc.)
+    if (typeof node.width === 'number') {
+        styles.width = node.width;
+    }
+    if (typeof node.height === 'number') {
+        styles.height = node.height;
+    }
+
     // Color & Gradients
     if (node.fills && Array.isArray(node.fills)) {
         // Check for gradient fills first
@@ -152,8 +160,21 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
         sourceName: node.name
     };
 
-    // Layout
-    if (typeof node.itemSpacing === 'number') styles.gap = node.itemSpacing;
+    // DEBUG: Log raw values from node
+    console.log('[EXTRACT STYLES]', node.name, {
+        itemSpacing: node.itemSpacing,
+        paddingTop: node.paddingTop,
+        paddingRight: node.paddingRight,
+        paddingBottom: node.paddingBottom,
+        paddingLeft: node.paddingLeft
+    });
+
+    // Layout - only set gap if itemSpacing is a reasonable value (not auto/placeholder)
+    // Figma uses high values or undefined for "auto" spacing
+    // Typical real gap values are 0-64px, so we use 100 as max
+    if (typeof node.itemSpacing === 'number' && node.itemSpacing >= 0 && node.itemSpacing < 100) {
+        styles.gap = node.itemSpacing;
+    }
 
     if (typeof (node as any).height === 'number') {
         styles.minHeight = (node as any).height;

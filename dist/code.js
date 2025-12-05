@@ -296,6 +296,12 @@
       const map = { LEFT: "left", CENTER: "center", RIGHT: "right", JUSTIFIED: "justify" };
       styles.align = map[node.textAlignHorizontal] || "left";
     }
+    if (typeof node.width === "number") {
+      styles.width = node.width;
+    }
+    if (typeof node.height === "number") {
+      styles.height = node.height;
+    }
     if (node.fills && Array.isArray(node.fills)) {
       const gradient = node.fills.find(
         (f) => f.type === "GRADIENT_RADIAL" || f.type === "GRADIENT_LINEAR"
@@ -340,7 +346,16 @@
       sourceId: node.id,
       sourceName: node.name
     };
-    if (typeof node.itemSpacing === "number") styles.gap = node.itemSpacing;
+    console.log("[EXTRACT STYLES]", node.name, {
+      itemSpacing: node.itemSpacing,
+      paddingTop: node.paddingTop,
+      paddingRight: node.paddingRight,
+      paddingBottom: node.paddingBottom,
+      paddingLeft: node.paddingLeft
+    });
+    if (typeof node.itemSpacing === "number" && node.itemSpacing >= 0 && node.itemSpacing < 100) {
+      styles.gap = node.itemSpacing;
+    }
     if (typeof node.height === "number") {
       styles.minHeight = node.height;
     }
@@ -751,16 +766,21 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("image", ["imagem", "foto", "figura"], ["img", "picture", "photo", "single image", "imagem \xFAnica"]),
       compile: (w, base) => {
+        var _a, _b, _c, _d;
         const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
-        return {
-          widgetType: "image",
-          settings: __spreadProps(__spreadValues({}, base), {
-            image: {
-              url: w.content || "",
-              id: isNaN(imgId) ? "" : imgId
-            }
-          })
-        };
+        const settings = __spreadProps(__spreadValues({}, base), {
+          image: {
+            url: w.content || "",
+            id: isNaN(imgId) ? "" : imgId
+          },
+          image_size: "full"
+          // Use full resolution
+        });
+        if (((_a = w.styles) == null ? void 0 : _a.width) && typeof w.styles.width === "number") {
+          settings.width = { unit: "px", size: Math.round(w.styles.width), sizes: [] };
+        }
+        console.log("[IMAGE WIDGET DEBUG]", { width: (_b = w.styles) == null ? void 0 : _b.width, height: (_c = w.styles) == null ? void 0 : _c.height, name: (_d = w.styles) == null ? void 0 : _d.sourceName });
+        return { widgetType: "image", settings };
       }
     },
     {
@@ -813,7 +833,48 @@ ${refText}` });
       widgetType: "icon-list",
       family: "media",
       aliases: generateAliases("icon-list", ["lista de \xEDcones", "lista", "t\xF3picos"], ["icon list", "list", "bullet points", "check list"]),
-      compile: (_w, base) => ({ widgetType: "icon-list", settings: __spreadValues({}, base) })
+      compile: (w, base) => {
+        var _a;
+        const settings = __spreadValues({
+          view: "traditional",
+          link_click: "full_width"
+        }, base);
+        const children = w.children || [];
+        console.log("[ICON-LIST] Processing with", children.length, "children");
+        if (children.length > 0) {
+          settings.icon_list = children.map((child, idx) => {
+            var _a2, _b;
+            const text = child.content || ((_a2 = child.styles) == null ? void 0 : _a2.sourceName) || `Item ${idx + 1}`;
+            const iconId = child.imageId;
+            console.log("[ICON-LIST] Item", idx, ":", { text, iconId });
+            const item = {
+              _id: Math.random().toString(36).substring(2, 9),
+              text,
+              selected_icon: iconId ? {
+                value: { url: ((_b = child.styles) == null ? void 0 : _b.icon_url) || "", id: iconId },
+                library: "svg"
+              } : { value: "fas fa-check", library: "fa-solid" },
+              link: { url: "", is_external: "", nofollow: "", custom_attributes: "" }
+            };
+            if (item.icon) delete item.icon;
+            console.log("[ICON-LIST] Generated Item:", JSON.stringify(item));
+            return item;
+          });
+        } else if ((_a = w.styles) == null ? void 0 : _a.icon_list) {
+          settings.icon_list = w.styles.icon_list;
+        } else {
+          settings.icon_list = [{
+            _id: "list_item_1",
+            text: w.content || "Item",
+            selected_icon: w.imageId ? {
+              value: { url: "", id: w.imageId },
+              library: "svg"
+            } : { value: "fas fa-check", library: "fa-solid" },
+            link: { url: "", is_external: "", nofollow: "", custom_attributes: "" }
+          }];
+        }
+        return { widgetType: "icon-list", settings };
+      }
     },
     {
       key: "video",
@@ -860,6 +921,81 @@ ${refText}` });
           suffix: base.suffix
         })
       })
+    },
+    {
+      key: "countdown",
+      widgetType: "countdown",
+      family: "pro",
+      aliases: generateAliases("countdown", ["contagem regressiva", "timer"], ["timer", "count down", "clock"]),
+      compile: (w, base) => {
+        const settings = __spreadValues({}, base);
+        const children = w.children || [];
+        const timeData = {};
+        const labels = {};
+        children.forEach((child) => {
+          const text = (child.content || "").toString().trim();
+          const lowerText = text.toLowerCase();
+          const numValue = parseInt(text, 10);
+          if (!isNaN(numValue) && text.match(/^\d+$/)) {
+            const childIndex = children.indexOf(child);
+            for (let i = childIndex + 1; i < children.length; i++) {
+              const nextChild = children[i];
+              const nextText = (nextChild.content || "").toString().trim().toLowerCase();
+              if (nextText === ":") continue;
+              if (nextText.includes("dia") || nextText.includes("day")) {
+                timeData.days = numValue;
+                labels.days = nextChild.content;
+              } else if (nextText.includes("hr") || nextText.includes("hour") || nextText.includes("hora")) {
+                timeData.hours = numValue;
+                labels.hours = nextChild.content;
+              } else if (nextText.includes("min") || nextText.includes("minute")) {
+                timeData.minutes = numValue;
+                labels.minutes = nextChild.content;
+              } else if (nextText.includes("seg") || nextText.includes("sec") || nextText.includes("second")) {
+                timeData.seconds = numValue;
+                labels.seconds = nextChild.content;
+              }
+              break;
+            }
+          }
+        });
+        console.log("[COUNTDOWN] Extracted time data:", timeData);
+        console.log("[COUNTDOWN] Extracted labels:", labels);
+        const now = /* @__PURE__ */ new Date();
+        const futureDate = new Date(now);
+        if (timeData.days) futureDate.setDate(futureDate.getDate() + timeData.days);
+        if (timeData.hours) futureDate.setHours(futureDate.getHours() + timeData.hours);
+        if (timeData.minutes) futureDate.setMinutes(futureDate.getMinutes() + timeData.minutes);
+        if (timeData.seconds) futureDate.setSeconds(futureDate.getSeconds() + timeData.seconds);
+        const pad = (n) => n < 10 ? "0" + n : String(n);
+        const year = futureDate.getFullYear();
+        const month = pad(futureDate.getMonth() + 1);
+        const day = pad(futureDate.getDate());
+        const hours = pad(futureDate.getHours());
+        const minutes = pad(futureDate.getMinutes());
+        const dueDate = `${year}-${month}-${day} ${hours}:${minutes}`;
+        settings.countdown_type = "due_date";
+        settings.due_date = dueDate;
+        settings.show_days = timeData.days !== void 0 ? "yes" : "";
+        settings.show_hours = timeData.hours !== void 0 ? "yes" : "";
+        settings.show_minutes = timeData.minutes !== void 0 ? "yes" : "";
+        settings.show_seconds = timeData.seconds !== void 0 ? "yes" : "";
+        settings.show_labels = "yes";
+        settings.custom_labels = "yes";
+        if (labels.days) settings.label_days = labels.days;
+        if (labels.hours) settings.label_hours = labels.hours;
+        if (labels.minutes) settings.label_minutes = labels.minutes;
+        if (labels.seconds) settings.label_seconds = labels.seconds;
+        if (base.background_color) {
+          settings.box_background_color = base.background_color;
+        }
+        if (base.border_radius) {
+          settings.box_border_radius = base.border_radius;
+        }
+        console.log("[COUNTDOWN] Generated due_date:", dueDate);
+        console.log("[COUNTDOWN] Final settings:", settings);
+        return { widgetType: "countdown", settings };
+      }
     },
     {
       key: "progress",
@@ -1239,7 +1375,49 @@ ${refText}` });
       widgetType: "nav-menu",
       family: "nav",
       aliases: generateAliases("nav-menu", ["menu", "navega\xE7\xE3o", "menu principal"], ["nav menu", "navigation", "navbar", "header menu", "menu topo"]),
-      compile: (w, base) => ({ widgetType: "nav-menu", settings: __spreadProps(__spreadValues({}, base), { layout: base.layout || "horizontal", menu: w.content || base.menu }) })
+      compile: (w, base) => {
+        var _a, _b, _c, _d, _e, _f;
+        const settings = __spreadProps(__spreadValues({}, base), {
+          layout: base.layout || "horizontal",
+          menu: w.content || base.menu || "",
+          // Full width stretch
+          full_width: "stretch",
+          stretch_element_to_full_width: "yes",
+          // Align menu items
+          align_items: "center"
+        });
+        if ((_a = w.styles) == null ? void 0 : _a.fontSize) {
+          settings.typography_typography = "custom";
+          settings.typography_font_size = { unit: "px", size: w.styles.fontSize };
+        }
+        if ((_c = (_b = w.styles) == null ? void 0 : _b.fontName) == null ? void 0 : _c.family) {
+          settings.typography_typography = "custom";
+          settings.typography_font_family = w.styles.fontName.family;
+        }
+        if ((_d = w.styles) == null ? void 0 : _d.fontWeight) {
+          settings.typography_font_weight = w.styles.fontWeight;
+        }
+        if ((_e = w.styles) == null ? void 0 : _e.letterSpacing) {
+          const lsValue = typeof w.styles.letterSpacing === "object" ? w.styles.letterSpacing.value : w.styles.letterSpacing;
+          settings.typography_letter_spacing = { unit: "px", size: lsValue };
+        }
+        if ((_f = w.styles) == null ? void 0 : _f.color) {
+          const c = w.styles.color;
+          if (typeof c === "object" && "r" in c) {
+            const r = Math.round(c.r * 255);
+            const g = Math.round(c.g * 255);
+            const b = Math.round(c.b * 255);
+            const a = c.a !== void 0 ? c.a : 1;
+            settings.text_color = `rgba(${r}, ${g}, ${b}, ${a})`;
+          } else if (typeof c === "string") {
+            settings.text_color = c;
+          }
+        }
+        if (settings.text_color) {
+          settings.text_color_hover = settings.text_color;
+        }
+        return { widgetType: "nav-menu", settings };
+      }
     },
     {
       key: "search-form",
@@ -1655,6 +1833,14 @@ ${refText}` });
       const settings = {};
       settings.overflow = "hidden";
       if (!styles) return settings;
+      console.log("[CONTAINER STYLES DEBUG]", {
+        gap: styles.gap,
+        paddingTop: styles.paddingTop,
+        paddingRight: styles.paddingRight,
+        paddingBottom: styles.paddingBottom,
+        paddingLeft: styles.paddingLeft,
+        sourceName: styles.sourceName
+      });
       const normalizeFlexValue = (value) => {
         if (!value) return void 0;
         if (value === "start") return "flex-start";
@@ -1669,7 +1855,7 @@ ${refText}` });
         settings.align_items = normalizeFlexValue(styles.align_items);
         settings.flex_align_items = settings.align_items;
       }
-      if (styles.gap !== void 0) {
+      if (typeof styles.gap === "number" && styles.gap > 0) {
         settings.flex_gap = {
           unit: "px",
           column: String(styles.gap),
@@ -1677,14 +1863,18 @@ ${refText}` });
           isLinked: true
         };
       }
-      if (typeof styles.paddingTop === "number" || typeof styles.paddingRight === "number" || typeof styles.paddingBottom === "number" || typeof styles.paddingLeft === "number") {
+      const pTop = typeof styles.paddingTop === "number" ? styles.paddingTop : 0;
+      const pRight = typeof styles.paddingRight === "number" ? styles.paddingRight : 0;
+      const pBottom = typeof styles.paddingBottom === "number" ? styles.paddingBottom : 0;
+      const pLeft = typeof styles.paddingLeft === "number" ? styles.paddingLeft : 0;
+      if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
         settings.padding = {
           unit: "px",
-          top: styles.paddingTop || 0,
-          right: styles.paddingRight || 0,
-          bottom: styles.paddingBottom || 0,
-          left: styles.paddingLeft || 0,
-          isLinked: false
+          top: pTop,
+          right: pRight,
+          bottom: pBottom,
+          left: pLeft,
+          isLinked: pTop === pRight && pTop === pBottom && pTop === pLeft
         };
       }
       if (styles.background) {
@@ -1807,7 +1997,7 @@ ${refText}` });
     normalizeSelectedIcon(icon, imageId, fallback = { value: "fas fa-star", library: "fa-solid" }) {
       var _a;
       if (!icon) return __spreadValues({}, fallback);
-      if (icon.value && icon.library === "svg" && typeof icon.value === "object" && icon.value.url) {
+      if (icon.value && icon.library === "svg" && typeof icon.value === "object" && "url" in icon.value) {
         return icon;
       }
       const rawValue = icon.value || icon.url || icon.icon || icon;
@@ -1836,7 +2026,6 @@ ${refText}` });
         return __spreadProps(__spreadValues({
           _id: item._id || `icon_item_${idx + 1}`
         }, item), {
-          icon: normalizedIcon,
           selected_icon: normalizedIcon
         });
       });
@@ -3221,6 +3410,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             return null;
           }
           const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), analysis.containerStyles), analysis.textStyles);
+          if (typeof node.width === "number") mergedStyles.width = node.width;
+          if (typeof node.height === "number") mergedStyles.height = node.height;
           if (widgetType === "button" && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
             mergedStyles.fills = [{
               type: "SOLID",
@@ -3270,6 +3461,64 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           content: boxContent.title || node.name,
           imageId: boxContent.imageId || findFirstImageId(node) || null,
           styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+        };
+      }
+      if (widgetType === "icon-list") {
+        let listItems = [];
+        const iconChildren = children.filter((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
+        const textChildren = children.filter((c) => c.type === "TEXT");
+        if (children.length === 2 && iconChildren.length === 1 && textChildren.length === 1) {
+          console.log("[NOAI ICON-LIST] Detected Single Item Split pattern (1 Icon + 1 Text)");
+          const textNode = textChildren[0];
+          const iconNode = iconChildren[0];
+          const text = textNode.characters || textNode.name;
+          listItems.push({
+            type: "list-item",
+            content: text,
+            imageId: iconNode.id,
+            styles: { sourceName: text }
+          });
+        } else {
+          listItems = children.map((child) => {
+            var _a2;
+            if (child.type === "TEXT") {
+              return {
+                type: "list-item",
+                content: child.characters || child.name,
+                imageId: null,
+                styles: { sourceName: child.name }
+              };
+            }
+            if (isImageFill(child) || child.type === "IMAGE" || child.type === "VECTOR") {
+              return {
+                type: "list-item",
+                content: child.name,
+                imageId: child.id,
+                styles: { sourceName: child.name }
+              };
+            }
+            const itemContent = extractBoxContent(child);
+            let text = itemContent.title;
+            if (!text) {
+              const textNode = (_a2 = child.children) == null ? void 0 : _a2.find((c) => c.type === "TEXT");
+              if (textNode) text = textNode.characters || textNode.name;
+              else text = child.name;
+            }
+            return {
+              type: "list-item",
+              content: text,
+              imageId: itemContent.imageId || findFirstImageId(child),
+              styles: { sourceName: text }
+            };
+          });
+        }
+        console.log("[NOAI ICON-LIST] Extracted", listItems.length, "items");
+        return {
+          type: "icon-list",
+          content: null,
+          imageId: null,
+          styles,
+          children: listItems
         };
       }
       if (widgetType === "button") {
@@ -3327,10 +3576,17 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         return { type: "video", content: "", imageId: null, styles };
       }
       if (widgetType === "image") {
-        return { type: "image", content: null, imageId: node.id, styles };
+        const imageStyles = __spreadValues({}, styles);
+        if (typeof node.width === "number") imageStyles.width = node.width;
+        if (typeof node.height === "number") imageStyles.height = node.height;
+        console.log("[NOAI IMAGE] Creating image widget with dimensions:", { width: node.width, height: node.height });
+        return { type: "image", content: null, imageId: node.id, styles: imageStyles };
       }
       if (widgetType === "icon") {
-        return { type: "icon", content: null, imageId: node.id, styles };
+        const iconStyles = __spreadValues({}, styles);
+        if (typeof node.width === "number") iconStyles.width = node.width;
+        if (typeof node.height === "number") iconStyles.height = node.height;
+        return { type: "icon", content: null, imageId: node.id, styles: iconStyles };
       }
       if (widgetType === "text-editor") {
         const extractedStyles = extractWidgetStyles(node);
@@ -4262,7 +4518,10 @@ ${JSON.stringify(baseSchema, null, 2)}
         const uploadNodeImage = (nodeId, preferSvg = false) => __async(this, null, function* () {
           if (!nodeId) return null;
           const node = figma.getNodeById(nodeId);
-          if (!node) return null;
+          if (!node) {
+            console.error(`[PIPELINE] \u274C Node not found for upload: ${nodeId}`);
+            return null;
+          }
           let format = preferSvg ? "SVG" : "WEBP";
           const hasImageChildren = (n) => {
             if ("fills" in n && Array.isArray(n.fills)) {
@@ -4284,13 +4543,15 @@ ${JSON.stringify(baseSchema, null, 2)}
           } else if (hasVectorChildren(node)) {
             format = "SVG";
           }
+          console.log(`[PIPELINE] \u{1F4E4} Uploading ${preferSvg ? "ICON" : "IMAGE"} for node ${node.name} (${node.id}) as ${format}`);
           return this.imageUploader.uploadToWordPress(node, format);
         });
         const processWidget = (widget) => __async(this, null, function* () {
           var _a, _b, _c, _d, _e, _f;
-          if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "icon-list")) {
+          console.log(`[PIPELINE] Processing widget: ${widget.type} (ID: ${widget.imageId || "none"})`);
+          if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item")) {
             try {
-              const result = yield uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box" || widget.type === "icon-list");
+              const result = yield uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item");
               if (result) {
                 if (widget.type === "image-box") {
                   if (!widget.styles) widget.styles = {};
@@ -4303,13 +4564,16 @@ ${JSON.stringify(baseSchema, null, 2)}
                   widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
                 } else if (((_a = widget.styles) == null ? void 0 : _a.icon) && widget.type === "icon-list") {
                   widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
+                } else if (widget.type === "list-item") {
+                  if (!widget.styles) widget.styles = {};
+                  widget.styles.icon_url = result.url;
                 } else {
                   widget.content = result.url;
                 }
                 widget.imageId = result.id.toString();
               }
             } catch (e) {
-              console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
+              console.error("Failed to upload image for widget:", widget.type, e);
             }
           }
           if (widget.type === "image-carousel" && ((_b = widget.styles) == null ? void 0 : _b.slides) && Array.isArray(widget.styles.slides)) {
@@ -7492,12 +7756,12 @@ ${detection.justification}
       const processWidget = (widget) => __async(null, null, function* () {
         const nodeId = widget.imageId || widget.id;
         console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
-        if (uploadEnabled && nodeId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button")) {
+        if (uploadEnabled && nodeId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button" || widget.type === "list-item" || widget.type === "icon-list")) {
           console.log(`[NO-AI UPLOAD] \u2705 Widget ${widget.type} (${nodeId}) will be uploaded`);
           try {
             const node = yield figma.getNodeById(nodeId);
             if (node) {
-              let format = widget.type === "icon" || widget.type === "icon-box" ? "SVG" : "WEBP";
+              let format = widget.type === "icon" || widget.type === "icon-box" || widget.type === "list-item" || widget.type === "icon-list" ? "SVG" : "WEBP";
               const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
               const hasVectorChildren = (n) => {
                 if (isVectorNode(n)) return true;
@@ -7526,7 +7790,7 @@ ${detection.justification}
               } else if (hasVectorChildren(node)) {
                 format = "SVG";
               }
-              if (node.name === "Icon" || widget.type === "icon") {
+              if (node.name === "Icon" || widget.type === "icon" || widget.type === "list-item") {
                 format = "SVG";
               }
               const result = yield noaiUploader.uploadToWordPress(node, format);
@@ -7542,6 +7806,15 @@ ${detection.justification}
                   widget.styles.selected_icon = { value: result.url, library: "svg" };
                   widget.imageId = result.id.toString();
                   console.log("[BUTTON UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
+                } else if (widget.type === "list-item") {
+                  if (!widget.styles) widget.styles = {};
+                  widget.styles.icon_url = result.url;
+                  widget.imageId = result.id.toString();
+                  console.log("[LIST-ITEM UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
+                } else if (widget.type === "icon-list") {
+                  if (!widget.styles) widget.styles = {};
+                  widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
+                  widget.imageId = result.id.toString();
                 } else {
                   widget.content = result.url;
                   widget.imageId = result.id.toString();

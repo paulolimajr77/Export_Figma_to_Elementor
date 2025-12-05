@@ -268,16 +268,23 @@ const registry: WidgetDefinition[] = [
         aliases: generateAliases('image', ['imagem', 'foto', 'figura'], ['img', 'picture', 'photo', 'single image', 'imagem única']),
         compile: (w, base) => {
             const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
-            return {
-                widgetType: 'image',
-                settings: {
-                    ...base,
-                    image: {
-                        url: w.content || '',
-                        id: isNaN(imgId) ? '' : imgId
-                    }
-                }
+            const settings: ElementorSettings = {
+                ...base,
+                image: {
+                    url: w.content || '',
+                    id: isNaN(imgId) ? '' : imgId
+                },
+                image_size: 'full' // Use full resolution
             };
+
+            // Set width from styles if available (just width, not custom dimension)
+            if (w.styles?.width && typeof w.styles.width === 'number') {
+                settings.width = { unit: 'px', size: Math.round(w.styles.width), sizes: [] };
+            }
+
+            console.log('[IMAGE WIDGET DEBUG]', { width: w.styles?.width, height: w.styles?.height, name: w.styles?.sourceName });
+
+            return { widgetType: 'image', settings };
         }
     },
     {
@@ -329,7 +336,59 @@ const registry: WidgetDefinition[] = [
         widgetType: 'icon-list',
         family: 'media',
         aliases: generateAliases('icon-list', ['lista de ícones', 'lista', 'tópicos'], ['icon list', 'list', 'bullet points', 'check list']),
-        compile: (_w, base) => ({ widgetType: 'icon-list', settings: { ...base } })
+        compile: (w, base) => {
+            const settings: ElementorSettings = {
+                view: 'traditional',
+                link_click: 'full_width',
+                ...base
+            };
+
+            // Extract items from children if available
+            const children = w.children || [];
+            console.log('[ICON-LIST] Processing with', children.length, 'children');
+
+            if (children.length > 0) {
+                settings.icon_list = children.map((child: any, idx: number) => {
+                    // Each child should have text and optionally an icon
+                    const text = child.content || child.styles?.sourceName || `Item ${idx + 1}`;
+                    const iconId = child.imageId;
+
+                    console.log('[ICON-LIST] Item', idx, ':', { text, iconId });
+
+                    const item: any = {
+                        _id: Math.random().toString(36).substring(2, 9),
+                        text: text,
+                        selected_icon: iconId ? {
+                            value: { url: child.styles?.icon_url || '', id: iconId },
+                            library: 'svg'
+                        } : { value: 'fas fa-check', library: 'fa-solid' },
+                        link: { url: '', is_external: '', nofollow: '', custom_attributes: '' }
+                    };
+
+                    // EXPLICITLY DELETE ANY LEGACY ICON PROP IF IT EXISTS (Paranoia Check)
+                    if (item.icon) delete item.icon;
+
+                    console.log('[ICON-LIST] Generated Item:', JSON.stringify(item));
+                    return item;
+                });
+            } else if (w.styles?.icon_list) {
+                // Already has icon_list from AI or other source
+                settings.icon_list = w.styles.icon_list;
+            } else {
+                // Fallback: create single item from widget content
+                settings.icon_list = [{
+                    _id: 'list_item_1',
+                    text: w.content || 'Item',
+                    selected_icon: w.imageId ? {
+                        value: { url: '', id: w.imageId },
+                        library: 'svg'
+                    } : { value: 'fas fa-check', library: 'fa-solid' },
+                    link: { url: '', is_external: '', nofollow: '', custom_attributes: '' }
+                }];
+            }
+
+            return { widgetType: 'icon-list', settings };
+        }
     },
     {
         key: 'video',
@@ -374,6 +433,107 @@ const registry: WidgetDefinition[] = [
                 suffix: base.suffix
             }
         })
+    },
+    {
+        key: 'countdown',
+        widgetType: 'countdown',
+        family: 'pro',
+        aliases: generateAliases('countdown', ['contagem regressiva', 'timer'], ['timer', 'count down', 'clock']),
+        compile: (w, base) => {
+            const settings: ElementorSettings = { ...base };
+
+            // Extract time values and labels from children
+            const children = w.children || [];
+            const timeData: { days?: number; hours?: number; minutes?: number; seconds?: number } = {};
+            const labels: { days?: string; hours?: string; minutes?: string; seconds?: string } = {};
+
+            // Parse children to find numeric values and labels
+            children.forEach((child: any) => {
+                const text = (child.content || '').toString().trim();
+                const lowerText = text.toLowerCase();
+
+                // Check if it's a numeric value
+                const numValue = parseInt(text, 10);
+                if (!isNaN(numValue) && text.match(/^\d+$/)) {
+                    // Look ahead to find the label (next non-separator child)
+                    const childIndex = children.indexOf(child);
+                    for (let i = childIndex + 1; i < children.length; i++) {
+                        const nextChild = children[i];
+                        const nextText = (nextChild.content || '').toString().trim().toLowerCase();
+
+                        if (nextText === ':') continue; // Skip separators
+
+                        // Match label to time unit
+                        if (nextText.includes('dia') || nextText.includes('day')) {
+                            timeData.days = numValue;
+                            labels.days = nextChild.content;
+                        } else if (nextText.includes('hr') || nextText.includes('hour') || nextText.includes('hora')) {
+                            timeData.hours = numValue;
+                            labels.hours = nextChild.content;
+                        } else if (nextText.includes('min') || nextText.includes('minute')) {
+                            timeData.minutes = numValue;
+                            labels.minutes = nextChild.content;
+                        } else if (nextText.includes('seg') || nextText.includes('sec') || nextText.includes('second')) {
+                            timeData.seconds = numValue;
+                            labels.seconds = nextChild.content;
+                        }
+                        break;
+                    }
+                }
+            });
+
+            console.log('[COUNTDOWN] Extracted time data:', timeData);
+            console.log('[COUNTDOWN] Extracted labels:', labels);
+
+            // Calculate due_date (current time + extracted time)
+            const now = new Date();
+            const futureDate = new Date(now);
+
+            if (timeData.days) futureDate.setDate(futureDate.getDate() + timeData.days);
+            if (timeData.hours) futureDate.setHours(futureDate.getHours() + timeData.hours);
+            if (timeData.minutes) futureDate.setMinutes(futureDate.getMinutes() + timeData.minutes);
+            if (timeData.seconds) futureDate.setSeconds(futureDate.getSeconds() + timeData.seconds);
+
+            // Format as YYYY-MM-DD HH:mm (Elementor format)
+            const pad = (n: number) => (n < 10 ? '0' + n : String(n));
+            const year = futureDate.getFullYear();
+            const month = pad(futureDate.getMonth() + 1);
+            const day = pad(futureDate.getDate());
+            const hours = pad(futureDate.getHours());
+            const minutes = pad(futureDate.getMinutes());
+            const dueDate = `${year}-${month}-${day} ${hours}:${minutes}`;
+
+            // Build settings
+            settings.countdown_type = 'due_date';
+            settings.due_date = dueDate;
+
+            // Show/hide units based on what was found
+            settings.show_days = timeData.days !== undefined ? 'yes' : '';
+            settings.show_hours = timeData.hours !== undefined ? 'yes' : '';
+            settings.show_minutes = timeData.minutes !== undefined ? 'yes' : '';
+            settings.show_seconds = timeData.seconds !== undefined ? 'yes' : '';
+
+            // Custom labels
+            settings.show_labels = 'yes';
+            settings.custom_labels = 'yes';
+            if (labels.days) settings.label_days = labels.days;
+            if (labels.hours) settings.label_hours = labels.hours;
+            if (labels.minutes) settings.label_minutes = labels.minutes;
+            if (labels.seconds) settings.label_seconds = labels.seconds;
+
+            // Default styling from Figma (if available)
+            if (base.background_color) {
+                settings.box_background_color = base.background_color;
+            }
+            if (base.border_radius) {
+                settings.box_border_radius = base.border_radius;
+            }
+
+            console.log('[COUNTDOWN] Generated due_date:', dueDate);
+            console.log('[COUNTDOWN] Final settings:', settings);
+
+            return { widgetType: 'countdown', settings };
+        }
     },
     {
         key: 'progress',
@@ -788,7 +948,56 @@ const registry: WidgetDefinition[] = [
         widgetType: 'nav-menu',
         family: 'nav',
         aliases: generateAliases('nav-menu', ['menu', 'navegação', 'menu principal'], ['nav menu', 'navigation', 'navbar', 'header menu', 'menu topo']),
-        compile: (w, base) => ({ widgetType: 'nav-menu', settings: { ...base, layout: base.layout || 'horizontal', menu: w.content || base.menu } })
+        compile: (w, base) => {
+            const settings: ElementorSettings = {
+                ...base,
+                layout: base.layout || 'horizontal',
+                menu: w.content || base.menu || '',
+                // Full width stretch
+                full_width: 'stretch',
+                stretch_element_to_full_width: 'yes',
+                // Align menu items
+                align_items: 'center'
+            };
+
+            // Typography from styles
+            if (w.styles?.fontSize) {
+                settings.typography_typography = 'custom';
+                settings.typography_font_size = { unit: 'px', size: w.styles.fontSize };
+            }
+            if (w.styles?.fontName?.family) {
+                settings.typography_typography = 'custom';
+                settings.typography_font_family = w.styles.fontName.family;
+            }
+            if (w.styles?.fontWeight) {
+                settings.typography_font_weight = w.styles.fontWeight;
+            }
+            if (w.styles?.letterSpacing) {
+                const lsValue = typeof w.styles.letterSpacing === 'object' ? w.styles.letterSpacing.value : w.styles.letterSpacing;
+                settings.typography_letter_spacing = { unit: 'px', size: lsValue };
+            }
+
+            // Text color from styles
+            if (w.styles?.color) {
+                const c = w.styles.color;
+                if (typeof c === 'object' && 'r' in c) {
+                    const r = Math.round(c.r * 255);
+                    const g = Math.round(c.g * 255);
+                    const b = Math.round(c.b * 255);
+                    const a = c.a !== undefined ? c.a : 1;
+                    settings.text_color = `rgba(${r}, ${g}, ${b}, ${a})`;
+                } else if (typeof c === 'string') {
+                    settings.text_color = c;
+                }
+            }
+
+            // Hover and active colors (optional)
+            if (settings.text_color) {
+                settings.text_color_hover = settings.text_color; // Keep same for now
+            }
+
+            return { widgetType: 'nav-menu', settings };
+        }
     },
     {
         key: 'search-form',

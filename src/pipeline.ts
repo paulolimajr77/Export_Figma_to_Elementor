@@ -396,9 +396,12 @@ ${JSON.stringify(baseSchema, null, 2)}
         };
 
         const uploadNodeImage = async (nodeId: string, preferSvg: boolean = false) => {
-            if (!nodeId) return null; // Adicionado para segurança
+            if (!nodeId) return null;
             const node = figma.getNodeById(nodeId);
-            if (!node) return null;
+            if (!node) {
+                console.error(`[PIPELINE] ❌ Node not found for upload: ${nodeId}`);
+                return null;
+            }
             let format: any = preferSvg ? 'SVG' : 'WEBP';
             const hasImageChildren = (n: SceneNode): boolean => {
                 if ('fills' in n && Array.isArray((n as any).fills)) {
@@ -424,19 +427,18 @@ ${JSON.stringify(baseSchema, null, 2)}
             } else if (hasVectorChildren(node as SceneNode)) {
                 format = 'SVG';
             }
-            // Adicionado log para debug de nós do tipo IMAGE
-            // if (node.type === 'IMAGE') {
-            //    console.warn(`[Pipeline] Tentando exportar nó do tipo IMAGE depreciado: ${node.name} (${node.id}). Isso pode falhar.`);
-            // }
+
+            console.log(`[PIPELINE] 📤 Uploading ${preferSvg ? 'ICON' : 'IMAGE'} for node ${node.name} (${node.id}) as ${format}`);
             return this.imageUploader.uploadToWordPress(node as SceneNode, format);
         };
 
         const processWidget = async (widget: PipelineWidget) => {
+            console.log(`[PIPELINE] Processing widget: ${widget.type} (ID: ${widget.imageId || 'none'})`);
 
             // Widgets simples com imageId
-            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'icon-list')) {
+            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'icon-list' || widget.type === 'list-item')) {
                 try {
-                    const result = await uploadNodeImage(widget.imageId, widget.type === 'icon' || widget.type === 'icon-box' || widget.type === 'icon-list');
+                    const result = await uploadNodeImage(widget.imageId, widget.type === 'icon' || widget.type === 'icon-box' || widget.type === 'icon-list' || widget.type === 'list-item');
                     if (result) {
                         if (widget.type === 'image-box') {
                             if (!widget.styles) widget.styles = {};
@@ -454,15 +456,22 @@ ${JSON.stringify(baseSchema, null, 2)}
                         } else if (widget.styles?.icon && widget.type === 'icon-list') {
                             // Correção para itens de lista de ícones
                             widget.styles.icon = { value: { id: result.id, url: result.url }, library: 'svg' };
+                        } else if (widget.type === 'list-item') {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.icon_url = result.url;
+                            // Also update selected_icon/icon for registry if needed (though registry uses imageId)
+                            // But registry uses child.imageId, which is updated below
                         } else {
                             widget.content = result.url;
                         }
                         widget.imageId = result.id.toString();
                     }
                 } catch (e) {
-                    console.error(`[Pipeline] Erro ao processar imagem ${widget.imageId}:`, e);
+                    console.error('Failed to upload image for widget:', widget.type, e);
                 }
             }
+
+
 
             // Carrosseis: preencher slides com URLs/IDs do WP
             if (widget.type === 'image-carousel' && widget.styles?.slides && Array.isArray(widget.styles.slides)) {
