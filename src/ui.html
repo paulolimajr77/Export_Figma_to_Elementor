@@ -1470,11 +1470,12 @@
             <input id="wp_export_images" type="checkbox" />
             <span>Exportar imagens automaticamente</span>
           </label>
-          <label class="checkbox">
-            <input id="wp_create_page" type="checkbox" />
-            <span>Criar p&#225;gina automaticamente</span>
-          </label>
-          </label>
+
+          <div class="slider-group" id="webp_quality_group" style="margin: 12px 0; display: none;">
+            <label class="input-label" for="wp_webp_quality">Qualidade WebP: <span
+                id="webp_quality_value">85</span>%</label>
+            <input id="wp_webp_quality" type="range" min="0" max="100" value="85" style="width: 100%;" />
+          </div>
 
           <div class="actions">
             <button class="btn primary" data-action="test-wp">Testar conex&#227;o</button>
@@ -1554,7 +1555,9 @@
         wp_user: document.getElementById('wp_user'),
         wp_token: document.getElementById('wp_token'),
         wp_export_images: document.getElementById('wp_export_images'),
-        wp_create_page: document.getElementById('wp_create_page')
+        wp_webp_quality: document.getElementById('wp_webp_quality'),
+        webp_quality_group: document.getElementById('webp_quality_group'),
+        webp_quality_value: document.getElementById('webp_quality_value')
       };
       const aiSettings = document.getElementById('ai_settings');
 
