@@ -8010,7 +8010,7 @@ ${detection.justification}
       const user = yield loadSetting("gptel_wp_user", "");
       const token = yield loadSetting("gptel_wp_token", "");
       const exportImages = yield loadSetting("gptel_export_images", false);
-      const autoPage = yield loadSetting("gptel_auto_page", false);
+      const webpQuality = yield loadSetting("gptel_webp_quality", 85);
       if (!url || !token || !user) {
         const legacy = yield loadSetting("wp_config", null);
         if (legacy) {
@@ -8019,11 +8019,11 @@ ${detection.justification}
             user: legacy.user || user,
             token: legacy.auth || token,
             exportImages,
-            autoPage
+            webpQuality
           };
         }
       }
-      return { url, user, token, exportImages, autoPage };
+      return { url, user, token, exportImages, webpQuality };
     });
   }
   function resolveProviderConfig(msg) {
@@ -8345,7 +8345,7 @@ ${detection.justification}
       const wpUser = yield loadSetting("gptel_wp_user", "");
       const wpToken = yield loadSetting("gptel_wp_token", "");
       const exportImages = yield loadSetting("gptel_export_images", false);
-      const autoPage = yield loadSetting("gptel_auto_page", false);
+      const webpQuality = yield loadSetting("gptel_webp_quality", 85);
       const darkMode = yield loadSetting("gptel_dark_mode", false);
       const useAI = yield loadSetting("gptel_use_ai", true);
       const includeScreenshot = yield loadSetting("gptel_include_screenshot", true);
@@ -8369,7 +8369,7 @@ ${detection.justification}
           wpUser,
           wpToken,
           exportImages,
-          autoPage,
+          webpQuality,
           darkMode,
           useAI,
           includeScreenshot,

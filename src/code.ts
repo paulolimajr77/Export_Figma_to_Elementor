@@ -152,7 +152,7 @@ async function loadWPConfig(): Promise<WPConfig> {
     const user = await loadSetting<string>('gptel_wp_user', '');
     const token = await loadSetting<string>('gptel_wp_token', '');
     const exportImages = await loadSetting<boolean>('gptel_export_images', false);
-    const autoPage = await loadSetting<boolean>('gptel_auto_page', false);
+    const webpQuality = await loadSetting<number>('gptel_webp_quality', 85);
     // legacy fallback
     if (!url || !token || !user) {
         const legacy = await loadSetting<any>('wp_config', null);
@@ -162,11 +162,11 @@ async function loadWPConfig(): Promise<WPConfig> {
                 user: legacy.user || user,
                 token: legacy.auth || token,
                 exportImages,
-                autoPage
+                webpQuality
             } as any;
         }
     }
-    return { url, user, token, exportImages, autoPage } as any;
+    return { url, user, token, exportImages, webpQuality } as any;
 }
 
 async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvider; apiKey: string; providerId: string }> {
@@ -530,7 +530,7 @@ async function sendStoredSettings() {
     const wpUser = await loadSetting<string>('gptel_wp_user', '');
     const wpToken = await loadSetting<string>('gptel_wp_token', '');
     const exportImages = await loadSetting<boolean>('gptel_export_images', false);
-    const autoPage = await loadSetting<boolean>('gptel_auto_page', false);
+    const webpQuality = await loadSetting<number>('gptel_webp_quality', 85);
     const darkMode = await loadSetting<boolean>('gptel_dark_mode', false);
     const useAI = await loadSetting<boolean>('gptel_use_ai', true);
     const includeScreenshot = await loadSetting<boolean>('gptel_include_screenshot', true);
@@ -556,7 +556,7 @@ async function sendStoredSettings() {
             wpUser,
             wpToken,
             exportImages,
-            autoPage,
+            webpQuality,
             darkMode,
             useAI,
             includeScreenshot,

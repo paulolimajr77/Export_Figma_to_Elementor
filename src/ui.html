@@ -1712,8 +1712,18 @@
         if (fields.wp_url) fields.wp_url.value = payload.wpUrl || '';
         if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
         if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
-        if (fields.wp_export_images) fields.wp_export_images.checked = !!payload.exportImages;
-        if (fields.wp_create_page) fields.wp_create_page.checked = !!payload.autoPage;
+        if (fields.wp_export_images) {
+          fields.wp_export_images.checked = !!payload.exportImages;
+          // Toggle slider visibility based on export images checkbox
+          if (fields.webp_quality_group) {
+            fields.webp_quality_group.style.display = payload.exportImages ? 'block' : 'none';
+          }
+        }
+        if (fields.wp_webp_quality) {
+          const quality = payload.webpQuality !== undefined ? payload.webpQuality : 85;
+          fields.wp_webp_quality.value = quality;
+          if (fields.webp_quality_value) fields.webp_quality_value.textContent = quality;
+        }
         if (typeof payload.darkMode === 'boolean') applyTheme(payload.darkMode);
         updateIndicator();
       }
@@ -1747,8 +1757,23 @@
         if (fields.wp_url) fields.wp_url.addEventListener('input', saveText('gptel_wp_url', fields.wp_url));
         if (fields.wp_user) fields.wp_user.addEventListener('input', saveText('gptel_wp_user', fields.wp_user));
         if (fields.wp_token) fields.wp_token.addEventListener('input', saveText('gptel_wp_token', fields.wp_token));
-        if (fields.wp_export_images) fields.wp_export_images.addEventListener('change', () => send('save-setting', { key: 'gptel_export_images', value: fields.wp_export_images.checked }));
-        if (fields.wp_create_page) fields.wp_create_page.addEventListener('change', () => send('save-setting', { key: 'gptel_auto_page', value: fields.wp_create_page.checked }));
+        if (fields.wp_export_images) {
+          fields.wp_export_images.addEventListener('change', () => {
+            const checked = fields.wp_export_images.checked;
+            send('save-setting', { key: 'gptel_export_images', value: checked });
+            // Toggle slider visibility
+            if (fields.webp_quality_group) {
+              fields.webp_quality_group.style.display = checked ? 'block' : 'none';
+            }
+          });
+        }
+        if (fields.wp_webp_quality) {
+          fields.wp_webp_quality.addEventListener('input', () => {
+            const quality = fields.wp_webp_quality.value;
+            if (fields.webp_quality_value) fields.webp_quality_value.textContent = quality;
+            send('save-setting', { key: 'gptel_webp_quality', value: parseInt(quality) });
+          });
+        }
       }
 
       function bindActions() {
@@ -1770,7 +1795,7 @@
                 user: fields.wp_user?.value || '',
                 token: fields.wp_token?.value || '',
                 exportImages: fields.wp_export_images?.checked || false,
-                autoPage: fields.wp_create_page?.checked || false
+                webpQuality: parseInt(fields.wp_webp_quality?.value || 85)
               },
               apiKey: fields.gemini_api_key?.value || '',
               gptApiKey: fields.gpt_api_key?.value || '',
@@ -1862,10 +1887,14 @@
         ctx.drawImage(img, 0, 0);
 
         return new Promise(resolve => {
+          // Get quality from slider (0-100) and convert to 0-1 range
+          const qualitySlider = document.getElementById('wp_webp_quality');
+          const quality = qualitySlider ? parseInt(qualitySlider.value) / 100 : 0.85;
+
           canvas.toBlob(blob => {
             URL.revokeObjectURL(url);
             resolve(blob);
-          }, 'image/webp', 0.85);
+          }, 'image/webp', quality);
         });
       }
 
