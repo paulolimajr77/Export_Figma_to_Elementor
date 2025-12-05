@@ -18,6 +18,18 @@
     return a;
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+  var __objRest = (source, exclude) => {
+    var target = {};
+    for (var prop in source)
+      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+        target[prop] = source[prop];
+    if (source != null && __getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(source)) {
+        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+          target[prop] = source[prop];
+      }
+    return target;
+  };
   var __async = (__this, __arguments, generator) => {
     return new Promise((resolve, reject) => {
       var fulfilled = (value) => {
@@ -1130,32 +1142,119 @@ ${refText}` });
       family: "misc",
       aliases: generateAliases("accordion", ["acorde\xE3o", "sanfona"], ["collapse", "faq"]),
       compile: (w, base) => {
-        var _a;
-        let items = base.accordion || [];
+        var _a, _b, _d;
+        console.log("[ACCORDION COMPILE] Received widget:", JSON.stringify({
+          type: w.type,
+          content: w.content,
+          childrenCount: ((_a = w.children) == null ? void 0 : _a.length) || 0,
+          children: (_b = w.children) == null ? void 0 : _b.map((c) => ({
+            content: c.content,
+            styles: c.styles
+          }))
+        }, null, 2));
+        const items = [];
+        const nestedElements = [];
         if (w.children && w.children.length > 0) {
-          items = w.children.map((child, i) => {
-            var _a2, _b;
+          w.children.forEach((child, i) => {
+            var _a2;
+            const itemId = generateGUID();
             const title = ((_a2 = child.styles) == null ? void 0 : _a2.title) || child.content || `Item ${i + 1}`;
-            const content = ((_b = child.styles) == null ? void 0 : _b.content) || "Conte\xFAdo do item";
-            return {
-              _id: `acc${i + 1}`,
-              title,
-              content
-            };
+            items.push({
+              item_title: title,
+              _id: itemId,
+              element_css_id: ""
+            });
+            nestedElements.push({
+              id: generateGUID(),
+              elType: "container",
+              isInner: true,
+              isLocked: true,
+              settings: {
+                _title: title,
+                content_width: "full",
+                container_type: "flex",
+                width: { unit: "%", size: "", sizes: [] },
+                min_height: { unit: "px", size: "", sizes: [] },
+                flex_direction: "",
+                flex__is_row: "row",
+                flex__is_column: "column",
+                flex_justify_content: "",
+                flex_align_items: "",
+                flex_gap: { column: "", row: "", isLinked: true, unit: "px" },
+                flex_wrap: "",
+                overflow: "",
+                html_tag: "",
+                background_background: "",
+                background_color: "",
+                border_border: "",
+                border_radius: { unit: "px", top: "", right: "", bottom: "", left: "", isLinked: true },
+                margin: { unit: "px", top: "", right: "", bottom: "", left: "", isLinked: true },
+                padding: { unit: "px", top: "", right: "", bottom: "", left: "", isLinked: true },
+                _element_id: "",
+                css_classes: ""
+              },
+              defaultEditSettings: { defaultEditRoute: "content" },
+              elements: []
+            });
           });
         }
         if (items.length === 0) {
-          items = [{ _id: "acc1", title: "Item 1", content: w.content || "Conte\xFAdo" }];
+          const itemId = generateGUID();
+          items.push({ item_title: "Item 1", _id: itemId, element_css_id: "" });
+          nestedElements.push({
+            id: generateGUID(),
+            elType: "container",
+            isInner: true,
+            isLocked: true,
+            settings: {
+              _title: "Item 1",
+              content_width: "full",
+              container_type: "flex",
+              width: { unit: "%", size: "", sizes: [] },
+              flex_direction: "",
+              flex__is_row: "row",
+              flex__is_column: "column"
+            },
+            defaultEditSettings: { defaultEditRoute: "content" },
+            elements: []
+          });
         }
-        const settings = __spreadProps(__spreadValues({}, base), {
-          accordion: items
+        const _c = base, { selected_icon: _ } = _c, cleanBase = __objRest(_c, ["selected_icon"]);
+        const settings = __spreadProps(__spreadValues({}, cleanBase), {
+          items,
+          accordion_item_title_position_horizontal: "stretch",
+          accordion_item_title_icon_position: "end",
+          accordion_item_title_icon: { value: "fas fa-plus", library: "fa-solid" },
+          accordion_item_title_icon_active: { value: "fas fa-minus", library: "fa-solid" },
+          title_tag: "div",
+          faq_schema: "",
+          default_state: "expanded",
+          max_items_expended: "one",
+          n_accordion_animation_duration: { unit: "ms", size: 400, sizes: [] },
+          accordion_item_title_space_between: { unit: "px", size: 8, sizes: [] },
+          accordion_item_title_distance_from_content: { unit: "px", size: 10, sizes: [] },
+          accordion_background_normal_background: "",
+          accordion_background_normal_color: "",
+          accordion_border_normal_border: "",
+          accordion_border_radius: { unit: "px", top: "5", right: "5", bottom: "5", left: "5", isLinked: true },
+          accordion_padding: { unit: "px", top: "10", right: "10", bottom: "10", left: "10", isLinked: true },
+          title_typography_typography: "",
+          normal_title_color: "",
+          icon_size: { unit: "px", size: 20, sizes: [] },
+          normal_icon_color: "",
+          content_background_background: "classic",
+          content_background_color: "",
+          content_border_border: "",
+          content_border_radius: { unit: "px", top: "5", right: "5", bottom: "5", left: "5", isLinked: true },
+          content_padding: { unit: "px", top: "20", right: "20", bottom: "20", left: "20", isLinked: true }
         });
-        if ((_a = w.styles) == null ? void 0 : _a.selected_icon) {
-          settings.selected_icon = w.styles.selected_icon;
+        if ((_d = w.styles) == null ? void 0 : _d.selected_icon) {
+          settings.accordion_item_title_icon = w.styles.selected_icon;
         }
         return {
-          widgetType: "accordion",
-          settings
+          widgetType: "nested-accordion",
+          settings,
+          elements: nestedElements
         };
       }
     },
@@ -1165,27 +1264,46 @@ ${refText}` });
       family: "misc",
       aliases: generateAliases("toggle", ["alternar", "toggle"], []),
       compile: (w, base) => {
-        let items = base.toggle || [];
+        var _b;
+        const tabs = [];
         if (w.children && w.children.length > 0) {
-          items = w.children.map((child, i) => {
-            var _a, _b;
-            const title = ((_a = child.styles) == null ? void 0 : _a.title) || child.content || `Item ${i + 1}`;
-            const content = ((_b = child.styles) == null ? void 0 : _b.content) || "Conte\xFAdo do item";
-            return {
-              _id: `tog${i + 1}`,
-              title,
-              content
-            };
+          w.children.forEach((child, i) => {
+            var _a2, _b2;
+            const itemId = generateGUID();
+            const title = ((_a2 = child.styles) == null ? void 0 : _a2.title) || child.content || `Toggle Item ${i + 1}`;
+            const content = ((_b2 = child.styles) == null ? void 0 : _b2.content) || "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
+            tabs.push({
+              tab_title: title,
+              tab_content: content,
+              _id: itemId
+            });
           });
         }
-        if (items.length === 0) {
-          items = [{ _id: "tog1", title: "Item 1", content: w.content || "Conte\xFAdo" }];
+        if (tabs.length === 0) {
+          tabs.push({
+            tab_title: "Toggle Item 1",
+            tab_content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            _id: generateGUID()
+          });
+        }
+        const _a = base, { selected_icon: _ } = _a, cleanBase = __objRest(_a, ["selected_icon"]);
+        const settings = __spreadProps(__spreadValues({}, cleanBase), {
+          tabs,
+          // Icons
+          selected_icon: { value: "fas fa-plus", library: "fa-solid" },
+          selected_active_icon: { value: "fas fa-minus", library: "fa-solid" },
+          icon_align: "right",
+          // Title
+          title_html_tag: "div",
+          // Behavior
+          faq_schema: ""
+        });
+        if ((_b = w.styles) == null ? void 0 : _b.selected_icon) {
+          settings.selected_icon = w.styles.selected_icon;
         }
         return {
           widgetType: "toggle",
-          settings: __spreadProps(__spreadValues({}, base), {
-            toggle: items
-          })
+          settings
         };
       }
     },
@@ -1765,7 +1883,7 @@ ${refText}` });
   ];
   var widgetAliases = {
     "w:container": { pt: ["container", "se\xE7\xE3o", "coluna", "linha"], en: ["section", "row", "column", "full container", "container 100%", "boxed container", "inner container"] },
-    "w:form": { pt: ["formul\xE1rio", "contato", "campos", "form de contato", "newsletter"], en: ["form", "contact form", "input"] },
+    "w:form": { pt: ["formul\xE1rio", "campos", "form de contato", "newsletter"], en: ["form", "contact form", "input"] },
     "w:login": { pt: ["login", "entrar", "acesso", "login form"], en: ["login", "signin", "sign in"] },
     "w:subscription": { pt: ["inscri\xE7\xE3o", "newsletter"], en: ["subscription", "newsletter"] },
     "w:call-to-action": { pt: ["chamada para a\xE7\xE3o", "box cta", "promo box"], en: ["call to action", "cta box"] },
@@ -1921,10 +2039,13 @@ ${refText}` });
     compile(schema) {
       var _a;
       const elements = schema.containers.map((container) => this.compileContainer(container, false));
+      let siteurl = ((_a = this.wpConfig) == null ? void 0 : _a.url) || "";
+      if (siteurl && !siteurl.endsWith("/")) siteurl += "/";
+      if (siteurl && !siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
       const template = {
         type: "elementor",
         version: "0.4",
-        siteurl: ((_a = this.wpConfig) == null ? void 0 : _a.url) || "",
+        siteurl,
         elements
       };
       return template;
@@ -2189,7 +2310,7 @@ ${refText}` });
       return normalized;
     }
     compileWidget(widget) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
       const widgetId = generateGUID();
       const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
       Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
@@ -2205,11 +2326,12 @@ ${refText}` });
         return {
           id: widgetId,
           elType: "widget",
+          isInner: (_c = registryResult.isInner) != null ? _c : false,
           isLocked: false,
           widgetType: registryResult.widgetType,
           settings: normalizedSettings,
           defaultEditSettings: { defaultEditRoute: "content" },
-          elements: []
+          elements: registryResult.elements || []
         };
       }
       let widgetType = widget.type;
@@ -2229,9 +2351,9 @@ ${refText}` });
           widgetType = "button";
           settings.text = widget.content || "Button";
           Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
-          if ((_c = widget.styles) == null ? void 0 : _c.background) {
+          if ((_d = widget.styles) == null ? void 0 : _d.background) {
             settings.background_color = this.sanitizeColor(widget.styles.background);
-          } else if (((_d = widget.styles) == null ? void 0 : _d.fills) && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
+          } else if (((_e = widget.styles) == null ? void 0 : _e.fills) && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
             const solidFill = widget.styles.fills.find((f) => f.type === "SOLID");
             if (solidFill) {
               settings.background_color = this.sanitizeColor(solidFill.color);
@@ -2240,7 +2362,7 @@ ${refText}` });
           if (baseSettings.color) {
             settings.button_text_color = baseSettings.color;
           }
-          if (((_e = widget.styles) == null ? void 0 : _e.paddingTop) !== void 0 || ((_f = widget.styles) == null ? void 0 : _f.paddingRight) !== void 0 || ((_g = widget.styles) == null ? void 0 : _g.paddingBottom) !== void 0 || ((_h = widget.styles) == null ? void 0 : _h.paddingLeft) !== void 0) {
+          if (((_f = widget.styles) == null ? void 0 : _f.paddingTop) !== void 0 || ((_g = widget.styles) == null ? void 0 : _g.paddingRight) !== void 0 || ((_h = widget.styles) == null ? void 0 : _h.paddingBottom) !== void 0 || ((_i = widget.styles) == null ? void 0 : _i.paddingLeft) !== void 0) {
             settings.button_padding = {
               unit: "px",
               top: widget.styles.paddingTop || 0,
@@ -2250,7 +2372,7 @@ ${refText}` });
               isLinked: false
             };
           }
-          if (((_i = widget.styles) == null ? void 0 : _i.cornerRadius) !== void 0) {
+          if (((_j = widget.styles) == null ? void 0 : _j.cornerRadius) !== void 0) {
             settings.border_radius = {
               unit: "px",
               top: widget.styles.cornerRadius,
@@ -2262,7 +2384,7 @@ ${refText}` });
           }
           if (widget.imageId) {
             settings.selected_icon = this.normalizeSelectedIcon(
-              ((_j = widget.styles) == null ? void 0 : _j.selected_icon) || baseSettings.selected_icon || widget.content,
+              ((_k = widget.styles) == null ? void 0 : _k.selected_icon) || baseSettings.selected_icon || widget.content,
               widget.imageId,
               { value: "fas fa-arrow-right", library: "fa-solid" }
             );
@@ -2280,7 +2402,7 @@ ${refText}` });
           break;
         case "icon":
           widgetType = "icon";
-          settings.selected_icon = ((_k = widget.styles) == null ? void 0 : _k.selected_icon) || baseSettings.selected_icon || widget.content;
+          settings.selected_icon = ((_l = widget.styles) == null ? void 0 : _l.selected_icon) || baseSettings.selected_icon || widget.content;
           break;
         case "custom":
         default:
@@ -3725,24 +3847,46 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         const toggleItems = children.filter((c) => {
           var _a2;
           const n = c.name.toLowerCase();
-          return n.includes("toggle") || n.includes("item") || n.includes("faq") || c.type === "FRAME" && ((_a2 = c.children) == null ? void 0 : _a2.length) > 0;
+          return n.includes("accordion:") || n.includes("toggle") || n.includes("item") || n.includes("faq") || c.type === "FRAME" && ((_a2 = c.children) == null ? void 0 : _a2.length) > 0;
         });
         let accordionIconId = null;
         const items = toggleItems.map((child, i) => {
           let title = "";
           let content = "";
           let iconId = null;
+          const LOREM_IPSUM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis, pulvinar dapibus leo.";
           if (child.children) {
             const childNodes = child.children;
-            const textNodes = childNodes.filter((c) => c.type === "TEXT");
-            if (textNodes.length >= 1) {
-              title = textNodes[0].characters || "";
+            const titleNode = childNodes.find(
+              (c) => c.name.toLowerCase().includes("accordion:title") || c.name.toLowerCase().includes("toggle:title") || c.name.toLowerCase().includes(":title") || c.name.toLowerCase() === "title"
+            );
+            const contentNode = childNodes.find(
+              (c) => c.name.toLowerCase().includes("accordion:content") || c.name.toLowerCase().includes("toggle:content") || c.name.toLowerCase().includes(":content") || c.name.toLowerCase() === "content"
+            );
+            if (titleNode && titleNode.type === "TEXT") {
+              title = titleNode.characters || "";
             }
-            if (textNodes.length >= 2) {
-              content = textNodes[1].characters || "";
+            if (contentNode) {
+              if (contentNode.type === "TEXT") {
+                content = contentNode.characters || "";
+              } else if (contentNode.children) {
+                const textChild = contentNode.children.find((c) => c.type === "TEXT");
+                if (textChild) {
+                  content = textChild.characters || "";
+                }
+              }
+            }
+            if (!title || !content) {
+              const textNodes = childNodes.filter((c) => c.type === "TEXT");
+              if (!title && textNodes.length >= 1) {
+                title = textNodes[0].characters || "";
+              }
+              if (!content && textNodes.length >= 2) {
+                content = textNodes[1].characters || "";
+              }
             }
             const iconNode = childNodes.find(
-              (c) => c.type === "VECTOR" || c.type === "IMAGE" || c.name.toLowerCase().includes("icon") && c.type === "FRAME"
+              (c) => c.name.toLowerCase().includes("accordion:icon") || c.name.toLowerCase().includes(":icon") || c.name.toLowerCase().includes("icon") || c.type === "VECTOR" || c.type === "IMAGE"
             );
             if (iconNode) {
               iconId = iconNode.type === "FRAME" ? findFirstImageId(iconNode) : iconNode.id;
@@ -3751,7 +3895,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
               }
             }
             if (!title && child.name) {
-              const cleanName = child.name.replace(/^w:(toggle|item|faq)-?/i, "").trim();
+              const cleanName = child.name.replace(/^(accordion:|toggle:|w:toggle|w:item|item|faq)[-:]?\s*/i, "").trim();
               if (cleanName && !cleanName.match(/^\d+$/)) {
                 title = cleanName;
               }
@@ -3763,7 +3907,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             imageId: iconId,
             styles: {
               title: title || `Item ${i + 1}`,
-              content: content || "Conte\xFAdo do item"
+              content: content || LOREM_IPSUM
             }
           };
         });
@@ -4543,7 +4687,12 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           childrenIds: ((_i = (_h = schema.containers[0]) == null ? void 0 : _h.children) == null ? void 0 : _i.map((c) => c.id)) || []
         }, null, 2));
         const elementorJson = this.compiler.compile(schema);
-        if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
+        if (wpConfig.url) {
+          let siteurl = wpConfig.url;
+          if (!siteurl.endsWith("/")) siteurl += "/";
+          if (!siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
+          elementorJson.siteurl = siteurl;
+        }
         validateElementorJSON(elementorJson);
         if (options == null ? void 0 : options.debug) {
           const coverage = computeCoverage(preprocessed.flatNodes, schema, elementorJson);
@@ -7966,9 +8115,12 @@ ${detection.justification}
     return __async(this, null, function* () {
       var _a;
       const normalizedElements = json.elements || json.content || [];
+      let siteurl = json.siteurl || ((_a = this == null ? void 0 : this.wpConfig) == null ? void 0 : _a.url) || "";
+      if (siteurl && !siteurl.endsWith("/")) siteurl += "/";
+      if (siteurl && !siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
       const normalizedJson = {
         type: json.type || "elementor",
-        siteurl: json.siteurl || ((_a = this == null ? void 0 : this.wpConfig) == null ? void 0 : _a.url) || "",
+        siteurl,
         version: json.version || "0.4",
         elements: normalizedElements
       };
@@ -8037,7 +8189,7 @@ ${detection.justification}
         var _a;
         const nodeId = widget.imageId || widget.id;
         console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
-        if (uploadEnabled && nodeId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button" || widget.type === "list-item" || widget.type === "icon-list")) {
+        if (uploadEnabled && nodeId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button" || widget.type === "list-item" || widget.type === "icon-list" || widget.type === "accordion" || widget.type === "toggle")) {
           console.log(`[NO-AI UPLOAD] \u2705 Widget ${widget.type} (${nodeId}) will be uploaded`);
           try {
             const node = yield figma.getNodeById(nodeId);
@@ -8071,7 +8223,7 @@ ${detection.justification}
               } else if (hasVectorChildren(node)) {
                 format = "SVG";
               }
-              if (node.name === "Icon" || widget.type === "icon" || widget.type === "list-item") {
+              if (node.name === "Icon" || widget.type === "icon" || widget.type === "list-item" || widget.type === "accordion" || widget.type === "toggle") {
                 format = "SVG";
               }
               const result = yield noaiUploader.uploadToWordPress(node, format);
@@ -8169,7 +8321,12 @@ ${detection.justification}
       const compiler = new ElementorCompiler();
       compiler.setWPConfig(normalizedWP);
       const json = compiler.compile(schema);
-      if (normalizedWP.url) json.siteurl = normalizedWP.url;
+      if (normalizedWP.url) {
+        let siteurl = normalizedWP.url;
+        if (!siteurl.endsWith("/")) siteurl += "/";
+        if (!siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
+        json.siteurl = siteurl;
+      }
       return json;
     });
   }

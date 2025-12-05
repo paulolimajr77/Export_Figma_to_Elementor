@@ -262,13 +262,20 @@ function log(message: string, level: 'info' | 'warn' | 'error' | 'success' = 'in
 
 async function deliverResult(json: ElementorJSON, debugInfo?: any) {
     const normalizedElements = (json as any).elements || (json as any).content || [];
+
+    // Normalize siteurl to always end with /wp-json/
+    let siteurl = (json as any).siteurl || (this as any)?.wpConfig?.url || '';
+    if (siteurl && !siteurl.endsWith('/')) siteurl += '/';
+    if (siteurl && !siteurl.endsWith('wp-json/')) siteurl += 'wp-json/';
+
     const normalizedJson: ElementorJSON = {
         type: (json as any).type || 'elementor',
-        siteurl: (json as any).siteurl || (this as any)?.wpConfig?.url || '',
+        siteurl: siteurl,
         version: (json as any).version || '0.4',
         elements: normalizedElements
     } as any;
 
+    // Human-readable for display and paste
     const payload = JSON.stringify(normalizedJson, null, 2);
     const pastePayload = payload;
     lastJSON = payload;
@@ -349,7 +356,7 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
 
         console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
 
-        if (uploadEnabled && nodeId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'button' || widget.type === 'list-item' || widget.type === 'icon-list')) {
+        if (uploadEnabled && nodeId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'button' || widget.type === 'list-item' || widget.type === 'icon-list' || widget.type === 'accordion' || widget.type === 'toggle')) {
             console.log(`[NO-AI UPLOAD] ✅ Widget ${widget.type} (${nodeId}) will be uploaded`);
             try {
                 const node = await figma.getNodeById(nodeId);
@@ -392,7 +399,7 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                     }
 
                     // Force SVG for Icon nodes inside buttons or explicit icon widgets
-                    if (node.name === 'Icon' || widget.type === 'icon' || widget.type === 'list-item') {
+                    if (node.name === 'Icon' || widget.type === 'icon' || widget.type === 'list-item' || widget.type === 'accordion' || widget.type === 'toggle') {
                         format = 'SVG';
                     }
 
@@ -498,7 +505,13 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
     const compiler = new ElementorCompiler();
     compiler.setWPConfig(normalizedWP);
     const json = compiler.compile(schema);
-    if (normalizedWP.url) json.siteurl = normalizedWP.url;
+    // Ensure siteurl ends with /wp-json/ as Elementor expects
+    if (normalizedWP.url) {
+        let siteurl = normalizedWP.url;
+        if (!siteurl.endsWith('/')) siteurl += '/';
+        if (!siteurl.endsWith('wp-json/')) siteurl += 'wp-json/';
+        json.siteurl = siteurl;
+    }
     return json;
 }
 

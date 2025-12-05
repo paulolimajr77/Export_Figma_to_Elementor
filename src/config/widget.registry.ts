@@ -1,6 +1,7 @@
 ﻿import type { PipelineWidget } from '../types/pipeline.schema';
 import type { ElementorSettings } from '../types/elementor.types';
 import { normalizeColor, normalizeElementorSettings } from '../utils/style_normalizer';
+import { generateGUID } from '../utils/guid';
 
 export interface WidgetDefinition {
     key: string;
@@ -640,39 +641,135 @@ const registry: WidgetDefinition[] = [
         family: 'misc',
         aliases: generateAliases('accordion', ['acordeão', 'sanfona'], ['collapse', 'faq']),
         compile: (w, base) => {
-            // Build items from children (toggle items)
-            let items = base.accordion || [];
+            // Debug: log what we receive
+            console.log('[ACCORDION COMPILE] Received widget:', JSON.stringify({
+                type: w.type,
+                content: w.content,
+                childrenCount: w.children?.length || 0,
+                children: w.children?.map((c: any) => ({
+                    content: c.content,
+                    styles: c.styles
+                }))
+            }, null, 2));
+
+            // Build items array for nested-accordion (exactly matching Elementor reference)
+            const items: any[] = [];
+            const nestedElements: any[] = [];
 
             if (w.children && w.children.length > 0) {
-                items = w.children.map((child: any, i: number) => {
+                w.children.forEach((child: any, i: number) => {
+                    const itemId = generateGUID();
                     const title = child.styles?.title || child.content || `Item ${i + 1}`;
-                    const content = child.styles?.content || 'Conteúdo do item';
-                    return {
-                        _id: `acc${i + 1}`,
-                        title: title,
-                        content: content
-                    };
+
+                    // Items array format from Elementor reference
+                    items.push({
+                        item_title: title,
+                        _id: itemId,
+                        element_css_id: ''
+                    });
+
+                    // Nested container with FULL settings from Elementor reference
+                    nestedElements.push({
+                        id: generateGUID(),
+                        elType: 'container',
+                        isInner: true,
+                        isLocked: true,
+                        settings: {
+                            _title: title,
+                            content_width: 'full',
+                            container_type: 'flex',
+                            width: { unit: '%', size: '', sizes: [] },
+                            min_height: { unit: 'px', size: '', sizes: [] },
+                            flex_direction: '',
+                            flex__is_row: 'row',
+                            flex__is_column: 'column',
+                            flex_justify_content: '',
+                            flex_align_items: '',
+                            flex_gap: { column: '', row: '', isLinked: true, unit: 'px' },
+                            flex_wrap: '',
+                            overflow: '',
+                            html_tag: '',
+                            background_background: '',
+                            background_color: '',
+                            border_border: '',
+                            border_radius: { unit: 'px', top: '', right: '', bottom: '', left: '', isLinked: true },
+                            margin: { unit: 'px', top: '', right: '', bottom: '', left: '', isLinked: true },
+                            padding: { unit: 'px', top: '', right: '', bottom: '', left: '', isLinked: true },
+                            _element_id: '',
+                            css_classes: ''
+                        },
+                        defaultEditSettings: { defaultEditRoute: 'content' },
+                        elements: []
+                    });
                 });
             }
 
             // Fallback if no items
             if (items.length === 0) {
-                items = [{ _id: 'acc1', title: 'Item 1', content: w.content || 'Conteúdo' }];
+                const itemId = generateGUID();
+                items.push({ item_title: 'Item 1', _id: itemId, element_css_id: '' });
+                nestedElements.push({
+                    id: generateGUID(),
+                    elType: 'container',
+                    isInner: true,
+                    isLocked: true,
+                    settings: {
+                        _title: 'Item 1',
+                        content_width: 'full',
+                        container_type: 'flex',
+                        width: { unit: '%', size: '', sizes: [] },
+                        flex_direction: '',
+                        flex__is_row: 'row',
+                        flex__is_column: 'column'
+                    },
+                    defaultEditSettings: { defaultEditRoute: 'content' },
+                    elements: []
+                });
             }
 
+            // Remove selected_icon from base to prevent duplication
+            const { selected_icon: _, ...cleanBase } = base;
+
+            // Settings EXACTLY matching Elementor reference structure
             const settings: any = {
-                ...base,
-                accordion: items
+                ...cleanBase,
+                items: items,
+                accordion_item_title_position_horizontal: 'stretch',
+                accordion_item_title_icon_position: 'end',
+                accordion_item_title_icon: { value: 'fas fa-plus', library: 'fa-solid' },
+                accordion_item_title_icon_active: { value: 'fas fa-minus', library: 'fa-solid' },
+                title_tag: 'div',
+                faq_schema: '',
+                default_state: 'expanded',
+                max_items_expended: 'one',
+                n_accordion_animation_duration: { unit: 'ms', size: 400, sizes: [] },
+                accordion_item_title_space_between: { unit: 'px', size: 8, sizes: [] },
+                accordion_item_title_distance_from_content: { unit: 'px', size: 10, sizes: [] },
+                accordion_background_normal_background: '',
+                accordion_background_normal_color: '',
+                accordion_border_normal_border: '',
+                accordion_border_radius: { unit: 'px', top: '5', right: '5', bottom: '5', left: '5', isLinked: true },
+                accordion_padding: { unit: 'px', top: '10', right: '10', bottom: '10', left: '10', isLinked: true },
+                title_typography_typography: '',
+                normal_title_color: '',
+                icon_size: { unit: 'px', size: 20, sizes: [] },
+                normal_icon_color: '',
+                content_background_background: 'classic',
+                content_background_color: '',
+                content_border_border: '',
+                content_border_radius: { unit: 'px', top: '5', right: '5', bottom: '5', left: '5', isLinked: true },
+                content_padding: { unit: 'px', top: '20', right: '20', bottom: '20', left: '20', isLinked: true }
             };
 
-            // Add selected_icon if available (populated after upload)
+            // Add uploaded icon if available
             if (w.styles?.selected_icon) {
-                settings.selected_icon = w.styles.selected_icon;
+                settings.accordion_item_title_icon = w.styles.selected_icon;
             }
 
             return {
-                widgetType: 'accordion',
-                settings
+                widgetType: 'nested-accordion',
+                settings,
+                elements: nestedElements
             };
         }
     },
@@ -682,30 +779,56 @@ const registry: WidgetDefinition[] = [
         family: 'misc',
         aliases: generateAliases('toggle', ['alternar', 'toggle'], []),
         compile: (w, base) => {
-            let items = base.toggle || [];
+            // Build tabs array for toggle (same format as accordion)
+            const tabs: any[] = [];
 
             if (w.children && w.children.length > 0) {
-                items = w.children.map((child: any, i: number) => {
-                    const title = child.styles?.title || child.content || `Item ${i + 1}`;
-                    const content = child.styles?.content || 'Conteúdo do item';
-                    return {
-                        _id: `tog${i + 1}`,
-                        title: title,
-                        content: content
-                    };
+                w.children.forEach((child: any, i: number) => {
+                    const itemId = generateGUID();
+                    const title = child.styles?.title || child.content || `Toggle Item ${i + 1}`;
+                    const content = child.styles?.content || 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+
+                    tabs.push({
+                        tab_title: title,
+                        tab_content: content,
+                        _id: itemId
+                    });
                 });
             }
 
-            if (items.length === 0) {
-                items = [{ _id: 'tog1', title: 'Item 1', content: w.content || 'Conteúdo' }];
+            // Fallback if no items
+            if (tabs.length === 0) {
+                tabs.push({
+                    tab_title: 'Toggle Item 1',
+                    tab_content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
+                    _id: generateGUID()
+                });
+            }
+
+            // Remove selected_icon from base to prevent duplication
+            const { selected_icon: _, ...cleanBase } = base;
+
+            const settings: any = {
+                ...cleanBase,
+                tabs: tabs,
+                // Icons
+                selected_icon: { value: 'fas fa-plus', library: 'fa-solid' },
+                selected_active_icon: { value: 'fas fa-minus', library: 'fa-solid' },
+                icon_align: 'right',
+                // Title
+                title_html_tag: 'div',
+                // Behavior
+                faq_schema: ''
+            };
+
+            // Add selected_icon if available (populated after upload)
+            if (w.styles?.selected_icon) {
+                settings.selected_icon = w.styles.selected_icon;
             }
 
             return {
                 widgetType: 'toggle',
-                settings: {
-                    ...base,
-                    toggle: items
-                }
+                settings
             };
         }
     },
@@ -1331,7 +1454,7 @@ const wpWidgets = [
 
 const widgetAliases: Record<string, { pt: string[], en: string[] }> = {
     'w:container': { pt: ['container', 'seção', 'coluna', 'linha'], en: ['section', 'row', 'column', 'full container', 'container 100%', 'boxed container', 'inner container'] },
-    'w:form': { pt: ['formulário', 'contato', 'campos', 'form de contato', 'newsletter'], en: ['form', 'contact form', 'input'] },
+    'w:form': { pt: ['formulário', 'campos', 'form de contato', 'newsletter'], en: ['form', 'contact form', 'input'] },
     'w:login': { pt: ['login', 'entrar', 'acesso', 'login form'], en: ['login', 'signin', 'sign in'] },
     'w:subscription': { pt: ['inscrição', 'newsletter'], en: ['subscription', 'newsletter'] },
     'w:call-to-action': { pt: ['chamada para ação', 'box cta', 'promo box'], en: ['call to action', 'cta box'] },

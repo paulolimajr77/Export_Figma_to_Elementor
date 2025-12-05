@@ -660,10 +660,12 @@ function detectWidget(node: SerializedNode): MaybeWidget {
             };
         }
         // Handle accordion: extract children as toggle items
+        // Naming convention: w:accordion > accordion:item > accordion:title + accordion:content
         if (widgetType === 'accordion' || widgetType === 'toggle') {
             const toggleItems = children.filter(c => {
                 const n = c.name.toLowerCase();
-                return n.includes('toggle') || n.includes('item') || n.includes('faq') ||
+                // Accept: accordion:item, accordion:1, w:toggle, item, faq, or any FRAME with children
+                return n.includes('accordion:') || n.includes('toggle') || n.includes('item') || n.includes('faq') ||
                     (c.type === 'FRAME' && (c as any).children?.length > 0);
             });
 
@@ -675,26 +677,60 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 let content = '';
                 let iconId: string | null = null;
 
+                // Lorem ipsum fallback for missing content
+                const LOREM_IPSUM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis, pulvinar dapibus leo.';
+
                 // Try to find title, content and icon from child's children
                 if ((child as any).children) {
                     const childNodes = (child as any).children as SerializedNode[];
 
-                    // Find text nodes
-                    const textNodes = childNodes.filter(c => c.type === 'TEXT');
-                    if (textNodes.length >= 1) {
-                        // First text is usually the title
-                        title = (textNodes[0] as any).characters || '';
+                    // Look for named elements first (accordion:title, accordion:content)
+                    const titleNode = childNodes.find(c =>
+                        c.name.toLowerCase().includes('accordion:title') ||
+                        c.name.toLowerCase().includes('toggle:title') ||
+                        c.name.toLowerCase().includes(':title') ||
+                        c.name.toLowerCase() === 'title'
+                    );
+                    const contentNode = childNodes.find(c =>
+                        c.name.toLowerCase().includes('accordion:content') ||
+                        c.name.toLowerCase().includes('toggle:content') ||
+                        c.name.toLowerCase().includes(':content') ||
+                        c.name.toLowerCase() === 'content'
+                    );
+
+                    if (titleNode && titleNode.type === 'TEXT') {
+                        title = (titleNode as any).characters || '';
                     }
-                    if (textNodes.length >= 2) {
-                        // Second text is content
-                        content = (textNodes[1] as any).characters || '';
+                    if (contentNode) {
+                        if (contentNode.type === 'TEXT') {
+                            content = (contentNode as any).characters || '';
+                        } else if ((contentNode as any).children) {
+                            // Content might be a frame with text inside
+                            const textChild = (contentNode as any).children.find((c: any) => c.type === 'TEXT');
+                            if (textChild) {
+                                content = textChild.characters || '';
+                            }
+                        }
                     }
 
-                    // Find icon (VECTOR, IMAGE, or frame with icon/vector)
+                    // Fallback: use first and second TEXT nodes
+                    if (!title || !content) {
+                        const textNodes = childNodes.filter(c => c.type === 'TEXT');
+                        if (!title && textNodes.length >= 1) {
+                            title = (textNodes[0] as any).characters || '';
+                        }
+                        if (!content && textNodes.length >= 2) {
+                            content = (textNodes[1] as any).characters || '';
+                        }
+                    }
+
+                    // Find icon (accordion:icon, VECTOR, IMAGE, or frame with icon)
                     const iconNode = childNodes.find(c =>
+                        c.name.toLowerCase().includes('accordion:icon') ||
+                        c.name.toLowerCase().includes(':icon') ||
+                        c.name.toLowerCase().includes('icon') ||
                         c.type === 'VECTOR' ||
-                        c.type === 'IMAGE' ||
-                        (c.name.toLowerCase().includes('icon') && c.type === 'FRAME')
+                        c.type === 'IMAGE'
                     );
                     if (iconNode) {
                         iconId = iconNode.type === 'FRAME' ? findFirstImageId(iconNode) : iconNode.id;
@@ -706,7 +742,7 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
                     // If no title, check the child node's name
                     if (!title && child.name) {
-                        const cleanName = child.name.replace(/^w:(toggle|item|faq)-?/i, '').trim();
+                        const cleanName = child.name.replace(/^(accordion:|toggle:|w:toggle|w:item|item|faq)[-:]?\s*/i, '').trim();
                         if (cleanName && !cleanName.match(/^\d+$/)) {
                             title = cleanName;
                         }
@@ -719,7 +755,7 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                     imageId: iconId,
                     styles: {
                         title: title || `Item ${i + 1}`,
-                        content: content || 'Conteúdo do item'
+                        content: content || LOREM_IPSUM
                     }
                 };
             });

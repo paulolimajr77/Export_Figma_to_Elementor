@@ -20,10 +20,16 @@ export class ElementorCompiler {
 
     public compile(schema: PipelineSchema): ElementorJSON {
         const elements = schema.containers.map(container => this.compileContainer(container, false));
+
+        // Ensure siteurl ends with /wp-json/ as Elementor expects
+        let siteurl = this.wpConfig?.url || '';
+        if (siteurl && !siteurl.endsWith('/')) siteurl += '/';
+        if (siteurl && !siteurl.endsWith('wp-json/')) siteurl += 'wp-json/';
+
         const template: ElementorJSON = {
             type: 'elementor',
             version: '0.4',
-            siteurl: this.wpConfig?.url || '',
+            siteurl: siteurl,
             elements
         };
         return template as any;
@@ -331,11 +337,12 @@ export class ElementorCompiler {
             return {
                 id: widgetId,
                 elType: 'widget',
+                isInner: (registryResult as any).isInner ?? false,
                 isLocked: false,
                 widgetType: registryResult.widgetType,
                 settings: normalizedSettings,
                 defaultEditSettings: { defaultEditRoute: 'content' },
-                elements: []
+                elements: (registryResult as any).elements || []
             };
         }
 

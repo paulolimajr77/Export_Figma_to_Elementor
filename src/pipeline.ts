@@ -78,7 +78,13 @@ export class ConversionPipeline {
         }, null, 2));
 
         const elementorJson = this.compiler.compile(schema);
-        if (wpConfig.url) elementorJson.siteurl = wpConfig.url;
+        // Ensure siteurl ends with /wp-json/ as Elementor expects
+        if (wpConfig.url) {
+            let siteurl = wpConfig.url;
+            if (!siteurl.endsWith('/')) siteurl += '/';
+            if (!siteurl.endsWith('wp-json/')) siteurl += 'wp-json/';
+            elementorJson.siteurl = siteurl;
+        }
         validateElementorJSON(elementorJson);
 
         if (options?.debug) {
