@@ -13,9 +13,7 @@ import { FileLogger } from './utils/logger';
 import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } from './linter';
 import { enforceWidgetTypes } from './services/heuristics';
 import { initializeCompatLayer, safeGet, safeGetArray, safeGetNumber, safeGetString, safeGetBoolean, safeInvoke } from './compat';
-
-figma.notify('Plugin carregou! (diagnóstico)');
-console.log('[diagnostic] plugin loaded');
+import { TelemetryServiceStub as TelemetryService } from './services/telemetry/telemetry.stub';
 
 const runtimeHealth = initializeCompatLayer({
     logger: (event, payload) => {
@@ -29,7 +27,7 @@ const runtimeHealth = initializeCompatLayer({
 
 // Logger dedicado para capturar eventos sem alterar console global
 export const logger = new FileLogger(console.log.bind(console));
-
+figma.notify("Plugin carregou!");
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 safeInvoke(() => figma.ui.postMessage({
     type: 'runtime-health',
@@ -448,10 +446,13 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
 
         // Handle image-carousel: upload each slide
         const carouselSlides = safeGet(widget, 'styles.slides') as any[] | undefined;
-        if (uploadEnabled && widget.type === 'image-carousel' && Array.isArray(carouselSlides)) {
-            console.log(`[NO-AI UPLOAD] ?? Processing image-carousel with ${carouselSlides.length} slides`);
+        if (uploadEnabled && widget.type === 'image-carousel' && Array.isArray(carouselSlides)) {
+
+            console.log(`[NO-AI UPLOAD] ?? Processing image-carousel with ${carouselSlides.length} slides`);
+
             const updatedSlides = [];
-            for (const slide of carouselSlides) {
+            for (const slide of carouselSlides) {
+
                 const slideNodeId = slide.id;
                 if (slideNodeId) {
                     try {
@@ -574,8 +575,6 @@ async function sendStoredSettings() {
 }
 
 figma.ui.onmessage = async (msg) => {
-    figma.notify('Mensagem recebida: ' + JSON.stringify(msg));
-    console.log('[diagnostic] received message', msg);
     if (!msg || typeof msg !== 'object') return;
     if (typeof msg.type !== 'string') return;
 

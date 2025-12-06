@@ -13,7 +13,7 @@ import { referenceDocs } from './reference_docs';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { createNodeSnapshot } from './heuristics/adapter';
 import type { DeterministicPipeline, DeterministicPipelineOptions } from './core/deterministic/deterministic.pipeline';
-import { TelemetryService } from './services/telemetry/telemetry.service';
+import { TelemetryService } from './services/telemetry';
 
 interface PreprocessedData {
     pageTitle: string;

@@ -4,7 +4,8 @@ import { ConversionPipeline } from '../pipeline';
 import type { DeterministicPipeline } from '../core/deterministic/deterministic.pipeline';
 import type { PipelineSchema } from '../types/pipeline.schema';
 import type { ElementorJSON } from '../types/elementor.types';
-import { TelemetryService } from '../services/telemetry/telemetry.service';
+import { TelemetryService } from './services/telemetry';
+
 
 const fakeNode = {
     id: 'node-1',
