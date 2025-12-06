@@ -3,7 +3,7 @@
 
 import { ANALYZE_RECREATE_PROMPT } from './config/prompts';
 import { repairJson } from './utils/serialization_utils';
-import { GenerateSchemaInput, SchemaProvider } from './types/providers';
+import { GenerateSchemaInput, SchemaProvider, SchemaResponse } from './types/providers';
 import { PipelineSchema } from './types/pipeline.schema';
 
 export type GeminiModel =

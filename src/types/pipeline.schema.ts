@@ -22,4 +22,5 @@ export interface PipelineWidget {
     styles?: Record<string, any>;
     children?: PipelineWidget[];
     kind?: string;
+    id?: string;
 }

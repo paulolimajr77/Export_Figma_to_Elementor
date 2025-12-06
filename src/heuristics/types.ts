@@ -51,6 +51,7 @@ export interface NodeSnapshot {
     childrenWidths: number[];
     childrenHeights: number[];
     childrenAlignment: "LEFT" | "CENTER" | "RIGHT" | "JUSTIFY" | "MIXED";
+    children?: NodeSnapshot[];
 
     // Repetição / grid
     repetitionGroupId?: string;

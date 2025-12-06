@@ -1,0 +1,21 @@
+# Build artifacts
+dist/
+coverage/
+
+# Dependencies
+node_modules/
+
+# Logs & debug dumps
+Logs IA/
+debug_*.json
+*.log
+
+# Archives / exports
+*.zip
+*.tar
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -50,17 +50,25 @@ export interface NodeData {
  * Extrai dados completos de um node, preservando árvore 1:1 sem qualquer interpretação.
  */
 export function extractNodeData(node: SceneNode): NodeData {
+    const autoLayout = extractAutoLayout(node);
+    const constraints = 'constraints' in node ? {
+        horizontal: node.constraints.horizontal,
+        vertical: node.constraints.vertical
+    } : undefined;
+
     const devMode: DevModeData = {
         css: generateCSS(node),
-        autoLayout: extractAutoLayout(node),
         fills: ('fills' in node && typeof node.fills !== 'symbol') ? node.fills : [],
         strokes: ('strokes' in node && typeof node.strokes !== 'symbol') ? node.strokes : [],
-        effects: ('effects' in node && typeof node.effects !== 'symbol') ? node.effects : [],
-        constraints: 'constraints' in node ? {
-            horizontal: node.constraints.horizontal,
-            vertical: node.constraints.vertical
-        } : undefined
+        effects: ('effects' in node && typeof node.effects !== 'symbol') ? node.effects : []
     };
+
+    if (autoLayout) {
+        devMode.autoLayout = autoLayout;
+    }
+    if (constraints) {
+        devMode.constraints = constraints;
+    }
 
     const textData: TextData | undefined = node.type === 'TEXT' ? {
         characters: node.characters,
@@ -71,7 +79,7 @@ export function extractNodeData(node: SceneNode): NodeData {
         letterSpacing: typeof node.letterSpacing !== 'symbol' ? node.letterSpacing : { value: 0, unit: 'PIXELS' }
     } : undefined;
 
-    return {
+    const baseNode: NodeData = {
         id: node.id,
         name: node.name,
         type: node.type,
@@ -80,21 +88,22 @@ export function extractNodeData(node: SceneNode): NodeData {
         x: 'x' in node ? node.x : 0,
         y: 'y' in node ? node.y : 0,
         devMode,
-        text: textData,
         children: 'children' in node ? node.children.map(c => c.id) : []
     };
+
+    if (textData) {
+        baseNode.text = textData;
+    }
+
+    return baseNode;
 }
 
 /**
  * Extrai configurações de Auto Layout sem inferências.
  */
-function extractAutoLayout(node: SceneNode): DevModeData['autoLayout'] {
+function extractAutoLayout(node: SceneNode): DevModeData['autoLayout'] | undefined {
     if (!('layoutMode' in node) || node.layoutMode === 'NONE') {
-        return {
-            direction: 'none',
-            gap: 0,
-            padding: { top: 0, right: 0, bottom: 0, left: 0 }
-        };
+        return undefined;
     }
 
     return {

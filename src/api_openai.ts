@@ -131,13 +131,25 @@ async function callOpenAI(apiKey: string, model: OpenAIModel, messages: any[], m
     return { ok: false, error: 'Falha ao chamar OpenAI apos retries.' };
 }
 
-export async function testOpenAIConnection(apiKey: string, model: OpenAIModel): Promise<{ ok: boolean; error?: string; data?: any }> {
+export async function testOpenAIConnection(apiKey: string, model: OpenAIModel): Promise<{ ok: boolean; message?: string; error?: string; raw?: any }> {
     const messages = [
         { role: 'system', content: `${JSON_SAFETY} Retorne {"pong": true}.` },
         { role: 'user', content: 'ping (json)' }
     ];
     const resp = await callOpenAI(apiKey, model, messages, 64, 1);
-    return { ok: resp.ok, error: resp.error, data: resp.raw };
+    if (resp.ok) {
+        return { ok: true, message: 'Conexao com OpenAI verificada.', raw: resp.raw };
+    }
+    const message = resp.error || 'Falha ao testar OpenAI.';
+    const result: { ok: boolean; message: string; raw?: any; error?: string } = {
+        ok: false,
+        message,
+        raw: resp.raw
+    };
+    if (resp.error) {
+        result.error = resp.error;
+    }
+    return result;
 }
 
 export const openaiProvider: SchemaProvider = {
@@ -184,14 +196,17 @@ export const openaiProvider: SchemaProvider = {
 
         const resp = await callOpenAI(apiKey, model, messages);
         if (!resp.ok) return resp;
-        return { ok: true, schema: resp.schema, data: resp.data, raw: resp.raw };
+        if (resp.schema) {
+            return { ok: true, schema: resp.schema, data: resp.data, raw: resp.raw };
+        }
+        return { ok: true, data: resp.data, raw: resp.raw };
     },
 
-    async testConnection(apiKey?: string): Promise<{ ok: boolean; error?: string; data?: any }> {
+    async testConnection(apiKey?: string): Promise<{ ok: boolean; message?: string; error?: string; raw?: any }> {
         const keyToTest = apiKey || await getOpenAIKey();
         const model = this.model as OpenAIModel;
         if (!keyToTest) {
-            return { ok: false, error: 'API Key do OpenAI nao configurada.' };
+            return { ok: false, error: 'API Key do OpenAI nao configurada.', message: 'API Key do OpenAI nao configurada.' };
         }
         return await testOpenAIConnection(keyToTest, model);
     }

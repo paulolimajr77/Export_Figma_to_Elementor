@@ -3,14 +3,20 @@
     "version": "1.0.0",
     "description": "Figma to Elementor Exporter",
     "main": "dist/code.js",
-  "scripts": {
-        "build": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --loader:.md=text",
-        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --loader:.md=text --watch",
-        "test": "vitest run"
+    "scripts": {
+        "clean": "rimraf dist",
+        "build": "npm run clean && esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2022 --loader:.md=text",
+        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2022 --loader:.md=text --watch",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "check": "npm run typecheck && npm run test"
     },
     "devDependencies": {
         "@figma/plugin-typings": "*",
+        "@types/node": "^24.10.1",
         "esbuild": "^0.27.0",
+        "rimraf": "^5.0.5",
         "typescript": "*",
         "vitest": "^1.6.0"
     }

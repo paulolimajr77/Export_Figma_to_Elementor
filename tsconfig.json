@@ -1,27 +1,35 @@
 {
     "compilerOptions": {
-        "target": "es6",
+        "target": "ES2022",
         "lib": [
-            "es6",
-            "dom",
-            "es2016",
-            "dom.iterable"
+            "ES2022",
+            "DOM",
+            "DOM.Iterable"
         ],
-        "strict": false,
+        "module": "ESNext",
+        "moduleResolution": "Node",
         "typeRoots": [
             "./node_modules/@types",
             "./node_modules/@figma"
         ],
-        "module": "esnext",
-        "moduleResolution": "node",
-        "outDir": "./dist",
+        "types": [
+            "node"
+        ],
+        "strict": true,
+        "noImplicitAny": true,
+        "noImplicitOverride": true,
+        "exactOptionalPropertyTypes": true,
+        "useUnknownInCatchVariables": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
-        "noImplicitAny": false
+        "outDir": "./dist"
     },
     "include": [
         "src/**/*"
     ],
     "exclude": [
+        "dist",
         "node_modules"
     ]
 }

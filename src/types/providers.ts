@@ -4,7 +4,7 @@ export interface GenerateSchemaInput {
     prompt: string;
     snapshot: any;
     instructions: string;
-    apiKey?: string;
+    apiKey?: string | undefined;
     image?: {
         data: string; // base64 sem prefixo
         mimeType?: string;
@@ -17,10 +17,10 @@ export interface GenerateSchemaInput {
 
 export interface SchemaResponse {
     ok: boolean;
-    schema?: PipelineSchema;
+    schema?: PipelineSchema | undefined;
     data?: any;
-    message?: string;
-    error?: string;
+    message?: string | undefined;
+    error?: string | undefined;
     raw?: any;
 }
 
@@ -29,5 +29,5 @@ export interface SchemaProvider {
     model: string;
     setModel(model: string): void | Promise<void>;
     generateSchema(input: GenerateSchemaInput): Promise<SchemaResponse>;
-    testConnection(apiKey?: string): Promise<{ ok: boolean; message: string; raw?: any }>;
+    testConnection(apiKey?: string): Promise<{ ok: boolean; message?: string; error?: string; raw?: any }>;
 }

@@ -131,3 +131,5 @@ export class ImageUploader {
         this.nodeHashCache.clear();
     }
 }
+
+export { DefaultMediaService, determineExportFormat } from '../services/media';

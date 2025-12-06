@@ -33,8 +33,10 @@ const schema: PipelineSchema = {
 describe('ElementorCompiler', () => {
   it('gera containers com elType container e widgetType corretos', () => {
     const json = compiler.compile(schema);
-    expect(Array.isArray(json.elements)).toBe(true);
-    const root = json.elements[0];
+    const elements = json.elements || [];
+    expect(Array.isArray(elements)).toBe(true);
+    expect(elements.length).toBeGreaterThan(0);
+    const root = elements[0];
     expect(root.elType).toBe('container');
     expect(root.settings.flex_direction).toBe('row');
     expect(root.settings._element_id).toBeDefined();

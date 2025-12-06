@@ -11,17 +11,10 @@ import { createNodeSnapshot } from './heuristics/adapter';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { FileLogger } from './utils/logger';
 import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } from './linter';
+import { enforceWidgetTypes } from './services/heuristics';
 
-// Save original console.log BEFORE any modifications
-const originalConsoleLog = console.log.bind(console);
-
-// Initialize logger with original console.log
-export const logger = new FileLogger(originalConsoleLog);
-
-// Override console.log to route through logger
-console.log = (...args: any[]) => {
-    logger.log(...args);
-};
+// Logger dedicado para capturar eventos sem alterar console global
+export const logger = new FileLogger(console.log.bind(console));
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
 
@@ -241,7 +234,7 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
     const autoFixLayout = await loadSetting<boolean>('auto_fix_layout', false);
     log(`Iniciando pipeline (${providerId.toUpperCase()})...`, 'info');
     const result = await pipeline.run(node, wpConfig, {
-        debug,
+        debug: !!debug,
         provider,
         apiKey,
         autoFixLayout,
@@ -257,6 +250,11 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
 }
 
 function log(message: string, level: 'info' | 'warn' | 'error' | 'success' = 'info') {
+    try {
+        logger.log(`[${level}] ${message}`);
+    } catch {
+        // logger best-effort; avoid breaking UX
+    }
     figma.ui.postMessage({ type: 'log', level, message });
 }
 
@@ -264,7 +262,7 @@ async function deliverResult(json: ElementorJSON, debugInfo?: any) {
     const normalizedElements = (json as any).elements || (json as any).content || [];
 
     // Normalize siteurl to always end with /wp-json/
-    let siteurl = (json as any).siteurl || (this as any)?.wpConfig?.url || '';
+    let siteurl = (json as any).siteurl || '';
     if (siteurl && !siteurl.endsWith('/')) siteurl += '/';
     if (siteurl && !siteurl.endsWith('wp-json/')) siteurl += 'wp-json/';
 
@@ -301,56 +299,12 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
 
     const uploadPromises: Promise<void>[] = [];
 
-    // Function to recursively correct widget types based on Figma node names
-    const correctWidgetTypes = async (container: any) => {
-        for (const widget of container.widgets || []) {
-            try {
-                const node = await figma.getNodeById(widget.id);
-                if (node) {
-                    // Fix: Force 'image' type if Figma node is named 'w:image'
-                    if (node.name.startsWith('w:image') && !node.name.startsWith('w:image-box') && widget.type !== 'image') {
-                        console.log(`[FIX] Correcting widget type from ${widget.type} to image for node ${node.name}`);
-                        widget.type = 'image';
-                    }
-                    // Fix: Force 'button' type if Figma node is named 'w:button'
-                    if (node.name.startsWith('w:button') && widget.type !== 'button') {
-                        console.log(`[FIX] Correcting widget type from ${widget.type} to button for node ${node.name}`);
-                        widget.type = 'button';
-                    }
-                }
-            } catch (e) {
-                console.error(`[FIX] Error checking node ${widget.id}:`, e);
-            }
-
-            if (widget.children && Array.isArray(widget.children)) {
-                // Recursively correct children (e.g. icons inside buttons)
-                for (const child of widget.children) {
-                    if (child.id) {
-                        try {
-                            const childNode = await figma.getNodeById(child.id);
-                            if (childNode) {
-                                // Fix: Ensure icons are typed as icons
-                                if ((childNode.type === 'VECTOR' || childNode.name === 'Icon') && child.type !== 'icon') {
-                                    console.log(`[FIX] Correcting child widget type to icon for node ${childNode.name}`);
-                                    child.type = 'icon';
-                                }
-                            }
-                        } catch (e) { }
-                    }
-                }
-            }
-        }
-        for (const child of container.children || []) {
-            await correctWidgetTypes(child);
-        }
-    };
-
-    // Apply corrections before processing uploads
-    for (const container of schema.containers) {
-        await correctWidgetTypes(container);
-    }
+    await enforceWidgetTypes(schema);
 
     const processWidget = async (widget: any) => {
+        const uploader = noaiUploader;
+        if (!uploader) return;
+
         // Ensure we use the ID from the widget if imageId is missing
         const nodeId = widget.imageId || widget.id;
 
@@ -403,7 +357,7 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                         format = 'SVG';
                     }
 
-                    const result = await noaiUploader.uploadToWordPress(node as SceneNode, format as any);
+                    const result = await uploader.uploadToWordPress(node as SceneNode, format as any);
                     if (result) {
                         if (widget.type === 'image-box') {
                             if (!widget.styles) widget.styles = {};
@@ -452,7 +406,7 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                     try {
                         const node = await figma.getNodeById(slideNodeId);
                         if (node) {
-                            const result = await noaiUploader.uploadToWordPress(node as SceneNode, 'WEBP');
+                            const result = await uploader.uploadToWordPress(node as SceneNode, 'WEBP');
                             if (result) {
                                 console.log(`[NO-AI UPLOAD] 🎠 Slide uploaded: ${result.url}, ID: ${result.id}`);
                                 updatedSlides.push({

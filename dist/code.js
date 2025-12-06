@@ -1,56 +1,5 @@
+"use strict";
 (() => {
-  var __defProp = Object.defineProperty;
-  var __defProps = Object.defineProperties;
-  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
-  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-  var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __propIsEnum = Object.prototype.propertyIsEnumerable;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-  var __spreadValues = (a, b) => {
-    for (var prop in b || (b = {}))
-      if (__hasOwnProp.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    if (__getOwnPropSymbols)
-      for (var prop of __getOwnPropSymbols(b)) {
-        if (__propIsEnum.call(b, prop))
-          __defNormalProp(a, prop, b[prop]);
-      }
-    return a;
-  };
-  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
-  var __objRest = (source, exclude) => {
-    var target = {};
-    for (var prop in source)
-      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
-        target[prop] = source[prop];
-    if (source != null && __getOwnPropSymbols)
-      for (var prop of __getOwnPropSymbols(source)) {
-        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
-          target[prop] = source[prop];
-      }
-    return target;
-  };
-  var __async = (__this, __arguments, generator) => {
-    return new Promise((resolve, reject) => {
-      var fulfilled = (value) => {
-        try {
-          step(generator.next(value));
-        } catch (e) {
-          reject(e);
-        }
-      };
-      var rejected = (value) => {
-        try {
-          step(generator.throw(value));
-        } catch (e) {
-          reject(e);
-        }
-      };
-      var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
-      step((generator = generator.apply(__this, __arguments)).next());
-    });
-  };
-
   // src/utils/image_utils.ts
   function rgbToHex(rgb) {
     const toHex = (c) => {
@@ -60,7 +9,7 @@
     return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
   }
 
-  // src/utils/serialization_utils.ts
+  // src/services/serializer/index.ts
   function getFontWeight(style) {
     style = (style || "").toLowerCase();
     if (style.includes("thin")) return 100;
@@ -73,8 +22,32 @@
     if (style.includes("black") || style.includes("heavy")) return 900;
     return 400;
   }
-  function serializeNode(node, parentId) {
-    var _a;
+  var DefaultSerializerService = class {
+    serialize(node, parentId) {
+      return serializeNodeInternal(node, parentId);
+    }
+    flatten(root) {
+      const acc = [];
+      const stack = [root];
+      while (stack.length > 0) {
+        const current = stack.pop();
+        acc.push(current);
+        if (Array.isArray(current.children)) {
+          for (let i = current.children.length - 1; i >= 0; i--) {
+            stack.push(current.children[i]);
+          }
+        }
+      }
+      return acc;
+    }
+    createSnapshot(node) {
+      const root = this.serialize(node);
+      const flatNodes = this.flatten(root);
+      return { root, flatNodes };
+    }
+  };
+  var serializerService = new DefaultSerializerService();
+  function serializeNodeInternal(node, parentId) {
     const data = {
       id: node.id,
       name: node.name,
@@ -157,7 +130,7 @@
       data.characters = node.characters;
       data.fontSize = node.fontSize !== figma.mixed ? node.fontSize : void 0;
       data.fontName = node.fontName !== figma.mixed ? node.fontName : void 0;
-      data.fontWeight = node.fontName !== figma.mixed ? getFontWeight((_a = node.fontName) == null ? void 0 : _a.style) : 400;
+      data.fontWeight = node.fontName !== figma.mixed ? getFontWeight(node.fontName?.style) : 400;
       data.textAlignHorizontal = node.textAlignHorizontal;
       data.textAlignVertical = node.textAlignVertical;
       data.textAutoResize = node.textAutoResize;
@@ -168,10 +141,12 @@
       if (node.fills !== figma.mixed && node.fills.length > 0 && node.fills[0].type === "SOLID") {
         data.color = node.fills[0].color;
       }
-      try {
-        data.styledTextSegments = node.getStyledTextSegments(["fontSize", "fontName", "fontWeight", "textDecoration", "textCase", "lineHeight", "letterSpacing", "fills", "fillStyleId"]);
-      } catch (e) {
-        console.warn("Error getting styled text segments", e);
+      if (typeof node.getStyledTextSegments === "function") {
+        try {
+          data.styledTextSegments = node.getStyledTextSegments(["fontSize", "fontName", "fontWeight", "textDecoration", "textCase", "lineHeight", "letterSpacing", "fills", "fillStyleId"]);
+        } catch (e) {
+          console.warn("Error getting styled text segments", e);
+        }
       }
     }
     if ("layoutMode" in node) {
@@ -194,10 +169,15 @@
       if (node.locked) {
         data.children = [];
       } else {
-        data.children = node.children.map((child) => serializeNode(child, node.id));
+        data.children = node.children.map((child) => serializeNodeInternal(child, node.id));
       }
     }
     return data;
+  }
+
+  // src/utils/serialization_utils.ts
+  function serializeNode(node, parentId) {
+    return serializerService.serialize(node, parentId);
   }
   function repairJson(jsonString) {
     let repaired = jsonString.trim();
@@ -450,38 +430,32 @@
   var GEMINI_MODEL = "gemini-1.5-flash-002";
   var API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
   var DEFAULT_TIMEOUT_MS = 12e3;
-  function fetchWithTimeout(_0) {
-    return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
-      const AC = typeof AbortController === "function" ? AbortController : null;
-      let controller = null;
-      if (AC) {
-        try {
-          controller = new AC();
-        } catch (e) {
-          controller = null;
-        }
-      }
-      if (!controller) {
-        return yield fetch(url, options);
-      }
-      const id = setTimeout(() => controller.abort(), timeoutMs);
+  async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+    const AC = typeof AbortController === "function" ? AbortController : null;
+    let controller = null;
+    if (AC) {
       try {
-        const resp = yield fetch(url, __spreadProps(__spreadValues({}, options), { signal: controller.signal }));
-        return resp;
-      } finally {
-        clearTimeout(id);
+        controller = new AC();
+      } catch {
+        controller = null;
       }
-    });
+    }
+    if (!controller) {
+      return await fetch(url, options);
+    }
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { ...options, signal: controller.signal });
+      return resp;
+    } finally {
+      clearTimeout(id);
+    }
   }
-  function getKey() {
-    return __async(this, null, function* () {
-      return yield figma.clientStorage.getAsync("gemini_api_key");
-    });
+  async function getKey() {
+    return await figma.clientStorage.getAsync("gemini_api_key");
   }
-  function saveModel(model) {
-    return __async(this, null, function* () {
-      yield figma.clientStorage.setAsync("gemini_model", model);
-    });
+  async function saveModel(model) {
+    await figma.clientStorage.setAsync("gemini_model", model);
   }
   function cleanJson(content) {
     return content.replace(/```json/gi, "").replace(/```/g, "").trim();
@@ -498,105 +472,99 @@
       saveModel(model).catch(() => {
       });
     },
-    generateSchema(input) {
-      return __async(this, null, function* () {
-        var _a, _b, _c, _d, _e, _f, _g;
-        const apiKey = input.apiKey || (yield getKey());
-        if (!apiKey) {
-          return { ok: false, message: "API Key do Gemini nao configurada." };
-        }
-        const model = this.model || GEMINI_MODEL;
-        const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
-        const parts = [
-          { text: input.instructions },
-          { text: input.prompt },
-          { text: `SNAPSHOT:
+    async generateSchema(input) {
+      const apiKey = input.apiKey || await getKey();
+      if (!apiKey) {
+        return { ok: false, message: "API Key do Gemini nao configurada." };
+      }
+      const model = this.model || GEMINI_MODEL;
+      const endpoint = `${API_BASE_URL}${model}:generateContent?key=${apiKey}`;
+      const parts = [
+        { text: input.instructions },
+        { text: input.prompt },
+        { text: `SNAPSHOT:
 ${JSON.stringify(input.snapshot)}` }
-        ];
-        if (input.references && input.references.length > 0) {
-          const refText = input.references.map((ref) => `### ${ref.name}
+      ];
+      if (input.references && input.references.length > 0) {
+        const refText = input.references.map((ref) => `### ${ref.name}
 ${ref.content}`).join("\n\n");
-          parts.push({ text: `REFERENCIAS:
+        parts.push({ text: `REFERENCIAS:
 ${refText}` });
+      }
+      if (input.image?.data) {
+        parts.push({
+          inlineData: {
+            data: input.image.data,
+            mimeType: input.image.mimeType || "image/png"
+          }
+        });
+      }
+      const contents = [{ parts }];
+      const requestBody = {
+        contents,
+        generationConfig: {
+          temperature: 0.15,
+          maxOutputTokens: 8192,
+          response_mime_type: "application/json"
         }
-        if ((_a = input.image) == null ? void 0 : _a.data) {
-          parts.push({
-            inlineData: {
-              data: input.image.data,
-              mimeType: input.image.mimeType || "image/png"
-            }
-          });
-        }
-        const contents = [{ parts }];
-        const requestBody = {
-          contents,
-          generationConfig: {
-            temperature: 0.15,
-            maxOutputTokens: 8192,
-            response_mime_type: "application/json"
-          }
-        };
-        try {
-          const response = yield fetchWithTimeout(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody)
-          });
-          if (!response.ok) {
-            const rawText = yield response.text();
-            let parsed = null;
-            try {
-              parsed = JSON.parse(rawText);
-            } catch (e) {
-              parsed = rawText;
-            }
-            const message = ((_b = parsed == null ? void 0 : parsed.error) == null ? void 0 : _b.message) || `HTTP ${response.status}`;
-            return { ok: false, message: `Falha na API Gemini: ${message}`, raw: parsed };
-          }
-          const data = yield response.json();
-          const text = (_g = (_f = (_e = (_d = (_c = data == null ? void 0 : data.candidates) == null ? void 0 : _c[0]) == null ? void 0 : _d.content) == null ? void 0 : _e.parts) == null ? void 0 : _f[0]) == null ? void 0 : _g.text;
-          if (!text) {
-            return { ok: false, message: "Resposta vazia da Gemini.", raw: data };
-          }
+      };
+      try {
+        const response = await fetchWithTimeout(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+        if (!response.ok) {
+          const rawText = await response.text();
+          let parsed = null;
           try {
-            const schema = parseGeminiJson(text);
-            return { ok: true, schema, raw: data };
-          } catch (e) {
-            try {
-              const repaired = repairJson(cleanJson(text));
-              const schema = JSON.parse(repaired);
-              return { ok: true, schema, raw: data };
-            } catch (err) {
-              return { ok: false, message: "Resposta nao JSON da Gemini.", raw: text };
-            }
+            parsed = JSON.parse(rawText);
+          } catch {
+            parsed = rawText;
           }
-        } catch (err) {
-          const aborted = (err == null ? void 0 : err.name) === "AbortError";
-          const message = aborted ? "Timeout na chamada Gemini." : (err == null ? void 0 : err.message) || "Erro desconhecido na Gemini.";
-          return { ok: false, message, raw: err };
+          const message = parsed?.error?.message || `HTTP ${response.status}`;
+          return { ok: false, message: `Falha na API Gemini: ${message}`, raw: parsed };
         }
-      });
-    },
-    testConnection(apiKey) {
-      return __async(this, null, function* () {
-        var _a;
-        const keyToTest = apiKey || (yield getKey());
-        if (!keyToTest) return { ok: false, message: "API Key nao configurada" };
-        const endpoint = `${API_BASE_URL}?key=${keyToTest}`;
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) {
+          return { ok: false, message: "Resposta vazia da Gemini.", raw: data };
+        }
         try {
-          const response = yield fetchWithTimeout(endpoint, { method: "GET" });
-          if (!response.ok) {
-            const errorData = yield response.json().catch(() => ({}));
-            const message = ((_a = errorData == null ? void 0 : errorData.error) == null ? void 0 : _a.message) || `HTTP ${response.status}`;
-            return { ok: false, message: `Falha na conexao: ${message}`, raw: errorData };
+          const schema = parseGeminiJson(text);
+          return { ok: true, schema, raw: data };
+        } catch {
+          try {
+            const repaired = repairJson(cleanJson(text));
+            const schema = JSON.parse(repaired);
+            return { ok: true, schema, raw: data };
+          } catch (err) {
+            return { ok: false, message: "Resposta nao JSON da Gemini.", raw: text };
           }
-          return { ok: true, message: "Conexao com Gemini verificada." };
-        } catch (e) {
-          const aborted = (e == null ? void 0 : e.name) === "AbortError";
-          const baseMessage = aborted ? "Tempo limite ao testar conexao." : (e == null ? void 0 : e.message) || "Erro desconhecido";
-          return { ok: false, message: baseMessage, raw: e };
         }
-      });
+      } catch (err) {
+        const aborted = err?.name === "AbortError";
+        const message = aborted ? "Timeout na chamada Gemini." : err?.message || "Erro desconhecido na Gemini.";
+        return { ok: false, message, raw: err };
+      }
+    },
+    async testConnection(apiKey) {
+      const keyToTest = apiKey || await getKey();
+      if (!keyToTest) return { ok: false, message: "API Key nao configurada" };
+      const endpoint = `${API_BASE_URL}?key=${keyToTest}`;
+      try {
+        const response = await fetchWithTimeout(endpoint, { method: "GET" });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const message = errorData?.error?.message || `HTTP ${response.status}`;
+          return { ok: false, message: `Falha na conexao: ${message}`, raw: errorData };
+        }
+        return { ok: true, message: "Conexao com Gemini verificada." };
+      } catch (e) {
+        const aborted = e?.name === "AbortError";
+        const baseMessage = aborted ? "Tempo limite ao testar conexao." : e?.message || "Erro desconhecido";
+        return { ok: false, message: baseMessage, raw: e };
+      }
     }
   };
 
@@ -618,7 +586,7 @@ ${refText}` });
       widgetType,
       family,
       aliases: [.../* @__PURE__ */ new Set([widgetType, ...aliases])],
-      compile: (_w, base) => ({ widgetType, settings: __spreadValues({}, base) })
+      compile: (_w, base) => ({ widgetType, settings: { ...base } })
     };
   }
   function generateAliases(key, ptAliases = [], extraAliases = []) {
@@ -648,9 +616,11 @@ ${refText}` });
         const color = base.color;
         return {
           widgetType: "heading",
-          settings: __spreadValues(__spreadProps(__spreadValues({}, base), {
-            title: w.content || "Heading"
-          }), color ? { title_color: color } : {})
+          settings: {
+            ...base,
+            title: w.content || "Heading",
+            ...color ? { title_color: color } : {}
+          }
         };
       }
     },
@@ -663,9 +633,11 @@ ${refText}` });
         const color = base.color;
         return {
           widgetType: "text-editor",
-          settings: __spreadValues(__spreadProps(__spreadValues({}, base), {
-            editor: w.content || "Text"
-          }), color ? { text_color: color } : {})
+          settings: {
+            ...base,
+            editor: w.content || "Text",
+            ...color ? { text_color: color } : {}
+          }
         };
       }
     },
@@ -675,9 +647,8 @@ ${refText}` });
       family: "action",
       aliases: generateAliases("button", ["bot\xE3o", "link", "chamada para a\xE7\xE3o"], ["btn", "cta", "action button", "clique aqui"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
         console.log("[REGISTRY DEBUG] Compiling button widget:", w.type);
-        console.log("[REGISTRY DEBUG] Button has", ((_a = w.children) == null ? void 0 : _a.length) || 0, "child widgets");
+        console.log("[REGISTRY DEBUG] Button has", w.children?.length || 0, "child widgets");
         let buttonText = w.content || "Button";
         let iconId = w.imageId;
         let textColor;
@@ -690,7 +661,7 @@ ${refText}` });
           if (textChild && textChild.content) {
             buttonText = textChild.content;
             console.log("[REGISTRY DEBUG] \u2705 Extracted text from child:", buttonText);
-            if ((_b = textChild.styles) == null ? void 0 : _b.color) {
+            if (textChild.styles?.color) {
               const { r, g, b } = textChild.styles.color;
               textColor = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
               console.log("[REGISTRY DEBUG] \u2705 Extracted text color from child:", textColor);
@@ -707,7 +678,8 @@ ${refText}` });
             console.log("[REGISTRY DEBUG] \u2705 Extracted icon from child:", iconId);
           }
         }
-        const settings = __spreadProps(__spreadValues({}, base), {
+        const settings = {
+          ...base,
           text: buttonText,
           // Default Elementor settings
           size: "sm",
@@ -715,7 +687,7 @@ ${refText}` });
           align: "center",
           // Default alignment
           typography_typography: "custom"
-        });
+        };
         const styles = textStyles.fontName ? textStyles : w.styles || {};
         if (styles.fontName) settings.typography_font_family = styles.fontName.family;
         if (styles.fontSize) settings.typography_font_size = { unit: "px", size: styles.fontSize };
@@ -737,9 +709,9 @@ ${refText}` });
           const alignMap = { LEFT: "left", CENTER: "center", RIGHT: "right", JUSTIFIED: "justify" };
           if (alignMap[styles.textAlignHorizontal]) settings.align = alignMap[styles.textAlignHorizontal];
         }
-        if ((_c = w.styles) == null ? void 0 : _c.background) {
+        if (w.styles?.background) {
           settings.background_color = w.styles.background.color || w.styles.background;
-        } else if (((_d = w.styles) == null ? void 0 : _d.fills) && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
+        } else if (w.styles?.fills && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
           const solidFill = w.styles.fills.find((f) => f.type === "SOLID");
           if (solidFill && solidFill.color) {
             const { r, g, b } = solidFill.color;
@@ -749,13 +721,13 @@ ${refText}` });
         }
         if (textColor) {
           settings.button_text_color = textColor;
-        } else if ((_e = w.styles) == null ? void 0 : _e.color) {
+        } else if (w.styles?.color) {
           const { r, g, b } = w.styles.color;
           settings.button_text_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
         } else if (base.color) {
           settings.button_text_color = base.color;
         }
-        if (((_f = w.styles) == null ? void 0 : _f.paddingTop) !== void 0 || ((_g = w.styles) == null ? void 0 : _g.paddingRight) !== void 0 || ((_h = w.styles) == null ? void 0 : _h.paddingBottom) !== void 0 || ((_i = w.styles) == null ? void 0 : _i.paddingLeft) !== void 0) {
+        if (w.styles?.paddingTop !== void 0 || w.styles?.paddingRight !== void 0 || w.styles?.paddingBottom !== void 0 || w.styles?.paddingLeft !== void 0) {
           settings.button_padding = {
             unit: "px",
             top: w.styles.paddingTop || 0,
@@ -765,7 +737,7 @@ ${refText}` });
             isLinked: false
           };
         }
-        if (((_k = (_j = w.styles) == null ? void 0 : _j.border) == null ? void 0 : _k.radius) !== void 0) {
+        if (w.styles?.border?.radius !== void 0) {
           settings.border_radius = {
             unit: "px",
             top: w.styles.border.radius,
@@ -774,7 +746,7 @@ ${refText}` });
             left: w.styles.border.radius,
             isLinked: true
           };
-        } else if (((_l = w.styles) == null ? void 0 : _l.cornerRadius) !== void 0) {
+        } else if (w.styles?.cornerRadius !== void 0) {
           settings.border_radius = {
             unit: "px",
             top: w.styles.cornerRadius,
@@ -796,7 +768,7 @@ ${refText}` });
               console.log("[BUTTON ICON DEBUG] Found icon URL from child:", iconUrl);
             }
           }
-          if (!iconUrl && ((_n = (_m = w.styles) == null ? void 0 : _m.selected_icon) == null ? void 0 : _n.value)) {
+          if (!iconUrl && w.styles?.selected_icon?.value) {
             iconUrl = w.styles.selected_icon.value;
           }
           console.log("[BUTTON ICON DEBUG] iconId:", iconId);
@@ -816,20 +788,20 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("image", ["imagem", "foto", "figura"], ["img", "picture", "photo", "single image", "imagem \xFAnica"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d;
         const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
-        const settings = __spreadProps(__spreadValues({}, base), {
+        const settings = {
+          ...base,
           image: {
             url: w.content || "",
             id: isNaN(imgId) ? "" : imgId
           },
           image_size: "full"
           // Use full resolution
-        });
-        if (((_a = w.styles) == null ? void 0 : _a.width) && typeof w.styles.width === "number") {
+        };
+        if (w.styles?.width && typeof w.styles.width === "number") {
           settings.width = { unit: "px", size: Math.round(w.styles.width), sizes: [] };
         }
-        console.log("[IMAGE WIDGET DEBUG]", { width: (_b = w.styles) == null ? void 0 : _b.width, height: (_c = w.styles) == null ? void 0 : _c.height, name: (_d = w.styles) == null ? void 0 : _d.sourceName });
+        console.log("[IMAGE WIDGET DEBUG]", { width: w.styles?.width, height: w.styles?.height, name: w.styles?.sourceName });
         return { widgetType: "image", settings };
       }
     },
@@ -838,13 +810,10 @@ ${refText}` });
       widgetType: "icon",
       family: "media",
       aliases: generateAliases("icon", ["\xEDcone", "simbolo"], ["ico", "symbol", "svg icon"]),
-      compile: (w, base) => {
-        var _a;
-        return {
-          widgetType: "icon",
-          settings: __spreadProps(__spreadValues({}, base), { selected_icon: ((_a = w.styles) == null ? void 0 : _a.selected_icon) || { value: w.content || "fas fa-star", library: "fa-solid" } })
-        };
-      }
+      compile: (w, base) => ({
+        widgetType: "icon",
+        settings: { ...base, selected_icon: w.styles?.selected_icon || { value: w.content || "fas fa-star", library: "fa-solid" } }
+      })
     },
     // Hint-based simples
     {
@@ -856,11 +825,12 @@ ${refText}` });
         const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
         return {
           widgetType: "image-box",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             image: { url: base.image_url || "", id: isNaN(imgId) ? "" : imgId },
             title_text: w.content || base.title_text || "Title",
             description_text: base.description_text || ""
-          })
+          }
         };
       }
     },
@@ -869,18 +839,16 @@ ${refText}` });
       widgetType: "icon-box",
       family: "media",
       aliases: generateAliases("icon-box", ["caixa de \xEDcone", "box \xEDcone", "card com \xEDcone"], ["icon box", "box icon", "card icon", "feature icon"]),
-      compile: (w, base) => {
-        var _a, _b, _c;
-        return {
-          widgetType: "icon-box",
-          settings: __spreadProps(__spreadValues({}, base), {
-            // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
-            selected_icon: ((_a = w.styles) == null ? void 0 : _a.selected_icon) || base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
-            title_text: w.content || base.title_text || ((_b = w.styles) == null ? void 0 : _b.title_text) || "Title",
-            description_text: base.description_text || ((_c = w.styles) == null ? void 0 : _c.description_text) || ""
-          })
-        };
-      }
+      compile: (w, base) => ({
+        widgetType: "icon-box",
+        settings: {
+          ...base,
+          // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
+          selected_icon: w.styles?.selected_icon || base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
+          title_text: w.content || base.title_text || w.styles?.title_text || "Title",
+          description_text: base.description_text || w.styles?.description_text || ""
+        }
+      })
     },
     {
       key: "icon_list",
@@ -888,24 +856,23 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("icon-list", ["lista de \xEDcones", "lista", "t\xF3picos"], ["icon list", "list", "bullet points", "check list"]),
       compile: (w, base) => {
-        var _a;
-        const settings = __spreadValues({
+        const settings = {
           view: "traditional",
-          link_click: "full_width"
-        }, base);
+          link_click: "full_width",
+          ...base
+        };
         const children = w.children || [];
         console.log("[ICON-LIST] Processing with", children.length, "children");
         if (children.length > 0) {
           settings.icon_list = children.map((child, idx) => {
-            var _a2, _b;
-            const text = child.content || ((_a2 = child.styles) == null ? void 0 : _a2.sourceName) || `Item ${idx + 1}`;
+            const text = child.content || child.styles?.sourceName || `Item ${idx + 1}`;
             const iconId = child.imageId;
             console.log("[ICON-LIST] Item", idx, ":", { text, iconId });
             const item = {
               _id: Math.random().toString(36).substring(2, 9),
               text,
               selected_icon: iconId ? {
-                value: { url: ((_b = child.styles) == null ? void 0 : _b.icon_url) || "", id: iconId },
+                value: { url: child.styles?.icon_url || "", id: iconId },
                 library: "svg"
               } : { value: "fas fa-check", library: "fa-solid" },
               link: { url: "", is_external: "", nofollow: "", custom_attributes: "" }
@@ -914,7 +881,7 @@ ${refText}` });
             console.log("[ICON-LIST] Generated Item:", JSON.stringify(item));
             return item;
           });
-        } else if ((_a = w.styles) == null ? void 0 : _a.icon_list) {
+        } else if (w.styles?.icon_list) {
           settings.icon_list = w.styles.icon_list;
         } else {
           settings.icon_list = [{
@@ -935,31 +902,28 @@ ${refText}` });
       widgetType: "video",
       family: "media",
       aliases: generateAliases("video", ["v\xEDdeo", "player"], ["youtube", "vimeo", "video player"]),
-      compile: (w, base) => ({ widgetType: "video", settings: __spreadProps(__spreadValues({}, base), { link: w.content || "" }) })
+      compile: (w, base) => ({ widgetType: "video", settings: { ...base, link: w.content || "" } })
     },
     {
       key: "divider",
       widgetType: "divider",
       family: "misc",
       aliases: generateAliases("divider", ["divisor", "linha", "separador"], ["line", "separator", "horizontal line", "linha horizontal"]),
-      compile: (_w, base) => ({ widgetType: "divider", settings: __spreadValues({}, base) })
+      compile: (_w, base) => ({ widgetType: "divider", settings: { ...base } })
     },
     {
       key: "spacer",
       widgetType: "spacer",
       family: "misc",
       aliases: generateAliases("spacer", ["espa\xE7amento", "espa\xE7o", "separador"], ["space", "gap", "empty space", "vazio"]),
-      compile: (_w, base) => {
-        var _a;
-        return { widgetType: "spacer", settings: __spreadProps(__spreadValues({}, base), { space: (_a = base.space) != null ? _a : 20 }) };
-      }
+      compile: (_w, base) => ({ widgetType: "spacer", settings: { ...base, space: base.space ?? 20 } })
     },
     {
       key: "star-rating",
       widgetType: "star-rating",
       family: "misc",
       aliases: generateAliases("star-rating", ["avalia\xE7\xE3o", "estrelas", "nota"], ["star rating", "stars", "rating", "5 stars"]),
-      compile: (w, base) => ({ widgetType: "star-rating", settings: __spreadProps(__spreadValues({}, base), { rating: Number(w.content) || 5 }) })
+      compile: (w, base) => ({ widgetType: "star-rating", settings: { ...base, rating: Number(w.content) || 5 } })
     },
     {
       key: "counter",
@@ -968,12 +932,13 @@ ${refText}` });
       aliases: generateAliases("counter", ["contador", "n\xFAmero"], ["number", "stats"]),
       compile: (w, base) => ({
         widgetType: "counter",
-        settings: __spreadProps(__spreadValues({}, base), {
+        settings: {
+          ...base,
           starting_number: 0,
           ending_number: Number(w.content) || 100,
           prefix: base.prefix,
           suffix: base.suffix
-        })
+        }
       })
     },
     {
@@ -982,7 +947,7 @@ ${refText}` });
       family: "pro",
       aliases: generateAliases("countdown", ["contagem regressiva", "timer"], ["timer", "count down", "clock"]),
       compile: (w, base) => {
-        const settings = __spreadValues({}, base);
+        const settings = { ...base };
         const children = w.children || [];
         const timeData = {};
         const labels = {};
@@ -991,15 +956,14 @@ ${refText}` });
         let digitsFontSize;
         let labelFontSize;
         children.forEach((child) => {
-          var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
           const text = (child.content || "").toString().trim();
           const lowerText = text.toLowerCase();
           const numValue = parseInt(text, 10);
           if (!isNaN(numValue) && text.match(/^\d+$/)) {
-            if (!digitsColor && ((_a = child.styles) == null ? void 0 : _a.color)) {
+            if (!digitsColor && child.styles?.color) {
               digitsColor = normalizeColor(child.styles.color);
             }
-            if (!digitsFontSize && ((_b = child.styles) == null ? void 0 : _b.fontSize)) {
+            if (!digitsFontSize && child.styles?.fontSize) {
               digitsFontSize = child.styles.fontSize;
             }
             const childIndex = children.indexOf(child);
@@ -1009,38 +973,38 @@ ${refText}` });
               if (nextText === ":") continue;
               if (nextText.includes("dia") || nextText.includes("day")) {
                 timeData.days = numValue;
-                labels.days = nextChild.content;
-                if (!labelColor && ((_c = nextChild.styles) == null ? void 0 : _c.color)) {
+                labels.days = String(nextChild.content ?? "");
+                if (!labelColor && nextChild.styles?.color) {
                   labelColor = normalizeColor(nextChild.styles.color);
                 }
-                if (!labelFontSize && ((_d = nextChild.styles) == null ? void 0 : _d.fontSize)) {
+                if (!labelFontSize && nextChild.styles?.fontSize) {
                   labelFontSize = nextChild.styles.fontSize;
                 }
               } else if (nextText.includes("hr") || nextText.includes("hour") || nextText.includes("hora")) {
                 timeData.hours = numValue;
-                labels.hours = nextChild.content;
-                if (!labelColor && ((_e = nextChild.styles) == null ? void 0 : _e.color)) {
+                labels.hours = String(nextChild.content ?? "");
+                if (!labelColor && nextChild.styles?.color) {
                   labelColor = normalizeColor(nextChild.styles.color);
                 }
-                if (!labelFontSize && ((_f = nextChild.styles) == null ? void 0 : _f.fontSize)) {
+                if (!labelFontSize && nextChild.styles?.fontSize) {
                   labelFontSize = nextChild.styles.fontSize;
                 }
               } else if (nextText.includes("min") || nextText.includes("minute")) {
                 timeData.minutes = numValue;
-                labels.minutes = nextChild.content;
-                if (!labelColor && ((_g = nextChild.styles) == null ? void 0 : _g.color)) {
+                labels.minutes = String(nextChild.content ?? "");
+                if (!labelColor && nextChild.styles?.color) {
                   labelColor = normalizeColor(nextChild.styles.color);
                 }
-                if (!labelFontSize && ((_h = nextChild.styles) == null ? void 0 : _h.fontSize)) {
+                if (!labelFontSize && nextChild.styles?.fontSize) {
                   labelFontSize = nextChild.styles.fontSize;
                 }
               } else if (nextText.includes("seg") || nextText.includes("sec") || nextText.includes("second")) {
                 timeData.seconds = numValue;
-                labels.seconds = nextChild.content;
-                if (!labelColor && ((_i = nextChild.styles) == null ? void 0 : _i.color)) {
+                labels.seconds = String(nextChild.content ?? "");
+                if (!labelColor && nextChild.styles?.color) {
                   labelColor = normalizeColor(nextChild.styles.color);
                 }
-                if (!labelFontSize && ((_j = nextChild.styles) == null ? void 0 : _j.fontSize)) {
+                if (!labelFontSize && nextChild.styles?.fontSize) {
                   labelFontSize = nextChild.styles.fontSize;
                 }
               }
@@ -1121,7 +1085,7 @@ ${refText}` });
       aliases: generateAliases("progress", ["barra de progresso", "progresso"], ["progress bar", "bar", "skill bar"]),
       compile: (w, base) => ({
         widgetType: "progress",
-        settings: __spreadProps(__spreadValues({}, base), { title: w.content || base.title || "Progresso", percent: Number(base.percent) || 50 })
+        settings: { ...base, title: w.content || base.title || "Progresso", percent: Number(base.percent) || 50 }
       })
     },
     {
@@ -1131,9 +1095,10 @@ ${refText}` });
       aliases: generateAliases("tabs", ["abas", "guias"], ["tabbed content"]),
       compile: (w, base) => ({
         widgetType: "tabs",
-        settings: __spreadProps(__spreadValues({}, base), {
+        settings: {
+          ...base,
           tabs: base.tabs || [{ _id: "tab1", tab_title: "Aba 1", tab_content: w.content || "Conte\xFAdo" }]
-        })
+        }
       })
     },
     {
@@ -1142,12 +1107,11 @@ ${refText}` });
       family: "misc",
       aliases: generateAliases("accordion", ["acorde\xE3o", "sanfona"], ["collapse", "faq"]),
       compile: (w, base) => {
-        var _a, _b, _d;
         console.log("[ACCORDION COMPILE] Received widget:", JSON.stringify({
           type: w.type,
           content: w.content,
-          childrenCount: ((_a = w.children) == null ? void 0 : _a.length) || 0,
-          children: (_b = w.children) == null ? void 0 : _b.map((c) => ({
+          childrenCount: w.children?.length || 0,
+          children: w.children?.map((c) => ({
             content: c.content,
             styles: c.styles
           }))
@@ -1156,9 +1120,8 @@ ${refText}` });
         const nestedElements = [];
         if (w.children && w.children.length > 0) {
           w.children.forEach((child, i) => {
-            var _a2;
             const itemId = generateGUID();
-            const title = ((_a2 = child.styles) == null ? void 0 : _a2.title) || child.content || `Item ${i + 1}`;
+            const title = child.styles?.title || child.content || `Item ${i + 1}`;
             items.push({
               item_title: title,
               _id: itemId,
@@ -1219,8 +1182,9 @@ ${refText}` });
             elements: []
           });
         }
-        const _c = base, { selected_icon: _ } = _c, cleanBase = __objRest(_c, ["selected_icon"]);
-        const settings = __spreadProps(__spreadValues({}, cleanBase), {
+        const { selected_icon: _, ...cleanBase } = base;
+        const settings = {
+          ...cleanBase,
           items,
           accordion_item_title_position_horizontal: "stretch",
           accordion_item_title_icon_position: "end",
@@ -1247,8 +1211,8 @@ ${refText}` });
           content_border_border: "",
           content_border_radius: { unit: "px", top: "5", right: "5", bottom: "5", left: "5", isLinked: true },
           content_padding: { unit: "px", top: "20", right: "20", bottom: "20", left: "20", isLinked: true }
-        });
-        if ((_d = w.styles) == null ? void 0 : _d.selected_icon) {
+        };
+        if (w.styles?.selected_icon) {
           settings.accordion_item_title_icon = w.styles.selected_icon;
         }
         return {
@@ -1264,14 +1228,12 @@ ${refText}` });
       family: "misc",
       aliases: generateAliases("toggle", ["alternar", "toggle"], []),
       compile: (w, base) => {
-        var _b;
         const tabs = [];
         if (w.children && w.children.length > 0) {
           w.children.forEach((child, i) => {
-            var _a2, _b2;
             const itemId = generateGUID();
-            const title = ((_a2 = child.styles) == null ? void 0 : _a2.title) || child.content || `Toggle Item ${i + 1}`;
-            const content = ((_b2 = child.styles) == null ? void 0 : _b2.content) || "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
+            const title = child.styles?.title || child.content || `Toggle Item ${i + 1}`;
+            const content = child.styles?.content || "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
             tabs.push({
               tab_title: title,
               tab_content: content,
@@ -1286,8 +1248,9 @@ ${refText}` });
             _id: generateGUID()
           });
         }
-        const _a = base, { selected_icon: _ } = _a, cleanBase = __objRest(_a, ["selected_icon"]);
-        const settings = __spreadProps(__spreadValues({}, cleanBase), {
+        const { selected_icon: _, ...cleanBase } = base;
+        const settings = {
+          ...cleanBase,
           tabs,
           // Icons
           selected_icon: { value: "fas fa-plus", library: "fa-solid" },
@@ -1297,8 +1260,8 @@ ${refText}` });
           title_html_tag: "div",
           // Behavior
           faq_schema: ""
-        });
-        if ((_b = w.styles) == null ? void 0 : _b.selected_icon) {
+        };
+        if (w.styles?.selected_icon) {
           settings.selected_icon = w.styles.selected_icon;
         }
         return {
@@ -1314,7 +1277,7 @@ ${refText}` });
       aliases: generateAliases("alert", ["alerta", "aviso", "notifica\xE7\xE3o"], ["notification", "message", "info box"]),
       compile: (w, base) => ({
         widgetType: "alert",
-        settings: __spreadProps(__spreadValues({}, base), { alert_type: base.alert_type || "info", title: w.content || base.title || "Alerta" })
+        settings: { ...base, alert_type: base.alert_type || "info", title: w.content || base.title || "Alerta" }
       })
     },
     {
@@ -1324,11 +1287,12 @@ ${refText}` });
       aliases: generateAliases("social-icons", ["\xEDcones sociais", "redes sociais"], ["social icons", "social media", "follow us", "facebook", "instagram"]),
       compile: (_w, base) => ({
         widgetType: "social-icons",
-        settings: __spreadProps(__spreadValues({}, base), {
+        settings: {
+          ...base,
           social_icon_list: base.social_icon_list || [
             { _id: "soc1", icon: { value: "fab fa-facebook", library: "fa-brands" }, link: { url: "" } }
           ]
-        })
+        }
       })
     },
     {
@@ -1336,34 +1300,34 @@ ${refText}` });
       widgetType: "soundcloud",
       family: "media",
       aliases: generateAliases("soundcloud", ["\xE1udio", "som"], ["audio", "player"]),
-      compile: (w, base) => ({ widgetType: "soundcloud", settings: __spreadProps(__spreadValues({}, base), { url: w.content || base.url || "" }) })
+      compile: (w, base) => ({ widgetType: "soundcloud", settings: { ...base, url: w.content || base.url || "" } })
     },
     {
       key: "shortcode",
       widgetType: "shortcode",
       family: "misc",
       aliases: generateAliases("shortcode", ["shortcode", "c\xF3digo"], ["code"]),
-      compile: (w, base) => ({ widgetType: "shortcode", settings: __spreadProps(__spreadValues({}, base), { shortcode: w.content || base.shortcode || "" }) })
+      compile: (w, base) => ({ widgetType: "shortcode", settings: { ...base, shortcode: w.content || base.shortcode || "" } })
     },
     {
       key: "menu-anchor",
       widgetType: "menu-anchor",
       family: "nav",
       aliases: generateAliases("menu-anchor", ["\xE2ncora", "link interno"], ["menu anchor", "anchor", "id"]),
-      compile: (w, base) => ({ widgetType: "menu-anchor", settings: __spreadProps(__spreadValues({}, base), { anchor: w.content || base.anchor || "ancora" }) })
+      compile: (w, base) => ({ widgetType: "menu-anchor", settings: { ...base, anchor: w.content || base.anchor || "ancora" } })
     },
     {
       key: "sidebar",
       widgetType: "sidebar",
       family: "misc",
-      compile: (w, base) => ({ widgetType: "sidebar", settings: __spreadProps(__spreadValues({}, base), { sidebar: w.content || base.sidebar || "sidebar-1" }) })
+      compile: (w, base) => ({ widgetType: "sidebar", settings: { ...base, sidebar: w.content || base.sidebar || "sidebar-1" } })
     },
     {
       key: "read-more",
       widgetType: "read-more",
       family: "action",
       aliases: generateAliases("read-more", ["leia mais"], ["read more"]),
-      compile: (w, base) => ({ widgetType: "read-more", settings: __spreadProps(__spreadValues({}, base), { text: w.content || base.text || "Leia mais" }) })
+      compile: (w, base) => ({ widgetType: "read-more", settings: { ...base, text: w.content || base.text || "Leia mais" } })
     },
     {
       key: "image-carousel",
@@ -1389,34 +1353,30 @@ ${refText}` });
           image: { url: w.content || "", id: w.imageId || "" },
           _id: "slide1"
         };
-        const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => {
-          var _a;
-          return {
-            _id: s._id || `slide_${i + 1}`,
-            id: (() => {
-              var _a2, _b;
-              const raw = (_b = s.id) != null ? _b : (_a2 = s.image) == null ? void 0 : _a2.id;
-              const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
-              return isNaN(parsed) ? "" : parsed;
-            })(),
-            url: s.url || ((_a = s.image) == null ? void 0 : _a.url) || "",
-            image: (() => {
-              var _a2, _b, _c;
-              const url = s.url || ((_a2 = s.image) == null ? void 0 : _a2.url) || "";
-              const raw = (_c = s.id) != null ? _c : (_b = s.image) == null ? void 0 : _b.id;
-              const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
-              const id = isNaN(parsed) ? "" : parsed;
-              return { url, id };
-            })()
-          };
-        }) : [fallbackSlide];
+        const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => ({
+          _id: s._id || `slide_${i + 1}`,
+          id: (() => {
+            const raw = s.id ?? s.image?.id;
+            const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+            return isNaN(parsed) ? "" : parsed;
+          })(),
+          url: s.url || s.image?.url || "",
+          image: (() => {
+            const url = s.url || s.image?.url || "";
+            const raw = s.id ?? s.image?.id;
+            const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+            const id = isNaN(parsed) ? "" : parsed;
+            return { url, id };
+          })()
+        })) : [fallbackSlide];
         return {
           widgetType: "image-carousel",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             carousel: normalizedSlides,
             slides: normalizedSlides
             // Keep both for compatibility
-          })
+          }
         };
       }
     },
@@ -1427,12 +1387,13 @@ ${refText}` });
       aliases: generateAliases("loop-carousel", ["loop do carrossel", "loop carousel"], ["loop"]),
       compile: (w, base) => ({
         widgetType: "loop-carousel",
-        settings: __spreadProps(__spreadValues({}, base), {
+        settings: {
+          ...base,
           // Loop carousel relies on templates, so we mostly pass base settings
           // but we can ensure some defaults if needed
           slides_to_show: base.slides_to_show || "3",
           slides_to_scroll: base.slides_to_scroll || "1"
-        })
+        }
       })
     },
     {
@@ -1450,12 +1411,13 @@ ${refText}` });
         }
         return {
           widgetType: "basic-gallery",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             gallery: gallery || [{
               id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
               url: w.content || ""
             }]
-          })
+          }
         };
       }
     },
@@ -1483,32 +1445,28 @@ ${refText}` });
           image: { url: w.content || "", id: w.imageId || "" },
           _id: "slide1"
         };
-        const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => {
-          var _a;
-          return {
-            _id: s._id || `slide_${i + 1}`,
-            id: (() => {
-              var _a2, _b;
-              const raw = (_b = s.id) != null ? _b : (_a2 = s.image) == null ? void 0 : _a2.id;
-              const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
-              return isNaN(parsed) ? "" : parsed;
-            })(),
-            url: s.url || ((_a = s.image) == null ? void 0 : _a.url) || "",
-            image: (() => {
-              var _a2, _b, _c;
-              const url = s.url || ((_a2 = s.image) == null ? void 0 : _a2.url) || "";
-              const raw = (_c = s.id) != null ? _c : (_b = s.image) == null ? void 0 : _b.id;
-              const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
-              const id = isNaN(parsed) ? "" : parsed;
-              return { url, id };
-            })()
-          };
-        }) : [fallbackSlide];
+        const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => ({
+          _id: s._id || `slide_${i + 1}`,
+          id: (() => {
+            const raw = s.id ?? s.image?.id;
+            const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+            return isNaN(parsed) ? "" : parsed;
+          })(),
+          url: s.url || s.image?.url || "",
+          image: (() => {
+            const url = s.url || s.image?.url || "";
+            const raw = s.id ?? s.image?.id;
+            const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+            const id = isNaN(parsed) ? "" : parsed;
+            return { url, id };
+          })()
+        })) : [fallbackSlide];
         return {
           widgetType: "media-carousel",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             slides: normalizedSlides
-          })
+          }
         };
       }
     },
@@ -1521,9 +1479,10 @@ ${refText}` });
         const slides = base.slides || [];
         return {
           widgetType: "testimonial-carousel",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             slides
-          })
+          }
         };
       }
     },
@@ -1536,9 +1495,10 @@ ${refText}` });
         const slides = base.slides || [];
         return {
           widgetType: "reviews",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             slides
-          })
+          }
         };
       }
     },
@@ -1551,9 +1511,10 @@ ${refText}` });
         const slides = base.slides || [];
         return {
           widgetType: "slides",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             slides
-          })
+          }
         };
       }
     },
@@ -1581,32 +1542,28 @@ ${refText}` });
           image: { url: w.content || "", id: w.imageId || "" },
           _id: "slide1"
         };
-        const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => {
-          var _a;
-          return {
-            _id: s._id || `slide_${i + 1}`,
-            id: (() => {
-              var _a2, _b;
-              const raw = (_b = s.id) != null ? _b : (_a2 = s.image) == null ? void 0 : _a2.id;
-              const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
-              return isNaN(parsed) ? "" : parsed;
-            })(),
-            url: s.url || ((_a = s.image) == null ? void 0 : _a.url) || "",
-            image: (() => {
-              var _a2, _b, _c;
-              const url = s.url || ((_a2 = s.image) == null ? void 0 : _a2.url) || "";
-              const raw = (_c = s.id) != null ? _c : (_b = s.image) == null ? void 0 : _b.id;
-              const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
-              const id = isNaN(parsed) ? "" : parsed;
-              return { url, id };
-            })()
-          };
-        }) : [fallbackSlide];
+        const normalizedSlides = Array.isArray(slides) && slides.length > 0 ? slides.map((s, i) => ({
+          _id: s._id || `slide_${i + 1}`,
+          id: (() => {
+            const raw = s.id ?? s.image?.id;
+            const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+            return isNaN(parsed) ? "" : parsed;
+          })(),
+          url: s.url || s.image?.url || "",
+          image: (() => {
+            const url = s.url || s.image?.url || "";
+            const raw = s.id ?? s.image?.id;
+            const parsed = raw !== void 0 ? parseInt(String(raw), 10) : NaN;
+            const id = isNaN(parsed) ? "" : parsed;
+            return { url, id };
+          })()
+        })) : [fallbackSlide];
         return {
           widgetType: "image-carousel",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             slides: normalizedSlides
-          })
+          }
         };
       }
     },
@@ -1625,12 +1582,13 @@ ${refText}` });
         }
         return {
           widgetType: "gallery",
-          settings: __spreadProps(__spreadValues({}, base), {
+          settings: {
+            ...base,
             gallery: gallery || [{
               id: w.imageId && !isNaN(parseInt(w.imageId, 10)) ? parseInt(w.imageId, 10) : "",
               url: w.content || ""
             }]
-          })
+          }
         };
       }
     },
@@ -1640,8 +1598,8 @@ ${refText}` });
       family: "nav",
       aliases: generateAliases("nav-menu", ["menu", "navega\xE7\xE3o", "menu principal"], ["nav menu", "navigation", "navbar", "header menu", "menu topo"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f;
-        const settings = __spreadProps(__spreadValues({}, base), {
+        const settings = {
+          ...base,
           layout: base.layout || "horizontal",
           menu: w.content || base.menu || "",
           // Full width stretch
@@ -1649,23 +1607,23 @@ ${refText}` });
           stretch_element_to_full_width: "yes",
           // Align menu items
           align_items: "center"
-        });
-        if ((_a = w.styles) == null ? void 0 : _a.fontSize) {
+        };
+        if (w.styles?.fontSize) {
           settings.typography_typography = "custom";
           settings.typography_font_size = { unit: "px", size: w.styles.fontSize };
         }
-        if ((_c = (_b = w.styles) == null ? void 0 : _b.fontName) == null ? void 0 : _c.family) {
+        if (w.styles?.fontName?.family) {
           settings.typography_typography = "custom";
           settings.typography_font_family = w.styles.fontName.family;
         }
-        if ((_d = w.styles) == null ? void 0 : _d.fontWeight) {
+        if (w.styles?.fontWeight) {
           settings.typography_font_weight = w.styles.fontWeight;
         }
-        if ((_e = w.styles) == null ? void 0 : _e.letterSpacing) {
+        if (w.styles?.letterSpacing) {
           const lsValue = typeof w.styles.letterSpacing === "object" ? w.styles.letterSpacing.value : w.styles.letterSpacing;
           settings.typography_letter_spacing = { unit: "px", size: lsValue };
         }
-        if ((_f = w.styles) == null ? void 0 : _f.color) {
+        if (w.styles?.color) {
           const c = w.styles.color;
           if (typeof c === "object" && "r" in c) {
             const r = Math.round(c.r * 255);
@@ -1688,14 +1646,14 @@ ${refText}` });
       widgetType: "search-form",
       family: "misc",
       aliases: generateAliases("search-form", ["formul\xE1rio de busca", "pesquisa"], ["search form", "search"]),
-      compile: (_w, base) => ({ widgetType: "search-form", settings: __spreadValues({}, base) })
+      compile: (_w, base) => ({ widgetType: "search-form", settings: { ...base } })
     },
     {
       key: "google-maps",
       widgetType: "google-maps",
       family: "media",
       aliases: generateAliases("google-maps", ["mapa", "google maps"], ["maps", "location"]),
-      compile: (w, base) => ({ widgetType: "google-maps", settings: __spreadProps(__spreadValues({}, base), { address: w.content || base.address || "" }) })
+      compile: (w, base) => ({ widgetType: "google-maps", settings: { ...base, address: w.content || base.address || "" } })
     },
     {
       key: "testimonial",
@@ -1704,7 +1662,7 @@ ${refText}` });
       aliases: generateAliases("testimonial", ["depoimento", "cita\xE7\xE3o", "avalia\xE7\xE3o"], ["quote", "review", "single testimonial"]),
       compile: (w, base) => ({
         widgetType: "testimonial",
-        settings: __spreadProps(__spreadValues({}, base), { testimonial_content: w.content || base.testimonial_content || "Depoimento" })
+        settings: { ...base, testimonial_content: w.content || base.testimonial_content || "Depoimento" }
       })
     },
     {
@@ -1712,21 +1670,21 @@ ${refText}` });
       widgetType: "embed",
       family: "media",
       aliases: generateAliases("embed", ["incorporar", "embed"], ["iframe"]),
-      compile: (w, base) => ({ widgetType: "embed", settings: __spreadProps(__spreadValues({}, base), { embed_url: w.content || base.embed_url || "" }) })
+      compile: (w, base) => ({ widgetType: "embed", settings: { ...base, embed_url: w.content || base.embed_url || "" } })
     },
     {
       key: "lottie",
       widgetType: "lottie",
       family: "media",
       aliases: generateAliases("lottie", ["lottie", "anima\xE7\xE3o"], ["animation", "json animation"]),
-      compile: (w, base) => ({ widgetType: "lottie", settings: __spreadProps(__spreadValues({}, base), { lottie_url: w.content || base.lottie_url || "" }) })
+      compile: (w, base) => ({ widgetType: "lottie", settings: { ...base, lottie_url: w.content || base.lottie_url || "" } })
     },
     {
       key: "html",
       widgetType: "html",
       family: "misc",
       aliases: generateAliases("html", ["html", "c\xF3digo personalizado"], ["custom code"]),
-      compile: (w, base) => ({ widgetType: "html", settings: __spreadProps(__spreadValues({}, base), { html: w.content || "" }) })
+      compile: (w, base) => ({ widgetType: "html", settings: { ...base, html: w.content || "" } })
     }
   ];
   var basicWidgets = [
@@ -2027,9 +1985,7 @@ ${refText}` });
 
   // src/compiler/elementor.compiler.ts
   var ElementorCompiler = class {
-    constructor() {
-      this.wpConfig = {};
-    }
+    wpConfig = {};
     setWPConfig(config) {
       this.wpConfig = config;
     }
@@ -2037,9 +1993,8 @@ ${refText}` });
       return normalizeColor(value);
     }
     compile(schema) {
-      var _a;
       const elements = schema.containers.map((container) => this.compileContainer(container, false));
-      let siteurl = ((_a = this.wpConfig) == null ? void 0 : _a.url) || "";
+      let siteurl = this.wpConfig?.url || "";
       if (siteurl && !siteurl.endsWith("/")) siteurl += "/";
       if (siteurl && !siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
       const template = {
@@ -2053,14 +2008,15 @@ ${refText}` });
     compileContainer(container, isInner) {
       const id = generateGUID();
       const flexDirection = container.direction === "row" ? "row" : "column";
-      const settings = __spreadValues({
+      const settings = {
         _element_id: id,
         container_type: "flex",
         content_width: container.width === "full" ? "full" : "boxed",
         flex_direction: flexDirection,
         flex__is_row: "row",
-        flex__is_column: "column"
-      }, this.mapContainerStyles(container.styles, container.width !== "full"));
+        flex__is_column: "column",
+        ...this.mapContainerStyles(container.styles, container.width !== "full")
+      };
       if (!settings.flex_gap) {
         settings.flex_gap = { unit: "px", column: "", row: "", isLinked: true };
       }
@@ -2068,14 +2024,8 @@ ${refText}` });
       if (!settings.align_items) settings.align_items = "flex-start";
       settings.flex_justify_content = settings.justify_content;
       settings.flex_align_items = settings.align_items;
-      const widgetElements = container.widgets.map((w) => {
-        var _a, _b;
-        return { order: (_b = (_a = w.styles) == null ? void 0 : _a._order) != null ? _b : 0, el: this.compileWidget(w) };
-      });
-      const childContainers = container.children.map((child) => {
-        var _a, _b;
-        return { order: (_b = (_a = child.styles) == null ? void 0 : _a._order) != null ? _b : 0, el: this.compileContainer(child, true) };
-      });
+      const widgetElements = container.widgets.map((w) => ({ order: w.styles?._order ?? 0, el: this.compileWidget(w) }));
+      const childContainers = container.children.map((child) => ({ order: child.styles?._order ?? 0, el: this.compileContainer(child, true) }));
       const merged = [...widgetElements, ...childContainers].sort((a, b) => a.order - b.order).map((i) => i.el);
       return {
         id,
@@ -2261,15 +2211,14 @@ ${refText}` });
       return /^https?:\/\//i.test(trimmed) || trimmed.startsWith("data:") || trimmed.endsWith(".svg") || trimmed.startsWith("<svg");
     }
     normalizeSelectedIcon(icon, imageId, fallback = { value: "fas fa-star", library: "fa-solid" }) {
-      var _a;
-      if (!icon) return __spreadValues({}, fallback);
+      if (!icon) return { ...fallback };
       if (icon.value && icon.library === "svg" && typeof icon.value === "object" && "url" in icon.value) {
         return icon;
       }
       const rawValue = icon.value || icon.url || icon.icon || icon;
-      const normalized = __spreadProps(__spreadValues(__spreadValues({}, fallback), icon), { value: rawValue });
+      const normalized = { ...fallback, ...icon, value: rawValue };
       if (this.looksLikeIconUrl(rawValue)) {
-        const parsedId = imageId !== void 0 ? parseInt(String(imageId), 10) : (_a = icon.id) != null ? _a : icon.wpId;
+        const parsedId = imageId !== void 0 ? parseInt(String(imageId), 10) : icon.id ?? icon.wpId;
         normalized.library = "svg";
         normalized.value = {
           url: rawValue,
@@ -2283,25 +2232,23 @@ ${refText}` });
     normalizeIconList(settings) {
       if (!Array.isArray(settings.icon_list)) return settings;
       settings.icon_list = settings.icon_list.map((item, idx) => {
-        var _a, _b, _c, _d, _e, _f;
         const normalizedIcon = this.normalizeSelectedIcon(
           item.icon || item.selected_icon || item,
-          item.imageId || ((_a = item.icon) == null ? void 0 : _a.id) || ((_b = item.selected_icon) == null ? void 0 : _b.id),
-          { value: ((_c = item == null ? void 0 : item.icon) == null ? void 0 : _c.value) || ((_d = item == null ? void 0 : item.selected_icon) == null ? void 0 : _d.value) || "fas fa-check", library: ((_e = item == null ? void 0 : item.icon) == null ? void 0 : _e.library) || ((_f = item == null ? void 0 : item.selected_icon) == null ? void 0 : _f.library) || "fa-solid" }
+          item.imageId || item.icon?.id || item.selected_icon?.id,
+          { value: item?.icon?.value || item?.selected_icon?.value || "fas fa-check", library: item?.icon?.library || item?.selected_icon?.library || "fa-solid" }
         );
-        return __spreadProps(__spreadValues({
-          _id: item._id || `icon_item_${idx + 1}`
-        }, item), {
+        return {
+          _id: item._id || `icon_item_${idx + 1}`,
+          ...item,
           selected_icon: normalizedIcon
-        });
+        };
       });
       return settings;
     }
     normalizeIconSettings(widgetType, settings, widget) {
-      var _a, _b;
-      const normalized = __spreadValues({}, settings);
+      const normalized = { ...settings };
       if (widgetType === "icon" || widgetType === "icon-box") {
-        const imageId = (widget == null ? void 0 : widget.imageId) || ((_a = normalized.selected_icon) == null ? void 0 : _a.id) || ((_b = normalized.selected_icon) == null ? void 0 : _b.wpId);
+        const imageId = widget?.imageId || normalized.selected_icon?.id || normalized.selected_icon?.wpId;
         normalized.selected_icon = this.normalizeSelectedIcon(normalized.selected_icon, imageId);
       }
       if (widgetType === "icon-list") {
@@ -2310,14 +2257,13 @@ ${refText}` });
       return normalized;
     }
     compileWidget(widget) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
       const widgetId = generateGUID();
-      const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
+      const baseSettings = { _element_id: widgetId, ...this.sanitizeSettings(widget.styles || {}) };
       Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
-      if ((_a = widget.styles) == null ? void 0 : _a.customCss) {
+      if (widget.styles?.customCss) {
         baseSettings.custom_css = widget.styles.customCss;
       }
-      if ((_b = widget.styles) == null ? void 0 : _b.align) {
+      if (widget.styles?.align) {
         baseSettings.align = widget.styles.align;
       }
       const registryResult = compileWithRegistry(widget, baseSettings);
@@ -2326,7 +2272,7 @@ ${refText}` });
         return {
           id: widgetId,
           elType: "widget",
-          isInner: (_c = registryResult.isInner) != null ? _c : false,
+          isInner: registryResult.isInner ?? false,
           isLocked: false,
           widgetType: registryResult.widgetType,
           settings: normalizedSettings,
@@ -2335,7 +2281,7 @@ ${refText}` });
         };
       }
       let widgetType = widget.type;
-      const settings = __spreadValues({}, baseSettings);
+      const settings = { ...baseSettings };
       switch (widget.type) {
         case "heading":
           widgetType = "heading";
@@ -2351,9 +2297,9 @@ ${refText}` });
           widgetType = "button";
           settings.text = widget.content || "Button";
           Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
-          if ((_d = widget.styles) == null ? void 0 : _d.background) {
+          if (widget.styles?.background) {
             settings.background_color = this.sanitizeColor(widget.styles.background);
-          } else if (((_e = widget.styles) == null ? void 0 : _e.fills) && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
+          } else if (widget.styles?.fills && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
             const solidFill = widget.styles.fills.find((f) => f.type === "SOLID");
             if (solidFill) {
               settings.background_color = this.sanitizeColor(solidFill.color);
@@ -2362,7 +2308,7 @@ ${refText}` });
           if (baseSettings.color) {
             settings.button_text_color = baseSettings.color;
           }
-          if (((_f = widget.styles) == null ? void 0 : _f.paddingTop) !== void 0 || ((_g = widget.styles) == null ? void 0 : _g.paddingRight) !== void 0 || ((_h = widget.styles) == null ? void 0 : _h.paddingBottom) !== void 0 || ((_i = widget.styles) == null ? void 0 : _i.paddingLeft) !== void 0) {
+          if (widget.styles?.paddingTop !== void 0 || widget.styles?.paddingRight !== void 0 || widget.styles?.paddingBottom !== void 0 || widget.styles?.paddingLeft !== void 0) {
             settings.button_padding = {
               unit: "px",
               top: widget.styles.paddingTop || 0,
@@ -2372,7 +2318,7 @@ ${refText}` });
               isLinked: false
             };
           }
-          if (((_j = widget.styles) == null ? void 0 : _j.cornerRadius) !== void 0) {
+          if (widget.styles?.cornerRadius !== void 0) {
             settings.border_radius = {
               unit: "px",
               top: widget.styles.cornerRadius,
@@ -2384,7 +2330,7 @@ ${refText}` });
           }
           if (widget.imageId) {
             settings.selected_icon = this.normalizeSelectedIcon(
-              ((_k = widget.styles) == null ? void 0 : _k.selected_icon) || baseSettings.selected_icon || widget.content,
+              widget.styles?.selected_icon || baseSettings.selected_icon || widget.content,
               widget.imageId,
               { value: "fas fa-arrow-right", library: "fa-solid" }
             );
@@ -2402,7 +2348,7 @@ ${refText}` });
           break;
         case "icon":
           widgetType = "icon";
-          settings.selected_icon = ((_l = widget.styles) == null ? void 0 : _l.selected_icon) || baseSettings.selected_icon || widget.content;
+          settings.selected_icon = widget.styles?.selected_icon || baseSettings.selected_icon || widget.content;
           break;
         case "custom":
         default:
@@ -2424,68 +2370,66 @@ ${refText}` });
   };
 
   // src/utils/hash.ts
-  function computeHash(bytes) {
-    return __async(this, null, function* () {
-      const chrsz = 8;
-      function rol(num, cnt) {
-        return num << cnt | num >>> 32 - cnt;
-      }
-      function safe_add(x, y) {
-        const lsw = (x & 65535) + (y & 65535);
-        const msw = (x >> 16) + (y >> 16) + (lsw >> 16);
-        return msw << 16 | lsw & 65535;
-      }
-      function sha1_ft(t, b, c, d) {
-        if (t < 20) return b & c | ~b & d;
-        if (t < 40) return b ^ c ^ d;
-        if (t < 60) return b & c | b & d | c & d;
-        return b ^ c ^ d;
-      }
-      function sha1_kt(t) {
-        return t < 20 ? 1518500249 : t < 40 ? 1859775393 : t < 60 ? -1894007588 : -899497514;
-      }
-      function core_sha1(x, len) {
-        x[len >> 5] |= 128 << 24 - len % 32;
-        x[(len + 64 >> 9 << 4) + 15] = len;
-        const w = Array(80);
-        let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878, e = -1009589776;
-        for (let i = 0; i < x.length; i += 16) {
-          const olda = a, oldb = b, oldc = c, oldd = d, olde = e;
-          for (let j = 0; j < 80; j++) {
-            if (j < 16) w[j] = x[i + j];
-            else w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
-            const t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)), safe_add(safe_add(e, w[j]), sha1_kt(j)));
-            e = d;
-            d = c;
-            c = rol(b, 30);
-            b = a;
-            a = t;
-          }
-          a = safe_add(a, olda);
-          b = safe_add(b, oldb);
-          c = safe_add(c, oldc);
-          d = safe_add(d, oldd);
-          e = safe_add(e, olde);
+  async function computeHash(bytes) {
+    const chrsz = 8;
+    function rol(num, cnt) {
+      return num << cnt | num >>> 32 - cnt;
+    }
+    function safe_add(x, y) {
+      const lsw = (x & 65535) + (y & 65535);
+      const msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+      return msw << 16 | lsw & 65535;
+    }
+    function sha1_ft(t, b, c, d) {
+      if (t < 20) return b & c | ~b & d;
+      if (t < 40) return b ^ c ^ d;
+      if (t < 60) return b & c | b & d | c & d;
+      return b ^ c ^ d;
+    }
+    function sha1_kt(t) {
+      return t < 20 ? 1518500249 : t < 40 ? 1859775393 : t < 60 ? -1894007588 : -899497514;
+    }
+    function core_sha1(x, len) {
+      x[len >> 5] |= 128 << 24 - len % 32;
+      x[(len + 64 >> 9 << 4) + 15] = len;
+      const w = Array(80);
+      let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878, e = -1009589776;
+      for (let i = 0; i < x.length; i += 16) {
+        const olda = a, oldb = b, oldc = c, oldd = d, olde = e;
+        for (let j = 0; j < 80; j++) {
+          if (j < 16) w[j] = x[i + j];
+          else w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
+          const t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)), safe_add(safe_add(e, w[j]), sha1_kt(j)));
+          e = d;
+          d = c;
+          c = rol(b, 30);
+          b = a;
+          a = t;
         }
-        return [a, b, c, d, e];
+        a = safe_add(a, olda);
+        b = safe_add(b, oldb);
+        c = safe_add(c, oldc);
+        d = safe_add(d, oldd);
+        e = safe_add(e, olde);
       }
-      function binb2hex(binarray) {
-        const hex_tab = "0123456789abcdef";
-        let str = "";
-        for (let i = 0; i < binarray.length * 4; i++) {
-          str += hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 + 4 & 15) + hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 & 15);
-        }
-        return str;
+      return [a, b, c, d, e];
+    }
+    function binb2hex(binarray) {
+      const hex_tab = "0123456789abcdef";
+      let str = "";
+      for (let i = 0; i < binarray.length * 4; i++) {
+        str += hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 + 4 & 15) + hex_tab.charAt(binarray[i >> 2] >> (3 - i % 4) * 8 & 15);
       }
-      function bytesToWords(bytes2) {
-        const words = [];
-        for (let i = 0; i < bytes2.length; i++) {
-          words[i >>> 2] |= (bytes2[i] & 255) << 24 - i % 4 * 8;
-        }
-        return words;
+      return str;
+    }
+    function bytesToWords(bytes2) {
+      const words = [];
+      for (let i = 0; i < bytes2.length; i++) {
+        words[i >>> 2] |= (bytes2[i] & 255) << 24 - i % 4 * 8;
       }
-      return binb2hex(core_sha1(bytesToWords(bytes), bytes.length * 8));
-    });
+      return words;
+    }
+    return binb2hex(core_sha1(bytesToWords(bytes), bytes.length * 8));
   }
 
   // src/media/image.exporter.ts
@@ -2521,47 +2465,46 @@ ${refText}` });
     svgString = svgString.replace(/<defs>\s*<\/defs>/gi, "");
     return stringToBytes(svgString);
   }
-  function exportNodeAsImage(node, format, quality = 0.85) {
-    return __async(this, null, function* () {
-      try {
-        if (format === "SVG") {
-          const bytes2 = yield node.exportAsync({ format: "SVG" });
-          const sanitizedBytes = sanitizeSvg(bytes2);
-          return { bytes: sanitizedBytes, mime: "image/svg+xml", ext: "svg" };
-        }
-        if (format === "WEBP") {
-          const bytes2 = yield node.exportAsync({
-            format: "PNG",
-            constraint: { type: "SCALE", value: 2 }
-          });
-          return { bytes: bytes2, mime: "image/png", ext: "webp", needsConversion: true };
-        }
-        if (format === "JPG") {
-          const bytes2 = yield node.exportAsync({
-            format: "JPG",
-            constraint: { type: "SCALE", value: 2 }
-          });
-          return { bytes: bytes2, mime: "image/jpeg", ext: "jpg" };
-        }
-        const bytes = yield node.exportAsync({
+  async function exportNodeAsImage(node, format, quality = 0.85) {
+    try {
+      if (format === "SVG") {
+        const bytes2 = await node.exportAsync({ format: "SVG" });
+        const sanitizedBytes = sanitizeSvg(bytes2);
+        return { bytes: sanitizedBytes, mime: "image/svg+xml", ext: "svg" };
+      }
+      if (format === "WEBP") {
+        const bytes2 = await node.exportAsync({
           format: "PNG",
           constraint: { type: "SCALE", value: 2 }
         });
-        return { bytes, mime: "image/png", ext: "png" };
-      } catch (e) {
-        console.error(`[F2E] Failed to export image for "${node.name}" (${node.id}):`, e);
-        return null;
+        return { bytes: bytes2, mime: "image/png", ext: "webp", needsConversion: true };
       }
-    });
+      if (format === "JPG") {
+        const bytes2 = await node.exportAsync({
+          format: "JPG",
+          constraint: { type: "SCALE", value: 2 }
+        });
+        return { bytes: bytes2, mime: "image/jpeg", ext: "jpg" };
+      }
+      const bytes = await node.exportAsync({
+        format: "PNG",
+        constraint: { type: "SCALE", value: 2 }
+      });
+      return { bytes, mime: "image/png", ext: "png" };
+    } catch (e) {
+      console.error(`[F2E] Failed to export image for "${node.name}" (${node.id}):`, e);
+      return null;
+    }
   }
 
   // src/media/uploader.ts
   var ImageUploader = class {
+    pendingUploads = /* @__PURE__ */ new Map();
+    mediaHashCache = /* @__PURE__ */ new Map();
+    nodeHashCache = /* @__PURE__ */ new Map();
+    quality = 0.85;
+    wpConfig;
     constructor(wpConfig, quality = 0.85) {
-      this.pendingUploads = /* @__PURE__ */ new Map();
-      this.mediaHashCache = /* @__PURE__ */ new Map();
-      this.nodeHashCache = /* @__PURE__ */ new Map();
-      this.quality = 0.85;
       this.wpConfig = wpConfig;
       this.quality = quality;
     }
@@ -2571,59 +2514,57 @@ ${refText}` });
      * @param format Formato da imagem
      * @returns Objeto com URL e ID da imagem no WordPress ou null
      */
-    uploadToWordPress(node, format = "WEBP") {
-      return __async(this, null, function* () {
-        if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
-          console.warn("[F2E] WP config ausente.");
-          return null;
+    async uploadToWordPress(node, format = "WEBP") {
+      if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
+        console.warn("[F2E] WP config ausente.");
+        return null;
+      }
+      try {
+        const targetFormat = format === "SVG" ? "SVG" : "WEBP";
+        const result = await exportNodeAsImage(node, targetFormat, this.quality);
+        if (!result) return null;
+        const { bytes, mime, ext, needsConversion } = result;
+        const hash = await computeHash(bytes);
+        if (this.mediaHashCache.has(hash)) {
+          return this.mediaHashCache.get(hash);
         }
-        try {
-          const targetFormat = format === "SVG" ? "SVG" : "WEBP";
-          const result = yield exportNodeAsImage(node, targetFormat, this.quality);
-          if (!result) return null;
-          const { bytes, mime, ext, needsConversion } = result;
-          const hash = yield computeHash(bytes);
-          if (this.mediaHashCache.has(hash)) {
-            return this.mediaHashCache.get(hash);
-          }
-          this.nodeHashCache.set(node.id, hash);
-          const id = generateGUID();
-          const safeId = node.id.replace(/[^a-z0-9]/gi, "_");
-          const name = `w_${safeId}_${hash}.${ext}`;
-          return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-              if (this.pendingUploads.has(id)) {
-                this.pendingUploads.delete(id);
-                resolve(null);
-              }
-            }, 9e4);
-            this.pendingUploads.set(id, (result2) => {
-              clearTimeout(timeout);
-              if (result2.success) {
-                console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}, ID: ${result2.wpId}`);
-                const mediaData = { url: result2.url, id: result2.wpId || 0 };
-                this.mediaHashCache.set(hash, mediaData);
-                resolve(mediaData);
-              } else {
-                console.error(`[ImageUploader] Falha no upload:`, result2.error);
-                resolve(null);
-              }
-            });
-            figma.ui.postMessage({
-              type: "upload-image-request",
-              id,
-              name,
-              mimeType: mime,
-              targetMimeType: "image/webp",
-              data: bytes,
-              needsConversion: !!needsConversion
-            });
+        this.nodeHashCache.set(node.id, hash);
+        const id = generateGUID();
+        const safeId = node.id.replace(/[^a-z0-9]/gi, "_");
+        const name = `w_${safeId}_${hash}.${ext}`;
+        return new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            if (this.pendingUploads.has(id)) {
+              this.pendingUploads.delete(id);
+              resolve(null);
+            }
+          }, 9e4);
+          this.pendingUploads.set(id, (result2) => {
+            clearTimeout(timeout);
+            if (result2.success) {
+              console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}, ID: ${result2.wpId}`);
+              const mediaData = { url: result2.url, id: result2.wpId || 0 };
+              this.mediaHashCache.set(hash, mediaData);
+              resolve(mediaData);
+            } else {
+              console.error(`[ImageUploader] Falha no upload:`, result2.error);
+              resolve(null);
+            }
           });
-        } catch (e) {
-          console.error("Error preparing upload:", e);
-          return null;
-        }
-      });
+          figma.ui.postMessage({
+            type: "upload-image-request",
+            id,
+            name,
+            mimeType: mime,
+            targetMimeType: "image/webp",
+            data: bytes,
+            needsConversion: !!needsConversion
+          });
+        });
+      } catch (e) {
+        console.error("Error preparing upload:", e);
+        return null;
+      }
     }
     /**
      * Processa resposta de upload da UI
@@ -2651,9 +2592,10 @@ ${refText}` });
      * @param wpConfig Nova configuração
      */
     setWPConfig(wpConfig) {
-      this.wpConfig = __spreadProps(__spreadValues({}, wpConfig), {
-        password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token)
-      });
+      this.wpConfig = {
+        ...wpConfig,
+        password: wpConfig?.password || wpConfig?.token
+      };
     }
     /**
      * Limpa o cache de hashes
@@ -2693,7 +2635,7 @@ ${refText}` });
   }
   function validateWidget(widget) {
     if (!widget || typeof widget.type !== "string" || widget.type.length === 0) {
-      throw new Error(`Widget com tipo invalido: ${widget == null ? void 0 : widget.type}`);
+      throw new Error(`Widget com tipo invalido: ${widget?.type}`);
     }
   }
   function validateElementorJSON(json) {
@@ -2712,7 +2654,6 @@ ${refText}` });
     el.elements.forEach((child) => validateElement(child));
   }
   function computeCoverage(serializedFlat, schema, elementor) {
-    var _a;
     const n_nodes_origem = serializedFlat.length;
     let n_widgets_schema = 0;
     let n_containers_schema = 0;
@@ -2727,7 +2668,7 @@ ${refText}` });
       n_elements_elementor++;
       el.elements.forEach(walkEl);
     };
-    (_a = elementor.elements) == null ? void 0 : _a.forEach(walkEl);
+    elementor.elements?.forEach(walkEl);
     return { n_nodes_origem, n_widgets_schema, n_containers_schema, n_elements_elementor };
   }
 
@@ -2763,19 +2704,19 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 
   // src/heuristics/engine.ts
   function evaluateNode(node, heuristics, options = {}) {
-    var _a;
-    const minConfidence = (_a = options.minConfidence) != null ? _a : 0.3;
+    const minConfidence = options.minConfidence ?? 0.3;
     const results = [];
     for (const rule of heuristics) {
       try {
         const out = rule.match(node);
         if (!out) continue;
         if (out.confidence < minConfidence) continue;
-        results.push(__spreadProps(__spreadValues({}, out), {
+        results.push({
+          ...out,
           heuristicId: rule.id,
           priority: rule.priority
-        }));
-      } catch (e) {
+        });
+      } catch {
         continue;
       }
     }
@@ -2864,14 +2805,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     id: "section.hero",
     priority: 85,
     match(node) {
-      var _a;
       if (!isFrameLike(node)) return null;
       if (node.width < 900) return null;
       if (node.height < 380) return null;
       if (!node.hasText) return null;
       const hasVisual = node.hasBackground || node.hasChildImage;
       if (!hasVisual) return null;
-      const bigText = ((_a = node.textFontSizeMax) != null ? _a : 0) >= 32;
+      const bigText = (node.textFontSizeMax ?? 0) >= 32;
       if (!bigText) return null;
       return {
         patternId: "section.hero",
@@ -2885,12 +2825,11 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     id: "section.cta",
     priority: 80,
     match(node) {
-      var _a;
       if (!isFrameLike(node)) return null;
       if (!node.hasText) return null;
       if (node.height < 140 || node.height > 520) return null;
       if (!node.hasBackground && !node.hasBorder) return null;
-      const bigText = ((_a = node.textFontSizeMax) != null ? _a : 0) >= 20;
+      const bigText = (node.textFontSizeMax ?? 0) >= 20;
       if (!bigText) return null;
       return {
         patternId: "section.cta",
@@ -2948,11 +2887,10 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     id: "typography.heading-generic",
     priority: 80,
     match(node) {
-      var _a, _b;
       if (node.type !== "TEXT") return null;
       if (!hasAnyText(node)) return null;
-      const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
-      const lineCount = (_b = node.textLineCount) != null ? _b : 1;
+      const sizeMax = node.textFontSizeMax ?? 0;
+      const lineCount = node.textLineCount ?? 1;
       if (sizeMax < 20) return null;
       if (lineCount > 3) return null;
       return {
@@ -2966,12 +2904,11 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     id: "typography.paragraph-generic",
     priority: 60,
     match(node) {
-      var _a, _b, _c;
       if (node.type !== "TEXT") return null;
       if (!hasAnyText(node)) return null;
-      const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
-      const sizeMin = (_b = node.textFontSizeMin) != null ? _b : sizeMax;
-      const lineCount = (_c = node.textLineCount) != null ? _c : 1;
+      const sizeMax = node.textFontSizeMax ?? 0;
+      const sizeMin = node.textFontSizeMin ?? sizeMax;
+      const lineCount = node.textLineCount ?? 1;
       if (sizeMax > 22) return null;
       if (sizeMin < 10) return null;
       if (lineCount < 2) return null;
@@ -2993,8 +2930,9 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     priority: 65,
     match(node) {
       const isGeometricShape = node.type === "RECTANGLE" || node.type === "ELLIPSE";
+      const children = node.children || [];
       if ((isGeometricShape || isFrameLike(node)) && node.hasImageFill) {
-        if (isFrameLike(node) && (node.hasText || node.children.length > 0)) {
+        if (isFrameLike(node) && (node.hasText || children.length > 0)) {
           return null;
         }
         return {
@@ -3006,8 +2944,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           imageId: node.id
         };
       }
-      if (isFrameLike(node) && node.hasChildImage && !node.hasText && node.children.length === 1) {
-        const imageChild = node.children[0];
+      if (isFrameLike(node) && node.hasChildImage && !node.hasText && children.length === 1) {
+        const imageChild = children[0];
         return {
           patternId: "media.image.child",
           // ID mais específico
@@ -3029,12 +2967,11 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     id: "widget.elementor.heading",
     priority: 90,
     match(node) {
-      var _a, _b, _c;
       if (node.type !== "TEXT") return null;
       if (!hasAnyText(node)) return null;
-      const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
-      const lineCount = (_b = node.textLineCount) != null ? _b : 1;
-      const isBold = (_c = node.textIsBoldDominant) != null ? _c : false;
+      const sizeMax = node.textFontSizeMax ?? 0;
+      const lineCount = node.textLineCount ?? 1;
+      const isBold = node.textIsBoldDominant ?? false;
       if (sizeMax < 22) return null;
       if (lineCount > 3) return null;
       if (!isBold) return null;
@@ -3050,11 +2987,10 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     id: "widget.elementor.text-editor",
     priority: 85,
     match(node) {
-      var _a, _b;
       if (node.type !== "TEXT") return null;
       if (!hasAnyText(node)) return null;
-      const sizeMax = (_a = node.textFontSizeMax) != null ? _a : 0;
-      const lineCount = (_b = node.textLineCount) != null ? _b : 1;
+      const sizeMax = node.textFontSizeMax ?? 0;
+      const lineCount = node.textLineCount ?? 1;
       if (sizeMax > 22) return null;
       if (lineCount < 2) return null;
       return {
@@ -3380,7 +3316,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     ...WOO_WIDGET_HEURISTICS
   ];
 
-  // src/pipeline/noai.parser.ts
+  // src/services/heuristics/noai.parser.ts
   var vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE", "RECTANGLE"];
   function isImageFill(node) {
     if (!node) return false;
@@ -3388,9 +3324,9 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       console.log("[IS IMAGE FILL] \u2705 Detected", node.type, "node:", node.name, "ID:", node.id);
       return true;
     }
-    const fills = node == null ? void 0 : node.fills;
+    const fills = node?.fills;
     if (!Array.isArray(fills)) return false;
-    const hasImageFill = fills.some((f) => (f == null ? void 0 : f.type) === "IMAGE");
+    const hasImageFill = fills.some((f) => f?.type === "IMAGE");
     if (hasImageFill) {
       console.log("[IS IMAGE FILL] \u2705 Detected IMAGE fill in:", node.name, "ID:", node.id);
     }
@@ -3480,7 +3416,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return false;
   }
   function isSolidColor(node) {
-    const fills = node == null ? void 0 : node.fills;
+    const fills = node?.fills;
     if (!Array.isArray(fills) || fills.length === 0) return void 0;
     const solid = fills.find((f) => f.type === "SOLID" && f.color);
     if (!solid) return void 0;
@@ -3640,7 +3576,6 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return scores.sort((a, b) => b.score - a.score);
   }
   function detectWidget(node) {
-    var _a, _b;
     const name = (node.name || "").toLowerCase();
     console.log("[DETECT WIDGET] Processing node:", node.name, "Type:", node.type, "Name (lowercase):", name);
     if (/^(w:|woo:|loop:)/.test(name)) {
@@ -3659,7 +3594,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           sourceId: node.id,
           sourceName: node.name
         };
-        let content = node.name;
+        let content = node.name || "";
         let imageId = null;
         if (widgetType === "heading" || widgetType === "text-editor" || widgetType === "text") {
           if (node.type === "TEXT") {
@@ -3669,7 +3604,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           }
         } else if (widgetType === "image" || widgetType === "icon") {
           imageId = node.id;
-          content = null;
+          content = "";
         } else if (widgetType === "image-box" || widgetType === "icon-box") {
           const boxContent = extractBoxContent(node);
           content = boxContent.title || node.name;
@@ -3709,7 +3644,11 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             console.log("[HEURISTICS] Container with", analysis.childWidgets.length, "child widgets - delegating to toContainer");
             return null;
           }
-          const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), analysis.containerStyles), analysis.textStyles);
+          const mergedStyles = {
+            ...styles,
+            ...analysis.containerStyles,
+            ...analysis.textStyles
+          };
           if (typeof node.width === "number") mergedStyles.width = node.width;
           if (typeof node.height === "number") mergedStyles.height = node.height;
           if (widgetType === "button" && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
@@ -3751,7 +3690,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           type: "image-box",
           content: boxContent.title || node.name,
           imageId: boxContent.imageId || findFirstImageId(node) || null,
-          styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+          styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
         };
       }
       if (widgetType === "icon-box") {
@@ -3760,7 +3699,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           type: "icon-box",
           content: boxContent.title || node.name,
           imageId: boxContent.imageId || findFirstImageId(node) || null,
-          styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+          styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
         };
       }
       if (widgetType === "icon-list") {
@@ -3780,7 +3719,6 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           });
         } else {
           listItems = children.map((child) => {
-            var _a2;
             if (child.type === "TEXT") {
               return {
                 type: "list-item",
@@ -3800,7 +3738,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             const itemContent = extractBoxContent(child);
             let text = itemContent.title;
             if (!text) {
-              const textNode = (_a2 = child.children) == null ? void 0 : _a2.find((c) => c.type === "TEXT");
+              const textNode = child.children?.find((c) => c.type === "TEXT");
               if (textNode) text = textNode.characters || textNode.name;
               else text = child.name;
             }
@@ -3845,9 +3783,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       }
       if (widgetType === "accordion" || widgetType === "toggle") {
         const toggleItems = children.filter((c) => {
-          var _a2;
           const n = c.name.toLowerCase();
-          return n.includes("accordion:") || n.includes("toggle") || n.includes("item") || n.includes("faq") || c.type === "FRAME" && ((_a2 = c.children) == null ? void 0 : _a2.length) > 0;
+          return n.includes("accordion:") || n.includes("toggle") || n.includes("item") || n.includes("faq") || c.type === "FRAME" && c.children?.length > 0;
         });
         let accordionIconId = null;
         const items = toggleItems.map((child, i) => {
@@ -3923,7 +3860,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       if (widgetType === "button") {
         const buttonData = analyzeButtonStructure(node);
         const containerStyles = extractContainerStyles(node);
-        const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), containerStyles), buttonData.textStyles);
+        const mergedStyles = { ...styles, ...containerStyles, ...buttonData.textStyles };
         if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
           mergedStyles.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 }, opacity: 0, visible: true }];
         }
@@ -3962,11 +3899,11 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             background_image: { url: "", id: imageId ? parseInt(imageId) : "" }
           };
         });
-        return { type: "slides", content: null, imageId: null, styles: __spreadProps(__spreadValues({}, styles), { slides }) };
+        return { type: "slides", content: null, imageId: null, styles: { ...styles, slides } };
       }
       if (widgetType === "image-carousel") {
         const slides = children.filter((c) => isImageFill(c) || vectorTypes.includes(c.type) || c.type === "IMAGE").map((img, i) => ({ id: img.id, url: "", _id: `slide_${i + 1} ` }));
-        return { type: "image-carousel", content: null, imageId: null, styles: __spreadProps(__spreadValues({}, styles), { slides }) };
+        return { type: "image-carousel", content: null, imageId: null, styles: { ...styles, slides } };
       }
       if (widgetType === "basic-gallery") {
         return { type: "basic-gallery", content: null, imageId: null, styles };
@@ -3975,14 +3912,14 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         return { type: "video", content: "", imageId: null, styles };
       }
       if (widgetType === "image") {
-        const imageStyles = __spreadValues({}, styles);
+        const imageStyles = { ...styles };
         if (typeof node.width === "number") imageStyles.width = node.width;
         if (typeof node.height === "number") imageStyles.height = node.height;
         console.log("[NOAI IMAGE] Creating image widget with dimensions:", { width: node.width, height: node.height });
         return { type: "image", content: null, imageId: node.id, styles: imageStyles };
       }
       if (widgetType === "icon") {
-        const iconStyles = __spreadValues({}, styles);
+        const iconStyles = { ...styles };
         if (typeof node.width === "number") iconStyles.width = node.width;
         if (typeof node.height === "number") iconStyles.height = node.height;
         return { type: "icon", content: null, imageId: node.id, styles: iconStyles };
@@ -4046,7 +3983,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
               type: "image-box",
               content: boxContent.title,
               imageId: boxContent.imageId || findFirstImageId(node) || null,
-              styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+              styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
             };
           }
           case "icon-box": {
@@ -4056,7 +3993,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
               type: "icon-box",
               content: boxContent.title,
               imageId: boxContent.imageId || findFirstImageId(node) || null,
-              styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+              styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
             };
           }
           case "star-rating":
@@ -4069,7 +4006,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
             return { type: "basic-gallery", content: null, imageId: null, styles };
           case "image-carousel": {
             const slides = children.filter((c) => isImageFill(c) || vectorTypes.includes(c.type) || c.type === "IMAGE").map((img, i) => ({ id: img.id, url: "", _id: `slide_${i + 1} ` }));
-            return { type: "image-carousel", content: null, imageId: null, styles: __spreadProps(__spreadValues({}, styles), { slides }) };
+            return { type: "image-carousel", content: null, imageId: null, styles: { ...styles, slides } };
           }
           case "icon_list":
             return { type: "icon_list", content: node.name, imageId: null, styles };
@@ -4109,13 +4046,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         if (children.length >= 3) {
           return { type: "basic-gallery", content: node.name, imageId: null, styles };
         }
-        const firstImage = children.find(isImageFill) || ((_b = (_a = children[0]) == null ? void 0 : _a.children) == null ? void 0 : _b.find((gr) => isImageFill(gr)));
-        const imageId = (firstImage == null ? void 0 : firstImage.id) || node.id;
+        const firstImage = children.find(isImageFill) || children[0]?.children?.find((gr) => isImageFill(gr));
+        const imageId = firstImage?.id || node.id;
         return { type: "image", content: null, imageId, styles };
       }
       if (children.some(isImageFill) && !children.some((c) => hasTextDeep(c))) {
         const firstImage = children.find(isImageFill);
-        return { type: "image", content: null, imageId: (firstImage == null ? void 0 : firstImage.id) || node.id, styles };
+        return { type: "image", content: null, imageId: firstImage?.id || node.id, styles };
       }
     }
     if (node.type === "TEXT") {
@@ -4160,7 +4097,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     if (name.includes("button") || name.includes("btn")) {
       const boxContent = extractBoxContent(node);
       const containerStyles = extractContainerStyles(node);
-      const mergedStyles = __spreadValues(__spreadValues({}, styles), containerStyles);
+      const mergedStyles = { ...styles, ...containerStyles };
       if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
         mergedStyles.fills = [{
           type: "SOLID",
@@ -4260,12 +4197,12 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       const childHasChildren = Array.isArray(child.children) && child.children.length > 0;
       const orderMark = idx;
       if (w) {
-        w.styles = __spreadProps(__spreadValues({}, w.styles || {}), { _order: orderMark });
+        w.styles = { ...w.styles || {}, _order: orderMark };
         widgets.push(w);
         console.log("[TO CONTAINER] \u2705 Added as widget:", child.name, "Type:", w.type);
       } else if (childHasChildren) {
         const childContainer = toContainer(child);
-        childContainer.styles = __spreadProps(__spreadValues({}, childContainer.styles || {}), { _order: orderMark });
+        childContainer.styles = { ...childContainer.styles || {}, _order: orderMark };
         childrenContainers.push(childContainer);
         console.log("[TO CONTAINER] \u2705 Added as container:", child.name);
       } else {
@@ -4295,10 +4232,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     console.log("[BUTTON STRUCTURE] Children count:", children.length);
     console.log("[BUTTON STRUCTURE] Children:", children.map((c) => ({ name: c.name, type: c.type, id: c.id })));
     const textChild = children.find(
-      (c) => {
-        var _a, _b;
-        return c.type === "TEXT" || ((_a = c.name) == null ? void 0 : _a.toLowerCase().includes("heading")) || ((_b = c.name) == null ? void 0 : _b.toLowerCase().includes("text"));
-      }
+      (c) => c.type === "TEXT" || c.name?.toLowerCase().includes("heading") || c.name?.toLowerCase().includes("text")
     );
     if (textChild) {
       text = textChild.characters || textChild.name || "";
@@ -4361,10 +4295,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     if (childWidgets.length === 0) {
       if (!text) {
         const textChild = children.find(
-          (c) => {
-            var _a, _b;
-            return c.type === "TEXT" || ((_a = c.name) == null ? void 0 : _a.toLowerCase().includes("heading")) || ((_b = c.name) == null ? void 0 : _b.toLowerCase().includes("text"));
-          }
+          (c) => c.type === "TEXT" || c.name?.toLowerCase().includes("heading") || c.name?.toLowerCase().includes("text")
         );
         if (textChild) {
           text = textChild.characters || textChild.name || "";
@@ -4386,15 +4317,14 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return tree;
   }
   function convertToFlexSchema(analyzedTree) {
-    var _a, _b, _c, _d;
     const rootContainer = toContainer(analyzedTree);
     const tokens = { primaryColor: "#000000", secondaryColor: "#FFFFFF" };
     console.log("[convertToFlexSchema] Root container after toContainer:", JSON.stringify({
       id: rootContainer.id,
-      widgets: ((_a = rootContainer.widgets) == null ? void 0 : _a.length) || 0,
-      widgetTypes: ((_b = rootContainer.widgets) == null ? void 0 : _b.map((w) => w.type)) || [],
-      children: ((_c = rootContainer.children) == null ? void 0 : _c.length) || 0,
-      childrenIds: ((_d = rootContainer.children) == null ? void 0 : _d.map((c) => c.id)) || []
+      widgets: rootContainer.widgets?.length || 0,
+      widgetTypes: rootContainer.widgets?.map((w) => w.type) || [],
+      children: rootContainer.children?.length || 0,
+      childrenIds: rootContainer.children?.map((c) => c.id) || []
     }, null, 2));
     return {
       page: { title: analyzedTree.name || "Layout importado", tokens },
@@ -4417,25 +4347,26 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       }
     }
     if (!imageId) {
-      let findIconDeep = function(n) {
+      let findIconDeep2 = function(n) {
         if (isImageFill(n) || n.type === "IMAGE" || n.type === "VECTOR") {
           return n.id;
         }
         if (n.children) {
           for (const child of n.children) {
-            const found = findIconDeep(child);
+            const found = findIconDeep2(child);
             if (found) return found;
           }
         }
         return null;
       };
+      var findIconDeep = findIconDeep2;
       const imgNode = children.find((c) => isImageFill(c) || c.type === "IMAGE" || c.type === "VECTOR");
       if (imgNode) {
         imageId = imgNode.id;
         console.log("[EXTRACT BOX] \u2705 Found image via type:", imageId);
       } else {
         for (const child of children) {
-          imageId = findIconDeep(child);
+          imageId = findIconDeep2(child);
           if (imageId) {
             console.log("[EXTRACT BOX] \u2705 Found image via deep search:", imageId);
             break;
@@ -4461,20 +4392,21 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       }
     }
     if (!title && !description) {
-      let collectTexts = function(n) {
+      let collectTexts2 = function(n) {
         if (n.type === "TEXT") {
           textNodes.push(n);
           return;
         }
         if (n.children) {
           for (const child of n.children) {
-            collectTexts(child);
+            collectTexts2(child);
             if (textNodes.length >= 2) break;
           }
         }
       };
+      var collectTexts = collectTexts2;
       for (const child of children) {
-        collectTexts(child);
+        collectTexts2(child);
         if (textNodes.length >= 2) break;
       }
       if (textNodes.length > 0) {
@@ -4504,7 +4436,6 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 
   // src/heuristics/adapter.ts
   function createNodeSnapshot(node) {
-    var _a;
     const { width, height, x, y } = node;
     const snapshot = {
       id: node.id,
@@ -4551,7 +4482,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         const solid = frame.fills.find((f) => f.type === "SOLID");
         if (solid) {
           snapshot.hasBackground = true;
-          snapshot.backgroundOpacity = (_a = solid.opacity) != null ? _a : 1;
+          snapshot.backgroundOpacity = solid.opacity ?? 1;
         }
         const image = frame.fills.find((f) => f.type === "IMAGE");
         if (image) snapshot.hasImageFill = true;
@@ -4653,60 +4584,66 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 
   // src/pipeline.ts
   var ConversionPipeline = class {
+    compiler;
+    imageUploader;
+    autoFixLayout = false;
+    autoRename = false;
+    deterministicPipeline;
     constructor() {
-      this.autoFixLayout = false;
-      this.autoRename = false;
       this.compiler = new ElementorCompiler();
       this.imageUploader = new ImageUploader({});
     }
-    run(_0) {
-      return __async(this, arguments, function* (node, wpConfig = {}, options) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-        const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token) });
-        this.compiler.setWPConfig(normalizedWP);
-        this.imageUploader.setWPConfig(normalizedWP);
-        const provider = (options == null ? void 0 : options.provider) || geminiProvider;
-        this.autoFixLayout = !!(options == null ? void 0 : options.autoFixLayout);
-        this.autoRename = !!(options == null ? void 0 : options.autoRename);
-        const preprocessed = this.preprocess(node);
-        const screenshot = (options == null ? void 0 : options.includeScreenshot) === false ? null : yield this.captureNodeImage(preprocessed.serializedRoot.id);
-        const schema = yield this.generateSchema(preprocessed, provider, options == null ? void 0 : options.apiKey, {
-          includeReferences: (options == null ? void 0 : options.includeReferences) !== false,
-          screenshot
-        });
-        this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
-        validatePipelineSchema(schema);
-        this.hydrateStyles(schema, preprocessed.flatNodes);
-        yield this.resolveImages(schema, normalizedWP);
-        yield this.syncNavMenus(schema, preprocessed.serializedRoot, normalizedWP);
-        console.log("[PIPELINE] Schema root container:", JSON.stringify({
-          id: (_a = schema.containers[0]) == null ? void 0 : _a.id,
-          widgets: ((_c = (_b = schema.containers[0]) == null ? void 0 : _b.widgets) == null ? void 0 : _c.length) || 0,
-          widgetTypes: ((_e = (_d = schema.containers[0]) == null ? void 0 : _d.widgets) == null ? void 0 : _e.map((w) => w.type)) || [],
-          children: ((_g = (_f = schema.containers[0]) == null ? void 0 : _f.children) == null ? void 0 : _g.length) || 0,
-          childrenIds: ((_i = (_h = schema.containers[0]) == null ? void 0 : _h.children) == null ? void 0 : _i.map((c) => c.id)) || []
-        }, null, 2));
-        const elementorJson = this.compiler.compile(schema);
-        if (wpConfig.url) {
-          let siteurl = wpConfig.url;
-          if (!siteurl.endsWith("/")) siteurl += "/";
-          if (!siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
-          elementorJson.siteurl = siteurl;
-        }
-        validateElementorJSON(elementorJson);
-        if (options == null ? void 0 : options.debug) {
-          const coverage = computeCoverage(preprocessed.flatNodes, schema, elementorJson);
-          const debugInfo = {
-            serializedTree: preprocessed.serializedRoot,
-            flatNodes: preprocessed.flatNodes,
-            schema,
-            elementor: elementorJson,
-            coverage
-          };
-          return { elementorJson, debugInfo };
-        }
-        return elementorJson;
+    /**
+     * Permite injetar o pipeline determinístico sem alterar o comportamento atual.
+     */
+    attachDeterministicPipeline(pipeline2) {
+      this.deterministicPipeline = pipeline2;
+    }
+    async run(node, wpConfig = {}, options) {
+      const normalizedWP = { ...wpConfig, password: wpConfig?.password || wpConfig?.token };
+      this.compiler.setWPConfig(normalizedWP);
+      this.imageUploader.setWPConfig(normalizedWP);
+      const provider = options?.provider || geminiProvider;
+      this.autoFixLayout = !!options?.autoFixLayout;
+      this.autoRename = !!options?.autoRename;
+      const preprocessed = this.preprocess(node);
+      const screenshot = options?.includeScreenshot === false ? null : await this.captureNodeImage(preprocessed.serializedRoot.id);
+      const schema = await this.generateSchema(preprocessed, provider, options?.apiKey, {
+        includeReferences: options?.includeReferences !== false,
+        screenshot
       });
+      this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
+      validatePipelineSchema(schema);
+      this.hydrateStyles(schema, preprocessed.flatNodes);
+      await this.resolveImages(schema, normalizedWP);
+      await this.syncNavMenus(schema, preprocessed.serializedRoot, normalizedWP);
+      console.log("[PIPELINE] Schema root container:", JSON.stringify({
+        id: schema.containers[0]?.id,
+        widgets: schema.containers[0]?.widgets?.length || 0,
+        widgetTypes: schema.containers[0]?.widgets?.map((w) => w.type) || [],
+        children: schema.containers[0]?.children?.length || 0,
+        childrenIds: schema.containers[0]?.children?.map((c) => c.id) || []
+      }, null, 2));
+      const elementorJson = this.compiler.compile(schema);
+      if (wpConfig.url) {
+        let siteurl = wpConfig.url;
+        if (!siteurl.endsWith("/")) siteurl += "/";
+        if (!siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
+        elementorJson.siteurl = siteurl;
+      }
+      validateElementorJSON(elementorJson);
+      if (options?.debug) {
+        const coverage = computeCoverage(preprocessed.flatNodes, schema, elementorJson);
+        const debugInfo = {
+          serializedTree: preprocessed.serializedRoot,
+          flatNodes: preprocessed.flatNodes,
+          schema,
+          elementor: elementorJson,
+          coverage
+        };
+        return { elementorJson, debugInfo };
+      }
+      return elementorJson;
     }
     handleUploadResponse(id, result) {
       this.imageUploader.handleUploadResponse(id, result);
@@ -4738,7 +4675,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       const fills = serializedRoot.fills;
       if (Array.isArray(fills) && fills.length > 0) {
         const solidFill = fills.find((f) => f.type === "SOLID");
-        if (solidFill == null ? void 0 : solidFill.color) {
+        if (solidFill?.color) {
           const { r, g, b } = solidFill.color;
           const toHex = (c) => ("0" + Math.round(c * 255).toString(16)).slice(-2);
           const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
@@ -4747,22 +4684,20 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       }
       return defaultTokens;
     }
-    captureNodeImage(nodeId) {
-      return __async(this, null, function* () {
-        if (!nodeId) return null;
-        const node = figma.getNodeById(nodeId);
-        if (!node || !("exportAsync" in node)) return null;
-        try {
-          const bytes = yield node.exportAsync({ format: "PNG" });
-          const base64 = this.uint8ToBase64(bytes);
-          const name = node.name || "frame";
-          const size = node.width && node.height ? { width: node.width, height: node.height } : {};
-          return __spreadValues({ data: base64, mimeType: "image/png", name }, size);
-        } catch (err) {
-          console.warn("Falha ao exportar imagem do frame:", err);
-          return null;
-        }
-      });
+    async captureNodeImage(nodeId) {
+      if (!nodeId) return null;
+      const node = figma.getNodeById(nodeId);
+      if (!node || !("exportAsync" in node)) return null;
+      try {
+        const bytes = await node.exportAsync({ format: "PNG" });
+        const base64 = this.uint8ToBase64(bytes);
+        const name = node.name || "frame";
+        const size = node.width && node.height ? { width: node.width, height: node.height } : {};
+        return { data: base64, mimeType: "image/png", name, ...size };
+      } catch (err) {
+        console.warn("Falha ao exportar imagem do frame:", err);
+        return null;
+      }
     }
     uint8ToBase64(bytes) {
       const base64abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -4786,39 +4721,42 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       }
       return result;
     }
-    generateSchema(pre, provider, apiKey, extras) {
-      return __async(this, null, function* () {
-        console.log("Generating Base Schema (Algorithm)...");
-        const baseSchema = convertToFlexSchema(pre.serializedRoot);
-        console.log("Optimizing Schema (AI)...");
-        const prompt = `${OPTIMIZE_SCHEMA_PROMPT}
+    async generateSchema(pre, provider, apiKey, extras) {
+      console.log("Generating Base Schema (Algorithm)...");
+      const baseSchema = convertToFlexSchema(pre.serializedRoot);
+      console.log("Optimizing Schema (AI)...");
+      const prompt = `${OPTIMIZE_SCHEMA_PROMPT}
 
 SCHEMA BASE:
 ${JSON.stringify(baseSchema, null, 2)}
 `;
-        const references = (extras == null ? void 0 : extras.includeReferences) === false ? [] : referenceDocs;
-        try {
-          const response = yield provider.generateSchema({
-            prompt,
-            snapshot: pre.serializedRoot,
-            instructions: "Otimize o schema JSON fornecido mantendo IDs e dados.",
-            apiKey,
-            image: (extras == null ? void 0 : extras.screenshot) || void 0,
-            references
-          });
-          if (!response.ok || !response.schema) {
-            console.warn("AI returned invalid response. Falling back to base schema.", response.message);
-            return baseSchema;
-          }
-          const aiSchema = response.schema;
-          const merged = this.mergeSchemas(baseSchema, aiSchema);
-          return merged;
-        } catch (error) {
-          console.error("AI Optimization failed:", error);
-          console.warn("Falling back to Base Schema.");
+      const references = extras?.includeReferences === false ? [] : referenceDocs;
+      try {
+        const schemaRequest = {
+          prompt,
+          snapshot: pre.serializedRoot,
+          instructions: "Otimize o schema JSON fornecido mantendo IDs e dados.",
+          references
+        };
+        if (apiKey) {
+          schemaRequest.apiKey = apiKey;
+        }
+        if (extras?.screenshot) {
+          schemaRequest.image = extras.screenshot;
+        }
+        const response = await provider.generateSchema(schemaRequest);
+        if (!response.ok || !response.schema) {
+          console.warn("AI returned invalid response. Falling back to base schema.", response.message);
           return baseSchema;
         }
-      });
+        const aiSchema = response.schema;
+        const merged = this.mergeSchemas(baseSchema, aiSchema);
+        return merged;
+      } catch (error) {
+        console.error("AI Optimization failed:", error);
+        console.warn("Falling back to Base Schema.");
+        return baseSchema;
+      }
     }
     /**
      * Mescla o schema base (NO-AI) com o schema otimizado pela IA.
@@ -4832,8 +4770,7 @@ ${JSON.stringify(baseSchema, null, 2)}
     mergeSchemas(baseSchema, aiSchema) {
       const aiContainersBySource = /* @__PURE__ */ new Map();
       const collect = (c) => {
-        var _a;
-        const key = ((_a = c.styles) == null ? void 0 : _a.sourceId) || c.id;
+        const key = c.styles?.sourceId || c.id;
         if (key && !aiContainersBySource.has(key)) {
           aiContainersBySource.set(key, c);
         }
@@ -4841,43 +4778,41 @@ ${JSON.stringify(baseSchema, null, 2)}
       };
       (aiSchema.containers || []).forEach((c) => collect(c));
       const mergeContainer = (base) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-        const key = ((_a = base.styles) == null ? void 0 : _a.sourceId) || base.id;
+        const key = base.styles?.sourceId || base.id;
         const ai = key ? aiContainersBySource.get(key) : void 0;
-        const merged = __spreadProps(__spreadValues({}, base), {
-          styles: __spreadValues({}, base.styles || {})
-        });
+        const merged = {
+          ...base,
+          styles: { ...base.styles || {} }
+        };
         if (ai) {
           merged._aiOptimized = true;
-          merged.styles = __spreadProps(__spreadValues(__spreadValues({}, ai.styles || {}), base.styles || {}), {
-            sourceId: ((_b = base.styles) == null ? void 0 : _b.sourceId) || ((_c = ai.styles) == null ? void 0 : _c.sourceId) || base.id
-          });
+          merged.styles = {
+            ...ai.styles || {},
+            ...base.styles || {},
+            sourceId: base.styles?.sourceId || ai.styles?.sourceId || base.id
+          };
           if (Array.isArray(ai.widgets)) {
-            const hasExplicitChildren = (_d = base.children) == null ? void 0 : _d.some(
-              (c) => {
-                var _a2;
-                return ((_a2 = c.styles) == null ? void 0 : _a2.sourceName) && (c.styles.sourceName.startsWith("w:") || c.styles.sourceName.startsWith("c:")) || c.widgets && c.widgets.length > 0;
-              }
+            const hasExplicitChildren = base.children?.some(
+              (c) => c.styles?.sourceName && (c.styles.sourceName.startsWith("w:") || c.styles.sourceName.startsWith("c:")) || c.widgets && c.widgets.length > 0
             );
-            const isCollapsing = (((_e = base.children) == null ? void 0 : _e.length) || 0) > 1 && ai.widgets.length === 1;
-            const isGenericWidget = ["image-box", "icon-box"].includes((_f = ai.widgets[0]) == null ? void 0 : _f.type);
+            const isCollapsing = (base.children?.length || 0) > 1 && ai.widgets.length === 1;
+            const isGenericWidget = ["image-box", "icon-box"].includes(ai.widgets[0]?.type);
             if (hasExplicitChildren && isCollapsing && isGenericWidget) {
               console.warn(`[Merge] Preventing AI from collapsing explicit children of ${base.id} into ${ai.widgets[0].type}`);
             } else {
-              merged.widgets = ai.widgets.map((w) => {
-                var _a2, _b2;
-                return __spreadProps(__spreadValues({}, w), {
-                  styles: __spreadProps(__spreadValues({}, w.styles || {}), {
-                    sourceId: ((_a2 = w.styles) == null ? void 0 : _a2.sourceId) || w.sourceId || ((_b2 = base.styles) == null ? void 0 : _b2.sourceId) || base.id
-                  })
-                });
-              });
+              merged.widgets = ai.widgets.map((w) => ({
+                ...w,
+                styles: {
+                  ...w.styles || {},
+                  sourceId: w.styles?.sourceId || w.sourceId || base.styles?.sourceId || base.id
+                }
+              }));
             }
           }
           if (Array.isArray(ai.children)) {
-            const isBaseWidget = (_g = base.widgets) == null ? void 0 : _g.some((w) => ["button", "video", "image", "icon"].includes(w.type));
+            const isBaseWidget = base.widgets?.some((w) => ["button", "video", "image", "icon"].includes(w.type));
             if (isBaseWidget && ai.children.length > 0) {
-              console.warn(`[Merge] Ignoring AI children for widget-container ${base.id} (${(_i = (_h = base.widgets) == null ? void 0 : _h[0]) == null ? void 0 : _i.type}). Keeping as widget.`);
+              console.warn(`[Merge] Ignoring AI children for widget-container ${base.id} (${base.widgets?.[0]?.type}). Keeping as widget.`);
               if (!merged.widgets && base.widgets) {
                 merged.widgets = base.widgets;
               }
@@ -4917,185 +4852,179 @@ ${JSON.stringify(baseSchema, null, 2)}
       };
       collectNodes(root);
       const walk = (c) => {
-        var _a, _b, _c;
         if (!c.id || !nodeMap.has(c.id)) {
-          if (((_a = c.styles) == null ? void 0 : _a.sourceId) && nodeMap.has(c.styles.sourceId)) {
+          if (c.styles?.sourceId && nodeMap.has(c.styles.sourceId)) {
             c.id = c.styles.sourceId;
           }
         }
-        (_b = c.widgets) == null ? void 0 : _b.forEach((w) => {
-          var _a2;
-          if (((_a2 = w.styles) == null ? void 0 : _a2.sourceId) && nodeMap.has(w.styles.sourceId)) {
+        c.widgets?.forEach((w) => {
+          if (w.styles?.sourceId && nodeMap.has(w.styles.sourceId)) {
           }
         });
-        (_c = c.children) == null ? void 0 : _c.forEach(walk);
+        c.children?.forEach(walk);
       };
       containers.forEach(walk);
     }
-    resolveImages(schema, wpConfig) {
-      return __async(this, null, function* () {
-        const uploadEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token) && wpConfig.exportImages);
-        if (!uploadEnabled) return;
-        const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
-        const hasVectorChildren = (n) => {
-          if (isVectorNode(n)) return true;
+    async resolveImages(schema, wpConfig) {
+      const uploadEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token) && wpConfig.exportImages);
+      if (!uploadEnabled) return;
+      const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
+      const hasVectorChildren = (n) => {
+        if (isVectorNode(n)) return true;
+        if ("children" in n) {
+          return n.children.some((c) => hasVectorChildren(c));
+        }
+        return false;
+      };
+      const uploadNodeImage = async (nodeId, preferSvg = false) => {
+        if (!nodeId) return null;
+        const node = figma.getNodeById(nodeId);
+        if (!node) {
+          console.error(`[PIPELINE] \u274C Node not found for upload: ${nodeId}`);
+          return null;
+        }
+        let format = preferSvg ? "SVG" : "WEBP";
+        const hasImageChildren = (n) => {
+          if ("fills" in n && Array.isArray(n.fills)) {
+            if (n.fills.some((f) => f.type === "IMAGE")) return true;
+          }
           if ("children" in n) {
-            return n.children.some((c) => hasVectorChildren(c));
+            return n.children.some((c) => hasImageChildren(c));
           }
           return false;
         };
-        const uploadNodeImage = (nodeId, preferSvg = false) => __async(this, null, function* () {
-          if (!nodeId) return null;
-          const node = figma.getNodeById(nodeId);
-          if (!node) {
-            console.error(`[PIPELINE] \u274C Node not found for upload: ${nodeId}`);
-            return null;
-          }
-          let format = preferSvg ? "SVG" : "WEBP";
-          const hasImageChildren = (n) => {
-            if ("fills" in n && Array.isArray(n.fills)) {
-              if (n.fills.some((f) => f.type === "IMAGE")) return true;
-            }
-            if ("children" in n) {
-              return n.children.some((c) => hasImageChildren(c));
-            }
-            return false;
-          };
-          if ("locked" in node && node.locked) {
-            if (hasImageChildren(node)) {
-              format = "WEBP";
-            } else if (hasVectorChildren(node)) {
-              format = "SVG";
-            } else {
-              format = "WEBP";
-            }
+        if ("locked" in node && node.locked) {
+          if (hasImageChildren(node)) {
+            format = "WEBP";
           } else if (hasVectorChildren(node)) {
             format = "SVG";
+          } else {
+            format = "WEBP";
           }
-          console.log(`[PIPELINE] \u{1F4E4} Uploading ${preferSvg ? "ICON" : "IMAGE"} for node ${node.name} (${node.id}) as ${format}`);
-          return this.imageUploader.uploadToWordPress(node, format);
-        });
-        const processWidget = (widget) => __async(this, null, function* () {
-          var _a, _b, _c, _d, _e, _f;
-          console.log(`[PIPELINE] Processing widget: ${widget.type} (ID: ${widget.imageId || "none"})`);
-          if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item")) {
+        } else if (hasVectorChildren(node)) {
+          format = "SVG";
+        }
+        console.log(`[PIPELINE] \u{1F4E4} Uploading ${preferSvg ? "ICON" : "IMAGE"} for node ${node.name} (${node.id}) as ${format}`);
+        return this.imageUploader.uploadToWordPress(node, format);
+      };
+      const processWidget = async (widget) => {
+        console.log(`[PIPELINE] Processing widget: ${widget.type} (ID: ${widget.imageId || "none"})`);
+        if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item")) {
+          try {
+            const result = await uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item");
+            if (result) {
+              if (widget.type === "image-box") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.image_url = result.url;
+              } else if (widget.type === "icon-box") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
+              } else if (widget.type === "icon") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
+              } else if (widget.styles?.icon && widget.type === "icon-list") {
+                widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
+              } else if (widget.type === "list-item") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.icon_url = result.url;
+              } else {
+                widget.content = result.url;
+              }
+              widget.imageId = result.id.toString();
+            }
+          } catch (e) {
+            console.error("Failed to upload image for widget:", widget.type, e);
+          }
+        }
+        if (widget.type === "image-carousel" && widget.styles?.slides && Array.isArray(widget.styles.slides)) {
+          const uploads = widget.styles.slides.map(async (slide, idx) => {
+            const nodeId = slide?.id || slide?.imageId;
+            if (!nodeId) return;
             try {
-              const result = yield uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item");
+              const result = await uploadNodeImage(nodeId, false);
               if (result) {
-                if (widget.type === "image-box") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.image_url = result.url;
-                } else if (widget.type === "icon-box") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
-                } else if (widget.type === "icon") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
-                } else if (((_a = widget.styles) == null ? void 0 : _a.icon) && widget.type === "icon-list") {
-                  widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
-                } else if (widget.type === "list-item") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.icon_url = result.url;
-                } else {
-                  widget.content = result.url;
-                }
-                widget.imageId = result.id.toString();
+                slide.url = result.url;
+                const parsedId = parseInt(String(result.id), 10);
+                slide.id = isNaN(parsedId) ? "" : parsedId;
+                slide._id = slide._id || `slide_${idx + 1}`;
+                slide.image = { url: slide.url, id: slide.id };
               }
             } catch (e) {
-              console.error("Failed to upload image for widget:", widget.type, e);
+              console.error(`[Pipeline] Erro ao processar slide ${nodeId}:`, e);
             }
-          }
-          if (widget.type === "image-carousel" && ((_b = widget.styles) == null ? void 0 : _b.slides) && Array.isArray(widget.styles.slides)) {
-            const uploads = widget.styles.slides.map((slide, idx) => __async(this, null, function* () {
-              const nodeId = (slide == null ? void 0 : slide.id) || (slide == null ? void 0 : slide.imageId);
-              if (!nodeId) return;
-              try {
-                const result = yield uploadNodeImage(nodeId, false);
-                if (result) {
-                  slide.url = result.url;
-                  const parsedId = parseInt(String(result.id), 10);
-                  slide.id = isNaN(parsedId) ? "" : parsedId;
-                  slide._id = slide._id || `slide_${idx + 1}`;
-                  slide.image = { url: slide.url, id: slide.id };
-                }
-              } catch (e) {
-                console.error(`[Pipeline] Erro ao processar slide ${nodeId}:`, e);
+          });
+          await Promise.all(uploads);
+        }
+        if ((widget.type === "gallery" || widget.type === "basic-gallery") && widget.styles?.gallery && Array.isArray(widget.styles.gallery)) {
+          const uploads = widget.styles.gallery.map(async (imageItem) => {
+            const nodeId = imageItem?.id || imageItem?.imageId;
+            if (!nodeId) return;
+            try {
+              const result = await uploadNodeImage(nodeId, false);
+              if (result) {
+                imageItem.url = result.url;
+                const parsedId = parseInt(String(result.id), 10);
+                imageItem.id = isNaN(parsedId) ? "" : parsedId;
               }
-            }));
-            yield Promise.all(uploads);
-          }
-          if ((widget.type === "gallery" || widget.type === "basic-gallery") && ((_c = widget.styles) == null ? void 0 : _c.gallery) && Array.isArray(widget.styles.gallery)) {
-            const uploads = widget.styles.gallery.map((imageItem) => __async(this, null, function* () {
-              const nodeId = (imageItem == null ? void 0 : imageItem.id) || (imageItem == null ? void 0 : imageItem.imageId);
-              if (!nodeId) return;
-              try {
-                const result = yield uploadNodeImage(nodeId, false);
-                if (result) {
-                  imageItem.url = result.url;
-                  const parsedId = parseInt(String(result.id), 10);
-                  imageItem.id = isNaN(parsedId) ? "" : parsedId;
-                }
-              } catch (e) {
-                console.error(`[Pipeline] Erro ao processar imagem da galeria ${nodeId}:`, e);
-              }
-            }));
-            yield Promise.all(uploads);
-            widget.styles.gallery = widget.styles.gallery.filter((item) => item.url && item.id);
-          }
-          if (widget.type === "button") {
-            const iconValue = (_e = (_d = widget.styles) == null ? void 0 : _d.selected_icon) == null ? void 0 : _e.value;
-            if (iconValue && typeof iconValue === "object" && iconValue.id) {
-              if ((_f = widget.styles) == null ? void 0 : _f.sourceId) {
-                const buttonNode = figma.getNodeById(widget.styles.sourceId);
-                if (buttonNode && "children" in buttonNode) {
-                  const iconChild = buttonNode.children.find((c) => c.name === "Icon" || c.type === "VECTOR" || c.name.toLowerCase().includes("icon"));
-                  if (iconChild) {
-                    try {
-                      const result = yield uploadNodeImage(iconChild.id, true);
-                      if (result) {
-                        widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
-                      }
-                    } catch (e) {
-                      console.error(`[Pipeline] Failed to upload button icon ${iconChild.id}:`, e);
+            } catch (e) {
+              console.error(`[Pipeline] Erro ao processar imagem da galeria ${nodeId}:`, e);
+            }
+          });
+          await Promise.all(uploads);
+          widget.styles.gallery = widget.styles.gallery.filter((item) => item.url && item.id);
+        }
+        if (widget.type === "button") {
+          const iconValue = widget.styles?.selected_icon?.value;
+          if (iconValue && typeof iconValue === "object" && iconValue.id) {
+            if (widget.styles?.sourceId) {
+              const buttonNode = figma.getNodeById(widget.styles.sourceId);
+              if (buttonNode && "children" in buttonNode) {
+                const iconChild = buttonNode.children.find((c) => c.name === "Icon" || c.type === "VECTOR" || c.name.toLowerCase().includes("icon"));
+                if (iconChild) {
+                  try {
+                    const result = await uploadNodeImage(iconChild.id, true);
+                    if (result) {
+                      widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
                     }
+                  } catch (e) {
+                    console.error(`[Pipeline] Failed to upload button icon ${iconChild.id}:`, e);
                   }
                 }
               }
             }
           }
-        });
-        const uploadPromises = [];
-        const collectUploads = (container) => {
-          if (container.widgets) {
-            for (const widget of container.widgets) {
-              uploadPromises.push(processWidget(widget));
-            }
-          }
-          if (container.children) {
-            for (const child of container.children) {
-              collectUploads(child);
-            }
-          }
-        };
-        if (schema.containers) {
-          for (const container of schema.containers) {
-            collectUploads(container);
+        }
+      };
+      const uploadPromises = [];
+      const collectUploads = (container) => {
+        if (container.widgets) {
+          for (const widget of container.widgets) {
+            uploadPromises.push(processWidget(widget));
           }
         }
-        if (uploadPromises.length > 0) {
-          yield Promise.all(uploadPromises);
+        if (container.children) {
+          for (const child of container.children) {
+            collectUploads(child);
+          }
         }
-      });
+      };
+      if (schema.containers) {
+        for (const container of schema.containers) {
+          collectUploads(container);
+        }
+      }
+      if (uploadPromises.length > 0) {
+        await Promise.all(uploadPromises);
+      }
     }
     hydrateStyles(schema, flatNodes) {
       const nodeMap = new Map(flatNodes.map((n) => [n.id, n]));
       const processContainer = (container) => {
-        var _a, _b, _c;
-        if ((_a = container.styles) == null ? void 0 : _a.sourceId) {
+        if (container.styles?.sourceId) {
           const node = nodeMap.get(container.styles.sourceId);
           if (node) {
             const realStyles = extractContainerStyles(node);
-            container.styles = __spreadValues(__spreadValues({}, container.styles), realStyles);
+            container.styles = { ...container.styles, ...realStyles };
             if (realStyles.paddingTop !== void 0) container.styles.paddingTop = realStyles.paddingTop;
             if (realStyles.paddingRight !== void 0) container.styles.paddingRight = realStyles.paddingRight;
             if (realStyles.paddingBottom !== void 0) container.styles.paddingBottom = realStyles.paddingBottom;
@@ -5105,18 +5034,18 @@ ${JSON.stringify(baseSchema, null, 2)}
         }
         if (container.widgets) {
           for (const widget of container.widgets) {
-            if ((_b = widget.styles) == null ? void 0 : _b.sourceId) {
+            if (widget.styles?.sourceId) {
               const node = nodeMap.get(widget.styles.sourceId);
               if (node) {
                 const realStyles = extractWidgetStyles(node);
-                widget.styles = __spreadValues(__spreadValues({}, widget.styles), realStyles);
+                widget.styles = { ...widget.styles, ...realStyles };
                 if (node.type === "VECTOR" || node.type === "STAR" || node.type === "POLYGON" || node.type === "ELLIPSE") {
                   if (widget.type !== "icon" && widget.type !== "image") {
                     widget.type = "icon";
                     widget.imageId = node.id;
                   }
                 } else if (node.type === "RECTANGLE" || node.type === "FRAME") {
-                  const hasImage = (_c = node.fills) == null ? void 0 : _c.some((f) => f.type === "IMAGE");
+                  const hasImage = node.fills?.some((f) => f.type === "IMAGE");
                   if (hasImage && widget.type !== "image") {
                     widget.type = "image";
                     widget.imageId = node.id;
@@ -5151,12 +5080,11 @@ ${JSON.stringify(baseSchema, null, 2)}
       const logWarn = (message) => {
         try {
           figma.ui.postMessage({ type: "log", level: "warn", message });
-        } catch (e) {
+        } catch {
         }
       };
       containers = this.deduplicateContainers(containers);
       const walk = (c, parent) => {
-        var _a, _b, _c;
         if (!c.id) {
           logWarn("[AutoFix] Container sem id detectado. Ignorado para evitar quebra.");
           return null;
@@ -5194,7 +5122,7 @@ ${JSON.stringify(baseSchema, null, 2)}
                 }
                 let imageId = null;
                 if (widgetType === "image" || widgetType === "image-box") {
-                  if ((_a = node.fills) == null ? void 0 : _a.some((f) => f.type === "IMAGE")) imageId = node.id;
+                  if (node.fills?.some((f) => f.type === "IMAGE")) imageId = node.id;
                   else if (node.children) {
                     const imgChild = node.children.find((child) => child.type === "VECTOR" || child.type === "RECTANGLE" || child.type === "ELLIPSE");
                     if (imgChild) imageId = imgChild.id;
@@ -5214,9 +5142,9 @@ ${JSON.stringify(baseSchema, null, 2)}
             console.warn("[Heuristics] Error evaluating node:", err);
           }
         }
-        const layoutMode = (node == null ? void 0 : node.layoutMode) || c.layoutMode;
-        const type = (node == null ? void 0 : node.type) || c.type;
-        const name = (node == null ? void 0 : node.name) || c.name;
+        const layoutMode = node?.layoutMode || c.layoutMode;
+        const type = node?.type || c.type;
+        const name = node?.name || c.name;
         const isFrameLike2 = type === "FRAME" || type === "GROUP" || type === "COMPONENT" || type === "INSTANCE" || type === "SECTION";
         const hasAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
         const looksInvalidContainer = !hasAutoLayout || !isFrameLike2;
@@ -5229,9 +5157,9 @@ ${JSON.stringify(baseSchema, null, 2)}
                 parent.widgets = parent.widgets || [];
                 parent.widgets.push({
                   type: "custom",
-                  content: (node == null ? void 0 : node.characters) || c.characters || name || null,
+                  content: node?.characters || c.characters || name || null,
                   imageId: null,
-                  styles: { sourceId: c.id, sourceName: node == null ? void 0 : node.name }
+                  styles: { sourceId: c.id, sourceName: node?.name }
                 });
                 return null;
               }
@@ -5264,14 +5192,12 @@ ${JSON.stringify(baseSchema, null, 2)}
         c.children = c.children.map((child) => walk(child, c)).filter(Boolean);
         if (node && "children" in node && !c._aiOptimized) {
           const collectIds = (container, ids) => {
-            var _a2, _b2;
             if (container.id) ids.add(container.id);
-            (_a2 = container.widgets) == null ? void 0 : _a2.forEach((w) => {
-              var _a3;
-              if ((_a3 = w.styles) == null ? void 0 : _a3.sourceId) ids.add(w.styles.sourceId);
+            container.widgets?.forEach((w) => {
+              if (w.styles?.sourceId) ids.add(w.styles.sourceId);
               if (w.imageId) ids.add(w.imageId);
             });
-            (_b2 = container.children) == null ? void 0 : _b2.forEach((child) => collectIds(child, ids));
+            container.children?.forEach((child) => collectIds(child, ids));
           };
           const existingIds = /* @__PURE__ */ new Set();
           collectIds(c, existingIds);
@@ -5290,7 +5216,7 @@ ${JSON.stringify(baseSchema, null, 2)}
                   styles: {
                     sourceId: child.id,
                     sourceName: child.name,
-                    color: ((_c = (_b = child.fills) == null ? void 0 : _b[0]) == null ? void 0 : _c.color) ? this.rgbaToHex(child.fills[0].color) : void 0
+                    color: child.fills?.[0]?.color ? this.rgbaToHex(child.fills[0].color) : void 0
                   }
                 });
               } else if (child.type === "FRAME" || child.type === "GROUP" || child.type === "INSTANCE" || child.type === "RECTANGLE") {
@@ -5317,15 +5243,14 @@ ${JSON.stringify(baseSchema, null, 2)}
       return containers.map((c) => walk(c, null)).filter(Boolean);
     }
     normalizeWidget(widget) {
-      var _a, _b, _c;
-      if ((widget.type === "image-box" || widget.type === "icon-box") && ((_a = widget.styles) == null ? void 0 : _a.title_text) && typeof widget.styles.title_text === "object") {
+      if ((widget.type === "image-box" || widget.type === "icon-box") && widget.styles?.title_text && typeof widget.styles.title_text === "object") {
         const tt = widget.styles.title_text;
         if (tt.imageId && !widget.imageId) widget.imageId = tt.imageId;
         if (tt.title) widget.content = tt.title;
         if (tt.description) widget.styles.description_text = tt.description;
         widget.styles.title_text = tt.title || "";
       }
-      if (widget.type === "image-box" && !widget.imageId && ((_c = (_b = widget.styles) == null ? void 0 : _b.image) == null ? void 0 : _c.id)) {
+      if (widget.type === "image-box" && !widget.imageId && widget.styles?.image?.id) {
         widget.imageId = widget.styles.image.id;
       }
     }
@@ -5339,10 +5264,7 @@ ${JSON.stringify(baseSchema, null, 2)}
     deduplicateContainers(containers) {
       const map = /* @__PURE__ */ new Map();
       const order = [];
-      const resolveKey = (container) => {
-        var _a;
-        return ((_a = container.styles) == null ? void 0 : _a.sourceId) || container.id;
-      };
+      const resolveKey = (container) => container.styles?.sourceId || container.id;
       for (const c of containers) {
         if (!c.id) {
           continue;
@@ -5350,13 +5272,13 @@ ${JSON.stringify(baseSchema, null, 2)}
         const key = resolveKey(c);
         if (!key) {
           if (!map.has(c.id)) {
-            map.set(c.id, __spreadProps(__spreadValues({}, c), { widgets: [...c.widgets || []], children: [...c.children || []] }));
+            map.set(c.id, { ...c, widgets: [...c.widgets || []], children: [...c.children || []] });
             order.push(c.id);
           }
           continue;
         }
         if (!map.has(key)) {
-          map.set(key, __spreadProps(__spreadValues({}, c), { widgets: [...c.widgets || []], children: [...c.children || []] }));
+          map.set(key, { ...c, widgets: [...c.widgets || []], children: [...c.children || []] });
           order.push(key);
           continue;
         }
@@ -5365,10 +5287,10 @@ ${JSON.stringify(baseSchema, null, 2)}
           const existingStylesCount = Object.keys(existing.styles).length;
           const newStylesCount = Object.keys(c.styles).length;
           if (newStylesCount > existingStylesCount) {
-            existing.styles = __spreadValues(__spreadValues({}, existing.styles), c.styles);
+            existing.styles = { ...existing.styles, ...c.styles };
           }
         } else if (c.styles && !existing.styles) {
-          existing.styles = __spreadValues({}, c.styles);
+          existing.styles = { ...c.styles };
         }
       }
       return order.map((id) => map.get(id));
@@ -5376,96 +5298,93 @@ ${JSON.stringify(baseSchema, null, 2)}
     /**
      * Sync nav-menus to WordPress via figtoel-remote-menus plugin
      */
-    syncNavMenus(schema, root, wpConfig) {
-      return __async(this, null, function* () {
-        var _a;
-        console.log("[NAV MENU SYNC] ========== START ==========");
-        console.log("[NAV MENU SYNC] WPConfig:", { url: wpConfig.url, user: wpConfig.user, hasPassword: !!(wpConfig.password || wpConfig.token) });
-        const syncEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token));
-        if (!syncEnabled) {
-          console.log("[NAV MENU SYNC] \u274C Skipped: WordPress config not provided.");
-          return;
-        }
-        const navMenus = [];
-        const collect = (container) => {
-          if (container.widgets) {
-            for (const widget of container.widgets) {
-              if (widget.type === "nav-menu") {
-                navMenus.push({ widget, container });
-              }
+    async syncNavMenus(schema, root, wpConfig) {
+      console.log("[NAV MENU SYNC] ========== START ==========");
+      console.log("[NAV MENU SYNC] WPConfig:", { url: wpConfig.url, user: wpConfig.user, hasPassword: !!(wpConfig.password || wpConfig.token) });
+      const syncEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token));
+      if (!syncEnabled) {
+        console.log("[NAV MENU SYNC] \u274C Skipped: WordPress config not provided.");
+        return;
+      }
+      const navMenus = [];
+      const collect = (container) => {
+        if (container.widgets) {
+          for (const widget of container.widgets) {
+            if (widget.type === "nav-menu") {
+              navMenus.push({ widget, container });
             }
           }
-          if (container.children) {
-            for (const child of container.children) {
-              collect(child);
-            }
-          }
-        };
-        schema.containers.forEach((c) => collect(c));
-        console.log(`[NAV MENU SYNC] Collected ${navMenus.length} nav-menu widget(s):`, navMenus.map((m) => ({ widgetType: m.widget.type, content: m.widget.content })));
-        if (navMenus.length === 0) {
-          console.log("[NAV MENU SYNC] No nav-menu widgets found.");
-          return;
         }
-        console.log(`[NAV MENU SYNC] Found ${navMenus.length} nav-menu(s). Syncing to WordPress...`);
-        for (const { widget, container } of navMenus) {
-          try {
-            const sourceId = ((_a = widget.styles) == null ? void 0 : _a.sourceId) || container.id;
-            const figmaNode = figma.getNodeById(sourceId);
-            if (!figmaNode || !("children" in figmaNode)) {
-              console.warn(`[NAV MENU SYNC] Cannot find Figma node for nav-menu: ${sourceId}`);
-              continue;
-            }
-            const items = this.extractMenuItems(figmaNode);
-            const menuName = widget.content || figmaNode.name || "Menu Principal";
-            const payload = {
-              menu_name: menuName,
-              menu_location: "primary",
-              // Default location
-              replace_existing: true,
-              items
-            };
-            const url = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
-            const btoaPolyfill = (str) => {
-              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-              let output = "";
-              let i = 0;
-              while (i < str.length) {
-                const a = str.charCodeAt(i++);
-                const b = i < str.length ? str.charCodeAt(i++) : 0;
-                const c = i < str.length ? str.charCodeAt(i++) : 0;
-                const bitmap = a << 16 | b << 8 | c;
-                output += chars.charAt(bitmap >> 18 & 63);
-                output += chars.charAt(bitmap >> 12 & 63);
-                output += chars.charAt(b ? bitmap >> 6 & 63 : 64);
-                output += chars.charAt(c ? bitmap & 63 : 64);
-              }
-              return output;
-            };
-            const auth = "Basic " + btoaPolyfill(`${wpConfig.user}:${wpConfig.password || wpConfig.token}`);
-            console.log(`[NAV MENU SYNC] Posting to ${url}...`, payload);
-            const response = yield fetch(url, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": auth
-              },
-              body: JSON.stringify(payload)
-            });
-            const result = yield response.json();
-            if (response.ok && result.success) {
-              console.log(`[NAV MENU SYNC] \u2705 Menu "${menuName}" synced successfully. Items created: ${result.items_created}`);
-              figma.ui.postMessage({ type: "log", level: "success", message: `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.` });
-            } else {
-              console.error(`[NAV MENU SYNC] \u274C Failed to sync menu "${menuName}":`, result);
-              figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao criar menu "${menuName}": ${result.error || "Desconhecido"}` });
-            }
-          } catch (error) {
-            console.error(`[NAV MENU SYNC] Exception:`, error);
-            figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao sincronizar menu: ${error}` });
+        if (container.children) {
+          for (const child of container.children) {
+            collect(child);
           }
         }
-      });
+      };
+      schema.containers.forEach((c) => collect(c));
+      console.log(`[NAV MENU SYNC] Collected ${navMenus.length} nav-menu widget(s):`, navMenus.map((m) => ({ widgetType: m.widget.type, content: m.widget.content })));
+      if (navMenus.length === 0) {
+        console.log("[NAV MENU SYNC] No nav-menu widgets found.");
+        return;
+      }
+      console.log(`[NAV MENU SYNC] Found ${navMenus.length} nav-menu(s). Syncing to WordPress...`);
+      for (const { widget, container } of navMenus) {
+        try {
+          const sourceId = widget.styles?.sourceId || container.id;
+          const figmaNode = figma.getNodeById(sourceId);
+          if (!figmaNode || !("children" in figmaNode)) {
+            console.warn(`[NAV MENU SYNC] Cannot find Figma node for nav-menu: ${sourceId}`);
+            continue;
+          }
+          const items = this.extractMenuItems(figmaNode);
+          const menuName = widget.content || figmaNode.name || "Menu Principal";
+          const payload = {
+            menu_name: menuName,
+            menu_location: "primary",
+            // Default location
+            replace_existing: true,
+            items
+          };
+          const url = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
+          const btoaPolyfill = (str) => {
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+            let output = "";
+            let i = 0;
+            while (i < str.length) {
+              const a = str.charCodeAt(i++);
+              const b = i < str.length ? str.charCodeAt(i++) : 0;
+              const c = i < str.length ? str.charCodeAt(i++) : 0;
+              const bitmap = a << 16 | b << 8 | c;
+              output += chars.charAt(bitmap >> 18 & 63);
+              output += chars.charAt(bitmap >> 12 & 63);
+              output += chars.charAt(b ? bitmap >> 6 & 63 : 64);
+              output += chars.charAt(c ? bitmap & 63 : 64);
+            }
+            return output;
+          };
+          const auth = "Basic " + btoaPolyfill(`${wpConfig.user}:${wpConfig.password || wpConfig.token}`);
+          console.log(`[NAV MENU SYNC] Posting to ${url}...`, payload);
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": auth
+            },
+            body: JSON.stringify(payload)
+          });
+          const result = await response.json();
+          if (response.ok && result.success) {
+            console.log(`[NAV MENU SYNC] \u2705 Menu "${menuName}" synced successfully. Items created: ${result.items_created}`);
+            figma.ui.postMessage({ type: "log", level: "success", message: `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.` });
+          } else {
+            console.error(`[NAV MENU SYNC] \u274C Failed to sync menu "${menuName}":`, result);
+            figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao criar menu "${menuName}": ${result.error || "Desconhecido"}` });
+          }
+        } catch (error) {
+          console.error(`[NAV MENU SYNC] Exception:`, error);
+          figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao sincronizar menu: ${error}` });
+        }
+      }
     }
     /**
      * Extract menu items from a nav-menu Figma node
@@ -5505,133 +5424,131 @@ ${JSON.stringify(baseSchema, null, 2)}
   var OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
   var DEFAULT_TIMEOUT_MS2 = 12e3;
   var DEFAULT_GPT_MODEL = "gpt-4.1-mini";
-  function fetchWithTimeout2(_0) {
-    return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS2) {
-      const AC = typeof AbortController === "function" ? AbortController : null;
-      let controller = null;
-      if (AC) {
-        try {
-          controller = new AC();
-        } catch (e) {
-          controller = null;
-        }
-      }
-      if (!controller) {
-        return yield fetch(url, options);
-      }
-      const id = setTimeout(() => controller.abort(), timeoutMs);
+  async function fetchWithTimeout2(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS2) {
+    const AC = typeof AbortController === "function" ? AbortController : null;
+    let controller = null;
+    if (AC) {
       try {
-        const resp = yield fetch(url, __spreadProps(__spreadValues({}, options), { signal: controller.signal }));
-        return resp;
-      } finally {
-        clearTimeout(id);
+        controller = new AC();
+      } catch {
+        controller = null;
       }
-    });
+    }
+    if (!controller) {
+      return await fetch(url, options);
+    }
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { ...options, signal: controller.signal });
+      return resp;
+    } finally {
+      clearTimeout(id);
+    }
   }
-  function getOpenAIKey() {
-    return __async(this, null, function* () {
-      return yield figma.clientStorage.getAsync("gpt_api_key");
-    });
+  async function getOpenAIKey() {
+    return await figma.clientStorage.getAsync("gpt_api_key");
   }
-  function saveOpenAIModel(model) {
-    return __async(this, null, function* () {
-      yield figma.clientStorage.setAsync("gpt_model", model);
-    });
+  async function saveOpenAIModel(model) {
+    await figma.clientStorage.setAsync("gpt_model", model);
   }
   function cleanJson2(content) {
     return content.replace(/```json/gi, "").replace(/```/g, "").trim();
   }
-  function parseJsonResponse(rawContent) {
-    return __async(this, null, function* () {
-      const clean = cleanJson2(rawContent);
-      try {
-        return JSON.parse(clean);
-      } catch (err) {
-        throw new Error("Resposta nao JSON");
-      }
-    });
+  async function parseJsonResponse(rawContent) {
+    const clean = cleanJson2(rawContent);
+    try {
+      return JSON.parse(clean);
+    } catch (err) {
+      throw new Error("Resposta nao JSON");
+    }
   }
   var JSON_SAFETY = "Responda sempre em JSON (json) valido e completo.";
   function mapStatusError(status, parsed) {
-    var _a;
-    const base = (_a = parsed == null ? void 0 : parsed.error) == null ? void 0 : _a.message;
+    const base = parsed?.error?.message;
     if (status === 401) return "API Key invalida (401).";
     if (status === 404) return "Modelo nao encontrado (404).";
     if (status === 429) return "Quota excedida (429).";
     if (status >= 500) return "Erro interno da OpenAI (5xx).";
     return base || `HTTP ${status}`;
   }
-  function callOpenAI(apiKey, model, messages, maxTokens = 8192, retries = 3) {
-    return __async(this, null, function* () {
-      var _a, _b, _c;
-      const requestBody = {
-        model,
-        messages,
-        temperature: 0.2,
-        max_tokens: maxTokens,
-        response_format: { type: "json_object" }
-      };
-      let attempt = 0;
-      while (attempt < retries) {
-        try {
-          const response = yield fetchWithTimeout2(OPENAI_API_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(requestBody)
-          });
-          if (!response.ok) {
-            const rawText = yield response.text();
-            let parsed = null;
-            try {
-              parsed = JSON.parse(rawText);
-            } catch (e) {
-              parsed = rawText;
-            }
-            const error = mapStatusError(response.status, parsed);
-            if (response.status >= 400 && response.status < 500) {
-              return { ok: false, error, raw: parsed };
-            }
-            attempt++;
-            if (attempt >= retries) return { ok: false, error, raw: parsed };
-            yield new Promise((res) => setTimeout(res, 500 * attempt));
-            continue;
-          }
-          const data = yield response.json();
-          const content = (_c = (_b = (_a = data == null ? void 0 : data.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content;
-          if (!content) {
-            return { ok: false, error: "Resposta vazia da OpenAI.", raw: data };
-          }
+  async function callOpenAI(apiKey, model, messages, maxTokens = 8192, retries = 3) {
+    const requestBody = {
+      model,
+      messages,
+      temperature: 0.2,
+      max_tokens: maxTokens,
+      response_format: { type: "json_object" }
+    };
+    let attempt = 0;
+    while (attempt < retries) {
+      try {
+        const response = await fetchWithTimeout2(OPENAI_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+        if (!response.ok) {
+          const rawText = await response.text();
+          let parsed = null;
           try {
-            const schema = yield parseJsonResponse(content);
-            return { ok: true, data: schema, schema, raw: data };
-          } catch (err) {
-            return { ok: false, error: (err == null ? void 0 : err.message) || "Resposta nao JSON", raw: content };
+            parsed = JSON.parse(rawText);
+          } catch {
+            parsed = rawText;
           }
-        } catch (err) {
+          const error = mapStatusError(response.status, parsed);
+          if (response.status >= 400 && response.status < 500) {
+            return { ok: false, error, raw: parsed };
+          }
           attempt++;
-          if (attempt >= retries) {
-            const aborted = (err == null ? void 0 : err.name) === "AbortError";
-            const message = aborted ? "Timeout na chamada OpenAI." : (err == null ? void 0 : err.message) || "Erro desconhecido ao chamar OpenAI.";
-            return { ok: false, error: message, raw: err };
-          }
-          yield new Promise((res) => setTimeout(res, 500 * attempt));
+          if (attempt >= retries) return { ok: false, error, raw: parsed };
+          await new Promise((res) => setTimeout(res, 500 * attempt));
+          continue;
         }
+        const data = await response.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (!content) {
+          return { ok: false, error: "Resposta vazia da OpenAI.", raw: data };
+        }
+        try {
+          const schema = await parseJsonResponse(content);
+          return { ok: true, data: schema, schema, raw: data };
+        } catch (err) {
+          return { ok: false, error: err?.message || "Resposta nao JSON", raw: content };
+        }
+      } catch (err) {
+        attempt++;
+        if (attempt >= retries) {
+          const aborted = err?.name === "AbortError";
+          const message = aborted ? "Timeout na chamada OpenAI." : err?.message || "Erro desconhecido ao chamar OpenAI.";
+          return { ok: false, error: message, raw: err };
+        }
+        await new Promise((res) => setTimeout(res, 500 * attempt));
       }
-      return { ok: false, error: "Falha ao chamar OpenAI apos retries." };
-    });
+    }
+    return { ok: false, error: "Falha ao chamar OpenAI apos retries." };
   }
-  function testOpenAIConnection(apiKey, model) {
-    return __async(this, null, function* () {
-      const messages = [
-        { role: "system", content: `${JSON_SAFETY} Retorne {"pong": true}.` },
-        { role: "user", content: "ping (json)" }
-      ];
-      const resp = yield callOpenAI(apiKey, model, messages, 64, 1);
-      return { ok: resp.ok, error: resp.error, data: resp.raw };
-    });
+  async function testOpenAIConnection(apiKey, model) {
+    const messages = [
+      { role: "system", content: `${JSON_SAFETY} Retorne {"pong": true}.` },
+      { role: "user", content: "ping (json)" }
+    ];
+    const resp = await callOpenAI(apiKey, model, messages, 64, 1);
+    if (resp.ok) {
+      return { ok: true, message: "Conexao com OpenAI verificada.", raw: resp.raw };
+    }
+    const message = resp.error || "Falha ao testar OpenAI.";
+    const result = {
+      ok: false,
+      message,
+      raw: resp.raw
+    };
+    if (resp.error) {
+      result.error = resp.error;
+    }
+    return result;
   }
   var openaiProvider = {
     id: "gpt",
@@ -5641,64 +5558,65 @@ ${JSON.stringify(baseSchema, null, 2)}
       saveOpenAIModel(model).catch(() => {
       });
     },
-    generateSchema(input) {
-      return __async(this, null, function* () {
-        var _a;
-        const apiKey = input.apiKey || (yield getOpenAIKey());
-        if (!apiKey) {
-          return { ok: false, error: "API Key do OpenAI nao configurada." };
-        }
-        const model = this.model;
-        const messages = [
-          { role: "system", content: `${input.instructions}
+    async generateSchema(input) {
+      const apiKey = input.apiKey || await getOpenAIKey();
+      if (!apiKey) {
+        return { ok: false, error: "API Key do OpenAI nao configurada." };
+      }
+      const model = this.model;
+      const messages = [
+        { role: "system", content: `${input.instructions}
 ${JSON_SAFETY}` },
-          { role: "user", content: input.prompt },
-          { role: "user", content: `SNAPSHOT (json esperado):
+        { role: "user", content: input.prompt },
+        { role: "user", content: `SNAPSHOT (json esperado):
 ${JSON.stringify(input.snapshot)}` }
-        ];
-        if (input.references && input.references.length > 0) {
-          const refText = input.references.map((r) => `### ${r.name}
+      ];
+      if (input.references && input.references.length > 0) {
+        const refText = input.references.map((r) => `### ${r.name}
 ${r.content}`).join("\n\n");
-          messages.push({ role: "user", content: `REFERENCIAS:
+        messages.push({ role: "user", content: `REFERENCIAS:
 ${refText}` });
-        }
-        if ((_a = input.image) == null ? void 0 : _a.data) {
-          messages.push({
-            role: "user",
-            content: [
-              { type: "text", text: "PRINT DO FRAME (PNG base64 inline):" },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${input.image.mimeType || "image/png"};base64,${input.image.data}`
-                }
+      }
+      if (input.image?.data) {
+        messages.push({
+          role: "user",
+          content: [
+            { type: "text", text: "PRINT DO FRAME (PNG base64 inline):" },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${input.image.mimeType || "image/png"};base64,${input.image.data}`
               }
-            ]
-          });
-        }
-        const resp = yield callOpenAI(apiKey, model, messages);
-        if (!resp.ok) return resp;
+            }
+          ]
+        });
+      }
+      const resp = await callOpenAI(apiKey, model, messages);
+      if (!resp.ok) return resp;
+      if (resp.schema) {
         return { ok: true, schema: resp.schema, data: resp.data, raw: resp.raw };
-      });
+      }
+      return { ok: true, data: resp.data, raw: resp.raw };
     },
-    testConnection(apiKey) {
-      return __async(this, null, function* () {
-        const keyToTest = apiKey || (yield getOpenAIKey());
-        const model = this.model;
-        if (!keyToTest) {
-          return { ok: false, error: "API Key do OpenAI nao configurada." };
-        }
-        return yield testOpenAIConnection(keyToTest, model);
-      });
+    async testConnection(apiKey) {
+      const keyToTest = apiKey || await getOpenAIKey();
+      const model = this.model;
+      if (!keyToTest) {
+        return { ok: false, error: "API Key do OpenAI nao configurada.", message: "API Key do OpenAI nao configurada." };
+      }
+      return await testOpenAIConnection(keyToTest, model);
     }
   };
 
   // src/utils/logger.ts
   var FileLogger = class {
-    constructor(originalConsoleLog2) {
-      this.logs = [];
-      this.maxLogs = 1e3;
-      this.originalLog = originalConsoleLog2 || console.log.bind(console);
+    logs = [];
+    sessionStart;
+    maxLogs = 1e3;
+    // Prevent memory issues
+    originalLog;
+    constructor(originalConsoleLog) {
+      this.originalLog = originalConsoleLog || console.log.bind(console);
       this.sessionStart = (/* @__PURE__ */ new Date()).toISOString();
       this.log("=".repeat(80));
       this.log(`[SESSION START] ${this.sessionStart}`);
@@ -5713,7 +5631,7 @@ ${refText}` });
         if (typeof arg === "object") {
           try {
             return JSON.stringify(arg, null, 2);
-          } catch (e) {
+          } catch {
             return String(arg);
           }
         }
@@ -5772,8 +5690,8 @@ ${refText}` });
 
   // src/linter/detectors/WidgetDetector.ts
   var WidgetDetector = class {
+    rules = [];
     constructor() {
-      this.rules = [];
       this.initializeRules();
     }
     /**
@@ -5984,7 +5902,6 @@ ${refText}` });
      * Helper: Analisa contexto visual do node
      */
     analyzeVisualContext(node) {
-      var _a;
       const width = "width" in node ? node.width : 0;
       const height = "height" in node ? node.height : 0;
       const aspectRatio = height > 0 ? width / height : 0;
@@ -6009,7 +5926,7 @@ ${refText}` });
           }
           if (child.type === "TEXT" && "characters" in child) {
             textCount++;
-            totalTextLength += ((_a = child.characters) == null ? void 0 : _a.length) || 0;
+            totalTextLength += child.characters?.length || 0;
           }
         }
       }
@@ -6466,13 +6383,12 @@ ${refText}` });
       return Math.min(confidence, 1);
     }
     matchAnimatedHeadline(node) {
-      var _a;
       let confidence = 0;
       const name = node.name.toLowerCase();
       if (name.includes("animated") && name.includes("headline")) {
         confidence += 0.9;
       }
-      if (node.type === "TEXT" || node.type === "FRAME" && "children" in node && ((_a = node.children) == null ? void 0 : _a.some((c) => c.type === "TEXT"))) {
+      if (node.type === "TEXT" || node.type === "FRAME" && "children" in node && node.children?.some((c) => c.type === "TEXT")) {
         confidence += 0.1;
       }
       return Math.min(confidence, 1);
@@ -6901,14 +6817,13 @@ ${refText}` });
     }
     // ==================== MATCHERS - PRO AVANÇADO ====================
     matchSubscription(node) {
-      var _a;
       let confidence = 0;
       const name = node.name.toLowerCase();
       if (name.includes("subscription") || name.includes("subscribe") || name.includes("newsletter")) {
         confidence += 0.7;
       }
       if (node.type === "FRAME" && "children" in node) {
-        const hasInput = (_a = node.children) == null ? void 0 : _a.some((child) => child.name.toLowerCase().includes("email"));
+        const hasInput = node.children?.some((child) => child.name.toLowerCase().includes("email"));
         if (hasInput) confidence += 0.3;
       }
       return Math.min(confidence, 1);
@@ -7197,80 +7112,74 @@ ${refText}` });
 
   // src/linter/core/LinterEngine.ts
   var LinterEngine = class {
-    constructor() {
-      this.startTime = 0;
-      this.endTime = 0;
-    }
+    startTime = 0;
+    endTime = 0;
     /**
      * Analisa um node do Figma
      */
-    analyze(_0, _1) {
-      return __async(this, arguments, function* (node, registry2, options = {}) {
-        this.startTime = Date.now();
-        registry2.resetExecutedRules();
-        const results = [];
-        const rules = this.getApplicableRules(registry2, options);
-        for (const rule of rules) {
-          const result = yield rule.validate(node);
-          if (result) {
-            results.push(result);
-          }
-          registry2.markAsExecuted(rule.id);
+    async analyze(node, registry2, options = {}) {
+      this.startTime = Date.now();
+      registry2.resetExecutedRules();
+      const results = [];
+      const rules = this.getApplicableRules(registry2, options);
+      for (const rule of rules) {
+        const result = await rule.validate(node);
+        if (result) {
+          results.push(result);
         }
-        if ("children" in node && node.children) {
-          for (const child of node.children) {
-            const childResults = yield this.analyzeNode(child, registry2);
-            results.push(...childResults);
-          }
+        registry2.markAsExecuted(rule.id);
+      }
+      if ("children" in node && node.children) {
+        for (const child of node.children) {
+          const childResults = await this.analyzeNode(child, registry2);
+          results.push(...childResults);
         }
-        this.endTime = Date.now();
-        return results;
-      });
+      }
+      this.endTime = Date.now();
+      return results;
     }
     /**
      * Analisa um único node (sem recursão)
      */
-    analyzeNode(node, registry2) {
-      return __async(this, null, function* () {
-        console.log(`\u{1F50D} [analyzeNode] Analisando: ${node.name} (${node.type})`);
-        const results = [];
-        const hasValidWidgetName = /^(w:|woo:|loop:)/.test(node.name);
-        if (hasValidWidgetName) {
-          console.log(`  \u23ED\uFE0F Pulando ${node.name}: j\xE1 tem nome de widget v\xE1lido`);
-          if ("children" in node && node.children) {
-            console.log(`\u{1F50D} [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
-            for (const child of node.children) {
-              const childResults = yield this.analyzeNode(child, registry2);
-              results.push(...childResults);
-            }
-          }
-          return results;
-        }
-        const rules = registry2.getAll();
-        console.log(`\u{1F50D} [analyzeNode] ${rules.length} regras para executar`);
-        for (const rule of rules) {
-          console.log(`  \u2699\uFE0F Executando regra: ${rule.id}`);
-          try {
-            const result = yield rule.validate(node);
-            if (result) {
-              results.push(result);
-              console.log(`    \u2705 Regra ${rule.id}: Issue encontrado`);
-            } else {
-              console.log(`    \u2705 Regra ${rule.id}: OK`);
-            }
-          } catch (error) {
-            console.error(`    \u274C ERRO na regra ${rule.id}:`, error);
-          }
-        }
+    async analyzeNode(node, registry2) {
+      console.log(`\u{1F50D} [analyzeNode] Analisando: ${node.name} (${node.type})`);
+      const results = [];
+      const hasValidWidgetName = /^(w:|woo:|loop:)/.test(node.name);
+      if (hasValidWidgetName) {
+        console.log(`  \u23ED\uFE0F Pulando ${node.name}: j\xE1 tem nome de widget v\xE1lido`);
         if ("children" in node && node.children) {
           console.log(`\u{1F50D} [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
           for (const child of node.children) {
-            const childResults = yield this.analyzeNode(child, registry2);
+            const childResults = await this.analyzeNode(child, registry2);
             results.push(...childResults);
           }
         }
         return results;
-      });
+      }
+      const rules = registry2.getAll();
+      console.log(`\u{1F50D} [analyzeNode] ${rules.length} regras para executar`);
+      for (const rule of rules) {
+        console.log(`  \u2699\uFE0F Executando regra: ${rule.id}`);
+        try {
+          const result = await rule.validate(node);
+          if (result) {
+            results.push(result);
+            console.log(`    \u2705 Regra ${rule.id}: Issue encontrado`);
+          } else {
+            console.log(`    \u2705 Regra ${rule.id}: OK`);
+          }
+        } catch (error) {
+          console.error(`    \u274C ERRO na regra ${rule.id}:`, error);
+        }
+      }
+      if ("children" in node && node.children) {
+        console.log(`\u{1F50D} [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
+        for (const child of node.children) {
+          const childResults = await this.analyzeNode(child, registry2);
+          results.push(...childResults);
+        }
+      }
+      return results;
     }
     /**
      * Gera relatório completo
@@ -7408,10 +7317,8 @@ ${refText}` });
 
   // src/linter/core/RuleRegistry.ts
   var RuleRegistry = class {
-    constructor() {
-      this.rules = /* @__PURE__ */ new Map();
-      this.executedRules = [];
-    }
+    rules = /* @__PURE__ */ new Map();
+    executedRules = [];
     /**
      * Registra uma nova regra
      */
@@ -7483,27 +7390,24 @@ ${refText}` });
 
   // src/linter/rules/structure/AutoLayoutRule.ts
   var AutoLayoutRule = class {
-    constructor() {
-      this.id = "auto-layout-required";
-      this.category = "structure";
-      this.severity = "critical";
-    }
-    validate(node) {
-      return __async(this, null, function* () {
-        if (node.type !== "FRAME") return null;
-        const frame = node;
-        const hasChildren = frame.children && frame.children.length > 0;
-        const hasAutoLayout = frame.layoutMode !== "NONE";
-        if (hasChildren && !hasAutoLayout) {
-          return {
-            node_id: frame.id,
-            node_name: frame.name,
-            severity: this.severity,
-            category: this.category,
-            rule: this.id,
-            message: `Frame "${frame.name}" possui ${frame.children.length} filhos mas n\xE3o usa Auto Layout`,
-            fixAvailable: true,
-            educational_tip: `
+    id = "auto-layout-required";
+    category = "structure";
+    severity = "critical";
+    async validate(node) {
+      if (node.type !== "FRAME") return null;
+      const frame = node;
+      const hasChildren = frame.children && frame.children.length > 0;
+      const hasAutoLayout = frame.layoutMode !== "NONE";
+      if (hasChildren && !hasAutoLayout) {
+        return {
+          node_id: frame.id,
+          node_name: frame.name,
+          severity: this.severity,
+          category: this.category,
+          rule: this.id,
+          message: `Frame "${frame.name}" possui ${frame.children.length} filhos mas n\xE3o usa Auto Layout`,
+          fixAvailable: true,
+          educational_tip: `
 \u26A0\uFE0F Por que isso \xE9 cr\xEDtico?
 
 Frames sem Auto Layout usam posicionamento absoluto, que n\xE3o \xE9 suportado pelo Elementor. Isso causar\xE1:
@@ -7514,30 +7418,27 @@ Frames sem Auto Layout usam posicionamento absoluto, que n\xE3o \xE9 suportado p
 \u2705 Solu\xE7\xE3o:
 Aplicar Auto Layout permite que o Elementor entenda a estrutura e gere containers flex\xEDveis e responsivos.
         `.trim()
-          };
-        }
-        return null;
-      });
+        };
+      }
+      return null;
     }
-    fix(node) {
-      return __async(this, null, function* () {
-        if (node.type !== "FRAME") return false;
-        const frame = node;
-        try {
-          frame.layoutMode = "VERTICAL";
-          frame.primaryAxisSizingMode = "AUTO";
-          frame.counterAxisSizingMode = "AUTO";
-          frame.itemSpacing = 20;
-          frame.paddingLeft = 20;
-          frame.paddingRight = 20;
-          frame.paddingTop = 20;
-          frame.paddingBottom = 20;
-          return true;
-        } catch (e) {
-          console.error("Erro ao aplicar Auto Layout:", e);
-          return false;
-        }
-      });
+    async fix(node) {
+      if (node.type !== "FRAME") return false;
+      const frame = node;
+      try {
+        frame.layoutMode = "VERTICAL";
+        frame.primaryAxisSizingMode = "AUTO";
+        frame.counterAxisSizingMode = "AUTO";
+        frame.itemSpacing = 20;
+        frame.paddingLeft = 20;
+        frame.paddingRight = 20;
+        frame.paddingTop = 20;
+        frame.paddingBottom = 20;
+        return true;
+      } catch (e) {
+        console.error("Erro ao aplicar Auto Layout:", e);
+        return false;
+      }
     }
     generateGuide(node) {
       const frame = node;
@@ -7564,29 +7465,26 @@ Aplicar Auto Layout permite que o Elementor entenda a estrutura e gere container
 
   // src/linter/rules/structure/SpacerDetectionRule.ts
   var SpacerDetectionRule = class {
-    constructor() {
-      this.id = "spacer-detected";
-      this.category = "structure";
-      this.severity = "major";
-    }
-    validate(node) {
-      return __async(this, null, function* () {
-        if (node.type !== "RECTANGLE") return null;
-        const rect = node;
-        const hasNoFill = !rect.fills || typeof rect.fills !== "symbol" && rect.fills.length === 0 || typeof rect.fills !== "symbol" && rect.fills.every(
-          (fill) => fill.type === "SOLID" && fill.visible === false
-        );
-        const hasNoStroke = !rect.strokes || typeof rect.strokes !== "symbol" && rect.strokes.length === 0;
-        const isGenericName = /^(Rectangle|Spacer|Space|Gap)\s*\d*$/i.test(rect.name);
-        if (hasNoFill && hasNoStroke && isGenericName) {
-          return {
-            node_id: rect.id,
-            node_name: rect.name,
-            severity: this.severity,
-            category: this.category,
-            rule: this.id,
-            message: `Spacer detectado: "${rect.name}"`,
-            educational_tip: `
+    id = "spacer-detected";
+    category = "structure";
+    severity = "major";
+    async validate(node) {
+      if (node.type !== "RECTANGLE") return null;
+      const rect = node;
+      const hasNoFill = !rect.fills || typeof rect.fills !== "symbol" && rect.fills.length === 0 || typeof rect.fills !== "symbol" && rect.fills.every(
+        (fill) => fill.type === "SOLID" && fill.visible === false
+      );
+      const hasNoStroke = !rect.strokes || typeof rect.strokes !== "symbol" && rect.strokes.length === 0;
+      const isGenericName = /^(Rectangle|Spacer|Space|Gap)\s*\d*$/i.test(rect.name);
+      if (hasNoFill && hasNoStroke && isGenericName) {
+        return {
+          node_id: rect.id,
+          node_name: rect.name,
+          severity: this.severity,
+          category: this.category,
+          rule: this.id,
+          message: `Spacer detectado: "${rect.name}"`,
+          educational_tip: `
 \u26A0\uFE0F Por que evitar spacers?
 
 Ret\xE2ngulos vazios usados como espa\xE7amento devem ser substitu\xEDdos pela propriedade "gap" do Auto Layout. Isso:
@@ -7598,10 +7496,9 @@ Ret\xE2ngulos vazios usados como espa\xE7amento devem ser substitu\xEDdos pela p
 \u2705 Solu\xE7\xE3o:
 Use a propriedade "Gap" do Auto Layout no frame pai ao inv\xE9s de elementos invis\xEDveis.
         `.trim()
-          };
-        }
-        return null;
-      });
+        };
+      }
+      return null;
     }
     generateGuide(node) {
       const rect = node;
@@ -7628,25 +7525,22 @@ Use a propriedade "Gap" do Auto Layout no frame pai ao inv\xE9s de elementos inv
 
   // src/linter/rules/naming/GenericNameRule.ts
   var GenericNameRule = class {
-    constructor() {
-      this.id = "generic-name-detected";
-      this.category = "naming";
-      this.severity = "major";
-      this.GENERIC_PATTERNS = /^(Frame|Rectangle|Group|Vector|Ellipse|Line|Component|Instance)\s+\d+$/;
-    }
-    validate(node) {
-      return __async(this, null, function* () {
-        if (this.GENERIC_PATTERNS.test(node.name)) {
-          const suggestedPattern = this.detectSuggestedPattern(node);
-          const examples = this.getExamplesForNodeType(node);
-          return {
-            node_id: node.id,
-            node_name: node.name,
-            severity: this.severity,
-            category: this.category,
-            rule: this.id,
-            message: `Nome gen\xE9rico detectado: "${node.name}"`,
-            educational_tip: `
+    id = "generic-name-detected";
+    category = "naming";
+    severity = "major";
+    GENERIC_PATTERNS = /^(Frame|Rectangle|Group|Vector|Ellipse|Line|Component|Instance)\s+\d+$/;
+    async validate(node) {
+      if (this.GENERIC_PATTERNS.test(node.name)) {
+        const suggestedPattern = this.detectSuggestedPattern(node);
+        const examples = this.getExamplesForNodeType(node);
+        return {
+          node_id: node.id,
+          node_name: node.name,
+          severity: this.severity,
+          category: this.category,
+          rule: this.id,
+          message: `Nome gen\xE9rico detectado: "${node.name}"`,
+          educational_tip: `
 \u26A0\uFE0F Por que nomenclatura importa?
 
 \u2022 Facilita manuten\xE7\xE3o do design no Figma
@@ -7662,10 +7556,9 @@ ${examples.map((ex) => `  \u2022 ${ex}`).join("\n")}
 \u2705 Solu\xE7\xE3o:
 Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, Card/*, etc.)
         `.trim()
-          };
-        }
-        return null;
-      });
+        };
+      }
+      return null;
     }
     generateGuide(node) {
       const suggestedPattern = this.detectSuggestedPattern(node);
@@ -7785,36 +7678,33 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
 
   // src/linter/rules/naming/WidgetNamingRule.ts
   var WidgetNamingRule = class {
-    constructor() {
-      this.id = "widget-naming";
-      this.category = "naming";
-      this.severity = "major";
-      this.detector = new WidgetDetector();
-    }
-    validate(node) {
-      return __async(this, null, function* () {
-        const detection = this.detector.detect(node);
-        if (!detection) {
-          return null;
-        }
-        const currentName = node.name;
-        const suggestedWidget = detection.widget;
-        const confidence = detection.confidence;
-        if (confidence < 0.6) {
-          return null;
-        }
-        const isCorrectlyNamed = currentName.toLowerCase().includes(suggestedWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
-        if (isCorrectlyNamed) {
-          return null;
-        }
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          severity: this.severity,
-          category: this.category,
-          rule: this.id,
-          message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
-          educational_tip: `
+    id = "widget-naming";
+    category = "naming";
+    severity = "major";
+    detector = new WidgetDetector();
+    async validate(node) {
+      const detection = this.detector.detect(node);
+      if (!detection) {
+        return null;
+      }
+      const currentName = node.name;
+      const suggestedWidget = detection.widget;
+      const confidence = detection.confidence;
+      if (confidence < 0.6) {
+        return null;
+      }
+      const isCorrectlyNamed = currentName.toLowerCase().includes(suggestedWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
+      if (isCorrectlyNamed) {
+        return null;
+      }
+      return {
+        node_id: node.id,
+        node_name: node.name,
+        severity: this.severity,
+        category: this.category,
+        rule: this.id,
+        message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
+        educational_tip: `
 \u{1F4A1} Widget Detection
 
 O Linter detectou que este elemento corresponde ao widget "${suggestedWidget}" do Elementor.
@@ -7831,14 +7721,13 @@ ${this.getSuggestions(suggestedWidget, currentName).join("\n")}
 \u{1F3AF} Justificativa da detec\xE7\xE3o:
 ${detection.justification}
             `.trim(),
-          fixAvailable: false
-          // Naming não tem auto-fix (usuário deve decidir)
-        };
-      });
+        fixAvailable: false
+        // Naming não tem auto-fix (usuário deve decidir)
+      };
     }
     generateGuide(node) {
       const detection = this.detector.detect(node);
-      const suggestedWidget = (detection == null ? void 0 : detection.widget) || "w:unknown";
+      const suggestedWidget = detection?.widget || "w:unknown";
       return {
         node_id: node.id,
         problem: `Nome n\xE3o reflete o widget detectado (${suggestedWidget})`,
@@ -7871,57 +7760,117 @@ ${detection.justification}
   };
 
   // src/linter/index.ts
-  function analyzeFigmaLayout(_0) {
-    return __async(this, arguments, function* (node, options = {
-      aiAssisted: false,
-      aiProvider: "none",
-      deviceTarget: "desktop"
-    }) {
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Iniciando...");
-      const engine = new LinterEngine();
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Engine criado");
-      const registry2 = new RuleRegistry();
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Registry criado");
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Registrando regras...");
-      registry2.registerAll([
-        new AutoLayoutRule(),
-        new SpacerDetectionRule(),
-        new GenericNameRule(),
-        new WidgetNamingRule()
-      ]);
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Regras registradas");
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Iniciando engine.analyze...");
-      const results = yield engine.analyze(node, registry2, options);
-      console.log(`\u{1F4CD} [analyzeFigmaLayout] An\xE1lise completa. ${results.length} resultados`);
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Gerando relat\xF3rio...");
-      const report = engine.generateReport(results, registry2, options, node);
-      console.log("\u{1F4CD} [analyzeFigmaLayout] Relat\xF3rio gerado com sucesso");
-      return report;
-    });
+  async function analyzeFigmaLayout(node, options = {
+    aiAssisted: false,
+    aiProvider: "none",
+    deviceTarget: "desktop"
+  }) {
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Iniciando...");
+    const engine = new LinterEngine();
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Engine criado");
+    const registry2 = new RuleRegistry();
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Registry criado");
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Registrando regras...");
+    registry2.registerAll([
+      new AutoLayoutRule(),
+      new SpacerDetectionRule(),
+      new GenericNameRule(),
+      new WidgetNamingRule()
+    ]);
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Regras registradas");
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Iniciando engine.analyze...");
+    const results = await engine.analyze(node, registry2, options);
+    console.log(`\u{1F4CD} [analyzeFigmaLayout] An\xE1lise completa. ${results.length} resultados`);
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Gerando relat\xF3rio...");
+    const report = engine.generateReport(results, registry2, options, node);
+    console.log("\u{1F4CD} [analyzeFigmaLayout] Relat\xF3rio gerado com sucesso");
+    return report;
   }
-  function validateSingleNode(node) {
-    return __async(this, null, function* () {
-      const engine = new LinterEngine();
-      const registry2 = new RuleRegistry();
-      registry2.registerAll([
-        new AutoLayoutRule(),
-        new SpacerDetectionRule(),
-        new GenericNameRule()
-      ]);
-      const results = yield engine.analyzeNode(node, registry2);
-      return {
-        isValid: results.length === 0,
-        issues: results.map((r) => r.message)
+  async function validateSingleNode(node) {
+    const engine = new LinterEngine();
+    const registry2 = new RuleRegistry();
+    registry2.registerAll([
+      new AutoLayoutRule(),
+      new SpacerDetectionRule(),
+      new GenericNameRule()
+    ]);
+    const results = await engine.analyzeNode(node, registry2);
+    return {
+      isValid: results.length === 0,
+      issues: results.map((r) => r.message)
+    };
+  }
+
+  // src/services/heuristics/index.ts
+  var isSceneNode = (node) => {
+    return !!node && typeof node === "object" && typeof node.type === "string" && typeof node.name === "string";
+  };
+  var DefaultHeuristicsService = class {
+    analyzeTree(root) {
+      return analyzeTreeWithHeuristics(root);
+    }
+    generateSchema(root) {
+      const analyzed = this.analyzeTree(root);
+      return convertToFlexSchema(analyzed);
+    }
+    async enforceWidgetTypes(schema, deps = {}) {
+      const getNodeById = deps.getNodeById || ((id) => {
+        try {
+          return figma.getNodeById(id);
+        } catch {
+          return null;
+        }
+      });
+      const visitContainer = async (container) => {
+        for (const widget of container.widgets || []) {
+          await this.fixWidget(widget, getNodeById);
+        }
+        for (const child of container.children || []) {
+          await visitContainer(child);
+        }
       };
-    });
+      for (const container of schema.containers) {
+        await visitContainer(container);
+      }
+      return schema;
+    }
+    async fixWidget(widget, getNodeById) {
+      if (widget.id) {
+        try {
+          const node = await getNodeById(widget.id);
+          if (isSceneNode(node)) {
+            if (node.name.startsWith("w:image") && !node.name.startsWith("w:image-box") && widget.type !== "image") {
+              widget.type = "image";
+            }
+            if (node.name.startsWith("w:button") && widget.type !== "button") {
+              widget.type = "button";
+            }
+          }
+        } catch (err) {
+          console.error(`[Heuristics] Error checking node ${widget.id}:`, err);
+        }
+      }
+      if (widget.children && Array.isArray(widget.children)) {
+        for (const child of widget.children) {
+          if (!child.id) continue;
+          try {
+            const childNode = await getNodeById(child.id);
+            if (isSceneNode(childNode) && (childNode.type === "VECTOR" || childNode.name === "Icon") && child.type !== "icon") {
+              child.type = "icon";
+            }
+          } catch {
+          }
+        }
+      }
+    }
+  };
+  var heuristicsService = new DefaultHeuristicsService();
+  async function enforceWidgetTypes(schema, deps) {
+    return heuristicsService.enforceWidgetTypes(schema, deps);
   }
 
   // src/code.ts
-  var originalConsoleLog = console.log.bind(console);
-  var logger = new FileLogger(originalConsoleLog);
-  console.log = (...args) => {
-    logger.log(...args);
-  };
+  var logger = new FileLogger(console.log.bind(console));
   figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
   var pipeline = new ConversionPipeline();
   var lastJSON = null;
@@ -7955,25 +7904,25 @@ ${detection.justification}
     }
     return output;
   }
-  function fetchWithTimeout3(_0) {
-    return __async(this, arguments, function* (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS3) {
-      const AC = typeof AbortController !== "undefined" ? AbortController : null;
-      if (!AC) {
-        return yield fetch(url, options);
-      }
-      const controller = new AC();
-      const id = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        return yield fetch(url, __spreadProps(__spreadValues({}, options), {
-          signal: controller.signal,
-          headers: __spreadProps(__spreadValues({}, options.headers), {
-            "User-Agent": "Figma-To-Elementor/1.0"
-          })
-        }));
-      } finally {
-        clearTimeout(id);
-      }
-    });
+  async function fetchWithTimeout3(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS3) {
+    const AC = typeof AbortController !== "undefined" ? AbortController : null;
+    if (!AC) {
+      return await fetch(url, options);
+    }
+    const controller = new AC();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          ...options.headers,
+          "User-Agent": "Figma-To-Elementor/1.0"
+        }
+      });
+    } finally {
+      clearTimeout(id);
+    }
   }
   function normalizeWpUrl(raw) {
     if (!raw) return "";
@@ -7984,88 +7933,80 @@ ${detection.justification}
     url = url.replace(/\/+$/, "");
     return url;
   }
-  function loadSetting(key, defaultValue) {
-    return __async(this, null, function* () {
-      try {
-        const value = yield figma.clientStorage.getAsync(key);
-        if (value === void 0 || value === null) return defaultValue;
-        return value;
-      } catch (e) {
-        return defaultValue;
-      }
-    });
+  async function loadSetting(key, defaultValue) {
+    try {
+      const value = await figma.clientStorage.getAsync(key);
+      if (value === void 0 || value === null) return defaultValue;
+      return value;
+    } catch {
+      return defaultValue;
+    }
   }
-  function saveSetting(key, value) {
-    return __async(this, null, function* () {
-      try {
-        yield figma.clientStorage.setAsync(key, value);
-      } catch (e) {
-        console.warn("Failed to save setting", key, e);
-      }
-    });
+  async function saveSetting(key, value) {
+    try {
+      await figma.clientStorage.setAsync(key, value);
+    } catch (e) {
+      console.warn("Failed to save setting", key, e);
+    }
   }
-  function loadWPConfig() {
-    return __async(this, null, function* () {
-      const url = yield loadSetting("gptel_wp_url", "");
-      const user = yield loadSetting("gptel_wp_user", "");
-      const token = yield loadSetting("gptel_wp_token", "");
-      const exportImages = yield loadSetting("gptel_export_images", false);
-      const webpQuality = yield loadSetting("gptel_webp_quality", 85);
-      if (!url || !token || !user) {
-        const legacy = yield loadSetting("wp_config", null);
-        if (legacy) {
-          return {
-            url: legacy.url || url,
-            user: legacy.user || user,
-            token: legacy.auth || token,
-            exportImages,
-            webpQuality
-          };
-        }
+  async function loadWPConfig() {
+    const url = await loadSetting("gptel_wp_url", "");
+    const user = await loadSetting("gptel_wp_user", "");
+    const token = await loadSetting("gptel_wp_token", "");
+    const exportImages = await loadSetting("gptel_export_images", false);
+    const webpQuality = await loadSetting("gptel_webp_quality", 85);
+    if (!url || !token || !user) {
+      const legacy = await loadSetting("wp_config", null);
+      if (legacy) {
+        return {
+          url: legacy.url || url,
+          user: legacy.user || user,
+          token: legacy.auth || token,
+          exportImages,
+          webpQuality
+        };
       }
-      return { url, user, token, exportImages, webpQuality };
-    });
+    }
+    return { url, user, token, exportImages, webpQuality };
   }
-  function resolveProviderConfig(msg) {
-    return __async(this, null, function* () {
-      const incomingProvider = (msg == null ? void 0 : msg.providerAi) || (yield loadSetting("aiProvider", DEFAULT_PROVIDER)) || (yield loadSetting("provider_ai", DEFAULT_PROVIDER));
-      const providerId = incomingProvider === "gpt" ? "gpt" : DEFAULT_PROVIDER;
-      yield saveSetting("aiProvider", providerId);
-      yield saveSetting("provider_ai", providerId);
-      const provider = getActiveProvider(providerId);
-      if (providerId === "gpt") {
-        const inlineKey2 = msg == null ? void 0 : msg.gptApiKey;
-        let key2 = inlineKey2 || (yield loadSetting("gptApiKey", "")) || (yield loadSetting("gpt_api_key", ""));
-        if (inlineKey2) {
-          yield saveSetting("gptApiKey", inlineKey2);
-          yield saveSetting("gpt_api_key", inlineKey2);
-        }
-        const storedModel = (msg == null ? void 0 : msg.gptModel) || (yield loadSetting("gptModel", DEFAULT_GPT_MODEL2)) || (yield loadSetting("gpt_model", openaiProvider.model));
-        if (storedModel) {
-          yield saveSetting("gptModel", storedModel);
-          yield saveSetting("gpt_model", storedModel);
-          openaiProvider.setModel(storedModel);
-        }
-        if (!key2) throw new Error("OpenAI API Key nao configurada.");
-        return { provider, apiKey: key2, providerId };
+  async function resolveProviderConfig(msg) {
+    const incomingProvider = msg?.providerAi || await loadSetting("aiProvider", DEFAULT_PROVIDER) || await loadSetting("provider_ai", DEFAULT_PROVIDER);
+    const providerId = incomingProvider === "gpt" ? "gpt" : DEFAULT_PROVIDER;
+    await saveSetting("aiProvider", providerId);
+    await saveSetting("provider_ai", providerId);
+    const provider = getActiveProvider(providerId);
+    if (providerId === "gpt") {
+      const inlineKey2 = msg?.gptApiKey;
+      let key2 = inlineKey2 || await loadSetting("gptApiKey", "") || await loadSetting("gpt_api_key", "");
+      if (inlineKey2) {
+        await saveSetting("gptApiKey", inlineKey2);
+        await saveSetting("gpt_api_key", inlineKey2);
       }
-      const inlineKey = msg == null ? void 0 : msg.apiKey;
-      let key = inlineKey || (yield loadSetting("gptel_gemini_key", ""));
-      if (!key) {
-        key = yield loadSetting("gemini_api_key", "");
+      const storedModel = msg?.gptModel || await loadSetting("gptModel", DEFAULT_GPT_MODEL2) || await loadSetting("gpt_model", openaiProvider.model);
+      if (storedModel) {
+        await saveSetting("gptModel", storedModel);
+        await saveSetting("gpt_model", storedModel);
+        openaiProvider.setModel(storedModel);
       }
-      if (inlineKey) {
-        yield saveSetting("gptel_gemini_key", inlineKey);
-        yield saveSetting("gemini_api_key", inlineKey);
-      }
-      const model = (msg == null ? void 0 : msg.geminiModel) || (yield loadSetting("gemini_model", GEMINI_MODEL));
-      if (model) {
-        yield saveSetting("gemini_model", model);
-        geminiProvider.setModel(model);
-      }
-      if (!key) throw new Error("Gemini API Key nao configurada.");
-      return { provider, apiKey: key, providerId };
-    });
+      if (!key2) throw new Error("OpenAI API Key nao configurada.");
+      return { provider, apiKey: key2, providerId };
+    }
+    const inlineKey = msg?.apiKey;
+    let key = inlineKey || await loadSetting("gptel_gemini_key", "");
+    if (!key) {
+      key = await loadSetting("gemini_api_key", "");
+    }
+    if (inlineKey) {
+      await saveSetting("gptel_gemini_key", inlineKey);
+      await saveSetting("gemini_api_key", inlineKey);
+    }
+    const model = msg?.geminiModel || await loadSetting("gemini_model", GEMINI_MODEL);
+    if (model) {
+      await saveSetting("gemini_model", model);
+      geminiProvider.setModel(model);
+    }
+    if (!key) throw new Error("Gemini API Key nao configurada.");
+    return { provider, apiKey: key, providerId };
   }
   function getSelectedNode() {
     const selection = figma.currentPage.selection;
@@ -8074,314 +8015,269 @@ ${detection.justification}
     }
     return selection[0];
   }
-  function generateElementorJSON(aiPayload, customWP, debug) {
-    return __async(this, null, function* () {
-      const node = getSelectedNode();
-      log(`[DEBUG] Selected Node: ${node.name} (ID: ${node.id}, Type: ${node.type}, Locked: ${node.locked})`, "info");
-      const wpConfig = customWP || (yield loadWPConfig());
-      const useAI = typeof (aiPayload == null ? void 0 : aiPayload.useAI) === "boolean" ? aiPayload.useAI : yield loadSetting("gptel_use_ai", true);
-      const serialized = serializeNode(node);
-      const includeScreenshot = typeof (aiPayload == null ? void 0 : aiPayload.includeScreenshot) === "boolean" ? aiPayload.includeScreenshot : yield loadSetting("gptel_include_screenshot", true);
-      const includeReferences = typeof (aiPayload == null ? void 0 : aiPayload.includeReferences) === "boolean" ? aiPayload.includeReferences : yield loadSetting("gptel_include_references", true);
-      if (!useAI) {
-        log("Iniciando pipeline (NO-AI)...", "info");
-        const elementorJson = yield runPipelineWithoutAI(serialized, wpConfig);
-        log("Pipeline NO-AI concluido.", "success");
-        return { elementorJson };
-      }
-      const { provider, apiKey, providerId } = yield resolveProviderConfig(aiPayload);
-      const autoFixLayout = yield loadSetting("auto_fix_layout", false);
-      log(`Iniciando pipeline (${providerId.toUpperCase()})...`, "info");
-      const result = yield pipeline.run(node, wpConfig, {
-        debug,
-        provider,
-        apiKey,
-        autoFixLayout,
-        includeScreenshot,
-        includeReferences,
-        autoRename: typeof (aiPayload == null ? void 0 : aiPayload.autoRename) === "boolean" ? aiPayload.autoRename : yield loadSetting("gptel_auto_rename", false)
-      });
-      log("Pipeline concluido.", "success");
-      if (debug && result.elementorJson) {
-        return result;
-      }
-      return { elementorJson: result };
+  async function generateElementorJSON(aiPayload, customWP, debug) {
+    const node = getSelectedNode();
+    log(`[DEBUG] Selected Node: ${node.name} (ID: ${node.id}, Type: ${node.type}, Locked: ${node.locked})`, "info");
+    const wpConfig = customWP || await loadWPConfig();
+    const useAI = typeof aiPayload?.useAI === "boolean" ? aiPayload.useAI : await loadSetting("gptel_use_ai", true);
+    const serialized = serializeNode(node);
+    const includeScreenshot = typeof aiPayload?.includeScreenshot === "boolean" ? aiPayload.includeScreenshot : await loadSetting("gptel_include_screenshot", true);
+    const includeReferences = typeof aiPayload?.includeReferences === "boolean" ? aiPayload.includeReferences : await loadSetting("gptel_include_references", true);
+    if (!useAI) {
+      log("Iniciando pipeline (NO-AI)...", "info");
+      const elementorJson = await runPipelineWithoutAI(serialized, wpConfig);
+      log("Pipeline NO-AI concluido.", "success");
+      return { elementorJson };
+    }
+    const { provider, apiKey, providerId } = await resolveProviderConfig(aiPayload);
+    const autoFixLayout = await loadSetting("auto_fix_layout", false);
+    log(`Iniciando pipeline (${providerId.toUpperCase()})...`, "info");
+    const result = await pipeline.run(node, wpConfig, {
+      debug: !!debug,
+      provider,
+      apiKey,
+      autoFixLayout,
+      includeScreenshot,
+      includeReferences,
+      autoRename: typeof aiPayload?.autoRename === "boolean" ? aiPayload.autoRename : await loadSetting("gptel_auto_rename", false)
     });
+    log("Pipeline concluido.", "success");
+    if (debug && result.elementorJson) {
+      return result;
+    }
+    return { elementorJson: result };
   }
   function log(message, level = "info") {
+    try {
+      logger.log(`[${level}] ${message}`);
+    } catch {
+    }
     figma.ui.postMessage({ type: "log", level, message });
   }
-  function deliverResult(json, debugInfo) {
-    return __async(this, null, function* () {
-      var _a;
-      const normalizedElements = json.elements || json.content || [];
-      let siteurl = json.siteurl || ((_a = this == null ? void 0 : this.wpConfig) == null ? void 0 : _a.url) || "";
-      if (siteurl && !siteurl.endsWith("/")) siteurl += "/";
-      if (siteurl && !siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
-      const normalizedJson = {
-        type: json.type || "elementor",
-        siteurl,
-        version: json.version || "0.4",
-        elements: normalizedElements
-      };
-      const payload = JSON.stringify(normalizedJson, null, 2);
-      const pastePayload = payload;
-      lastJSON = payload;
-      figma.ui.postMessage({ type: "generation-complete", payload, pastePayload, debug: debugInfo });
-      figma.ui.postMessage({ type: "copy-json", payload: pastePayload });
-    });
+  async function deliverResult(json, debugInfo) {
+    const normalizedElements = json.elements || json.content || [];
+    let siteurl = json.siteurl || "";
+    if (siteurl && !siteurl.endsWith("/")) siteurl += "/";
+    if (siteurl && !siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
+    const normalizedJson = {
+      type: json.type || "elementor",
+      siteurl,
+      version: json.version || "0.4",
+      elements: normalizedElements
+    };
+    const payload = JSON.stringify(normalizedJson, null, 2);
+    const pastePayload = payload;
+    lastJSON = payload;
+    figma.ui.postMessage({ type: "generation-complete", payload, pastePayload, debug: debugInfo });
+    figma.ui.postMessage({ type: "copy-json", payload: pastePayload });
   }
   function sendPreview(data) {
     const payload = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     figma.ui.postMessage({ type: "preview", payload });
   }
-  function runPipelineWithoutAI(_0) {
-    return __async(this, arguments, function* (serializedTree, wpConfig = {}) {
-      const analyzed = analyzeTreeWithHeuristics(serializedTree);
-      const schema = convertToFlexSchema(analyzed);
-      const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token) });
-      noaiUploader = new ImageUploader({});
-      noaiUploader.setWPConfig(normalizedWP);
-      const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password && normalizedWP.exportImages);
-      const uploadPromises = [];
-      const correctWidgetTypes = (container) => __async(null, null, function* () {
-        for (const widget of container.widgets || []) {
-          try {
-            const node = yield figma.getNodeById(widget.id);
-            if (node) {
-              if (node.name.startsWith("w:image") && !node.name.startsWith("w:image-box") && widget.type !== "image") {
-                console.log(`[FIX] Correcting widget type from ${widget.type} to image for node ${node.name}`);
-                widget.type = "image";
+  async function runPipelineWithoutAI(serializedTree, wpConfig = {}) {
+    const analyzed = analyzeTreeWithHeuristics(serializedTree);
+    const schema = convertToFlexSchema(analyzed);
+    const normalizedWP = { ...wpConfig, password: wpConfig?.password || wpConfig?.token };
+    noaiUploader = new ImageUploader({});
+    noaiUploader.setWPConfig(normalizedWP);
+    const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password && normalizedWP.exportImages);
+    const uploadPromises = [];
+    await enforceWidgetTypes(schema);
+    const processWidget = async (widget) => {
+      const uploader = noaiUploader;
+      if (!uploader) return;
+      const nodeId = widget.imageId || widget.id;
+      console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
+      if (uploadEnabled && nodeId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button" || widget.type === "list-item" || widget.type === "icon-list" || widget.type === "accordion" || widget.type === "toggle")) {
+        console.log(`[NO-AI UPLOAD] \u2705 Widget ${widget.type} (${nodeId}) will be uploaded`);
+        try {
+          const node = await figma.getNodeById(nodeId);
+          if (node) {
+            let format = widget.type === "icon" || widget.type === "icon-box" || widget.type === "list-item" || widget.type === "icon-list" ? "SVG" : "WEBP";
+            const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
+            const hasVectorChildren = (n) => {
+              if (isVectorNode(n)) return true;
+              if ("children" in n) {
+                return n.children.some((c) => hasVectorChildren(c));
               }
-              if (node.name.startsWith("w:button") && widget.type !== "button") {
-                console.log(`[FIX] Correcting widget type from ${widget.type} to button for node ${node.name}`);
-                widget.type = "button";
+              return false;
+            };
+            const hasImageChildren = (n) => {
+              if ("fills" in n && Array.isArray(n.fills)) {
+                if (n.fills.some((f) => f.type === "IMAGE")) return true;
               }
-            }
-          } catch (e) {
-            console.error(`[FIX] Error checking node ${widget.id}:`, e);
-          }
-          if (widget.children && Array.isArray(widget.children)) {
-            for (const child of widget.children) {
-              if (child.id) {
-                try {
-                  const childNode = yield figma.getNodeById(child.id);
-                  if (childNode) {
-                    if ((childNode.type === "VECTOR" || childNode.name === "Icon") && child.type !== "icon") {
-                      console.log(`[FIX] Correcting child widget type to icon for node ${childNode.name}`);
-                      child.type = "icon";
-                    }
-                  }
-                } catch (e) {
-                }
+              if ("children" in n) {
+                return n.children.some((c) => hasImageChildren(c));
               }
-            }
-          }
-        }
-        for (const child of container.children || []) {
-          yield correctWidgetTypes(child);
-        }
-      });
-      for (const container of schema.containers) {
-        yield correctWidgetTypes(container);
-      }
-      const processWidget = (widget) => __async(null, null, function* () {
-        var _a;
-        const nodeId = widget.imageId || widget.id;
-        console.log(`[NO-AI UPLOAD] Processing widget: type=${widget.type}, nodeId=${nodeId}, uploadEnabled=${uploadEnabled}`);
-        if (uploadEnabled && nodeId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "button" || widget.type === "list-item" || widget.type === "icon-list" || widget.type === "accordion" || widget.type === "toggle")) {
-          console.log(`[NO-AI UPLOAD] \u2705 Widget ${widget.type} (${nodeId}) will be uploaded`);
-          try {
-            const node = yield figma.getNodeById(nodeId);
-            if (node) {
-              let format = widget.type === "icon" || widget.type === "icon-box" || widget.type === "list-item" || widget.type === "icon-list" ? "SVG" : "WEBP";
-              const isVectorNode = (n) => n.type === "VECTOR" || n.type === "STAR" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "BOOLEAN_OPERATION" || n.type === "LINE";
-              const hasVectorChildren = (n) => {
-                if (isVectorNode(n)) return true;
-                if ("children" in n) {
-                  return n.children.some((c) => hasVectorChildren(c));
-                }
-                return false;
-              };
-              const hasImageChildren = (n) => {
-                if ("fills" in n && Array.isArray(n.fills)) {
-                  if (n.fills.some((f) => f.type === "IMAGE")) return true;
-                }
-                if ("children" in n) {
-                  return n.children.some((c) => hasImageChildren(c));
-                }
-                return false;
-              };
-              if ("locked" in node && node.locked) {
-                if (hasImageChildren(node)) {
-                  format = "WEBP";
-                } else if (hasVectorChildren(node)) {
-                  format = "SVG";
-                } else {
-                  format = "WEBP";
-                }
+              return false;
+            };
+            if ("locked" in node && node.locked) {
+              if (hasImageChildren(node)) {
+                format = "WEBP";
               } else if (hasVectorChildren(node)) {
                 format = "SVG";
+              } else {
+                format = "WEBP";
               }
-              if (node.name === "Icon" || widget.type === "icon" || widget.type === "list-item" || widget.type === "accordion" || widget.type === "toggle") {
-                format = "SVG";
-              }
-              const result = yield noaiUploader.uploadToWordPress(node, format);
-              if (result) {
-                if (widget.type === "image-box") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.image_url = result.url;
-                } else if (widget.type === "icon-box") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
-                  widget.imageId = result.id.toString();
-                } else if (widget.type === "button") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
-                  widget.imageId = result.id.toString();
-                  console.log("[BUTTON UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
-                } else if (widget.type === "list-item") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.icon_url = result.url;
-                  widget.imageId = result.id.toString();
-                  console.log("[LIST-ITEM UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
-                } else if (widget.type === "icon-list") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
-                  widget.imageId = result.id.toString();
-                } else if (widget.type === "accordion" || widget.type === "toggle") {
-                  if (!widget.styles) widget.styles = {};
-                  widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
-                  widget.imageId = result.id.toString();
-                  console.log("[ACCORDION UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
-                } else {
-                  widget.content = result.url;
-                  widget.imageId = result.id.toString();
-                }
+            } else if (hasVectorChildren(node)) {
+              format = "SVG";
+            }
+            if (node.name === "Icon" || widget.type === "icon" || widget.type === "list-item" || widget.type === "accordion" || widget.type === "toggle") {
+              format = "SVG";
+            }
+            const result = await uploader.uploadToWordPress(node, format);
+            if (result) {
+              if (widget.type === "image-box") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.image_url = result.url;
+              } else if (widget.type === "icon-box") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
+                widget.imageId = result.id.toString();
+              } else if (widget.type === "button") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
+                widget.imageId = result.id.toString();
+                console.log("[BUTTON UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
+              } else if (widget.type === "list-item") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.icon_url = result.url;
+                widget.imageId = result.id.toString();
+                console.log("[LIST-ITEM UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
+              } else if (widget.type === "icon-list") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
+                widget.imageId = result.id.toString();
+              } else if (widget.type === "accordion" || widget.type === "toggle") {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.selected_icon = { value: { url: result.url, id: result.id }, library: "svg" };
+                widget.imageId = result.id.toString();
+                console.log("[ACCORDION UPLOAD] Icon uploaded:", result.url, "ID:", result.id);
+              } else {
+                widget.content = result.url;
+                widget.imageId = result.id.toString();
               }
             }
-          } catch (e) {
-            console.error(`[NO-AI] Erro ao processar imagem ${nodeId}:`, e);
           }
+        } catch (e) {
+          console.error(`[NO-AI] Erro ao processar imagem ${nodeId}:`, e);
         }
-        if (uploadEnabled && widget.type === "image-carousel" && ((_a = widget.styles) == null ? void 0 : _a.slides)) {
-          console.log(`[NO-AI UPLOAD] \u{1F3A0} Processing image-carousel with ${widget.styles.slides.length} slides`);
-          const updatedSlides = [];
-          for (const slide of widget.styles.slides) {
-            const slideNodeId = slide.id;
-            if (slideNodeId) {
-              try {
-                const node = yield figma.getNodeById(slideNodeId);
-                if (node) {
-                  const result = yield noaiUploader.uploadToWordPress(node, "WEBP");
-                  if (result) {
-                    console.log(`[NO-AI UPLOAD] \u{1F3A0} Slide uploaded: ${result.url}, ID: ${result.id}`);
-                    updatedSlides.push({
-                      _id: slide._id,
-                      id: result.id,
-                      url: result.url,
-                      image: { url: result.url, id: result.id }
-                    });
-                  } else {
-                    updatedSlides.push(slide);
-                  }
+      }
+      if (uploadEnabled && widget.type === "image-carousel" && widget.styles?.slides) {
+        console.log(`[NO-AI UPLOAD] \u{1F3A0} Processing image-carousel with ${widget.styles.slides.length} slides`);
+        const updatedSlides = [];
+        for (const slide of widget.styles.slides) {
+          const slideNodeId = slide.id;
+          if (slideNodeId) {
+            try {
+              const node = await figma.getNodeById(slideNodeId);
+              if (node) {
+                const result = await uploader.uploadToWordPress(node, "WEBP");
+                if (result) {
+                  console.log(`[NO-AI UPLOAD] \u{1F3A0} Slide uploaded: ${result.url}, ID: ${result.id}`);
+                  updatedSlides.push({
+                    _id: slide._id,
+                    id: result.id,
+                    url: result.url,
+                    image: { url: result.url, id: result.id }
+                  });
                 } else {
                   updatedSlides.push(slide);
                 }
-              } catch (e) {
-                console.error(`[NO-AI] Erro ao processar slide ${slideNodeId}:`, e);
+              } else {
                 updatedSlides.push(slide);
               }
-            } else {
+            } catch (e) {
+              console.error(`[NO-AI] Erro ao processar slide ${slideNodeId}:`, e);
               updatedSlides.push(slide);
             }
-          }
-          widget.styles.slides = updatedSlides;
-        }
-      });
-      const collectUploads = (container) => {
-        for (const widget of container.widgets || []) {
-          uploadPromises.push(processWidget(widget));
-          if (widget.children && Array.isArray(widget.children)) {
-            for (const childWidget of widget.children) {
-              uploadPromises.push(processWidget(childWidget));
-            }
+          } else {
+            updatedSlides.push(slide);
           }
         }
-        for (const child of container.children || []) {
-          collectUploads(child);
+        widget.styles.slides = updatedSlides;
+      }
+    };
+    const collectUploads = (container) => {
+      for (const widget of container.widgets || []) {
+        uploadPromises.push(processWidget(widget));
+        if (widget.children && Array.isArray(widget.children)) {
+          for (const childWidget of widget.children) {
+            uploadPromises.push(processWidget(childWidget));
+          }
         }
-      };
-      for (const container of schema.containers) {
-        collectUploads(container);
       }
-      if (uploadPromises.length > 0) {
-        yield Promise.all(uploadPromises);
+      for (const child of container.children || []) {
+        collectUploads(child);
       }
-      const compiler = new ElementorCompiler();
-      compiler.setWPConfig(normalizedWP);
-      const json = compiler.compile(schema);
-      if (normalizedWP.url) {
-        let siteurl = normalizedWP.url;
-        if (!siteurl.endsWith("/")) siteurl += "/";
-        if (!siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
-        json.siteurl = siteurl;
-      }
-      return json;
-    });
+    };
+    for (const container of schema.containers) {
+      collectUploads(container);
+    }
+    if (uploadPromises.length > 0) {
+      await Promise.all(uploadPromises);
+    }
+    const compiler = new ElementorCompiler();
+    compiler.setWPConfig(normalizedWP);
+    const json = compiler.compile(schema);
+    if (normalizedWP.url) {
+      let siteurl = normalizedWP.url;
+      if (!siteurl.endsWith("/")) siteurl += "/";
+      if (!siteurl.endsWith("wp-json/")) siteurl += "wp-json/";
+      json.siteurl = siteurl;
+    }
+    return json;
   }
-  function sendStoredSettings() {
-    return __async(this, null, function* () {
-      console.log("\u{1F527} [sendStoredSettings] Carregando configura\xE7\xF5es salvas...");
-      let geminiKey = yield loadSetting("gptel_gemini_key", "");
-      if (!geminiKey) {
-        geminiKey = yield loadSetting("gemini_api_key", "");
-      }
-      const geminiModel = yield loadSetting("gemini_model", GEMINI_MODEL);
-      const providerAi = (yield loadSetting("aiProvider", DEFAULT_PROVIDER)) || (yield loadSetting("provider_ai", DEFAULT_PROVIDER));
-      const gptKey = (yield loadSetting("gptApiKey", "")) || (yield loadSetting("gpt_api_key", ""));
-      const gptModel = (yield loadSetting("gptModel", DEFAULT_GPT_MODEL2)) || (yield loadSetting("gpt_model", openaiProvider.model));
-      const wpUrl = yield loadSetting("gptel_wp_url", "");
-      const wpUser = yield loadSetting("gptel_wp_user", "");
-      const wpToken = yield loadSetting("gptel_wp_token", "");
-      const exportImages = yield loadSetting("gptel_export_images", false);
-      const webpQuality = yield loadSetting("gptel_webp_quality", 85);
-      const darkMode = yield loadSetting("gptel_dark_mode", false);
-      const useAI = yield loadSetting("gptel_use_ai", true);
-      const includeScreenshot = yield loadSetting("gptel_include_screenshot", true);
-      const includeReferences = yield loadSetting("gptel_include_references", true);
-      const autoRename = yield loadSetting("gptel_auto_rename", false);
-      console.log("\u{1F527} [sendStoredSettings] Configura\xE7\xF5es carregadas:", {
-        geminiKey: geminiKey ? "***" + geminiKey.slice(-4) : "vazio",
-        gptKey: gptKey ? "***" + gptKey.slice(-4) : "vazio",
+  async function sendStoredSettings() {
+    console.log("\u{1F527} [sendStoredSettings] Carregando configura\xE7\xF5es salvas...");
+    let geminiKey = await loadSetting("gptel_gemini_key", "");
+    if (!geminiKey) {
+      geminiKey = await loadSetting("gemini_api_key", "");
+    }
+    const geminiModel = await loadSetting("gemini_model", GEMINI_MODEL);
+    const providerAi = await loadSetting("aiProvider", DEFAULT_PROVIDER) || await loadSetting("provider_ai", DEFAULT_PROVIDER);
+    const gptKey = await loadSetting("gptApiKey", "") || await loadSetting("gpt_api_key", "");
+    const gptModel = await loadSetting("gptModel", DEFAULT_GPT_MODEL2) || await loadSetting("gpt_model", openaiProvider.model);
+    const wpUrl = await loadSetting("gptel_wp_url", "");
+    const wpUser = await loadSetting("gptel_wp_user", "");
+    const wpToken = await loadSetting("gptel_wp_token", "");
+    const exportImages = await loadSetting("gptel_export_images", false);
+    const webpQuality = await loadSetting("gptel_webp_quality", 85);
+    const darkMode = await loadSetting("gptel_dark_mode", false);
+    const useAI = await loadSetting("gptel_use_ai", true);
+    const includeScreenshot = await loadSetting("gptel_include_screenshot", true);
+    const includeReferences = await loadSetting("gptel_include_references", true);
+    const autoRename = await loadSetting("gptel_auto_rename", false);
+    console.log("\u{1F527} [sendStoredSettings] Configura\xE7\xF5es carregadas:", {
+      geminiKey: geminiKey ? "***" + geminiKey.slice(-4) : "vazio",
+      gptKey: gptKey ? "***" + gptKey.slice(-4) : "vazio",
+      wpUrl,
+      providerAi
+    });
+    figma.ui.postMessage({
+      type: "load-settings",
+      payload: {
+        geminiKey,
+        geminiModel,
+        providerAi,
+        gptKey,
+        gptModel,
         wpUrl,
-        providerAi
-      });
-      figma.ui.postMessage({
-        type: "load-settings",
-        payload: {
-          geminiKey,
-          geminiModel,
-          providerAi,
-          gptKey,
-          gptModel,
-          wpUrl,
-          wpUser,
-          wpToken,
-          exportImages,
-          webpQuality,
-          darkMode,
-          useAI,
-          includeScreenshot,
-          includeReferences,
-          autoRename
-        }
-      });
-      console.log("\u{1F527} [sendStoredSettings] Mensagem enviada para UI");
+        wpUser,
+        wpToken,
+        exportImages,
+        webpQuality,
+        darkMode,
+        useAI,
+        includeScreenshot,
+        includeReferences,
+        autoRename
+      }
     });
+    console.log("\u{1F527} [sendStoredSettings] Mensagem enviada para UI");
   }
-  figma.ui.onmessage = (msg) => __async(null, null, function* () {
-    var _a;
+  figma.ui.onmessage = async (msg) => {
     if (!msg || typeof msg !== "object") return;
     switch (msg.type) {
       case "inspect":
@@ -8397,7 +8293,7 @@ ${detection.justification}
           }
           log("Arvore inspecionada.", "info");
         } catch (error) {
-          log((error == null ? void 0 : error.message) || String(error), "error");
+          log(error?.message || String(error), "error");
         }
         break;
       case "generate-json":
@@ -8405,10 +8301,10 @@ ${detection.justification}
           figma.ui.postMessage({ type: "generation-start" });
           const wpConfig = msg.wpConfig;
           const debug = !!msg.debug;
-          const { elementorJson, debugInfo } = yield generateElementorJSON(msg, wpConfig, debug);
-          yield deliverResult(elementorJson, debugInfo);
+          const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug);
+          await deliverResult(elementorJson, debugInfo);
         } catch (error) {
-          const message = (error == null ? void 0 : error.message) || String(error);
+          const message = error?.message || String(error);
           log(`Erro: ${message}`, "error");
           figma.ui.postMessage({ type: "generation-error", message });
           figma.notify("Erro ao gerar JSON. Verifique os logs.", { timeout: 5e3 });
@@ -8437,47 +8333,47 @@ ${detection.justification}
       case "test-gemini":
         try {
           if (msg.model) {
-            yield saveSetting("gemini_model", msg.model);
+            await saveSetting("gemini_model", msg.model);
             geminiProvider.setModel(msg.model);
           }
           const inlineKey = msg.apiKey;
           if (inlineKey) {
-            yield saveSetting("gptel_gemini_key", inlineKey);
-            yield saveSetting("gemini_api_key", inlineKey);
+            await saveSetting("gptel_gemini_key", inlineKey);
+            await saveSetting("gemini_api_key", inlineKey);
           }
-          const res = yield geminiProvider.testConnection(inlineKey);
+          const res = await geminiProvider.testConnection(inlineKey);
           figma.ui.postMessage({ type: "gemini-status", success: res.ok, message: res.message });
         } catch (e) {
-          figma.ui.postMessage({ type: "gemini-status", success: false, message: `Erro: ${(e == null ? void 0 : e.message) || e}` });
+          figma.ui.postMessage({ type: "gemini-status", success: false, message: `Erro: ${e?.message || e}` });
         }
         break;
       case "test-gpt":
         try {
           const inlineKey = msg.apiKey || msg.gptApiKey || "";
           if (inlineKey) {
-            yield saveSetting("gptApiKey", inlineKey);
-            yield saveSetting("gpt_api_key", inlineKey);
+            await saveSetting("gptApiKey", inlineKey);
+            await saveSetting("gpt_api_key", inlineKey);
           }
-          const model = msg.model || (yield loadSetting("gptModel", DEFAULT_GPT_MODEL2)) || (yield loadSetting("gpt_model", DEFAULT_GPT_MODEL2));
+          const model = msg.model || await loadSetting("gptModel", DEFAULT_GPT_MODEL2) || await loadSetting("gpt_model", DEFAULT_GPT_MODEL2);
           if (model) {
-            yield saveSetting("gptModel", model);
-            yield saveSetting("gpt_model", model);
+            await saveSetting("gptModel", model);
+            await saveSetting("gpt_model", model);
             openaiProvider.setModel(model);
           }
-          const keyToUse = inlineKey || (yield loadSetting("gptApiKey", "")) || (yield loadSetting("gpt_api_key", ""));
-          const res = yield testOpenAIConnection(keyToUse, model || openaiProvider.model);
+          const keyToUse = inlineKey || await loadSetting("gptApiKey", "") || await loadSetting("gpt_api_key", "");
+          const res = await testOpenAIConnection(keyToUse, model || openaiProvider.model);
           figma.ui.postMessage({ type: "gpt-status", success: res.ok, message: res.error || "Conexao com GPT verificada." });
         } catch (e) {
-          figma.ui.postMessage({ type: "gpt-status", success: false, message: `Erro: ${(e == null ? void 0 : e.message) || e}` });
+          figma.ui.postMessage({ type: "gpt-status", success: false, message: `Erro: ${e?.message || e}` });
         }
         break;
       case "test-wp":
         try {
           const incoming = msg.wpConfig;
-          const cfg = incoming && incoming.url ? incoming : yield loadWPConfig();
-          const url = normalizeWpUrl((cfg == null ? void 0 : cfg.url) || "");
-          const user = ((cfg == null ? void 0 : cfg.user) || "").trim();
-          const token = ((cfg == null ? void 0 : cfg.token) || (cfg == null ? void 0 : cfg.password) || "").replace(/\s+/g, "");
+          const cfg = incoming && incoming.url ? incoming : await loadWPConfig();
+          const url = normalizeWpUrl(cfg?.url || "");
+          const user = (cfg?.user || "").trim();
+          const token = (cfg?.token || cfg?.password || "").replace(/\s+/g, "");
           if (!url || !user || !token) {
             figma.ui.postMessage({ type: "wp-status", success: false, message: "URL, usuario ou senha do app ausentes." });
             break;
@@ -8489,34 +8385,34 @@ ${detection.justification}
           });
           const endpoint = url + "/wp-json/wp/v2/users/me";
           const auth = toBase64(`${user}:${token}`);
-          const resp = yield fetchWithTimeout3(endpoint, {
+          const resp = await fetchWithTimeout3(endpoint, {
             method: "GET",
             headers: { Authorization: `Basic ${auth}`, Accept: "application/json" }
           });
           if (!resp.ok) {
-            const text = yield resp.text();
+            const text = await resp.text();
             figma.ui.postMessage({ type: "log", level: "error", message: `[WP] Test FAIL (${resp.status}) -> ${text}` });
             figma.ui.postMessage({ type: "wp-status", success: false, message: `Falha (${resp.status}): ${text || "sem detalhe"}` });
             break;
           }
-          const autoPage = (_a = cfg.autoPage) != null ? _a : cfg.createPage;
-          yield saveSetting("gptel_wp_url", url);
-          yield saveSetting("gptel_wp_user", user);
-          yield saveSetting("gptel_wp_token", token);
-          yield saveSetting("gptel_export_images", !!cfg.exportImages);
-          yield saveSetting("gptel_auto_page", !!autoPage);
+          const autoPage = cfg.autoPage ?? cfg.createPage;
+          await saveSetting("gptel_wp_url", url);
+          await saveSetting("gptel_wp_user", user);
+          await saveSetting("gptel_wp_token", token);
+          await saveSetting("gptel_export_images", !!cfg.exportImages);
+          await saveSetting("gptel_auto_page", !!autoPage);
           figma.ui.postMessage({ type: "wp-status", success: true, message: "Conexao com WordPress verificada." });
         } catch (e) {
-          figma.ui.postMessage({ type: "wp-status", success: false, message: `Erro: ${(e == null ? void 0 : e.message) || e}` });
+          figma.ui.postMessage({ type: "wp-status", success: false, message: `Erro: ${e?.message || e}` });
         }
         break;
       case "save-setting":
         if (msg.key) {
-          yield saveSetting(msg.key, msg.value);
+          await saveSetting(msg.key, msg.value);
         }
         break;
       case "load-settings":
-        yield sendStoredSettings();
+        await sendStoredSettings();
         break;
       case "reset":
         lastJSON = null;
@@ -8553,10 +8449,10 @@ ${detection.justification}
             newName: name
           });
         } catch (e) {
-          figma.notify((e == null ? void 0 : e.message) || "Falha ao renomear layer");
+          figma.notify(e?.message || "Falha ao renomear layer");
           figma.ui.postMessage({
             type: "rename-error",
-            message: (e == null ? void 0 : e.message) || "Falha ao renomear layer"
+            message: e?.message || "Falha ao renomear layer"
           });
         }
         break;
@@ -8588,7 +8484,7 @@ ${detection.justification}
           selection.forEach(processNode);
           figma.notify(`Organiza\xE7\xE3o conclu\xEDda! ${count} layers renomeados.`);
         } catch (e) {
-          figma.notify((e == null ? void 0 : e.message) || "Erro ao organizar layers");
+          figma.notify(e?.message || "Erro ao organizar layers");
         }
         break;
       // ========== LINTER HANDLERS ==========
@@ -8623,7 +8519,7 @@ ${detection.justification}
           log("Iniciando an\xE1lise de layout...", "info");
           console.log("[LINTER] Chamando analyzeFigmaLayout...");
           log("Chamando analyzeFigmaLayout...", "info");
-          const report = yield analyzeFigmaLayout(node, {
+          const report = await analyzeFigmaLayout(node, {
             aiAssisted: false,
             deviceTarget: "desktop"
           });
@@ -8638,8 +8534,8 @@ ${detection.justification}
           console.log("[LINTER] \u2705 Mensagem enviada para UI");
           log(`An\xE1lise conclu\xEDda: ${report.summary.total} problemas encontrados`, "success");
         } catch (error) {
-          const message = (error == null ? void 0 : error.message) || String(error);
-          const stack = (error == null ? void 0 : error.stack) || "No stack trace";
+          const message = error?.message || String(error);
+          const stack = error?.stack || "No stack trace";
           console.error("[LINTER] \u274C ERRO:", message);
           console.error("[LINTER] Stack:", stack);
           log(`\u274C ERRO ao analisar layout: ${message}`, "error");
@@ -8677,7 +8573,7 @@ ${detection.justification}
         } catch (error) {
           figma.ui.postMessage({
             type: "linter-error",
-            message: (error == null ? void 0 : error.message) || "Erro ao selecionar node"
+            message: error?.message || "Erro ao selecionar node"
           });
         }
         break;
@@ -8699,9 +8595,9 @@ ${detection.justification}
             });
             break;
           }
-          const result = yield validateSingleNode(node);
+          const result = await validateSingleNode(node);
           if (result.isValid) {
-            yield figma.clientStorage.setAsync(`linter-resolved-${nodeId}`, true);
+            await figma.clientStorage.setAsync(`linter-resolved-${nodeId}`, true);
           }
           figma.ui.postMessage({
             type: "validation-result",
@@ -8717,7 +8613,7 @@ ${detection.justification}
         } catch (error) {
           figma.ui.postMessage({
             type: "linter-error",
-            message: (error == null ? void 0 : error.message) || "Erro ao validar corre\xE7\xE3o"
+            message: error?.message || "Erro ao validar corre\xE7\xE3o"
           });
         }
         break;
@@ -8737,10 +8633,10 @@ ${detection.justification}
           if (!rule.fix) {
             throw new Error(`Regra ${ruleId} n\xE3o possui corre\xE7\xE3o autom\xE1tica implementada`);
           }
-          const success = yield rule.fix(node);
+          const success = await rule.fix(node);
           if (success) {
             log(`\u2705 Corre\xE7\xE3o aplicada com sucesso para ${ruleId}`, "success");
-            const result = yield validateSingleNode(node);
+            const result = await validateSingleNode(node);
             figma.ui.postMessage({
               type: "validation-result",
               nodeId,
@@ -8774,6 +8670,6 @@ ${detection.justification}
         figma.closePlugin();
         break;
     }
-  });
+  };
   sendStoredSettings();
 })();

@@ -481,7 +481,7 @@ const registry: WidgetDefinition[] = [
                         // Match label to time unit
                         if (nextText.includes('dia') || nextText.includes('day')) {
                             timeData.days = numValue;
-                            labels.days = nextChild.content;
+                            labels.days = String(nextChild.content ?? '');
                             // Extract label color from first label
                             if (!labelColor && nextChild.styles?.color) {
                                 labelColor = normalizeColor(nextChild.styles.color);
@@ -491,7 +491,7 @@ const registry: WidgetDefinition[] = [
                             }
                         } else if (nextText.includes('hr') || nextText.includes('hour') || nextText.includes('hora')) {
                             timeData.hours = numValue;
-                            labels.hours = nextChild.content;
+                            labels.hours = String(nextChild.content ?? '');
                             if (!labelColor && nextChild.styles?.color) {
                                 labelColor = normalizeColor(nextChild.styles.color);
                             }
@@ -500,7 +500,7 @@ const registry: WidgetDefinition[] = [
                             }
                         } else if (nextText.includes('min') || nextText.includes('minute')) {
                             timeData.minutes = numValue;
-                            labels.minutes = nextChild.content;
+                            labels.minutes = String(nextChild.content ?? '');
                             if (!labelColor && nextChild.styles?.color) {
                                 labelColor = normalizeColor(nextChild.styles.color);
                             }
@@ -509,7 +509,7 @@ const registry: WidgetDefinition[] = [
                             }
                         } else if (nextText.includes('seg') || nextText.includes('sec') || nextText.includes('second')) {
                             timeData.seconds = numValue;
-                            labels.seconds = nextChild.content;
+                            labels.seconds = String(nextChild.content ?? '');
                             if (!labelColor && nextChild.styles?.color) {
                                 labelColor = normalizeColor(nextChild.styles.color);
                             }

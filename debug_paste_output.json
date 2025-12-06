@@ -4,35 +4,22 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "9d32597",
+      "id": "fbf2ff3",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "9d32597",
+        "_element_id": "fbf2ff3",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
         "flex__is_row": "row",
         "flex__is_column": "column",
+        "overflow": "hidden",
         "justify_content": "flex-start",
         "flex_justify_content": "flex-start",
         "align_items": "center",
         "flex_align_items": "center",
-        "flex_gap": {
-          "unit": "px",
-          "column": "0",
-          "row": "0",
-          "isLinked": true
-        },
-        "padding": {
-          "unit": "px",
-          "top": 0,
-          "right": 0,
-          "bottom": 0,
-          "left": 0,
-          "isLinked": false
-        },
         "width": {
           "unit": "%",
           "size": "",
@@ -42,6 +29,12 @@
           "unit": "px",
           "size": 7267,
           "sizes": []
+        },
+        "flex_gap": {
+          "unit": "px",
+          "column": "",
+          "row": "",
+          "isLinked": true
         }
       },
       "defaultEditSettings": {
@@ -49,17 +42,18 @@
       },
       "elements": [
         {
-          "id": "1d2a91c",
+          "id": "aa03aab",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "1d2a91c",
+            "_element_id": "aa03aab",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
             "flex__is_row": "row",
             "flex__is_column": "column",
+            "overflow": "hidden",
             "justify_content": "flex-start",
             "flex_justify_content": "flex-start",
             "align_items": "center",
@@ -78,6 +72,25 @@
               "left": 0,
               "isLinked": false
             },
+            "background_background": "gradient",
+            "background_gradient_type": "linear",
+            "background_color": "rgba(255, 71, 15, 1)",
+            "background_color_stop": {
+              "unit": "%",
+              "size": 0,
+              "sizes": []
+            },
+            "background_color_b": "rgba(255, 71, 15, 0.05999999865889549)",
+            "background_color_b_stop": {
+              "unit": "%",
+              "size": 100,
+              "sizes": []
+            },
+            "background_gradient_angle": {
+              "unit": "deg",
+              "size": 180,
+              "sizes": []
+            },
             "width": {
               "unit": "%",
               "size": "",
@@ -94,18 +107,22 @@
           },
           "elements": [
             {
-              "id": "856e8e0",
+              "id": "05d0e6a",
               "elType": "widget",
+              "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "856e8e0",
-                "minHeight": 690,
-                "justify_content": "flex-start",
-                "align_items": "flex-start",
+                "_element_id": "05d0e6a",
                 "image": {
                   "url": "",
-                  "id": 0
+                  "id": 6011
+                },
+                "image_size": "full",
+                "width": {
+                  "unit": "px",
+                  "size": 1440,
+                  "sizes": []
                 }
               },
               "defaultEditSettings": {
@@ -114,12 +131,13 @@
               "elements": []
             },
             {
-              "id": "d3ef1a8",
+              "id": "81d7385",
               "elType": "widget",
+              "isInner": false,
               "isLocked": false,
               "widgetType": "heading",
               "settings": {
-                "_element_id": "d3ef1a8",
+                "_element_id": "81d7385",
                 "minHeight": 260,
                 "align": "center",
                 "customCss": ".color-949494 { color: rgba(148, 148, 148, 1); }\n.color-fafafa { color: rgba(250, 250, 250, 1); }",
@@ -151,17 +169,18 @@
           ]
         },
         {
-          "id": "b78b29b",
+          "id": "8208b60",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "b78b29b",
+            "_element_id": "8208b60",
             "container_type": "flex",
-            "content_width": "boxed",
+            "content_width": "full",
             "flex_direction": "column",
             "flex__is_row": "row",
             "flex__is_column": "column",
+            "overflow": "hidden",
             "justify_content": "center",
             "flex_justify_content": "center",
             "align_items": "center",
@@ -182,11 +201,6 @@
             },
             "background_background": "classic",
             "background_color": "rgba(14, 14, 14, 1)",
-            "boxed_width": {
-              "unit": "px",
-              "size": 1100,
-              "sizes": []
-            },
             "width": {
               "unit": "%",
               "size": "",
@@ -203,34 +217,27 @@
           },
           "elements": [
             {
-              "id": "b16da99",
+              "id": "c5bfb78",
               "elType": "container",
               "isInner": true,
               "isLocked": false,
               "settings": {
-                "_element_id": "b16da99",
+                "_element_id": "c5bfb78",
                 "container_type": "flex",
                 "content_width": "full",
                 "flex_direction": "column",
                 "flex__is_row": "row",
                 "flex__is_column": "column",
-                "justify_content": "center",
-                "flex_justify_content": "center",
+                "overflow": "hidden",
+                "justify_content": "flex-start",
+                "flex_justify_content": "flex-start",
                 "align_items": "center",
                 "flex_align_items": "center",
                 "flex_gap": {
                   "unit": "px",
-                  "column": "48",
-                  "row": "48",
+                  "column": "96",
+                  "row": "96",
                   "isLinked": true
-                },
-                "padding": {
-                  "unit": "px",
-                  "top": 0,
-                  "right": 0,
-                  "bottom": 0,
-                  "left": 0,
-                  "isLinked": false
                 },
                 "width": {
                   "unit": "%",
@@ -239,7 +246,7 @@
                 },
                 "min_height": {
                   "unit": "px",
-                  "size": 270,
+                  "size": 445,
                   "sizes": []
                 }
               },
@@ -248,34 +255,27 @@
               },
               "elements": [
                 {
-                  "id": "81c4c50",
+                  "id": "2a4a5cd",
                   "elType": "container",
                   "isInner": true,
                   "isLocked": false,
                   "settings": {
-                    "_element_id": "81c4c50",
+                    "_element_id": "2a4a5cd",
                     "container_type": "flex",
                     "content_width": "full",
                     "flex_direction": "column",
                     "flex__is_row": "row",
                     "flex__is_column": "column",
-                    "justify_content": "flex-start",
-                    "flex_justify_content": "flex-start",
+                    "overflow": "hidden",
+                    "justify_content": "center",
+                    "flex_justify_content": "center",
                     "align_items": "center",
                     "flex_align_items": "center",
                     "flex_gap": {
                       "unit": "px",
-                      "column": "24",
-                      "row": "24",
+                      "column": "48",
+                      "row": "48",
                       "isLinked": true
-                    },
-                    "padding": {
-                      "unit": "px",
-                      "top": 0,
-                      "right": 0,
-                      "bottom": 0,
-                      "left": 0,
-                      "isLinked": false
                     },
                     "width": {
                       "unit": "%",
@@ -284,7 +284,7 @@
                     },
                     "min_height": {
                       "unit": "px",
-                      "size": 175,
+                      "size": 270,
                       "sizes": []
                     }
                   },
@@ -293,154 +293,212 @@
                   },
                   "elements": [
                     {
-                      "id": "7766b68",
-                      "elType": "widget",
+                      "id": "cc14f83",
+                      "elType": "container",
+                      "isInner": true,
                       "isLocked": false,
-                      "widgetType": "heading",
                       "settings": {
-                        "_element_id": "7766b68",
-                        "minHeight": 106,
-                        "align": "center",
-                        "color": "rgba(255, 255, 255, 1)",
-                        "typography_typography": "custom",
-                        "typography_font_family": "Figtree",
-                        "typography_font_weight": 400,
-                        "typography_font_size": {
-                          "unit": "px",
-                          "size": 48
-                        },
-                        "typography_line_height": {
-                          "unit": "px",
-                          "size": 52.79999923706055
-                        },
-                        "typography_letter_spacing": {
-                          "unit": "px",
-                          "size": -1
-                        },
-                        "typography_text_decoration": "none",
-                        "typography_text_transform": "none",
-                        "title": "Fueling Performance with \nNext-Gen Hydration Technology.",
-                        "title_color": "rgba(255, 255, 255, 1)"
-                      },
-                      "defaultEditSettings": {
-                        "defaultEditRoute": "content"
-                      },
-                      "elements": []
-                    },
-                    {
-                      "id": "6b2d693",
-                      "elType": "widget",
-                      "isLocked": false,
-                      "widgetType": "heading",
-                      "settings": {
-                        "_element_id": "6b2d693",
-                        "align": "center",
-                        "color": "rgba(255, 255, 255, 1)",
-                        "typography_typography": "custom",
-                        "typography_font_family": "Figtree",
-                        "typography_font_weight": 400,
-                        "typography_font_size": {
-                          "unit": "px",
-                          "size": 16
-                        },
-                        "typography_line_height": {
-                          "unit": "px",
-                          "size": 22.399999618530273
-                        },
-                        "typography_text_decoration": "none",
-                        "typography_text_transform": "none",
-                        "title": "Fuel Pro 2.0 harnesses cutting-edge hydration technology to deliver optimal performance support for athletes. Our advanced formula combines precisely balanced electrolytes and essential nutrients, engineered to hydrate at the cellular level and power you through the toughest challenges.",
-                        "title_color": "rgba(255, 255, 255, 1)"
-                      },
-                      "defaultEditSettings": {
-                        "defaultEditRoute": "content"
-                      },
-                      "elements": []
-                    }
-                  ]
-                },
-                {
-                  "id": "6b355b3",
-                  "elType": "container",
-                  "isInner": true,
-                  "isLocked": false,
-                  "settings": {
-                    "_element_id": "6b355b3",
-                    "container_type": "flex",
-                    "content_width": "full",
-                    "flex_direction": "row",
-                    "flex__is_row": "row",
-                    "flex__is_column": "column",
-                    "justify_content": "center",
-                    "flex_justify_content": "center",
-                    "align_items": "flex-start",
-                    "flex_align_items": "flex-start",
-                    "flex_gap": {
-                      "unit": "px",
-                      "column": "0",
-                      "row": "0",
-                      "isLinked": true
-                    },
-                    "padding": {
-                      "unit": "px",
-                      "top": 0,
-                      "right": 420,
-                      "bottom": 0,
-                      "left": 420,
-                      "isLinked": false
-                    },
-                    "width": {
-                      "unit": "%",
-                      "size": "",
-                      "sizes": []
-                    },
-                    "min_height": {
-                      "unit": "px",
-                      "size": 47,
-                      "sizes": []
-                    }
-                  },
-                  "defaultEditSettings": {
-                    "defaultEditRoute": "content"
-                  },
-                  "elements": [
-                    {
-                      "id": "ac72521",
-                      "elType": "widget",
-                      "isLocked": false,
-                      "widgetType": "button",
-                      "settings": {
-                        "_element_id": "ac72521",
-                        "minHeight": 47,
-                        "justify_content": "center",
+                        "_element_id": "cc14f83",
+                        "container_type": "flex",
+                        "content_width": "full",
+                        "flex_direction": "column",
+                        "flex__is_row": "row",
+                        "flex__is_column": "column",
+                        "overflow": "hidden",
+                        "justify_content": "flex-start",
+                        "flex_justify_content": "flex-start",
                         "align_items": "center",
-                        "text": "Button",
-                        "size": "sm",
-                        "button_type": "",
-                        "align": "center",
-                        "typography_typography": "custom",
-                        "background_color": "rgba(255, 255, 255, 1)",
-                        "button_padding": {
+                        "flex_align_items": "center",
+                        "flex_gap": {
                           "unit": "px",
-                          "top": 12,
-                          "right": 20,
-                          "bottom": 12,
-                          "left": 20,
+                          "column": "24",
+                          "row": "24",
+                          "isLinked": true
+                        },
+                        "width": {
+                          "unit": "%",
+                          "size": "",
+                          "sizes": []
+                        },
+                        "min_height": {
+                          "unit": "px",
+                          "size": 175,
+                          "sizes": []
+                        }
+                      },
+                      "defaultEditSettings": {
+                        "defaultEditRoute": "content"
+                      },
+                      "elements": [
+                        {
+                          "id": "806fb2c",
+                          "elType": "widget",
+                          "isInner": false,
+                          "isLocked": false,
+                          "widgetType": "heading",
+                          "settings": {
+                            "_element_id": "806fb2c",
+                            "minHeight": 106,
+                            "align": "center",
+                            "color": "rgba(255, 255, 255, 1)",
+                            "typography_typography": "custom",
+                            "typography_font_family": "Figtree",
+                            "typography_font_weight": 400,
+                            "typography_font_size": {
+                              "unit": "px",
+                              "size": 48
+                            },
+                            "typography_line_height": {
+                              "unit": "px",
+                              "size": 52.79999923706055
+                            },
+                            "typography_letter_spacing": {
+                              "unit": "px",
+                              "size": -1
+                            },
+                            "typography_text_decoration": "none",
+                            "typography_text_transform": "none",
+                            "title": "Fueling Performance with \nNext-Gen Hydration Technology.",
+                            "title_color": "rgba(255, 255, 255, 1)"
+                          },
+                          "defaultEditSettings": {
+                            "defaultEditRoute": "content"
+                          },
+                          "elements": []
+                        },
+                        {
+                          "id": "3c477ed",
+                          "elType": "widget",
+                          "isInner": false,
+                          "isLocked": false,
+                          "widgetType": "text-editor",
+                          "settings": {
+                            "_element_id": "3c477ed",
+                            "align": "center",
+                            "color": "rgba(255, 255, 255, 1)",
+                            "typography_typography": "custom",
+                            "typography_font_family": "Figtree",
+                            "typography_font_weight": 400,
+                            "typography_font_size": {
+                              "unit": "px",
+                              "size": 16
+                            },
+                            "typography_line_height": {
+                              "unit": "px",
+                              "size": 22.399999618530273
+                            },
+                            "typography_text_decoration": "none",
+                            "typography_text_transform": "none",
+                            "editor": "Fuel Pro 2.0 harnesses cutting-edge hydration technology to deliver optimal performance support for athletes. Our advanced formula combines precisely balanced electrolytes and essential nutrients, engineered to hydrate at the cellular level and power you through the toughest challenges.",
+                            "text_color": "rgba(255, 255, 255, 1)"
+                          },
+                          "defaultEditSettings": {
+                            "defaultEditRoute": "content"
+                          },
+                          "elements": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "3ceb86f",
+                      "elType": "container",
+                      "isInner": true,
+                      "isLocked": false,
+                      "settings": {
+                        "_element_id": "3ceb86f",
+                        "container_type": "flex",
+                        "content_width": "full",
+                        "flex_direction": "row",
+                        "flex__is_row": "row",
+                        "flex__is_column": "column",
+                        "overflow": "hidden",
+                        "justify_content": "center",
+                        "flex_justify_content": "center",
+                        "align_items": "flex-start",
+                        "flex_align_items": "flex-start",
+                        "padding": {
+                          "unit": "px",
+                          "top": 0,
+                          "right": 420,
+                          "bottom": 0,
+                          "left": 420,
                           "isLinked": false
                         },
-                        "border_radius": {
+                        "width": {
+                          "unit": "%",
+                          "size": "",
+                          "sizes": []
+                        },
+                        "min_height": {
                           "unit": "px",
-                          "top": 14,
-                          "right": 14,
-                          "bottom": 14,
-                          "left": 14,
+                          "size": 47,
+                          "sizes": []
+                        },
+                        "flex_gap": {
+                          "unit": "px",
+                          "column": "",
+                          "row": "",
                           "isLinked": true
                         }
                       },
                       "defaultEditSettings": {
                         "defaultEditRoute": "content"
                       },
-                      "elements": []
+                      "elements": [
+                        {
+                          "id": "1bb6203",
+                          "elType": "widget",
+                          "isInner": false,
+                          "isLocked": false,
+                          "widgetType": "button",
+                          "settings": {
+                            "_element_id": "1bb6203",
+                            "minHeight": 47,
+                            "justify_content": "center",
+                            "align_items": "center",
+                            "align": "center",
+                            "color": "rgba(0, 0, 0, 1)",
+                            "typography_typography": "custom",
+                            "typography_font_family": "Figtree",
+                            "typography_font_weight": 500,
+                            "typography_font_size": {
+                              "unit": "px",
+                              "size": 14
+                            },
+                            "typography_line_height": {
+                              "unit": "px",
+                              "size": 22.399999618530273
+                            },
+                            "typography_text_decoration": "none",
+                            "typography_text_transform": "none",
+                            "text": "Shop Now    |    $49",
+                            "size": "sm",
+                            "button_type": "",
+                            "background_color": "rgba(255, 255, 255, 1)",
+                            "button_text_color": "rgba(NaN, NaN, NaN, 1)",
+                            "button_padding": {
+                              "unit": "px",
+                              "top": 12,
+                              "right": 20,
+                              "bottom": 12,
+                              "left": 20,
+                              "isLinked": false
+                            },
+                            "border_radius": {
+                              "unit": "px",
+                              "top": 14,
+                              "right": 14,
+                              "bottom": 14,
+                              "left": 14,
+                              "isLinked": true
+                            }
+                          },
+                          "defaultEditSettings": {
+                            "defaultEditRoute": "content"
+                          },
+                          "elements": []
+                        }
+                      ]
                     }
                   ]
                 }

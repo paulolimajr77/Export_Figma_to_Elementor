@@ -30,7 +30,8 @@ describe('Debug Reproduction', () => {
 
         console.log('Elementor JSON generated.');
         console.log('Root Type:', elementorJson.type);
-        console.log('Elements count:', elementorJson.elements.length);
+        const elements = elementorJson.elements || [];
+        console.log('Elements count:', elements.length);
 
         // Write output
         fs.writeFileSync(outputPath, JSON.stringify(elementorJson, null, 2));

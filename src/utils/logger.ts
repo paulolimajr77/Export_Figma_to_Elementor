@@ -1,16 +1,10 @@
 /**
  * File Logger for Figma Plugin
- * 
- * Writes all console.log messages to a file for easier debugging and test analysis.
- * Usage: Replace console.log with logger.log() throughout the codebase.
-/**
- * File Logger for Figma Plugin
- * 
- * Writes all console.log messages to a file for easier debugging and test analysis.
- * Usage: Replace console.log with logger.log() throughout the codebase.
+ *
+ * Escreve logs em um buffer interno para exportação posterior sem precisar
+ * modificar o objeto global `console`.
  */
-
-class FileLogger {
+export class FileLogger {
     private logs: string[] = [];
     private sessionStart: string;
     private maxLogs: number = 1000; // Prevent memory issues
@@ -105,6 +99,25 @@ class FileLogger {
     }
 }
 
-// Export for use in code.ts - will be initialized there with originalConsoleLog
-export { FileLogger };
-export let logger: FileLogger;
+let patchedConsoleLog: ((...args: any[]) => void) | null = null;
+
+/**
+ * Opcionalmente encaminha console.log para o logger informado.
+ * Mantemos referência ao console original para permitir restauração.
+ */
+export function patchConsoleLogger(logger: FileLogger): void {
+    if (!patchedConsoleLog) {
+        patchedConsoleLog = console.log.bind(console);
+    }
+    console.log = (...args: any[]) => logger.log(...args);
+}
+
+/**
+ * Restaura o console.log original, se ele tiver sido alterado.
+ */
+export function restoreConsoleLogger(): void {
+    if (patchedConsoleLog) {
+        console.log = patchedConsoleLog;
+        patchedConsoleLog = null;
+    }
+}

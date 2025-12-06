@@ -6,12 +6,13 @@ import { ImageUploader } from './media/uploader';
 import { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipeline.schema';
 import { ElementorJSON, WPConfig } from './types/elementor.types';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from './utils/validation';
-import { SchemaProvider } from './types/providers';
+import { SchemaProvider, GenerateSchemaInput } from './types/providers';
 import { ANALYZE_RECREATE_PROMPT, OPTIMIZE_SCHEMA_PROMPT } from './config/prompts';
 import { convertToFlexSchema } from './pipeline/noai.parser';
 import { referenceDocs } from './reference_docs';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { createNodeSnapshot } from './heuristics/adapter';
+import type { DeterministicPipeline } from './core/deterministic/deterministic.pipeline';
 
 interface PreprocessedData {
     pageTitle: string;
@@ -33,10 +34,18 @@ export class ConversionPipeline {
     private imageUploader: ImageUploader;
     private autoFixLayout: boolean = false;
     private autoRename: boolean = false;
+    private deterministicPipeline?: DeterministicPipeline;
 
     constructor() {
         this.compiler = new ElementorCompiler();
         this.imageUploader = new ImageUploader({});
+    }
+
+    /**
+     * Permite injetar o pipeline determinístico sem alterar o comportamento atual.
+     */
+    public attachDeterministicPipeline(pipeline: DeterministicPipeline) {
+        this.deterministicPipeline = pipeline;
     }
 
     async run(
@@ -206,14 +215,20 @@ ${JSON.stringify(baseSchema, null, 2)}
         const references = (extras?.includeReferences === false) ? [] : referenceDocs;
 
         try {
-            const response = await provider.generateSchema({
+            const schemaRequest: GenerateSchemaInput = {
                 prompt,
                 snapshot: pre.serializedRoot,
                 instructions: 'Otimize o schema JSON fornecido mantendo IDs e dados.',
-                apiKey,
-                image: extras?.screenshot || undefined,
                 references
-            });
+            };
+            if (apiKey) {
+                schemaRequest.apiKey = apiKey;
+            }
+            if (extras?.screenshot) {
+                schemaRequest.image = extras.screenshot;
+            }
+
+            const response = await provider.generateSchema(schemaRequest);
 
             if (!response.ok || !response.schema) {
                 console.warn('AI returned invalid response. Falling back to base schema.', response.message);
