@@ -14,6 +14,14 @@ import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } 
 import { enforceWidgetTypes } from './services/heuristics';
 import { initializeCompatLayer, safeGet, safeGetArray, safeGetNumber, safeGetString, safeGetBoolean, safeInvoke } from './compat';
 
+// ============================================================
+// SHADOW MODE V2 - Lint Engine V2 Integration
+// When enabled, runs the new WidgetEngine in parallel with V1
+// and logs differences. Does NOT affect final output.
+// ============================================================
+import { analyzeNodeWithEngine } from './engine';
+const SHADOW_MODE = true;
+
 const runtimeHealth = initializeCompatLayer({
     logger: (event, payload) => {
         try {
@@ -325,6 +333,52 @@ function sendPreview(data: any) {
 async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WPConfig = {}): Promise<ElementorJSON> {
     const analyzed = analyzeTreeWithHeuristics(serializedTree as any);
     const schema = convertToFlexSchema(analyzed as any);
+
+    // ============================================================
+    // SHADOW MODE V2: Run V2 engine in parallel and log differences
+    // This block NEVER affects the final output (always uses V1)
+    // ============================================================
+    if (SHADOW_MODE) {
+        try {
+            var rootNode = figma.getNodeById(serializedTree.id) as FrameNode | null;
+            if (rootNode) {
+                var v2Result = analyzeNodeWithEngine(rootNode, rootNode);
+
+                // Get V1 widget type from schema (not raw node type)
+                // The schema root is a container, check first widget or container type
+                var v1Widget = 'container'; // Default fallback
+                if (schema.containers && schema.containers.length > 0) {
+                    var rootContainer = schema.containers[0];
+                    if (rootContainer.widgets && rootContainer.widgets.length > 0) {
+                        v1Widget = rootContainer.widgets[0].type || 'container';
+                    } else if (rootContainer.children && rootContainer.children.length > 0) {
+                        v1Widget = 'container';
+                    }
+                }
+                // Check if node has explicit widget name prefix
+                var nodeName = (serializedTree.name || '').toLowerCase();
+                if (nodeName.startsWith('w:') || nodeName.startsWith('c:')) {
+                    v1Widget = nodeName.replace(/^(w:|c:)/, '');
+                }
+
+                var v2Widget = v2Result.bestMatch ? v2Result.bestMatch.widget : 'null';
+                var v2Score = v2Result.bestMatch ? v2Result.bestMatch.score.toFixed(2) : '0.00';
+
+                if (v1Widget !== v2Widget) {
+                    console.log('[SHADOW-V2] Node ' + serializedTree.id + ' | V1: ' + v1Widget + ' | V2: ' + v2Widget + ' (' + v2Score + ')');
+                    if (v2Result.structuralIssues.length > 0) {
+                        console.log('[SHADOW-V2] Issues:', v2Result.structuralIssues.map(function (i) { return i.message; }));
+                    }
+                }
+            }
+        } catch (shadowError) {
+            console.warn('[SHADOW-V2] Error:', shadowError);
+        }
+    }
+    // ============================================================
+    // END SHADOW MODE - V1 result continues unchanged below
+    // ============================================================
+
 
     // Resolver imagens (upload para WP quando configurado)
     const normalizedWP = { ...wpConfig, password: safeGet(wpConfig as any, 'password') || safeGet(wpConfig as any, 'token') };

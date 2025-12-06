@@ -8324,7 +8324,692 @@ ${detection.justification}
     return compatState;
   }
 
+  // src/engine/zone-detector.ts
+  function detectZone(nodeY, rootHeight) {
+    if (!rootHeight || rootHeight <= 0) {
+      return "BODY";
+    }
+    var relativeY = nodeY;
+    if (relativeY < 150) {
+      return "HEADER";
+    }
+    if (relativeY > rootHeight - 300) {
+      return "FOOTER";
+    }
+    if (relativeY < 800) {
+      return "HERO";
+    }
+    return "BODY";
+  }
+
+  // src/engine/feature-extractor.ts
+  function extractNodeFeatures(node, rootFrame) {
+    var baseWidth = 0;
+    var baseHeight = 0;
+    var x = 0;
+    var y = 0;
+    var childCount = 0;
+    var layoutMode = "NONE";
+    var primaryAxisSizingMode;
+    var counterAxisSizingMode;
+    var hasNestedFrames = false;
+    if ("width" in node && typeof node.width === "number") {
+      baseWidth = node.width;
+    }
+    if ("height" in node && typeof node.height === "number") {
+      baseHeight = node.height;
+    }
+    if ("x" in node && typeof node.x === "number") {
+      x = node.x;
+    }
+    if ("y" in node && typeof node.y === "number") {
+      y = node.y;
+    }
+    if ("children" in node && Array.isArray(node.children)) {
+      var children = node.children;
+      childCount = children.length;
+      for (var n = 0; n < children.length; n++) {
+        var ch = children[n];
+        if (ch.type === "FRAME" || ch.type === "GROUP" || ch.type === "COMPONENT" || ch.type === "INSTANCE") {
+          hasNestedFrames = true;
+          break;
+        }
+      }
+      if ("layoutMode" in node) {
+        var lm = node.layoutMode;
+        if (lm === "HORIZONTAL" || lm === "VERTICAL" || lm === "NONE") {
+          layoutMode = lm;
+        }
+      }
+      if ("primaryAxisSizingMode" in node) {
+        var p = node.primaryAxisSizingMode;
+        if (p === "FIXED" || p === "AUTO") {
+          primaryAxisSizingMode = p;
+        }
+      }
+      if ("counterAxisSizingMode" in node) {
+        var c = node.counterAxisSizingMode;
+        if (c === "FIXED" || c === "AUTO") {
+          counterAxisSizingMode = c;
+        }
+      }
+    }
+    var hasFill = false;
+    var hasStroke = false;
+    var hasText = false;
+    var textCount = 0;
+    var hasImage = false;
+    var imageCount = 0;
+    var textLength = 0;
+    var fontSize = 0;
+    var fontWeight = 400;
+    if (node.type === "TEXT") {
+      hasText = true;
+      textCount = 1;
+      var textNode = node;
+      var chars = textNode.characters;
+      textLength = chars ? chars.length : 0;
+      if ("fontSize" in textNode && typeof textNode.fontSize === "number") {
+        fontSize = textNode.fontSize;
+      }
+      if ("fontWeight" in textNode && typeof textNode.fontWeight === "number") {
+        fontWeight = textNode.fontWeight;
+      } else if ("fontName" in textNode) {
+        var fn = textNode.fontName;
+        if (fn && fn.style) {
+          var style = fn.style.toLowerCase();
+          if (style.indexOf("bold") >= 0) {
+            fontWeight = 700;
+          } else if (style.indexOf("semibold") >= 0 || style.indexOf("semi") >= 0) {
+            fontWeight = 600;
+          } else if (style.indexOf("medium") >= 0) {
+            fontWeight = 500;
+          } else if (style.indexOf("light") >= 0) {
+            fontWeight = 300;
+          }
+        }
+      }
+    }
+    if ("fills" in node) {
+      var fills = node.fills;
+      if (Array.isArray(fills)) {
+        for (var i = 0; i < fills.length; i++) {
+          var fill = fills[i];
+          if (fill && fill.type === "SOLID") {
+            hasFill = true;
+          }
+          if (fill && fill.type === "IMAGE") {
+            hasImage = true;
+            imageCount++;
+          }
+        }
+      }
+    }
+    if ("strokes" in node) {
+      var strokes = node.strokes;
+      if (Array.isArray(strokes) && strokes.length > 0) {
+        hasStroke = true;
+      }
+    }
+    var maxFontSize = fontSize;
+    var maxFontWeight = fontWeight;
+    if ("children" in node && Array.isArray(node.children)) {
+      var _children = node.children;
+      for (var j = 0; j < _children.length; j++) {
+        var child = _children[j];
+        if (child.type === "TEXT") {
+          hasText = true;
+          textCount++;
+          var childText = child;
+          textLength += childText.characters ? childText.characters.length : 0;
+          if ("fontSize" in childText && typeof childText.fontSize === "number") {
+            if (childText.fontSize > maxFontSize) {
+              maxFontSize = childText.fontSize;
+            }
+          }
+          if ("fontName" in childText) {
+            var cfn = childText.fontName;
+            if (cfn && cfn.style) {
+              var cstyle = cfn.style.toLowerCase();
+              var cw = 400;
+              if (cstyle.indexOf("bold") >= 0) {
+                cw = 700;
+              } else if (cstyle.indexOf("semibold") >= 0 || cstyle.indexOf("semi") >= 0) {
+                cw = 600;
+              } else if (cstyle.indexOf("medium") >= 0) {
+                cw = 500;
+              }
+              if (cw > maxFontWeight) {
+                maxFontWeight = cw;
+              }
+            }
+          }
+        }
+        if ("fills" in child) {
+          var childFills = child.fills;
+          if (Array.isArray(childFills)) {
+            for (var k = 0; k < childFills.length; k++) {
+              var cf = childFills[k];
+              if (cf && cf.type === "IMAGE") {
+                hasImage = true;
+                imageCount++;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (maxFontSize > fontSize) {
+      fontSize = maxFontSize;
+    }
+    if (maxFontWeight > fontWeight) {
+      fontWeight = maxFontWeight;
+    }
+    var aspectRatio = 0;
+    if (baseHeight > 0) {
+      aspectRatio = baseWidth / baseHeight;
+    }
+    var area = baseWidth * baseHeight;
+    var rootHeight = null;
+    if (rootFrame && "height" in rootFrame) {
+      rootHeight = rootFrame.height;
+    }
+    var zone = detectZone(y, rootHeight);
+    var vectorTypes2 = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE"];
+    var isVectorNode = vectorTypes2.indexOf(node.type) >= 0;
+    var vectorWidth = isVectorNode ? baseWidth : 0;
+    var vectorHeight = isVectorNode ? baseHeight : 0;
+    var parentLayoutMode = "NONE";
+    var siblingCount = 0;
+    if (node.parent && "layoutMode" in node.parent) {
+      var pm = node.parent.layoutMode;
+      if (pm === "HORIZONTAL" || pm === "VERTICAL") {
+        parentLayoutMode = pm;
+      }
+      if ("children" in node.parent && Array.isArray(node.parent.children)) {
+        siblingCount = node.parent.children.length;
+      }
+    }
+    var features = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      width: baseWidth,
+      height: baseHeight,
+      x,
+      y,
+      area,
+      childCount,
+      layoutMode,
+      primaryAxisSizingMode,
+      counterAxisSizingMode,
+      hasNestedFrames,
+      hasFill,
+      hasStroke,
+      hasText,
+      textCount,
+      hasImage,
+      imageCount,
+      textLength,
+      fontSize,
+      fontWeight,
+      isVectorNode,
+      vectorWidth,
+      vectorHeight,
+      parentLayoutMode,
+      siblingCount,
+      aspectRatio,
+      zone
+    };
+    return features;
+  }
+
+  // src/engine/heuristic-registry.ts
+  var BUTTON_MIN_CONFIDENCE = 0.7;
+  var HEADING_MIN_CONFIDENCE = 0.75;
+  var IMAGE_BOX_MIN_CONFIDENCE = 0.65;
+  var TEXT_EDITOR_MIN_CONFIDENCE = 0.6;
+  var CONTAINER_DEFAULT_CONFIDENCE = 0.3;
+  var ButtonRule = {
+    id: "h_button_calibrated",
+    targetWidget: "w:button",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (features.hasText && features.textCount === 1) {
+        score += 0.35;
+        reasons.push("Texto \xFAnico detectado");
+      }
+      if (features.hasFill || features.hasStroke) {
+        score += 0.2;
+        reasons.push("Possui preenchimento ou borda");
+      }
+      if (features.aspectRatio > 1.5 && features.aspectRatio < 8) {
+        score += 0.2;
+        reasons.push("Propor\xE7\xE3o horizontal t\xEDpica de bot\xE3o");
+      }
+      if (features.textLength > 0 && features.textLength < 40) {
+        score += 0.15;
+        reasons.push("Texto curto (< 40 chars)");
+      }
+      if (features.childCount > 2) {
+        score -= 0.4;
+        reasons.push("PENALTY: Muitos filhos (" + features.childCount + ")");
+      }
+      if (features.height > 120) {
+        score -= 0.4;
+        reasons.push("PENALTY: Altura excessiva (" + features.height + "px)");
+      }
+      if (features.hasNestedFrames) {
+        score -= 0.3;
+        reasons.push("PENALTY: Estrutura aninhada complexa");
+      }
+      if (features.area > 15e4) {
+        score -= 0.35;
+        reasons.push("PENALTY: \xC1rea muito grande");
+      }
+      if ((features.zone === "HEADER" || features.zone === "FOOTER") && features.area > 5e4) {
+        score -= 0.2;
+        reasons.push("PENALTY: Container grande em " + features.zone);
+      }
+      if (!features.hasText) {
+        score -= 0.5;
+        reasons.push("PENALTY: Sem texto");
+      }
+      if (score < BUTTON_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:button",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_button_calibrated",
+        reasons
+      };
+    }
+  };
+  var HeadingRule = {
+    id: "h_heading_calibrated",
+    targetWidget: "w:heading",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasText && features.type !== "TEXT") {
+        return null;
+      }
+      if (features.fontSize >= 22) {
+        score += 0.4;
+        reasons.push("Tamanho de fonte tipogr\xE1fica grande (" + features.fontSize + "px)");
+      } else if (features.fontSize >= 18) {
+        score += 0.25;
+        reasons.push("Tamanho de fonte moderado (" + features.fontSize + "px)");
+      }
+      if (features.fontWeight >= 600) {
+        score += 0.25;
+        reasons.push("Peso de fonte bold/semibold");
+      }
+      if (features.textLength > 0 && features.textLength < 80) {
+        score += 0.2;
+        reasons.push("Texto curto (< 80 chars)");
+      }
+      if (features.zone === "HERO" || features.zone === "HEADER") {
+        score += 0.15;
+        reasons.push("Zona com alta probabilidade de heading");
+      }
+      if (features.textLength > 150) {
+        score -= 0.5;
+        reasons.push("PENALTY: Texto muito longo (par\xE1grafo)");
+      }
+      if (features.fontSize > 0 && features.fontSize <= 16) {
+        score -= 0.4;
+        reasons.push("PENALTY: Font size pequeno (" + features.fontSize + "px)");
+      }
+      if (features.fontWeight <= 400 && features.fontSize < 18) {
+        score -= 0.3;
+        reasons.push("PENALTY: Peso leve + fonte pequena");
+      }
+      if (features.zone === "FOOTER") {
+        score -= 0.15;
+        reasons.push("PENALTY: Zona FOOTER");
+      }
+      if (score < HEADING_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:heading",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_heading_calibrated",
+        reasons
+      };
+    }
+  };
+  var TextEditorRule = {
+    id: "h_text_editor",
+    targetWidget: "w:text-editor",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasText && features.type !== "TEXT") {
+        return null;
+      }
+      if (features.fontSize > 0 && features.fontSize < 20) {
+        score += 0.35;
+        reasons.push("Font size de texto corrido");
+      }
+      if (features.textLength > 80) {
+        score += 0.35;
+        reasons.push("Texto longo (par\xE1grafo)");
+      }
+      if (features.fontWeight <= 500) {
+        score += 0.2;
+        reasons.push("Peso de fonte regular");
+      }
+      if (features.zone === "BODY") {
+        score += 0.1;
+        reasons.push("Zona BODY");
+      }
+      if (score < TEXT_EDITOR_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:text-editor",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_text_editor",
+        reasons
+      };
+    }
+  };
+  var ImageBoxRule = {
+    id: "h_image_box_calibrated",
+    targetWidget: "w:image-box",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasImage) {
+        return null;
+      }
+      score += 0.3;
+      reasons.push("Possui imagem");
+      if (features.textCount >= 1 && features.textCount <= 3) {
+        score += 0.3;
+        reasons.push("Quantidade de texto ideal para card");
+      }
+      if (features.childCount >= 2 && features.childCount <= 5) {
+        score += 0.2;
+        reasons.push("Quantidade de filhos t\xEDpica de card");
+      }
+      if (features.aspectRatio > 0.5 && features.aspectRatio < 2.5) {
+        score += 0.15;
+        reasons.push("Propor\xE7\xE3o t\xEDpica de card");
+      }
+      if (features.textCount > 4) {
+        score -= 0.5;
+        reasons.push("PENALTY: Muitos textos (" + features.textCount + ")");
+      }
+      if (features.aspectRatio > 3) {
+        score -= 0.35;
+        reasons.push("PENALTY: Muito horizontal para card");
+      }
+      if (features.area > 3e5) {
+        score -= 0.4;
+        reasons.push("PENALTY: \xC1rea muito grande para card");
+      }
+      if (features.imageCount > 1) {
+        score -= 0.25;
+        reasons.push("PENALTY: M\xFAltiplas imagens (possivelmente grid/gallery)");
+      }
+      if (score < IMAGE_BOX_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:image-box",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_image_box_calibrated",
+        reasons
+      };
+    }
+  };
+  var ImageRule = {
+    id: "h_image_simple",
+    targetWidget: "w:image",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasImage && features.type !== "IMAGE") {
+        return null;
+      }
+      if (features.type === "IMAGE") {
+        score += 0.8;
+        reasons.push("N\xF3 do tipo IMAGE");
+      } else if (features.hasImage && features.textCount === 0) {
+        score += 0.7;
+        reasons.push("Possui imagem sem texto");
+      }
+      if (features.textCount > 0) {
+        score -= 0.4;
+        reasons.push("PENALTY: Tem texto (considerar image-box)");
+      }
+      if (score < 0.5) {
+        return null;
+      }
+      return {
+        widget: "w:image",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_image_simple",
+        reasons
+      };
+    }
+  };
+  var ICON_MAX_DIMENSION = 40;
+  var ICON_MIN_CONFIDENCE = 0.7;
+  var IconRule = {
+    id: "h_icon_v2",
+    targetWidget: "w:icon",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.isVectorNode) {
+        return null;
+      }
+      if (features.vectorWidth > 0 && features.vectorWidth <= ICON_MAX_DIMENSION && features.vectorHeight > 0 && features.vectorHeight <= ICON_MAX_DIMENSION) {
+        score += 0.7;
+        reasons.push("Vetor pequeno (<= " + ICON_MAX_DIMENSION + "px)");
+      } else if (features.vectorWidth <= 60 && features.vectorHeight <= 60) {
+        score += 0.5;
+        reasons.push("Vetor m\xE9dio (<= 60px)");
+      } else {
+        return null;
+      }
+      if (features.aspectRatio >= 0.8 && features.aspectRatio <= 1.2) {
+        score += 0.15;
+        reasons.push("Propor\xE7\xE3o quadrada t\xEDpica de \xEDcone");
+      }
+      if (features.hasFill || features.hasStroke) {
+        score += 0.1;
+        reasons.push("Possui preenchimento ou tra\xE7o");
+      }
+      if (score < ICON_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:icon",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_icon_v2",
+        reasons
+      };
+    }
+  };
+  var DIVIDER_MAX_HEIGHT = 5;
+  var DIVIDER_MIN_WIDTH = 100;
+  var DIVIDER_MIN_CONFIDENCE = 0.7;
+  var DividerRule = {
+    id: "h_divider_v2",
+    targetWidget: "w:divider",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (features.type !== "RECTANGLE" && features.type !== "LINE") {
+        return null;
+      }
+      if (features.height <= DIVIDER_MAX_HEIGHT && features.width >= DIVIDER_MIN_WIDTH) {
+        score += 0.7;
+        reasons.push("Ret\xE2ngulo fino e largo (divider horizontal)");
+      }
+      if (features.width <= DIVIDER_MAX_HEIGHT && features.height >= DIVIDER_MIN_WIDTH) {
+        score += 0.65;
+        reasons.push("Ret\xE2ngulo fino e alto (divider vertical)");
+      }
+      if (features.hasFill || features.hasStroke) {
+        score += 0.15;
+        reasons.push("Possui cor vis\xEDvel");
+      }
+      if (features.childCount === 0) {
+        score += 0.1;
+        reasons.push("Elemento simples sem filhos");
+      }
+      if (score < DIVIDER_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:divider",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_divider_v2",
+        reasons
+      };
+    }
+  };
+  var ContainerRule = {
+    id: "h_container_fallback",
+    targetWidget: "w:container",
+    evaluate: function(features) {
+      var score = CONTAINER_DEFAULT_CONFIDENCE;
+      var reasons = ["Fallback seguro para estrutura gen\xE9rica"];
+      if (features.layoutMode !== "NONE") {
+        score += 0.1;
+        reasons.push("Possui Auto Layout");
+      }
+      if (features.childCount > 0) {
+        score += 0.1;
+        reasons.push("Possui filhos");
+      }
+      return {
+        widget: "w:container",
+        score: score > 0.5 ? 0.5 : score,
+        // Cap at 0.5 to never beat specific widgets
+        ruleId: "h_container_fallback",
+        reasons
+      };
+    }
+  };
+  var heuristicRules = [
+    IconRule,
+    // Check icons first (vectors)
+    DividerRule,
+    // Check dividers early (rectangles)
+    ButtonRule,
+    HeadingRule,
+    TextEditorRule,
+    ImageRule,
+    ImageBoxRule,
+    ContainerRule
+    // Fallback sempre por último
+  ];
+  function evaluateHeuristics(features) {
+    var results = [];
+    for (var i = 0; i < heuristicRules.length; i++) {
+      var rule = heuristicRules[i];
+      var candidate = rule.evaluate(features);
+      if (candidate && candidate.score > 0) {
+        results.push(candidate);
+      }
+    }
+    results.sort(function(a, b) {
+      return b.score - a.score;
+    });
+    return results;
+  }
+
+  // src/engine/decision-engine.ts
+  var EXPLAIN_ENABLED = true;
+  var V2_MIN_CONFIDENCE = 0.7;
+  function explainDecision(explanation) {
+    if (!EXPLAIN_ENABLED) return;
+    const candidateList = explanation.candidates.slice(0, 3).map((c) => `${c.widget}(${c.score.toFixed(2)})`).join(", ");
+    const featureStr = Object.entries(explanation.features).filter(([_, v]) => v !== void 0 && v !== null && v !== false && v !== 0).slice(0, 5).map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed ? v.toFixed(0) : v : v}`).join(", ");
+    console.log(
+      `[V2-EXPLAIN] Node ${explanation.nodeId} | ${explanation.winner || "container"} (${explanation.score.toFixed(2)}) | ${explanation.reason} | Features: ${featureStr || "none"}`
+    );
+    if (explanation.candidates.length > 1) {
+      console.log(`[V2-EXPLAIN] Candidates: ${candidateList}`);
+    }
+  }
+  function analyzeNodeWithEngine(node, rootFrame) {
+    var features = extractNodeFeatures(node, rootFrame);
+    var structuralIssues = [];
+    if (features.childCount > 0 && features.layoutMode === "NONE") {
+      structuralIssues.push({
+        severity: "warning",
+        message: "Container com filhos sem Auto Layout. Considere aplicar Auto Layout para melhor responsividade.",
+        fixAvailable: false
+      });
+    }
+    var candidates = evaluateHeuristics(features);
+    var bestMatch = null;
+    var alternatives = [];
+    var decisionReason = "no candidates";
+    if (candidates.length > 0) {
+      bestMatch = candidates[0];
+      if (bestMatch.score < V2_MIN_CONFIDENCE) {
+        decisionReason = `score ${bestMatch.score.toFixed(2)} < threshold ${V2_MIN_CONFIDENCE}`;
+        bestMatch = {
+          widget: "w:container",
+          score: 0.3,
+          ruleId: "ContainerFallback"
+        };
+      } else {
+        decisionReason = `score ${bestMatch.score.toFixed(2)} >= threshold`;
+        for (var i = 1; i < candidates.length; i++) {
+          alternatives.push(candidates[i]);
+        }
+      }
+    } else {
+      bestMatch = {
+        widget: "w:container",
+        score: 0.3,
+        ruleId: "ContainerFallback"
+      };
+      decisionReason = "no candidates, fallback";
+    }
+    explainDecision({
+      nodeId: features.id,
+      nodeName: features.name,
+      winner: (bestMatch == null ? void 0 : bestMatch.widget) || null,
+      score: (bestMatch == null ? void 0 : bestMatch.score) || 0,
+      reason: decisionReason,
+      features: {
+        type: features.type,
+        width: features.width,
+        height: features.height,
+        childCount: features.childCount,
+        hasText: features.hasText,
+        hasImage: features.hasImage,
+        fontSize: features.fontSize,
+        fontWeight: features.fontWeight,
+        zone: features.zone
+      },
+      candidates: candidates.map((c) => ({ widget: c.widget, score: c.score }))
+    });
+    var result = {
+      nodeId: features.id,
+      nodeName: features.name,
+      bestMatch,
+      alternatives,
+      structuralIssues
+    };
+    return result;
+  }
+
   // src/code.ts
+  var SHADOW_MODE = true;
   var runtimeHealth = initializeCompatLayer({
     logger: (event, payload) => {
       try {
@@ -8562,6 +9247,39 @@ ${detection.justification}
   async function runPipelineWithoutAI(serializedTree, wpConfig = {}) {
     const analyzed = analyzeTreeWithHeuristics(serializedTree);
     const schema = convertToFlexSchema(analyzed);
+    if (SHADOW_MODE) {
+      try {
+        var rootNode = figma.getNodeById(serializedTree.id);
+        if (rootNode) {
+          var v2Result = analyzeNodeWithEngine(rootNode, rootNode);
+          var v1Widget = "container";
+          if (schema.containers && schema.containers.length > 0) {
+            var rootContainer = schema.containers[0];
+            if (rootContainer.widgets && rootContainer.widgets.length > 0) {
+              v1Widget = rootContainer.widgets[0].type || "container";
+            } else if (rootContainer.children && rootContainer.children.length > 0) {
+              v1Widget = "container";
+            }
+          }
+          var nodeName = (serializedTree.name || "").toLowerCase();
+          if (nodeName.startsWith("w:") || nodeName.startsWith("c:")) {
+            v1Widget = nodeName.replace(/^(w:|c:)/, "");
+          }
+          var v2Widget = v2Result.bestMatch ? v2Result.bestMatch.widget : "null";
+          var v2Score = v2Result.bestMatch ? v2Result.bestMatch.score.toFixed(2) : "0.00";
+          if (v1Widget !== v2Widget) {
+            console.log("[SHADOW-V2] Node " + serializedTree.id + " | V1: " + v1Widget + " | V2: " + v2Widget + " (" + v2Score + ")");
+            if (v2Result.structuralIssues.length > 0) {
+              console.log("[SHADOW-V2] Issues:", v2Result.structuralIssues.map(function(i) {
+                return i.message;
+              }));
+            }
+          }
+        }
+      } catch (shadowError) {
+        console.warn("[SHADOW-V2] Error:", shadowError);
+      }
+    }
     const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: safeGet(wpConfig, "password") || safeGet(wpConfig, "token") });
     noaiUploader = new ImageUploader({});
     noaiUploader.setWPConfig(normalizedWP);

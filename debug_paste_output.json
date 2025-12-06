@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "554158c",
+      "id": "8bcb0e8",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "554158c",
+        "_element_id": "8bcb0e8",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -42,12 +42,12 @@
       },
       "elements": [
         {
-          "id": "436d492",
+          "id": "9bbc86d",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "436d492",
+            "_element_id": "9bbc86d",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -107,13 +107,13 @@
           },
           "elements": [
             {
-              "id": "c1abdda",
+              "id": "2f8b3c7",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "c1abdda",
+                "_element_id": "2f8b3c7",
                 "image": {
                   "url": "",
                   "id": 6011
@@ -131,13 +131,13 @@
               "elements": []
             },
             {
-              "id": "f9310ce",
+              "id": "85960a5",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "heading",
               "settings": {
-                "_element_id": "f9310ce",
+                "_element_id": "85960a5",
                 "minHeight": 260,
                 "align": "center",
                 "customCss": ".color-949494 { color: rgba(148, 148, 148, 1); }\n.color-fafafa { color: rgba(250, 250, 250, 1); }",
@@ -169,12 +169,12 @@
           ]
         },
         {
-          "id": "2ca4782",
+          "id": "8907b83",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "2ca4782",
+            "_element_id": "8907b83",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -217,12 +217,12 @@
           },
           "elements": [
             {
-              "id": "80ba7aa",
+              "id": "81e7211",
               "elType": "container",
               "isInner": true,
               "isLocked": false,
               "settings": {
-                "_element_id": "80ba7aa",
+                "_element_id": "81e7211",
                 "container_type": "flex",
                 "content_width": "full",
                 "flex_direction": "column",
@@ -255,12 +255,12 @@
               },
               "elements": [
                 {
-                  "id": "2f2ba10",
+                  "id": "12ee343",
                   "elType": "container",
                   "isInner": true,
                   "isLocked": false,
                   "settings": {
-                    "_element_id": "2f2ba10",
+                    "_element_id": "12ee343",
                     "container_type": "flex",
                     "content_width": "full",
                     "flex_direction": "column",
@@ -293,12 +293,12 @@
                   },
                   "elements": [
                     {
-                      "id": "e0c7329",
+                      "id": "6d770df",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "e0c7329",
+                        "_element_id": "6d770df",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "column",
@@ -331,13 +331,13 @@
                       },
                       "elements": [
                         {
-                          "id": "b1828cf",
+                          "id": "7d5b17f",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "heading",
                           "settings": {
-                            "_element_id": "b1828cf",
+                            "_element_id": "7d5b17f",
                             "minHeight": 106,
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
@@ -367,13 +367,13 @@
                           "elements": []
                         },
                         {
-                          "id": "5e4cfa1",
+                          "id": "c8210da",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "text-editor",
                           "settings": {
-                            "_element_id": "5e4cfa1",
+                            "_element_id": "c8210da",
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
                             "typography_typography": "custom",
@@ -400,12 +400,12 @@
                       ]
                     },
                     {
-                      "id": "a0fe8e9",
+                      "id": "885bae7",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "a0fe8e9",
+                        "_element_id": "885bae7",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "row",
@@ -446,13 +446,13 @@
                       },
                       "elements": [
                         {
-                          "id": "79b9450",
+                          "id": "6ce1f25",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "button",
                           "settings": {
-                            "_element_id": "79b9450",
+                            "_element_id": "6ce1f25",
                             "minHeight": 47,
                             "justify_content": "center",
                             "align_items": "center",
