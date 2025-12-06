@@ -42,13 +42,26 @@ export class WidgetNamingRule implements Rule {
             return null; // Nome já está bom
         }
 
+        // Generate alternative naming suggestions
+        const alternatives = this.getAlternativeNames(suggestedWidget, currentName);
+
         return {
             node_id: node.id,
             node_name: node.name,
+            node_type: node.type,
             severity: this.severity,
             category: this.category,
             rule: this.id,
             message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confiança), mas nome atual é "${currentName}"`,
+
+            // ===== NAMING OBJECT FOR UI ACTION PANEL =====
+            widgetType: suggestedWidget,
+            confidence: confidence,
+            naming: {
+                recommendedName: suggestedWidget,
+                alternatives: alternatives
+            },
+
             educational_tip: `
 💡 Widget Detection
 
@@ -66,8 +79,38 @@ ${this.getSuggestions(suggestedWidget, currentName).join('\n')}
 🎯 Justificativa da detecção:
 ${detection.justification}
             `.trim(),
-            fixAvailable: false // Naming não tem auto-fix (usuário deve decidir)
+            fixAvailable: true // Naming now has one-click fix via UI
         };
+    }
+
+    /**
+     * Generate cleaner alternative names for the dropdown
+     */
+    private getAlternativeNames(widget: string, currentName: string): string[] {
+        const alternatives: string[] = [];
+
+        // Contextual name
+        const context = currentName.replace(/frame|rectangle|group|circle|ellipse|polygon|\d+/gi, '').trim();
+        if (context && context.length > 1) {
+            const contextName = `${context} ${widget}`.replace(/\s+/g, ' ').trim();
+            if (contextName !== widget) {
+                alternatives.push(contextName);
+            }
+        }
+
+        // Widget type variations
+        const widgetBase = widget.toLowerCase();
+        if (widgetBase.includes('button')) {
+            if (!widget.includes('primary')) alternatives.push(`${widget}-primary`);
+            if (!widget.includes('secondary')) alternatives.push(`${widget}-secondary`);
+        } else if (widgetBase.includes('heading')) {
+            alternatives.push(`${widget}-hero`);
+        } else if (widgetBase.includes('container')) {
+            alternatives.push(`c:section`);
+            alternatives.push(`c:wrapper`);
+        }
+
+        return alternatives.slice(0, 3); // Limit to 3 alternatives
     }
 
     generateGuide(node: SceneNode): ManualFixGuide {

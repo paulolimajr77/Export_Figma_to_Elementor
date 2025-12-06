@@ -2855,22 +2855,22 @@
               // Show success message
               setLinterStatus('success', `✅ Layer renomeada: "${oldName}" → "${newName}"`);
               addLog(`✏️ [LINTER/UI] Layer renomeada: ${oldName} → ${newName}`, 'success');
-              
+
               // Update current name display in action panel
               const currentNameEl = document.getElementById('details-current-name');
               if (currentNameEl) currentNameEl.textContent = newName;
-              
+
               // Update card that has the matching nodeId
               const card = document.querySelector(`.issue-card-v2[data-node-id="${nodeId}"]`);
               if (card) {
                 const nodeInfo = card.querySelector('.issue-node-info');
                 if (nodeInfo) nodeInfo.textContent = `📍 ${newName}`;
-                
+
                 // Hide naming suggestion since it's been applied
                 const suggestionEl = card.querySelector('.issue-naming-suggestion');
                 if (suggestionEl) suggestionEl.innerHTML = `<span style="color: var(--color-success);">✅ Renomeado para: ${newName}</span>`;
               }
-              
+
             } else {
               // Show error message
               const errorMsg = errorMessage || 'Erro desconhecido ao renomear layer.';
@@ -3357,7 +3357,9 @@
             const tr = document.createElement('tr');
             tr.style.cursor = 'pointer';
             tr.style.transition = 'background 0.15s';
-            tr.dataset.nodeId = issue.node_id || issue.nodeId || '';
+            const nodeId = issue.node_id || issue.nodeId || '';
+            const nodeName = issue.node_name || issue.nodeName || '(sem nome)';
+            tr.dataset.nodeId = nodeId;
             tr.dataset.issueIdx = idx;
             tr.onmouseover = () => { if (!tr.classList.contains('linter-issue--active')) tr.style.background = 'var(--color-bg-secondary)'; };
             tr.onmouseout = () => { if (!tr.classList.contains('linter-issue--active')) tr.style.background = ''; };
@@ -3381,21 +3383,69 @@
                   category.includes('image') ? 'Imagens' : 'Estrutura';
             tdCategory.textContent = categoryShort;
 
-            // Descrição (nodeName + message)
+            // Descrição (nodeName + message + inline rename controls if widget-naming)
             const tdDesc = document.createElement('td');
             tdDesc.style.padding = '8px';
-            const nodeName = issue.node_name || issue.nodeName || '(sem nome)';
             const message = issue.message || '';
-            tdDesc.innerHTML = `<strong>${nodeName}</strong><br><span style="color: var(--color-text-secondary); font-size: 11px;">${message}</span>`;
+
+            // Extract naming suggestions for inline controls
+            const naming = issue.naming || {};
+            const recommendedName = naming.recommendedName || issue.widgetType || '';
+            const alternatives = naming.alternatives || [];
+            const hasNamingSuggestion = !!recommendedName && !!nodeId;
+            const isNamingIssue = issue.rule === 'widget-naming' || (issue.category || '').includes('naming');
+
+            // Build rename options
+            const renameOptions = [];
+            if (recommendedName) renameOptions.push(recommendedName);
+            alternatives.forEach(alt => {
+              if (alt && !renameOptions.includes(alt)) renameOptions.push(alt);
+            });
+
+            // Build inline rename controls HTML
+            let inlineRenameHtml = '';
+            if (isNamingIssue && hasNamingSuggestion) {
+              inlineRenameHtml = `
+                <div class="inline-rename-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(59, 130, 246, 0.08); border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                  <select class="rename-select-inline" data-node-id="${nodeId}" style="flex: 1; padding: 5px 6px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 11px; background: var(--color-panel); color: var(--color-text); cursor: pointer;">
+                    ${renameOptions.map((name, i) => `<option value="${name}" ${i === 0 ? 'selected' : ''}>${name}</option>`).join('')}
+                  </select>
+                  <button class="btn-rename-row" data-node-id="${nodeId}" style="padding: 5px 10px; font-size: 11px; background: var(--color-primary, #3b82f6); color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">
+                    ✏️ Renomear
+                  </button>
+                </div>
+              `;
+            } else if (isNamingIssue && !hasNamingSuggestion) {
+              inlineRenameHtml = `<div style="margin-top: 6px; font-size: 10px; color: var(--color-text-secondary);">Nenhuma sugestão disponível</div>`;
+            }
+
+            tdDesc.innerHTML = `<strong>${nodeName}</strong><br><span style="color: var(--color-text-secondary); font-size: 11px;">${message}</span>${inlineRenameHtml}`;
+
+            // Setup inline rename handlers (after appending to prevent multiple bindings)
+            const renameSelect = tdDesc.querySelector('.rename-select-inline');
+            const renameBtn = tdDesc.querySelector('.btn-rename-row');
+            if (renameSelect && renameBtn) {
+              // Stop propagation on select and button to prevent row click
+              renameSelect.addEventListener('click', e => e.stopPropagation());
+              renameBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                const newName = renameSelect.value;
+                const targetNodeId = renameBtn.dataset.nodeId;
+                if (newName && targetNodeId) {
+                  renameBtn.disabled = true;
+                  renameBtn.textContent = '⏳...';
+                  send('linter-rename-node', { nodeId: targetNodeId, newName });
+                  console.log('[UI] Table inline rename:', targetNodeId, '→', newName);
+                }
+              });
+            }
 
             tr.appendChild(tdSeverity);
             tr.appendChild(tdCategory);
             tr.appendChild(tdDesc);
 
-            // Click handler: highlight + details + select node
+            // Click handler: highlight + select node
             tr.addEventListener('click', () => {
-              const nodeId = issue.node_id || issue.nodeId;
-
               // 1) Remove highlight from all rows, add to this one
               document.querySelectorAll('#linter-issues-body tr').forEach(row => {
                 row.classList.remove('linter-issue--active');
@@ -3403,10 +3453,7 @@
               });
               tr.classList.add('linter-issue--active');
 
-              // 2) Update details panel v2
-              updateDetailsPanelV2(issue);
-
-              // 3) Send message to select node in Figma
+              // 2) Send message to select node in Figma
               if (nodeId) {
                 send('select-node', { nodeId });
                 console.log('[UI] Selecionando node:', nodeId, nodeName);
@@ -3839,25 +3886,41 @@
           card.className = `issue-card-v2 ${issue.severity}`;
           card.dataset.issueIdx = idx;
           card.dataset.nodeId = issue.node_id || issue.nodeId || '';
+          const nodeId = issue.node_id || issue.nodeId || '';
+          const nodeName = issue.nodeName || issue.node_name || 'Node';
 
           // Extract naming suggestions
           const naming = issue.naming || {};
           const recommendedName = naming.recommendedName || issue.widgetType || '';
           const alternatives = naming.alternatives || [];
+          const hasNamingSuggestion = !!recommendedName;
 
-          // Build naming suggestion HTML
-          let namingSuggestionHtml = '';
-          if (recommendedName) {
-            namingSuggestionHtml = `
-              <div class="issue-naming-suggestion" style="margin-top: 6px; padding: 6px 8px; background: rgba(59, 130, 246, 0.1); border-radius: 4px; font-size: 11px;">
-                <span style="color: var(--color-text-secondary);">Sugestão:</span>
-                <code style="background: rgba(0,0,0,0.15); padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-family: monospace;">${recommendedName}</code>
-                ${alternatives.length > 0 ? `<span style="color: var(--color-text-secondary); margin-left: 6px;">+${alternatives.length} opções</span>` : ''}
+          // Build rename options for dropdown
+          const renameOptions = [];
+          if (recommendedName) renameOptions.push(recommendedName);
+          alternatives.forEach(alt => {
+            if (alt && !renameOptions.includes(alt)) renameOptions.push(alt);
+          });
+
+          // Build inline rename controls for naming issues
+          let inlineRenameHtml = '';
+          if (hasNamingSuggestion && nodeId) {
+            inlineRenameHtml = `
+              <div class="issue-rename-controls" style="margin-top: 8px; padding: 8px 10px; background: rgba(59, 130, 246, 0.08); border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <select class="rename-select" data-node-id="${nodeId}" style="flex: 1; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 11px; background: var(--color-panel); color: var(--color-text); cursor: pointer;">
+                    ${renameOptions.map((name, i) => `<option value="${name}" ${i === 0 ? 'selected' : ''}>${name}</option>`).join('')}
+                  </select>
+                  <button class="btn-rename-inline" data-node-id="${nodeId}" style="padding: 6px 12px; font-size: 11px; background: var(--color-primary, #3b82f6); color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">
+                    ✏️ Renomear
+                  </button>
+                </div>
+                ${alternatives.length > 0 ? `<div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 4px;">${alternatives.length} alternativa(s) disponível(is)</div>` : ''}
               </div>
             `;
-          } else if (issue.ruleId === 'widget-naming' || issue.rule === 'widget-naming' || (issue.category || '').includes('naming')) {
-            // Se é uma issue de naming mas não tem sugestão
-            namingSuggestionHtml = `
+          } else if (issue.rule === 'widget-naming' || (issue.category || '').includes('naming')) {
+            // Naming issue but no suggestion available
+            inlineRenameHtml = `
               <div class="issue-naming-suggestion" style="margin-top: 6px; padding: 6px 8px; background: rgba(100,100,100,0.1); border-radius: 4px; font-size: 11px; color: var(--color-text-secondary);">
                 Nenhuma sugestão disponível
               </div>
@@ -3866,31 +3929,50 @@
 
           card.innerHTML = `
             <span class="issue-icon">${severityIcon}</span>
-            <div class="issue-content">
+            <div class="issue-content" style="flex: 1;">
               <div class="issue-title-row">
                 <span class="issue-title-v2">${issue.title || issue.message}</span>
                 <span class="issue-category-chip">${issue.category || 'geral'}</span>
               </div>
               <div class="issue-summary">${issue.summary || issue.message}</div>
-              <div class="issue-node-info">📍 ${issue.nodeName || issue.node_name || 'Node'}</div>
-              ${namingSuggestionHtml}
+              <div class="issue-node-info">📍 ${nodeName}</div>
+              ${inlineRenameHtml}
             </div>
           `;
+
+          // Prevent card click from firing when clicking on rename controls
+          const renameControls = card.querySelector('.issue-rename-controls');
+          if (renameControls) {
+            renameControls.addEventListener('click', (e) => e.stopPropagation());
+          }
+
+          // Setup inline rename button handler
+          const renameBtn = card.querySelector('.btn-rename-inline');
+          const renameSelect = card.querySelector('.rename-select');
+          if (renameBtn && renameSelect) {
+            renameBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const newName = renameSelect.value;
+              const targetNodeId = renameBtn.dataset.nodeId;
+              if (newName && targetNodeId) {
+                renameBtn.disabled = true;
+                renameBtn.textContent = '⏳...';
+                send('linter-rename-node', { nodeId: targetNodeId, newName });
+                console.log('[UI] Inline rename:', targetNodeId, '→', newName);
+              }
+            });
+          }
+
+          // Card click handler for select node
           card.addEventListener('click', () => {
-            // 1) Visual highlight
+            // Visual highlight
             document.querySelectorAll('.issue-card-v2').forEach(c => c.classList.remove('selected'));
             card.classList.add('selected');
 
-            // 2) Update details panel with naming info
-            updateDetailsPanelV2(issue);
-
-            // 3) Send message to select node in Figma
-            const nodeId = issue.node_id || issue.nodeId;
+            // Send message to select node in Figma
             if (nodeId) {
               send('select-node', { nodeId });
-              console.log('[UI] Card click - selecionando node:', nodeId, issue.nodeName || issue.node_name);
-            } else {
-              console.warn('[UI] Card click - nodeId não disponível para issue:', issue.message);
+              console.log('[UI] Card click - selecionando node:', nodeId, nodeName);
             }
           });
           container.appendChild(card);
@@ -3898,10 +3980,10 @@
       }
 
       /**
-       * setLinterStatus - Show feedback message in the Linter status bar
-       * @param {'success' | 'error' | 'warning'} state - Status type
-       * @param {string} message - Message to display (with emoji prefix)
-       */
+     * setLinterStatus - Show feedback message in the Linter status bar
+     * @param {'success' | 'error' | 'warning'} state - Status type
+     * @param {string} message - Message to display (with emoji prefix)
+     */
       function setLinterStatus(state, message) {
         const statusBar = document.getElementById('linter-status-bar');
         const statusIcon = document.getElementById('linter-status-icon');

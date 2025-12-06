@@ -8562,13 +8562,22 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
       if (isCorrectlyNamed) {
         return null;
       }
+      const alternatives = this.getAlternativeNames(suggestedWidget, currentName);
       return {
         node_id: node.id,
         node_name: node.name,
+        node_type: node.type,
         severity: this.severity,
         category: this.category,
         rule: this.id,
         message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
+        // ===== NAMING OBJECT FOR UI ACTION PANEL =====
+        widgetType: suggestedWidget,
+        confidence,
+        naming: {
+          recommendedName: suggestedWidget,
+          alternatives
+        },
         educational_tip: `
 \u{1F4A1} Widget Detection
 
@@ -8586,9 +8595,33 @@ ${this.getSuggestions(suggestedWidget, currentName).join("\n")}
 \u{1F3AF} Justificativa da detec\xE7\xE3o:
 ${detection.justification}
             `.trim(),
-        fixAvailable: false
-        // Naming não tem auto-fix (usuário deve decidir)
+        fixAvailable: true
+        // Naming now has one-click fix via UI
       };
+    }
+    /**
+     * Generate cleaner alternative names for the dropdown
+     */
+    getAlternativeNames(widget, currentName) {
+      const alternatives = [];
+      const context = currentName.replace(/frame|rectangle|group|circle|ellipse|polygon|\d+/gi, "").trim();
+      if (context && context.length > 1) {
+        const contextName = `${context} ${widget}`.replace(/\s+/g, " ").trim();
+        if (contextName !== widget) {
+          alternatives.push(contextName);
+        }
+      }
+      const widgetBase = widget.toLowerCase();
+      if (widgetBase.includes("button")) {
+        if (!widget.includes("primary")) alternatives.push(`${widget}-primary`);
+        if (!widget.includes("secondary")) alternatives.push(`${widget}-secondary`);
+      } else if (widgetBase.includes("heading")) {
+        alternatives.push(`${widget}-hero`);
+      } else if (widgetBase.includes("container")) {
+        alternatives.push(`c:section`);
+        alternatives.push(`c:wrapper`);
+      }
+      return alternatives.slice(0, 3);
     }
     generateGuide(node) {
       const detection = this.detector.detect(node);
