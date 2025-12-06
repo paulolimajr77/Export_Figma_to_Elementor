@@ -1,31 +1,73 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ConversionPipeline } from '../pipeline';
+import { ConversionPipeline, PipelineDebugInfo } from '../pipeline';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from '../utils/validation';
+import type { PipelineSchema } from '../types/pipeline.schema';
+import type { ElementorTemplate } from '../types/elementor.types';
 
-const createMockNode = () => ({
-    id: 'root',
-    name: 'Root Frame',
-    type: 'FRAME',
-    width: 400,
-    height: 300,
-    x: 0,
-    y: 0,
-    visible: true,
-    locked: false,
-    layoutMode: 'VERTICAL',
-    itemSpacing: 10,
-    paddingTop: 10,
-    paddingRight: 10,
-    paddingBottom: 10,
-    paddingLeft: 10,
-    children: [
-        { id: 't1', name: 'Heading', type: 'TEXT', width: 100, height: 20, x: 0, y: 0, visible: true, locked: false, layoutMode: 'NONE', children: [], characters: 'Hello' },
-        { id: 't2', name: 'Body', type: 'TEXT', width: 100, height: 20, x: 0, y: 24, visible: true, locked: false, layoutMode: 'NONE', children: [], characters: 'World' },
-        { id: 'b1', name: 'Button', type: 'RECTANGLE', width: 80, height: 30, x: 0, y: 48, visible: true, locked: false, layoutMode: 'NONE', children: [] }
-    ]
-});
+const createMockNode = (): SceneNode => {
+    const textHeading = {
+        id: 't1',
+        name: 'Heading',
+        type: 'TEXT',
+        width: 100,
+        height: 20,
+        x: 0,
+        y: 0,
+        visible: true,
+        locked: false,
+        layoutMode: 'NONE',
+        children: [],
+        characters: 'Hello'
+    };
+    const textBody = {
+        id: 't2',
+        name: 'Body',
+        type: 'TEXT',
+        width: 100,
+        height: 20,
+        x: 0,
+        y: 24,
+        visible: true,
+        locked: false,
+        layoutMode: 'NONE',
+        children: [],
+        characters: 'World'
+    };
+    const button = {
+        id: 'b1',
+        name: 'Button',
+        type: 'RECTANGLE',
+        width: 80,
+        height: 30,
+        x: 0,
+        y: 48,
+        visible: true,
+        locked: false,
+        layoutMode: 'NONE',
+        children: []
+    };
 
-const mockFigmaSelection = (node) => {
+    return {
+        id: 'root',
+        name: 'Root Frame',
+        type: 'FRAME',
+        width: 400,
+        height: 300,
+        x: 0,
+        y: 0,
+        visible: true,
+        locked: false,
+        layoutMode: 'VERTICAL',
+        itemSpacing: 10,
+        paddingTop: 10,
+        paddingRight: 10,
+        paddingBottom: 10,
+        paddingLeft: 10,
+        children: [textHeading, textBody, button]
+    } as unknown as SceneNode;
+};
+
+const mockFigmaSelection = (node: SceneNode) => {
     (globalThis as any).figma = {
         clientStorage: {
             getAsync: async (key: string) => {
@@ -42,11 +84,20 @@ const mockFigmaSelection = (node) => {
     } as any;
 };
 
-const mockFetchSchema = (schema) => {
+const mockFetchSchema = (schema: PipelineSchema) => {
     (globalThis as any).fetch = vi.fn(async () => ({
         ok: true,
         json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(schema) }] } }] })
-    })) as any;
+    })) as unknown as typeof fetch;
+};
+
+const normalizeRunResult = (
+    result: Awaited<ReturnType<ConversionPipeline['run']>>
+): { elementorJson: ElementorTemplate; debugInfo: PipelineDebugInfo | null } => {
+    if (typeof result === 'object' && result && 'elementorJson' in result) {
+        return { elementorJson: result.elementorJson, debugInfo: result.debugInfo ?? null };
+    }
+    return { elementorJson: result as ElementorTemplate, debugInfo: null };
 };
 
 describe('Pipeline + Serializer', () => {
@@ -58,7 +109,7 @@ describe('Pipeline + Serializer', () => {
         const frame = createMockNode();
         mockFigmaSelection(frame);
 
-        const schema = {
+        const schema: PipelineSchema = {
             page: { title: 'Test', tokens: { primaryColor: '#111', secondaryColor: '#fff' } },
             containers: [{
                 id: 'root',
@@ -77,7 +128,10 @@ describe('Pipeline + Serializer', () => {
         mockFetchSchema(schema);
         const pipeline = new ConversionPipeline();
         const result = await pipeline.run(frame, {}, { debug: true });
-        const { elementorJson, debugInfo } = result;
+        const { elementorJson, debugInfo } = normalizeRunResult(result);
+        if (!debugInfo) {
+            throw new Error('Esperado debugInfo para validar cobertura do pipeline');
+        }
         validatePipelineSchema(debugInfo.schema);
         validateElementorJSON(elementorJson);
         const coverage = computeCoverage(debugInfo.flatNodes, debugInfo.schema, elementorJson);

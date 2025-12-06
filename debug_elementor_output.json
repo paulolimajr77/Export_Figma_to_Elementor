@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "13a9fb9",
+      "id": "399df76",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "13a9fb9",
+        "_element_id": "399df76",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -42,12 +42,12 @@
       },
       "elements": [
         {
-          "id": "784cdba",
+          "id": "2adc4e8",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "784cdba",
+            "_element_id": "2adc4e8",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -107,13 +107,13 @@
           },
           "elements": [
             {
-              "id": "df001f5",
+              "id": "32ffdc4",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "df001f5",
+                "_element_id": "32ffdc4",
                 "image": {
                   "url": "",
                   "id": 6011
@@ -131,13 +131,13 @@
               "elements": []
             },
             {
-              "id": "55cf6bd",
+              "id": "da7a757",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "heading",
               "settings": {
-                "_element_id": "55cf6bd",
+                "_element_id": "da7a757",
                 "minHeight": 260,
                 "align": "center",
                 "customCss": ".color-949494 { color: rgba(148, 148, 148, 1); }\n.color-fafafa { color: rgba(250, 250, 250, 1); }",

@@ -1225,6 +1225,11 @@
 </head>
 
 <body>
+  <div id="runtime-health" style="display:none"></div>
+  <input id="useDeterministic" type="checkbox" style="display:none" aria-hidden="true" />
+  <input id="telemetryEnabled" type="checkbox" style="display:none" aria-hidden="true" />
+  <input id="telemetryStoreDiffs" type="checkbox" style="display:none" aria-hidden="true" />
+  <input id="telemetryStoreSnapshots" type="checkbox" style="display:none" aria-hidden="true" />
   <div class="app">
     <header class="topbar">
       <div class="brand">
@@ -1500,7 +1505,14 @@
   </div>
   <div id="resizer-handle" aria-label="Arraste para redimensionar"></div>
 
-  <script>
+<script>
+  parent.postMessage(
+    { pluginMessage: { diagnosticPing: true } },
+    "*"
+  );
+  console.log("[diagnostic] UI loaded, ping enviado");
+</script>
+<script>
     (() => {
       const tabs = document.querySelectorAll('.tab-btn');
       const panels = document.querySelectorAll('.tab-panel');
@@ -1520,7 +1532,11 @@
           geminiModel: fields.gemini_model?.value || '',
           includeScreenshot: fields.include_screenshot?.checked !== false,
           includeReferences: fields.include_references?.checked !== false,
-          autoRename: fields.auto_rename_layers?.checked || false
+          autoRename: fields.auto_rename_layers?.checked || false,
+          useDeterministic: fields.use_deterministic?.checked || false,
+          telemetryEnabled: fields.telemetry_enabled?.checked || false,
+          telemetryStoreDiffs: fields.telemetry_store_diffs?.checked || false,
+          telemetryStoreSnapshots: fields.telemetry_store_snapshots?.checked || false
         };
         // ... rest of generate logic
         send('generate-json', payload);
@@ -1544,6 +1560,10 @@
 
       const fields = {
         use_ai: document.getElementById('use_ai'),
+        use_deterministic: document.getElementById('useDeterministic'),
+        telemetry_enabled: document.getElementById('telemetryEnabled'),
+        telemetry_store_diffs: document.getElementById('telemetryStoreDiffs'),
+        telemetry_store_snapshots: document.getElementById('telemetryStoreSnapshots'),
         provider_ai: document.getElementById('provider_ai'),
         gemini_api_key: document.getElementById('gemini_api_key'),
         gemini_model: document.getElementById('gemini_model'),
@@ -1801,7 +1821,11 @@
               gptApiKey: fields.gpt_api_key?.value || '',
               geminiModel: fields.gemini_model?.value || '',
               includeScreenshot: fields.include_screenshot?.checked !== false,
-              includeReferences: fields.include_references?.checked !== false
+              includeReferences: fields.include_references?.checked !== false,
+              useDeterministic: fields.use_deterministic?.checked || false,
+              telemetryEnabled: fields.telemetry_enabled?.checked || false,
+              telemetryStoreDiffs: fields.telemetry_store_diffs?.checked || false,
+              telemetryStoreSnapshots: fields.telemetry_store_snapshots?.checked || false
             };
             if (payload.geminiModel) {
               send('save-setting', { key: 'gemini_model', value: payload.geminiModel });
@@ -1958,6 +1982,17 @@
         const msg = (event.data || {}).pluginMessage;
         if (!msg) return;
         switch (msg.type) {
+          case 'runtime-health': {
+            const runtimeEl = document.getElementById('runtime-health');
+            if (runtimeEl) {
+              runtimeEl.textContent = msg.status || 'unknown';
+              runtimeEl.dataset.status = msg.status || 'unknown';
+              if (Array.isArray(msg.warnings)) {
+                runtimeEl.dataset.warnings = msg.warnings.join(',');
+              }
+            }
+            break;
+          }
           case 'preview':
             // Preview = Figma JSON (readonly) -> #output
             if (output) output.value = msg.payload || '';
@@ -1977,6 +2012,10 @@
             lastPayload = txt;
             updateBridgeOutput(txt, true);
             addLog('JSON pronto para copiar. Clique em "Copiar JSON" ou use Ctrl+C.', 'info');
+            break;
+          }
+          case 'clipboard:copy': {
+            copyWithFallback(msg.payload || '', 'JSON');
             break;
           }
           case 'generation-error':

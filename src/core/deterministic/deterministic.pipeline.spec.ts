@@ -1,5 +1,5 @@
 /// <reference types="@figma/plugin-typings" />
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DeterministicPipeline } from './deterministic.pipeline';
 import { serializerService, type SerializerService, type SerializedNode } from '../../services/serializer';
 import { heuristicsService, type HeuristicsService } from '../../services/heuristics';
@@ -8,6 +8,7 @@ import { DefaultMediaService } from '../../services/media';
 import type { MediaService, MediaResolutionOptions, MediaResolutionResult } from '../../services/media';
 import type { PipelineSchema } from '../../types/pipeline.schema';
 import type { WPConfig } from '../../types/elementor.types';
+import type { TelemetryService } from '../../services/telemetry/telemetry.service';
 
 const createNode = (overrides: Record<string, unknown> = {}): SceneNode => {
     const base: any = {
@@ -59,7 +60,7 @@ class StubMediaService implements MediaService {
 }
 
 class InspectingMediaService implements MediaService {
-    captured?: MediaResolutionOptions;
+    captured: MediaResolutionOptions | undefined;
     async resolveImages(schema: PipelineSchema, options?: MediaResolutionOptions): Promise<MediaResolutionResult> {
         this.captured = options;
         return { schema, assets: [] };
@@ -516,5 +517,28 @@ describe('DeterministicPipeline', () => {
             },
           ]
         `);
+    });
+
+    it('suporta telemetria sem alterar o schema retornado', async () => {
+        const telemetry: Partial<TelemetryService> = {
+            log: vi.fn().mockResolvedValue(undefined),
+            metric: vi.fn().mockResolvedValue(undefined),
+            snapshot: vi.fn().mockResolvedValue(undefined)
+        };
+        const root = createNode({
+            id: 'telemetry-root',
+            name: 'Root Telemetry',
+            children: [createNode({ id: 'telemetry-text', type: 'TEXT', name: 'Heading', characters: 'Telemetry' }) as SceneNode]
+        });
+        const deterministic = new DeterministicPipeline(serializerService, heuristicsService, new StubMediaService());
+        const result = await deterministic.run(root, { telemetry: telemetry as TelemetryService });
+
+        const serialized = serializerService.serialize(root);
+        const baseline = convertToFlexSchema(analyzeTreeWithHeuristics(serialized));
+        await heuristicsService.enforceWidgetTypes(baseline);
+
+        expect(result.schema).toEqual(baseline);
+        expect(telemetry.log).toHaveBeenCalled();
+        expect(telemetry.metric).toHaveBeenCalled();
     });
 });

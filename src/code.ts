@@ -3,7 +3,7 @@ import type { WPConfig, ElementorJSON } from './types/elementor.types';
 import { serializeNode, SerializedNode } from './utils/serialization_utils';
 import { GEMINI_MODEL, geminiProvider } from './api_gemini';
 import { openaiProvider, testOpenAIConnection } from './api_openai';
-import { SchemaProvider } from './types/providers';
+import { SchemaProvider, DeterministicDiffMode, PipelineRunOptions } from './types/providers';
 import { analyzeTreeWithHeuristics, convertToFlexSchema } from './pipeline/noai.parser';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
@@ -12,11 +12,30 @@ import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { FileLogger } from './utils/logger';
 import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } from './linter';
 import { enforceWidgetTypes } from './services/heuristics';
+import { initializeCompatLayer, safeGet, safeGetArray, safeGetNumber, safeGetString, safeGetBoolean, safeInvoke } from './compat';
+
+figma.notify('Plugin carregou! (diagnóstico)');
+console.log('[diagnostic] plugin loaded');
+
+const runtimeHealth = initializeCompatLayer({
+    logger: (event, payload) => {
+        try {
+            console.log(`[compat:${event}]`, payload || '');
+        } catch {
+            // evitar falha em ambientes restritos
+        }
+    }
+});
 
 // Logger dedicado para capturar eventos sem alterar console global
 export const logger = new FileLogger(console.log.bind(console));
 
 figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
+safeInvoke(() => figma.ui.postMessage({
+    type: 'runtime-health',
+    status: runtimeHealth.runtime,
+    warnings: runtimeHealth.warnings || []
+}));
 
 const pipeline = new ConversionPipeline();
 let lastJSON: string | null = null;
@@ -34,38 +53,39 @@ function collectLayoutWarnings(node: any): string[] {
     const warnings: string[] = [];
     // Auto Layout validation removed as per user request.
 
-    if (Array.isArray((node as any).children)) {
-        (node as any).children.forEach((child: any) => warnings.push(...collectLayoutWarnings(child)));
-    }
+    const children = safeGetArray<any>(node, 'children', []);
+    children.forEach((child: any) => warnings.push(...collectLayoutWarnings(child)));
 
     return warnings;
 }
 
 function focusNode(nodeId: string) {
-    try {
+    if (!nodeId) {
+        return;
+    }
+    safeInvoke(() => {
         const n = figma.getNodeById(nodeId);
         if (n) {
             figma.currentPage.selection = [n as SceneNode];
             figma.viewport.scrollAndZoomIntoView([n as SceneNode]);
         }
-    } catch {
-        // ignore focus errors
-    }
+    });
 }
 
 function sendLayoutWarning(node: any, message: string) {
-    try {
-        const textSnippet = typeof node.characters === 'string' ? node.characters.slice(0, 200) : '';
+    const nodeId = safeGetString(node, 'id');
+    const nodeName = safeGetString(node, 'name');
+    const characters = safeGetString(node, 'characters', '');
+    const snippet = characters ? characters.slice(0, 200) : '';
+    safeInvoke(() => {
         figma.ui.postMessage({
             type: 'layout-warning',
-            nodeId: node.id,
-            name: node.name,
-            text: textSnippet,
+            nodeId,
+            name: nodeName,
+            text: snippet,
             message
         });
-    } catch {
-        // ignore
-    }
+    });
 }
 
 function toBase64(str: string): string {
@@ -163,20 +183,21 @@ async function loadWPConfig(): Promise<WPConfig> {
 }
 
 async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvider; apiKey: string; providerId: string }> {
-    const incomingProvider = (msg?.providerAi as string) || await loadSetting<string>('aiProvider', DEFAULT_PROVIDER) || await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
+    const providerFromMsg = safeGet(msg, 'providerAi') as string | undefined;
+    const incomingProvider = providerFromMsg || await loadSetting<string>('aiProvider', DEFAULT_PROVIDER) || await loadSetting<string>('provider_ai', DEFAULT_PROVIDER);
     const providerId = incomingProvider === 'gpt' ? 'gpt' : DEFAULT_PROVIDER;
     await saveSetting('aiProvider', providerId);
     await saveSetting('provider_ai', providerId);
     const provider = getActiveProvider(providerId);
 
     if (providerId === 'gpt') {
-        const inlineKey = msg?.gptApiKey as string | undefined;
+        const inlineKey = safeGet(msg, 'gptApiKey') as string | undefined;
         let key = inlineKey || await loadSetting<string>('gptApiKey', '') || await loadSetting<string>('gpt_api_key', '');
         if (inlineKey) {
             await saveSetting('gptApiKey', inlineKey);
             await saveSetting('gpt_api_key', inlineKey);
         }
-        const storedModel = (msg?.gptModel as string) || await loadSetting<string>('gptModel', DEFAULT_GPT_MODEL) || await loadSetting<string>('gpt_model', openaiProvider.model);
+        const storedModel = (safeGet(msg, 'gptModel') as string | undefined) || await loadSetting<string>('gptModel', DEFAULT_GPT_MODEL) || await loadSetting<string>('gpt_model', openaiProvider.model);
         if (storedModel) {
             await saveSetting('gptModel', storedModel);
             await saveSetting('gpt_model', storedModel);
@@ -186,7 +207,7 @@ async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvi
         return { provider, apiKey: key, providerId };
     }
 
-    const inlineKey = msg?.apiKey as string | undefined;
+    const inlineKey = safeGet(msg, 'apiKey') as string | undefined;
     let key = inlineKey || await loadSetting<string>('gptel_gemini_key', '');
     if (!key) {
         key = await loadSetting<string>('gemini_api_key', '');
@@ -196,7 +217,7 @@ async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvi
         await saveSetting('gemini_api_key', inlineKey);
     }
 
-    const model = msg?.geminiModel || await loadSetting<string>('gemini_model', GEMINI_MODEL);
+    const model = (safeGet(msg, 'geminiModel') as string | undefined) || await loadSetting<string>('gemini_model', GEMINI_MODEL);
     if (model) {
         await saveSetting('gemini_model', model);
         geminiProvider.setModel(model);
@@ -207,7 +228,7 @@ async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvi
 }
 
 function getSelectedNode(): SceneNode {
-    const selection = figma.currentPage.selection;
+    const selection = safeGetArray<SceneNode>(figma, 'currentPage.selection');
     if (!selection || selection.length === 0) {
         throw new Error('Selecione um frame ou node para converter.');
     }
@@ -216,12 +237,29 @@ function getSelectedNode(): SceneNode {
 
 async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug?: boolean): Promise<{ elementorJson: ElementorJSON; debugInfo?: any }> {
     const node = getSelectedNode();
-    log(`[DEBUG] Selected Node: ${node.name} (ID: ${node.id}, Type: ${node.type}, Locked: ${node.locked})`, 'info');
+    log(
+        `[DEBUG] Selected Node: ${safeGetString(node, 'name', 'unknown')} (ID: ${safeGetString(node, 'id', 'n/a')}, Type: ${safeGetString(node, 'type', 'unknown')}, Locked: ${safeGetBoolean(node, 'locked', false)})`,
+        'info'
+    );
     const wpConfig = customWP || await loadWPConfig();
-    const useAI = typeof aiPayload?.useAI === 'boolean' ? aiPayload.useAI : await loadSetting<boolean>('gptel_use_ai', true);
+    const useAIPayload = safeGet(aiPayload, 'useAI');
+    const useAI = typeof useAIPayload === 'boolean' ? useAIPayload : await loadSetting<boolean>('gptel_use_ai', true);
     const serialized = serializeNode(node);
-    const includeScreenshot = typeof aiPayload?.includeScreenshot === 'boolean' ? aiPayload.includeScreenshot : await loadSetting<boolean>('gptel_include_screenshot', true);
-    const includeReferences = typeof aiPayload?.includeReferences === 'boolean' ? aiPayload.includeReferences : await loadSetting<boolean>('gptel_include_references', true);
+    const includeScreenshotPayload = safeGet(aiPayload, 'includeScreenshot');
+    const includeScreenshot = typeof includeScreenshotPayload === 'boolean' ? includeScreenshotPayload : await loadSetting<boolean>('gptel_include_screenshot', true);
+    const includeReferencesPayload = safeGet(aiPayload, 'includeReferences');
+    const includeReferences = typeof includeReferencesPayload === 'boolean' ? includeReferencesPayload : await loadSetting<boolean>('gptel_include_references', true);
+    const useDeterministic = safeGet(aiPayload, 'useDeterministic') === true;
+    const diffModeValue = safeGet(aiPayload, 'deterministicDiffMode');
+    const deterministicDiffMode: DeterministicDiffMode | undefined =
+        diffModeValue === 'log' || diffModeValue === 'store' ? diffModeValue : undefined;
+    const telemetryConfig = safeGet(aiPayload, 'telemetryEnabled') === true
+        ? {
+            enabled: true,
+            storeDiffs: safeGet(aiPayload, 'telemetryStoreDiffs') === true,
+            storeSnapshots: safeGet(aiPayload, 'telemetryStoreSnapshots') === true
+        }
+        : undefined;
 
     if (!useAI) {
         log('Iniciando pipeline (NO-AI)...', 'info');
@@ -230,18 +268,29 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
         return { elementorJson };
     }
 
+    const autoRenameFlag = safeGet(aiPayload, 'autoRename');
+    const autoRenameValue = typeof autoRenameFlag === 'boolean' ? autoRenameFlag : await loadSetting<boolean>('gptel_auto_rename', false);
     const { provider, apiKey, providerId } = await resolveProviderConfig(aiPayload);
     const autoFixLayout = await loadSetting<boolean>('auto_fix_layout', false);
     log(`Iniciando pipeline (${providerId.toUpperCase()})...`, 'info');
-    const result = await pipeline.run(node, wpConfig, {
+    const runOptions: PipelineRunOptions = {
         debug: !!debug,
         provider,
         apiKey,
         autoFixLayout,
         includeScreenshot,
         includeReferences,
-        autoRename: typeof aiPayload?.autoRename === 'boolean' ? aiPayload.autoRename : await loadSetting<boolean>('gptel_auto_rename', false)
-    }) as any;
+        autoRename: autoRenameValue,
+        useDeterministic
+    };
+    if (deterministicDiffMode) {
+        runOptions.deterministicDiffMode = deterministicDiffMode;
+    }
+    if (telemetryConfig) {
+        runOptions.telemetry = telemetryConfig;
+    }
+
+    const result = await pipeline.run(node, wpConfig, runOptions) as any;
     log('Pipeline concluido.', 'success');
     if (debug && result.elementorJson) {
         return result;
@@ -280,6 +329,7 @@ async function deliverResult(json: ElementorJSON, debugInfo?: any) {
     figma.ui.postMessage({ type: 'generation-complete', payload, pastePayload, debug: debugInfo });
     // Bridge de copia: UI via navigator.clipboard ou fallback manual
     figma.ui.postMessage({ type: 'copy-json', payload: pastePayload });
+    figma.ui.postMessage({ type: 'clipboard:copy', payload: pastePayload });
 }
 
 function sendPreview(data: any) {
@@ -292,7 +342,7 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
     const schema = convertToFlexSchema(analyzed as any);
 
     // Resolver imagens (upload para WP quando configurado)
-    const normalizedWP = { ...wpConfig, password: (wpConfig as any)?.password || (wpConfig as any)?.token };
+    const normalizedWP = { ...wpConfig, password: safeGet(wpConfig as any, 'password') || safeGet(wpConfig as any, 'token') };
     noaiUploader = new ImageUploader({});
     noaiUploader.setWPConfig(normalizedWP);
     const uploadEnabled = !!(normalizedWP && normalizedWP.url && (normalizedWP as any).user && (normalizedWP as any).password && (normalizedWP as any).exportImages);
@@ -397,10 +447,11 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
         }
 
         // Handle image-carousel: upload each slide
-        if (uploadEnabled && widget.type === 'image-carousel' && widget.styles?.slides) {
-            console.log(`[NO-AI UPLOAD] 🎠 Processing image-carousel with ${widget.styles.slides.length} slides`);
+        const carouselSlides = safeGet(widget, 'styles.slides') as any[] | undefined;
+        if (uploadEnabled && widget.type === 'image-carousel' && Array.isArray(carouselSlides)) {
+            console.log(`[NO-AI UPLOAD] ?? Processing image-carousel with ${carouselSlides.length} slides`);
             const updatedSlides = [];
-            for (const slide of widget.styles.slides) {
+            for (const slide of carouselSlides) {
                 const slideNodeId = slide.id;
                 if (slideNodeId) {
                     try {
@@ -523,7 +574,10 @@ async function sendStoredSettings() {
 }
 
 figma.ui.onmessage = async (msg) => {
+    figma.notify('Mensagem recebida: ' + JSON.stringify(msg));
+    console.log('[diagnostic] received message', msg);
     if (!msg || typeof msg !== 'object') return;
+    if (typeof msg.type !== 'string') return;
 
     switch (msg.type) {
 
@@ -541,7 +595,7 @@ figma.ui.onmessage = async (msg) => {
                 }
                 log('Arvore inspecionada.', 'info');
             } catch (error: any) {
-                log(error?.message || String(error), 'error');
+                log((safeGet(error, 'message') as string) || String(error), 'error');
             }
             break;
 
@@ -553,7 +607,7 @@ figma.ui.onmessage = async (msg) => {
                 const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug);
                 await deliverResult(elementorJson, debugInfo);
             } catch (error: any) {
-                const message = error?.message || String(error);
+                const message = (safeGet(error, 'message') as string) || String(error);
                 log(`Erro: ${message}`, 'error');
                 figma.ui.postMessage({ type: 'generation-error', message });
                 figma.notify('Erro ao gerar JSON. Verifique os logs.', { timeout: 5000 });
@@ -563,6 +617,7 @@ figma.ui.onmessage = async (msg) => {
         case 'copy-json':
             if (lastJSON) {
                 figma.ui.postMessage({ type: 'copy-json', payload: lastJSON });
+                figma.ui.postMessage({ type: 'clipboard:copy', payload: lastJSON });
             } else {
                 log('Nenhum JSON para copiar.', 'warn');
             }
@@ -598,7 +653,8 @@ figma.ui.onmessage = async (msg) => {
                 const res = await geminiProvider.testConnection(inlineKey);
                 figma.ui.postMessage({ type: 'gemini-status', success: res.ok, message: res.message });
             } catch (e: any) {
-                figma.ui.postMessage({ type: 'gemini-status', success: false, message: `Erro: ${e?.message || e}` });
+                const geminiError = (safeGet(e, 'message') as string) || e;
+                figma.ui.postMessage({ type: 'gemini-status', success: false, message: `Erro: ${geminiError}` });
             }
             break;
 
@@ -619,7 +675,8 @@ figma.ui.onmessage = async (msg) => {
                 const res = await testOpenAIConnection(keyToUse, model || openaiProvider.model as any);
                 figma.ui.postMessage({ type: 'gpt-status', success: res.ok, message: res.error || 'Conexao com GPT verificada.' });
             } catch (e: any) {
-                figma.ui.postMessage({ type: 'gpt-status', success: false, message: `Erro: ${e?.message || e}` });
+                const gptError = (safeGet(e, 'message') as string) || e;
+                figma.ui.postMessage({ type: 'gpt-status', success: false, message: `Erro: ${gptError}` });
             }
             break;
 
@@ -627,9 +684,9 @@ figma.ui.onmessage = async (msg) => {
             try {
                 const incoming = msg.wpConfig as WPConfig | undefined;
                 const cfg = incoming && incoming.url ? incoming : await loadWPConfig();
-                const url = normalizeWpUrl(cfg?.url || '');
-                const user = ((cfg as any)?.user || '').trim();
-                const token = ((cfg as any)?.token || (cfg as any)?.password || '').replace(/\s+/g, '');
+                const url = normalizeWpUrl((safeGet(cfg, 'url') as string | undefined) || '');
+                const user = ((safeGet(cfg, 'user') as string | undefined) || '').trim();
+                const token = ((safeGet(cfg, 'token') as string | undefined) || (safeGet(cfg, 'password') as string | undefined) || '').replace(/\s+/g, '');
                 if (!url || !user || !token) {
                     figma.ui.postMessage({ type: 'wp-status', success: false, message: 'URL, usuario ou senha do app ausentes.' });
                     break;
@@ -651,7 +708,7 @@ figma.ui.onmessage = async (msg) => {
                     figma.ui.postMessage({ type: 'wp-status', success: false, message: `Falha (${resp.status}): ${text || 'sem detalhe'}` });
                     break;
                 }
-                const autoPage = (cfg as any).autoPage ?? (cfg as any).createPage;
+                const autoPage = (cfg as any).autoPage !== undefined ? (cfg as any).autoPage : (cfg as any).createPage;
                 await saveSetting('gptel_wp_url', url);
                 await saveSetting('gptel_wp_user', user);
                 await saveSetting('gptel_wp_token', token);
@@ -659,7 +716,8 @@ figma.ui.onmessage = async (msg) => {
                 await saveSetting('gptel_auto_page', !!autoPage);
                 figma.ui.postMessage({ type: 'wp-status', success: true, message: 'Conexao com WordPress verificada.' });
             } catch (e: any) {
-                figma.ui.postMessage({ type: 'wp-status', success: false, message: `Erro: ${e?.message || e}` });
+                const wpError = (safeGet(e, 'message') as string) || e;
+                figma.ui.postMessage({ type: 'wp-status', success: false, message: `Erro: ${wpError}` });
             }
             break;
 
@@ -678,8 +736,10 @@ figma.ui.onmessage = async (msg) => {
             break;
 
         case 'resize-ui':
-            if (msg.width && msg.height) {
-                figma.ui.resize(Math.min(1500, msg.width), Math.min(1000, msg.height));
+            const targetWidth = safeGetNumber(msg, 'width', 0);
+            const targetHeight = safeGetNumber(msg, 'height', 0);
+            if (targetWidth > 0 && targetHeight > 0) {
+                figma.ui.resize(Math.min(1500, targetWidth), Math.min(1000, targetHeight));
             }
             break;
 
@@ -697,7 +757,7 @@ figma.ui.onmessage = async (msg) => {
                     }
                 } else {
                     // Fallback to selection
-                    const selection = figma.currentPage.selection;
+                    const selection = safeGetArray<SceneNode>(figma, 'currentPage.selection');
                     if (!selection || selection.length === 0) {
                         throw new Error('Nenhum layer selecionado.');
                     }
@@ -717,17 +777,18 @@ figma.ui.onmessage = async (msg) => {
                     newName: name
                 });
             } catch (e: any) {
-                figma.notify(e?.message || 'Falha ao renomear layer');
+                const renameError = (safeGet(e, 'message') as string) || 'Falha ao renomear layer';
+                figma.notify(renameError);
                 figma.ui.postMessage({
                     type: 'rename-error',
-                    message: e?.message || 'Falha ao renomear layer'
+                    message: renameError
                 });
             }
             break;
 
         case 'run-heuristics-rename':
             try {
-                const selection = figma.currentPage.selection;
+                const selection = safeGetArray<SceneNode>(figma, 'currentPage.selection');
                 if (!selection || selection.length === 0) throw new Error('Selecione um frame ou node para organizar.');
 
                 let count = 0;
@@ -760,7 +821,7 @@ figma.ui.onmessage = async (msg) => {
                 selection.forEach(processNode);
                 figma.notify(`Organização concluída! ${count} layers renomeados.`);
             } catch (e: any) {
-                figma.notify(e?.message || 'Erro ao organizar layers');
+                figma.notify((safeGet(e, 'message') as string) || 'Erro ao organizar layers');
             }
             break;
 
@@ -770,7 +831,7 @@ figma.ui.onmessage = async (msg) => {
                 console.log('🔍 [LINTER] Handler analyze-layout iniciado');
                 log('🔍 Handler analyze-layout iniciado', 'info');
 
-                const selection = figma.currentPage.selection;
+                const selection = safeGetArray<SceneNode>(figma, 'currentPage.selection');
                 console.log('[LINTER] Selection:', selection);
 
                 if (!selection || selection.length === 0) {
@@ -821,8 +882,8 @@ figma.ui.onmessage = async (msg) => {
                 console.log('[LINTER] ✅ Mensagem enviada para UI');
                 log(`Análise concluída: ${report.summary.total} problemas encontrados`, 'success');
             } catch (error: any) {
-                const message = error?.message || String(error);
-                const stack = error?.stack || 'No stack trace';
+                const message = (safeGet(error, 'message') as string) || String(error);
+                const stack = (safeGet(error, 'stack') as string) || 'No stack trace';
                 console.error('[LINTER] ❌ ERRO:', message);
                 console.error('[LINTER] Stack:', stack);
                 log(`❌ ERRO ao analisar layout: ${message}`, 'error');
@@ -868,7 +929,7 @@ figma.ui.onmessage = async (msg) => {
             } catch (error: any) {
                 figma.ui.postMessage({
                     type: 'linter-error',
-                    message: error?.message || 'Erro ao selecionar node'
+                    message: (safeGet(error, 'message') as string) || 'Erro ao selecionar node'
                 });
             }
             break;
@@ -916,7 +977,7 @@ figma.ui.onmessage = async (msg) => {
             } catch (error: any) {
                 figma.ui.postMessage({
                     type: 'linter-error',
-                    message: error?.message || 'Erro ao validar correção'
+                    message: (safeGet(error, 'message') as string) || 'Erro ao validar correção'
                 });
             }
             break;

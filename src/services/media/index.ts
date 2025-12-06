@@ -224,7 +224,7 @@ export class DefaultMediaService implements MediaService {
 
         if (!widget.styles) widget.styles = {};
         widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: 'svg' };
-        widget.imageId = typeof result.id === 'number' ? result.id.toString() : widget.imageId;
+        widget.imageId = typeof result.id === 'number' ? result.id.toString() : widget.imageId ?? null;
         assets.push({
             widgetId: iconChild.id,
             format: 'SVG',

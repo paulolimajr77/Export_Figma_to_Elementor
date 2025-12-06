@@ -5,8 +5,8 @@
     "main": "dist/code.js",
     "scripts": {
         "clean": "rimraf dist",
-        "build": "npm run clean && esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2022 --loader:.md=text",
-        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2022 --loader:.md=text --watch",
+        "build": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2017 --supported:optional-chain=false --supported:nullish-coalescing=false --supported:class-field=false --supported:top-level-await=false --loader:.md=text",
+        "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --watch --target=es2017 --supported:optional-chain=false --supported:nullish-coalescing=false --supported:class-field=false --supported:top-level-await=false --loader:.md=text",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "test:watch": "vitest",

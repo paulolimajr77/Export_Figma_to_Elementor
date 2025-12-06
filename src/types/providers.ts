@@ -31,3 +31,24 @@ export interface SchemaProvider {
     generateSchema(input: GenerateSchemaInput): Promise<SchemaResponse>;
     testConnection(apiKey?: string): Promise<{ ok: boolean; message?: string; error?: string; raw?: any }>;
 }
+
+export type DeterministicDiffMode = 'log' | 'store';
+
+export interface PipelineTelemetryOptions {
+    enabled?: boolean;
+    storeDiffs?: boolean;
+    storeSnapshots?: boolean;
+}
+
+export interface PipelineRunOptions {
+    debug?: boolean;
+    provider?: SchemaProvider;
+    apiKey?: string;
+    autoFixLayout?: boolean;
+    includeScreenshot?: boolean;
+    includeReferences?: boolean;
+    autoRename?: boolean;
+    useDeterministic?: boolean;
+    deterministicDiffMode?: DeterministicDiffMode;
+    telemetry?: PipelineTelemetryOptions;
+}

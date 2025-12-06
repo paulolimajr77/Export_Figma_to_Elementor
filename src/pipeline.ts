@@ -6,13 +6,14 @@ import { ImageUploader } from './media/uploader';
 import { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipeline.schema';
 import { ElementorJSON, WPConfig } from './types/elementor.types';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from './utils/validation';
-import { SchemaProvider, GenerateSchemaInput } from './types/providers';
+import { SchemaProvider, GenerateSchemaInput, PipelineRunOptions, DeterministicDiffMode, PipelineTelemetryOptions } from './types/providers';
 import { ANALYZE_RECREATE_PROMPT, OPTIMIZE_SCHEMA_PROMPT } from './config/prompts';
 import { convertToFlexSchema } from './pipeline/noai.parser';
 import { referenceDocs } from './reference_docs';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { createNodeSnapshot } from './heuristics/adapter';
-import type { DeterministicPipeline } from './core/deterministic/deterministic.pipeline';
+import type { DeterministicPipeline, DeterministicPipelineOptions } from './core/deterministic/deterministic.pipeline';
+import { TelemetryService } from './services/telemetry/telemetry.service';
 
 interface PreprocessedData {
     pageTitle: string;
@@ -27,6 +28,12 @@ export interface PipelineDebugInfo {
     schema: PipelineSchema;
     elementor: ElementorJSON;
     coverage: ReturnType<typeof computeCoverage>;
+}
+
+interface PipelineExecutionResult {
+    elementorJson: ElementorJSON;
+    schema: PipelineSchema;
+    debugInfo?: PipelineDebugInfo | null;
 }
 
 export class ConversionPipeline {
@@ -51,16 +58,67 @@ export class ConversionPipeline {
     async run(
         node: SceneNode,
         wpConfig: WPConfig = {},
-        options?: { debug?: boolean; provider?: SchemaProvider; apiKey?: string; autoFixLayout?: boolean; includeScreenshot?: boolean; includeReferences?: boolean; autoRename?: boolean }
-    ): Promise<ElementorJSON | { elementorJson: ElementorJSON; debugInfo: PipelineDebugInfo }> {
+        options?: PipelineRunOptions
+    ): Promise<ElementorJSON | { elementorJson: ElementorJSON; debugInfo: PipelineDebugInfo | null }> {
         const normalizedWP = { ...wpConfig, password: (wpConfig as any)?.password || (wpConfig as any)?.token };
         this.compiler.setWPConfig(normalizedWP);
         this.imageUploader.setWPConfig(normalizedWP);
 
+        const telemetry = this.createTelemetry(options?.telemetry);
         const provider = options?.provider || geminiProvider;
         this.autoFixLayout = !!options?.autoFixLayout;
         this.autoRename = !!options?.autoRename;
 
+        const decision = this.shouldUseDeterministic(options);
+
+        if (decision.allowed && this.deterministicPipeline) {
+            void telemetry.log('deterministic_start', {
+                nodeId: node.id,
+                diffMode: options?.deterministicDiffMode
+            });
+            const deterministicStart = Date.now();
+            const deterministicResult = await this.runDeterministicFlow(node, wpConfig, normalizedWP, telemetry, options);
+            const deterministicDuration = Date.now() - deterministicStart;
+            void telemetry.metric('deterministic_duration_ms', deterministicDuration);
+            void telemetry.log('deterministic_end', {
+                duration: deterministicDuration,
+                ...this.summarizeSchema(deterministicResult.schema)
+            });
+
+            if (options?.deterministicDiffMode) {
+                const legacyResult = await this.runLegacyFlowWithTelemetry(node, wpConfig, normalizedWP, provider, options, telemetry);
+                const diffSnapshot = this.compareDeterministicSchemas(options.deterministicDiffMode, deterministicResult.schema, legacyResult.schema);
+                void telemetry.diff('pipeline_schema', deterministicResult.schema, legacyResult.schema, {
+                    mode: options.deterministicDiffMode,
+                    matches: diffSnapshot.matches
+                });
+                return this.formatRunResult(legacyResult, options);
+            }
+            return this.formatRunResult(deterministicResult, options);
+        }
+
+        if (options?.useDeterministic) {
+            console.info('[PIPELINE] Deterministic pipeline desativado:', decision.reason || 'motivo desconhecido');
+        }
+
+        const legacyResult = await this.runLegacyFlowWithTelemetry(node, wpConfig, normalizedWP, provider, options, telemetry);
+        return this.formatRunResult(legacyResult, options);
+    }
+
+    private formatRunResult(result: PipelineExecutionResult, options?: PipelineRunOptions) {
+        if (options?.debug) {
+            return { elementorJson: result.elementorJson, debugInfo: result.debugInfo || null };
+        }
+        return result.elementorJson;
+    }
+
+    private async runLegacyFlow(
+        node: SceneNode,
+        originalWP: WPConfig,
+        normalizedWP: WPConfig,
+        provider: SchemaProvider,
+        options?: PipelineRunOptions
+    ): Promise<PipelineExecutionResult> {
         const preprocessed = this.preprocess(node);
         const screenshot = options?.includeScreenshot === false ? null : await this.captureNodeImage(preprocessed.serializedRoot.id);
         const schema = await this.generateSchema(preprocessed, provider, options?.apiKey, {
@@ -73,42 +131,195 @@ export class ConversionPipeline {
 
         this.hydrateStyles(schema, preprocessed.flatNodes);
         await this.resolveImages(schema, normalizedWP);
-
-        // Sync nav-menus to WordPress via figtoel-remote-menus plugin
         await this.syncNavMenus(schema, preprocessed.serializedRoot, normalizedWP);
+        this.logSchemaSummary(schema);
 
-        // Debug: Show schema structure before elementor compilation
-        console.log('[PIPELINE] Schema root container:', JSON.stringify({
-            id: schema.containers[0]?.id,
-            widgets: schema.containers[0]?.widgets?.length || 0,
-            widgetTypes: schema.containers[0]?.widgets?.map(w => w.type) || [],
-            children: schema.containers[0]?.children?.length || 0,
-            childrenIds: schema.containers[0]?.children?.map(c => c.id) || []
-        }, null, 2));
+        const includeDebug = !!options?.debug || !!options?.deterministicDiffMode;
+        return this.buildExecutionResult(schema, originalWP, preprocessed, includeDebug);
+    }
 
+    private async runDeterministicFlow(
+        node: SceneNode,
+        originalWP: WPConfig,
+        normalizedWP: WPConfig,
+        telemetry: TelemetryService,
+        options?: PipelineRunOptions
+    ): Promise<PipelineExecutionResult> {
+        if (!this.deterministicPipeline) {
+            throw new Error('Deterministic pipeline indisponivel.');
+        }
+
+        const preprocessed = this.preprocess(node);
+        const canUpload = this.canUploadMedia(normalizedWP);
+        const simulateUploads = !!options?.deterministicDiffMode || !canUpload;
+        const deterministicOptions: DeterministicPipelineOptions = {
+            media: { simulate: simulateUploads },
+            telemetry
+        };
+        if (canUpload) {
+            deterministicOptions.wpConfig = normalizedWP;
+        }
+
+        const deterministicResult = await this.deterministicPipeline.run(node, deterministicOptions);
+        const schema = deterministicResult.schema;
+
+        this.validateAndNormalize(schema, preprocessed.serializedRoot, preprocessed.tokens);
+        validatePipelineSchema(schema);
+        this.hydrateStyles(schema, preprocessed.flatNodes);
+        await this.syncNavMenus(schema, preprocessed.serializedRoot, normalizedWP);
+        this.logSchemaSummary(schema);
+
+        const includeDebug = !!options?.debug || !!options?.deterministicDiffMode;
+        return this.buildExecutionResult(schema, originalWP, preprocessed, includeDebug);
+    }
+
+    private buildExecutionResult(
+        schema: PipelineSchema,
+        originalWP: WPConfig,
+        preprocessed: PreprocessedData,
+        includeDebug: boolean
+    ): PipelineExecutionResult {
         const elementorJson = this.compiler.compile(schema);
-        // Ensure siteurl ends with /wp-json/ as Elementor expects
-        if (wpConfig.url) {
-            let siteurl = wpConfig.url;
+        if (originalWP.url) {
+            let siteurl = originalWP.url;
             if (!siteurl.endsWith('/')) siteurl += '/';
             if (!siteurl.endsWith('wp-json/')) siteurl += 'wp-json/';
             elementorJson.siteurl = siteurl;
         }
         validateElementorJSON(elementorJson);
 
-        if (options?.debug) {
-            const coverage = computeCoverage(preprocessed.flatNodes, schema, elementorJson);
-            const debugInfo: PipelineDebugInfo = {
-                serializedTree: preprocessed.serializedRoot,
-                flatNodes: preprocessed.flatNodes,
-                schema,
-                elementor: elementorJson,
-                coverage
-            };
-            return { elementorJson, debugInfo };
+        let debugInfo: PipelineDebugInfo | null = null;
+        if (includeDebug) {
+            debugInfo = this.createDebugInfo(preprocessed, schema, elementorJson);
         }
 
-        return elementorJson;
+        return { elementorJson, schema, debugInfo };
+    }
+
+    private createDebugInfo(preprocessed: PreprocessedData, schema: PipelineSchema, elementorJson: ElementorJSON): PipelineDebugInfo {
+        const coverage = computeCoverage(preprocessed.flatNodes, schema, elementorJson);
+        return {
+            serializedTree: preprocessed.serializedRoot,
+            flatNodes: preprocessed.flatNodes,
+            schema,
+            elementor: elementorJson,
+            coverage
+        };
+    }
+
+    private summarizeSchema(schema: PipelineSchema) {
+        let containers = 0;
+        let widgets = 0;
+        const walk = (container: PipelineContainer) => {
+            containers += 1;
+            widgets += container.widgets?.length || 0;
+            container.children?.forEach(walk);
+        };
+        schema.containers?.forEach(walk);
+        return { totalContainers: containers, totalWidgets: widgets };
+    }
+
+    private async runLegacyFlowWithTelemetry(
+        node: SceneNode,
+        wpConfig: WPConfig,
+        normalizedWP: WPConfig,
+        provider: SchemaProvider,
+        options: PipelineRunOptions | undefined,
+        telemetry: TelemetryService
+    ): Promise<PipelineExecutionResult> {
+        void telemetry.log('legacy_start', {
+            nodeId: node.id,
+            provider: provider.id
+        });
+        const start = Date.now();
+        const result = await this.runLegacyFlow(node, wpConfig, normalizedWP, provider, options);
+        const duration = Date.now() - start;
+        void telemetry.metric('legacy_duration_ms', duration);
+        void telemetry.log('legacy_end', {
+            duration,
+            ...this.summarizeSchema(result.schema)
+        });
+        return result;
+    }
+
+    private createTelemetry(config?: PipelineTelemetryOptions): TelemetryService {
+        return new TelemetryService(!!config?.enabled, {
+            storeDiffs: !!config?.storeDiffs,
+            storeSnapshots: !!config?.storeSnapshots
+        });
+    }
+
+    private logSchemaSummary(schema: PipelineSchema) {
+        const root = schema?.containers?.[0];
+        console.log('[PIPELINE] Schema root container:', JSON.stringify({
+            id: root?.id,
+            widgets: root?.widgets?.length || 0,
+            widgetTypes: root?.widgets?.map(w => w.type) || [],
+            children: root?.children?.length || 0,
+            childrenIds: root?.children?.map(c => c.id) || []
+        }, null, 2));
+    }
+
+    private compareDeterministicSchemas(
+        mode: DeterministicDiffMode,
+        deterministic: PipelineSchema,
+        legacy: PipelineSchema
+    ): { matches: boolean; timestamp: string; deterministicSize: number; legacySize: number; details?: any } {
+        const deterministicJson = JSON.stringify(deterministic);
+        const legacyJson = JSON.stringify(legacy);
+        const matches = deterministicJson === legacyJson;
+        const snapshot = {
+            matches,
+            timestamp: new Date().toISOString(),
+            deterministicSize: deterministicJson.length,
+            legacySize: legacyJson.length
+        };
+
+        if (matches) {
+            console.info('[PIPELINE] Deterministic diff: schemas identicos.', snapshot);
+            if (mode === 'store') {
+                (globalThis as any).__FIGTOEL_DETERMINISTIC_DIFF = snapshot;
+            }
+            return snapshot;
+        }
+
+        const diffPayload = {
+            ...snapshot,
+            deterministicPreview: deterministicJson.slice(0, 1000),
+            legacyPreview: legacyJson.slice(0, 1000)
+        };
+
+        if (mode === 'store') {
+            (globalThis as any).__FIGTOEL_DETERMINISTIC_DIFF = {
+                ...diffPayload,
+                deterministicSchema: deterministic,
+                legacySchema: legacy
+            };
+        } else {
+            console.warn('[PIPELINE] Deterministic diff detectado.', diffPayload);
+        }
+
+        return { ...snapshot, details: diffPayload };
+    }
+
+    private shouldUseDeterministic(options: PipelineRunOptions | undefined): { allowed: boolean; reason?: string } {
+        if (!options?.useDeterministic) {
+            return { allowed: false, reason: 'Flag desativada' };
+        }
+        if (!this.deterministicPipeline) {
+            return { allowed: false, reason: 'Pipeline deterministico indisponivel' };
+        }
+        if (options.deterministicDiffMode && !['log', 'store'].includes(options.deterministicDiffMode)) {
+            return { allowed: false, reason: 'Modo diff invalido' };
+        }
+        return { allowed: true };
+    }
+
+    private canUploadMedia(config: WPConfig): boolean {
+        if (!config || !config.url) return false;
+        const user = (config as any)?.user;
+        const password = (config as any)?.password || (config as any)?.token;
+        return !!(user && password && (config as any)?.exportImages);
     }
 
     public handleUploadResponse(id: string, result: any) {
