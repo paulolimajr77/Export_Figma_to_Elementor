@@ -1086,6 +1086,192 @@ figma.ui.onmessage = async (msg) => {
             }
             break;
 
+        // ============================================================
+        // LINTER: Select Node from UI
+        // Handles message from Linter UI v2 to select and focus a node
+        // ============================================================
+        case 'linter:select-node':
+        case 'select-node': {
+            const { nodeId } = msg as { nodeId?: string };
+            console.log('[LINTER] onmessage: linter:select-node', { nodeId });
+
+            // Validate nodeId
+            if (!nodeId || typeof nodeId !== 'string') {
+                console.warn('[LINTER] nodeId inválido ou ausente', { nodeId });
+                figma.ui.postMessage({
+                    type: 'linter:select-node:error',
+                    payload: {
+                        nodeId: nodeId || undefined,
+                        reason: 'INVALID_ID',
+                        detail: 'O nodeId fornecido é inválido ou está ausente.'
+                    }
+                });
+                break;
+            }
+
+            try {
+                // Try to find the node
+                const node = figma.getNodeById(nodeId);
+
+                if (!node) {
+                    console.warn('[LINTER] Node não encontrado para nodeId:', nodeId);
+                    figma.ui.postMessage({
+                        type: 'linter:select-node:error',
+                        payload: {
+                            nodeId: nodeId,
+                            reason: 'NODE_NOT_FOUND',
+                            detail: `Node com ID "${nodeId}" não foi encontrado. Pode ter sido deletado.`
+                        }
+                    });
+                    figma.notify('Node não encontrado (pode ter sido deletado).', { error: true, timeout: 3000 });
+                    break;
+                }
+
+                // Select the node
+                console.log('[LINTER] Selecionando node:', node.name, nodeId);
+                figma.currentPage.selection = [node as SceneNode];
+
+                // Try to scroll and zoom to the node
+                try {
+                    figma.viewport.scrollAndZoomIntoView([node]);
+                    console.log('[LINTER] Viewport ajustado para node:', node.name);
+                } catch (viewportError) {
+                    console.warn('[LINTER] Erro ao ajustar viewport (ignorando):', viewportError);
+                }
+
+                // Send success response
+                figma.ui.postMessage({
+                    type: 'linter:select-node:ok',
+                    payload: {
+                        nodeId: nodeId,
+                        nodeName: node.name,
+                        message: `Node "${node.name}" selecionado com sucesso.`
+                    }
+                });
+
+                log(`🎯 [LINTER] Node selecionado: ${node.name}`, 'info');
+
+            } catch (error: any) {
+                console.error('[LINTER] Erro ao selecionar node:', error);
+                figma.ui.postMessage({
+                    type: 'linter:select-node:error',
+                    payload: {
+                        nodeId: nodeId,
+                        reason: 'UNKNOWN_ERROR',
+                        detail: error?.message || String(error)
+                    }
+                });
+            }
+            break;
+        }
+
+        // ============================================================
+        // LINTER: Rename Node from UI
+        // Handles rename requests from Linter action panel
+        // ============================================================
+        case 'linter-rename-node': {
+            const { nodeId, newName } = msg as { nodeId?: string; newName?: string };
+            console.log('[LINTER] onmessage: linter-rename-node', { nodeId, newName });
+
+            // Validate inputs
+            if (!nodeId || typeof nodeId !== 'string') {
+                console.warn('[LINTER] nodeId inválido');
+                figma.ui.postMessage({
+                    type: 'linter-rename-node:result',
+                    payload: {
+                        nodeId: nodeId || '',
+                        newName: newName || '',
+                        status: 'error',
+                        errorMessage: 'nodeId inválido ou ausente.'
+                    }
+                });
+                break;
+            }
+
+            if (!newName || typeof newName !== 'string' || newName.trim() === '') {
+                console.warn('[LINTER] newName inválido');
+                figma.ui.postMessage({
+                    type: 'linter-rename-node:result',
+                    payload: {
+                        nodeId: nodeId,
+                        newName: newName || '',
+                        status: 'error',
+                        errorMessage: 'Nome inválido ou vazio.'
+                    }
+                });
+                break;
+            }
+
+            try {
+                const node = figma.getNodeById(nodeId);
+
+                if (!node) {
+                    console.warn('[LINTER] Node não encontrado:', nodeId);
+                    figma.ui.postMessage({
+                        type: 'linter-rename-node:result',
+                        payload: {
+                            nodeId: nodeId,
+                            newName: newName,
+                            status: 'error',
+                            errorMessage: 'Node não encontrado. Pode ter sido deletado.'
+                        }
+                    });
+                    break;
+                }
+
+                // Cast to SceneNode to access name property
+                const sceneNode = node as SceneNode;
+                if (!sceneNode || !sceneNode.name) {
+                    console.warn('[LINTER] Node não suporta renomeação');
+                    figma.ui.postMessage({
+                        type: 'linter-rename-node:result',
+                        payload: {
+                            nodeId: nodeId,
+                            newName: newName,
+                            status: 'error',
+                            errorMessage: 'Node não suporta renomeação.'
+                        }
+                    });
+                    break;
+                }
+
+                const oldName = sceneNode.name;
+                sceneNode.name = newName.trim();
+
+                console.log('[LINTER] Node renomeado:', oldName, '→', sceneNode.name);
+
+                // Select the renamed node
+                figma.currentPage.selection = [sceneNode];
+
+                figma.ui.postMessage({
+                    type: 'linter-rename-node:result',
+                    payload: {
+                        nodeId: nodeId,
+                        oldName: oldName,
+                        newName: sceneNode.name,
+                        status: 'ok',
+                        errorMessage: null
+                    }
+                });
+
+                log(`✏️ Layer renomeada: "${oldName}" → "${sceneNode.name}"`, 'success');
+                figma.notify(`Layer renomeada: ${sceneNode.name}`, { timeout: 2000 });
+
+            } catch (error: any) {
+                console.error('[LINTER] Erro ao renomear node:', error);
+                figma.ui.postMessage({
+                    type: 'linter-rename-node:result',
+                    payload: {
+                        nodeId: nodeId,
+                        newName: newName,
+                        status: 'error',
+                        errorMessage: error?.message || String(error)
+                    }
+                });
+            }
+            break;
+        }
+
         case 'close':
             figma.closePlugin();
             break;

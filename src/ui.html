@@ -1221,6 +1221,583 @@
       font-size: 11px;
       padding: 6px 10px;
     }
+
+    /* ============================================
+       LINTER UI v2 - Visual Analyzer
+       ============================================ */
+
+    /* Severity Colors */
+    .linter-v2 {
+      --color-critical: #EF4444;
+      --color-warning: #F97316;
+      --color-info: #3B82F6;
+      --color-success: #22C55E;
+    }
+
+    /* Sub-tabs Navigation */
+    .linter-subtabs {
+      display: flex;
+      gap: 0;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .linter-subtab-btn {
+      flex: 1;
+      padding: 10px 12px;
+      border: none;
+      background: transparent;
+      font-weight: 500;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .linter-subtab-btn:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .linter-subtab-btn.active {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    .linter-subtab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--color-primary);
+    }
+
+    .linter-subpanel {
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .linter-subpanel.active {
+      display: block;
+    }
+
+    /* Score Ring v2 - Gradient */
+    .score-ring-v2 {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-panel);
+      position: relative;
+      box-shadow: inset 0 0 0 6px var(--color-border);
+    }
+
+    .score-ring-v2.critical {
+      box-shadow: inset 0 0 0 6px var(--color-critical);
+    }
+
+    .score-ring-v2.warning {
+      box-shadow: inset 0 0 0 6px var(--color-warning);
+    }
+
+    .score-ring-v2.success {
+      box-shadow: inset 0 0 0 6px var(--color-success);
+    }
+
+    .score-ring-v2 .score-number {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .score-ring-v2.critical .score-number {
+      color: var(--color-critical);
+    }
+
+    .score-ring-v2.warning .score-number {
+      color: var(--color-warning);
+    }
+
+    .score-ring-v2.success .score-number {
+      color: var(--color-success);
+    }
+
+    .score-ring-v2 .score-suffix {
+      font-size: 10px;
+      color: var(--color-text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-badge.ok {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--color-success);
+    }
+
+    .status-badge.warning {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--color-warning);
+    }
+
+    .status-badge.critical {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--color-critical);
+    }
+
+    .status-badge .badge-icon {
+      font-size: 14px;
+    }
+
+    /* Summary Header */
+    .linter-summary-v2 {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      padding: 16px;
+      background: var(--color-panel);
+      border-radius: 12px;
+      border: 1px solid var(--color-border);
+      margin-bottom: 16px;
+    }
+
+    .linter-summary-content {
+      flex: 1;
+    }
+
+    .linter-summary-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .linter-microcopy {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    /* Stats Cards Row */
+    .linter-stats-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .stat-card {
+      flex: 1;
+      padding: 10px;
+      background: var(--color-bg);
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid var(--color-border);
+    }
+
+    .stat-card .stat-number {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-card.critical .stat-number {
+      color: var(--color-critical);
+    }
+
+    .stat-card.warning .stat-number {
+      color: var(--color-warning);
+    }
+
+    .stat-card.info .stat-number {
+      color: var(--color-info);
+    }
+
+    .stat-card .stat-label {
+      font-size: 10px;
+      color: var(--color-text-secondary);
+      margin-top: 4px;
+      text-transform: uppercase;
+    }
+
+    /* Filter Chips */
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .filter-chip {
+      padding: 5px 10px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid var(--color-border);
+      background: var(--color-panel);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-chip:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .filter-chip.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+    }
+
+    .filter-chip.critical.active {
+      background: var(--color-critical);
+      border-color: var(--color-critical);
+    }
+
+    .filter-chip.warning.active {
+      background: var(--color-warning);
+      border-color: var(--color-warning);
+    }
+
+    .filter-chip.info.active {
+      background: var(--color-info);
+      border-color: var(--color-info);
+    }
+
+    .filter-separator {
+      width: 1px;
+      background: var(--color-border);
+      margin: 0 6px;
+    }
+
+    /* Issues List v2 */
+    .issues-list-v2 {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .issue-card-v2 {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 4px solid transparent;
+    }
+
+    .issue-card-v2:hover {
+      transform: translateX(2px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .issue-card-v2.critical {
+      border-left-color: var(--color-critical);
+    }
+
+    .issue-card-v2.warning {
+      border-left-color: var(--color-warning);
+    }
+
+    .issue-card-v2.info {
+      border-left-color: var(--color-info);
+    }
+
+    .issue-card-v2.selected {
+      background: rgba(12, 123, 255, 0.05);
+      border-color: var(--color-primary);
+    }
+
+    /* Linter Status Bar - Feedback Visual */
+    .linter-status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
+      background: var(--color-bg-secondary);
+      border: 1px solid transparent;
+    }
+
+    .linter-status-bar.hidden {
+      display: none;
+    }
+
+    .linter-status-bar--success {
+      background: rgba(46, 204, 113, 0.12);
+      color: #2ecc71;
+      border-color: rgba(46, 204, 113, 0.25);
+    }
+
+    .linter-status-bar--warning {
+      background: rgba(241, 196, 15, 0.12);
+      color: #f1c40f;
+      border-color: rgba(241, 196, 15, 0.25);
+    }
+
+    .linter-status-bar--error {
+      background: rgba(231, 76, 60, 0.12);
+      color: #e74c3c;
+      border-color: rgba(231, 76, 60, 0.25);
+    }
+
+    .linter-status-bar .status-icon {
+      flex-shrink: 0;
+    }
+
+    .linter-status-bar .status-text {
+      flex: 1;
+      line-height: 1.4;
+    }
+
+    /* Active Issue Highlight */
+    .linter-issue--active,
+    #linter-issues-body tr.linter-issue--active {
+      background: rgba(52, 152, 219, 0.08) !important;
+      outline: 2px solid rgba(52, 152, 219, 0.3);
+      outline-offset: -2px;
+    }
+
+    .issue-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .issue-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .issue-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .issue-title-v2 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .issue-category-chip {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--color-bg);
+      color: var(--color-text-secondary);
+    }
+
+    .issue-summary {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+    }
+
+    .issue-node-info {
+      font-size: 10px;
+      color: var(--color-text-secondary);
+      margin-top: 6px;
+      font-family: monospace;
+      opacity: 0.8;
+    }
+
+    /* Details Panel v2 */
+    .details-panel-v2 {
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .details-panel-v2.visible {
+      display: block;
+      animation: slideUp 0.2s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .details-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .details-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .details-close-btn {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: var(--color-text-secondary);
+      padding: 4px;
+    }
+
+    .details-section {
+      margin-bottom: 12px;
+    }
+
+    .details-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .details-text {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--color-text);
+    }
+
+    .details-suggestion {
+      padding: 10px;
+      background: rgba(34, 197, 94, 0.08);
+      border-radius: 6px;
+      border-left: 3px solid var(--color-success);
+    }
+
+    .details-tech-info {
+      font-family: monospace;
+      font-size: 11px;
+      background: var(--color-bg);
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    .btn-select-node {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-select-node:hover {
+      background: var(--color-primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-select-node:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Logs Tab v2 */
+    .logs-container-v2 {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .logs-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .logs-textarea {
+      width: 100%;
+      min-height: 200px;
+      max-height: 400px;
+      padding: 12px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      resize: vertical;
+      color: var(--color-text);
+    }
+
+    .logs-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--color-text-secondary);
+      font-size: 12px;
+    }
+
+    .logs-empty .icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+      opacity: 0.5;
+    }
+
+    /* Dark mode overrides */
+    body.dark .linter-v2 .score-ring-v2,
+    body.dark .linter-v2 .stat-card,
+    body.dark .linter-v2 .issue-card-v2,
+    body.dark .linter-v2 .details-panel-v2 {
+      background: #2a2a2e;
+    }
+
+    body.dark .linter-v2 .logs-textarea {
+      background: #1f1f22;
+    }
   </style>
 </head>
 
@@ -1297,105 +1874,189 @@
       </section>
 
       <section class="tab-panel" data-panel="linter">
-        <div class="linter-container">
-          <!-- Header / Summary -->
-          <div class="linter-header">
-            <div class="linter-score-card">
-              <div class="score-ring" id="linter-score-ring">
-                <span class="score-value" id="linter-total-issues">0</span>
-                <span class="score-label">Issues</span>
-              </div>
-            </div>
-            <div class="linter-stats">
-              <div class="stat-item critical">
-                <span class="stat-count" id="count-critical">0</span>
-                <span class="stat-label">Critical</span>
-              </div>
-              <div class="stat-item major">
-                <span class="stat-count" id="count-major">0</span>
-                <span class="stat-label">Major</span>
-              </div>
-              <div class="stat-item minor">
-                <span class="stat-count" id="count-minor">0</span>
-                <span class="stat-label">Minor</span>
-              </div>
-            </div>
-          </div> <!-- Educational Banner -->
-          <div class="linter-education-banner"
-            style="background: var(--figma-color-bg-brand-tertiary); border-left: 3px solid var(--figma-color-border-brand); padding: 10px 12px; margin: 12px 0; border-radius: 4px;">
-            <p style="margin: 0; font-size: 11px; line-height: 1.5; color: var(--figma-color-text-secondary);">
-              <strong style="color: var(--figma-color-text);">Por que nomenclatura importa:</strong><br>Facilita
-              manutenção Melhora detecção automática Gera código Elementor mais legível Reduz erros na exportação
+        <div class="linter-container linter-v2">
 
-            </p>
+          <!-- Linter Header with Actions -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="font-size: 16px; font-weight: 600; margin: 0;">📊 Análise de Layout</h2>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn secondary small" id="btn-reanalyze">🔄 Reanalisar</button>
+              <button class="btn ghost small" id="btn-copy-report-v2">📋 Copiar Relatório</button>
+            </div>
           </div>
 
+          <!-- Sub-tabs Navigation with PRD IDs -->
+          <nav class="linter-subtabs">
+            <button class="linter-subtab-btn active" id="linter-subtab-summary" data-subtab="summary">📈 Resumo</button>
+            <button class="linter-subtab-btn" id="linter-subtab-issues" data-subtab="issues">⚠️ Problemas</button>
+            <button class="linter-subtab-btn" id="linter-subtab-logs" data-subtab="logs">📝 Logs</button>
+          </nav>
 
-          <!-- Actions Bar -->
-          <div class="linter-actions-bar">
-            <button class="btn secondary small" id="btn-copy-report" style="display:none"
-              data-action="copy-linter-report">
-              <span class="icon">📋</span> Copiar
-            </button>
-          </div>
+          <!-- ===== RESUMO TAB ===== -->
+          <div class="linter-subpanel active" data-subpanel="summary" id="linter-panel-summary">
+            <!-- Summary Card -->
+            <div class="linter-summary-v2">
+              <div class="score-ring-v2 success" id="score-ring-v2">
+                <span class="score-number" id="linter-score-value">0</span>
+                <span class="score-suffix">/ 100</span>
+              </div>
+              <div class="linter-summary-content">
+                <div class="linter-summary-title">
+                  Saúde do Layout
+                  <span class="status-badge ok" id="linter-status-badge">
+                    <span class="badge-icon">✓</span> OK
+                  </span>
+                </div>
+                <p class="linter-microcopy" id="linter-summary-text">
+                  Clique em "🔄 Reanalisar" para analisar o layout selecionado.
+                </p>
 
-          <!-- Issues List -->
-          <div class="linter-content">
-            <div id="linter-issues-list" class="issues-list">
-              <!-- Issues will be injected here -->
-              <div class="linter-empty-state">
-                <div class="empty-icon">✨</div>
-                <h3>Nenhum problema encontrado</h3>
-                <p>Seu layout parece estar seguindo todas as boas práticas!</p>
+                <!-- Stats Cards -->
+                <div class="linter-stats-row">
+                  <div class="stat-card critical">
+                    <span class="stat-number" id="linter-critical-count">0</span>
+                    <span class="stat-label">Críticos</span>
+                  </div>
+                  <div class="stat-card warning">
+                    <span class="stat-number" id="linter-warning-count">0</span>
+                    <span class="stat-label">Atenção</span>
+                  </div>
+                  <div class="stat-card info">
+                    <span class="stat-number" id="linter-info-count">0</span>
+                    <span class="stat-label">Sugestões</span>
+                  </div>
+                  <div class="stat-card ok" style="border-left-color: var(--color-success);">
+                    <span class="stat-number" id="linter-ok-count">0</span>
+                    <span class="stat-label">OK</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <!-- Problem Details Panel (Hidden by default) -->
-            <div id="problem-details-panel" class="problem-details-panel" style="display:none;">
-              <div class="panel-header">
-                <h3>🎯 Problema Selecionado</h3>
-                <button id="btn-close-details" class="btn tiny ghost">✖</button>
-              </div>
-
-              <div id="problem-details-content" class="panel-content">
-                <!-- Content will be injected here -->
-              </div>
-
-              <div class="panel-actions">
-                <button id="btn-mark-resolved" class="btn primary small">
-                  ✅ Marcar como Resolvido
-                </button>
-                <button id="btn-next-problem" class="btn secondary small">
-                  ⏭️ Próximo
-                </button>
-                <button id="btn-ignore-problem" class="btn ghost small">
-                  ❌ Ignorar
-                </button>
-              </div>
-            </div>
-
-
-            <!-- Widgets Table -->
-            <div class="widgets-section">
-              <h3>🎨 Widgets Detectados (<span id="widgets-count">0</span>)</h3>
-              <div class="widgets-table-container">
-                <table class="widgets-table">
-                  <thead>
-                    <tr>
-                      <th>Widget</th>
-                      <th>Node</th>
-                      <th>Confiança</th>
-                    </tr>
-                  </thead>
-                  <tbody id="widgets-table-body">
-                    <!-- Widgets will be injected here -->
-                  </tbody>
-                </table>
+            <!-- Top Problems Preview -->
+            <div class="card" id="top-problems-preview">
+              <div class="card-title">🎯 Problemas Principais</div>
+              <div id="top-problems-list" style="font-size: 12px; color: var(--color-text-secondary);">
+                Clique em "🔄 Reanalisar" para ver os problemas do layout selecionado.
               </div>
             </div>
           </div>
+
+          <!-- ===== PROBLEMAS TAB ===== -->
+          <div class="linter-subpanel" data-subpanel="issues" id="linter-panel-issues">
+            <!-- Severity Filters with PRD IDs -->
+            <div class="filter-row">
+              <div class="filter-group" id="severity-filters">
+                <button class="filter-chip active" id="filter-severity-all" data-filter-severity="all">Todos</button>
+                <button class="filter-chip critical" id="filter-severity-critical" data-filter-severity="critical">🔴
+                  Crítico</button>
+                <button class="filter-chip warning" id="filter-severity-warning" data-filter-severity="warning">🟠
+                  Atenção</button>
+                <button class="filter-chip info" id="filter-severity-info" data-filter-severity="info">🔵 Info</button>
+                <button class="filter-chip ok" id="filter-severity-ok" data-filter-severity="ok">✅ OK</button>
+              </div>
+              <span class="filter-separator"></span>
+              <!-- Category Filters with PRD IDs -->
+              <div class="filter-group" id="category-filters">
+                <button class="filter-chip active" id="filter-category-all" data-filter-category="all">Todos</button>
+                <button class="filter-chip" id="filter-category-auto-layout" data-filter-category="auto-layout">Auto
+                  Layout</button>
+                <button class="filter-chip" id="filter-category-naming"
+                  data-filter-category="naming">Nomenclatura</button>
+                <button class="filter-chip" id="filter-category-structure"
+                  data-filter-category="structure">Estrutura</button>
+                <button class="filter-chip" id="filter-category-widget" data-filter-category="widget">Widgets</button>
+                <button class="filter-chip" id="filter-category-image" data-filter-category="image">Imagens</button>
+              </div>
+            </div>
+
+            <!-- Search with PRD ID -->
+            <div class="search-box" style="margin-bottom: 12px;">
+              <input type="text" class="search-input" id="linter-search-input"
+                placeholder="Filtrar por nome do layer ou mensagem...">
+            </div>
+
+            <!-- Status Bar for Node Selection Feedback -->
+            <div class="linter-status-bar hidden" id="linter-status-bar">
+              <span class="status-icon" id="linter-status-icon"></span>
+              <span class="status-text" id="linter-status-message">Pronto</span>
+            </div>
+
+            <!-- Issues Table with standardized ID: linter-issues-body -->
+            <div class="issues-list-v2" id="issues-list-v2">
+              <table class="linter-issues-table" style="width:100%; font-size:12px; border-collapse: collapse;">
+                <thead>
+                  <tr style="background: var(--color-bg-tertiary); text-align: left;">
+                    <th style="padding: 8px; width: 80px;">Severidade</th>
+                    <th style="padding: 8px; width: 100px;">Categoria</th>
+                    <th style="padding: 8px;">Descrição</th>
+                  </tr>
+                </thead>
+                <tbody id="linter-issues-body">
+                  <!-- Issues serão renderizados aqui -->
+                  <tr>
+                    <td colspan="3" style="text-align: center; padding: 24px; color: var(--color-text-secondary);">
+                      ✨ Nenhum problema encontrado. Execute a análise para ver resultados.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Details Panel (contextual, appears when issue selected) -->
+            <div class="details-panel-v2" id="details-panel-v2">
+              <div class="details-header">
+                <span class="details-title" id="details-title">🎯 Detalhes do Problema</span>
+                <button class="details-close-btn" id="btn-close-details-v2">✕</button>
+              </div>
+
+              <div class="details-section">
+                <div class="details-label">Descrição</div>
+                <div class="details-text" id="details-description">...</div>
+              </div>
+
+              <div class="details-section">
+                <div class="details-label">Sugestão de Correção</div>
+                <div class="details-suggestion details-text" id="details-suggestion">...</div>
+              </div>
+
+              <div class="details-section">
+                <div class="details-label">Informações Técnicas</div>
+                <div class="details-tech-info" id="details-tech-info">
+                  Node: ... | Tipo: ... | Auto Layout: ...
+                </div>
+              </div>
+
+              <div style="margin-top: 12px;">
+                <button class="btn-select-node" id="btn-select-node-v2">
+                  🎯 Selecionar no Figma
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== LOGS TAB ===== -->
+          <div class="linter-subpanel" data-subpanel="logs" id="linter-panel-logs">
+            <div class="logs-container-v2">
+              <div class="logs-actions">
+                <button class="btn secondary small" id="linter-logs-copy">📋 Copiar Logs</button>
+                <button class="btn ghost small" id="linter-logs-clear">🗑️ Limpar Visualização</button>
+              </div>
+
+              <!-- Standardized ID: linter-logs-content -->
+              <textarea class="logs-textarea" id="linter-logs-content" readonly
+                placeholder="Os logs de análise aparecerão aqui após executar o Linter..."></textarea>
+
+              <div class="logs-empty" id="logs-empty-state" style="display: none;">
+                <div class="icon">📋</div>
+                <p>Nenhum log disponível nesta execução.</p>
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
+
 
       <section class="tab-panel" data-panel="ai">
         <div class="card">
@@ -1502,14 +2163,14 @@
   </div>
   <div id="resizer-handle" aria-label="Arraste para redimensionar"></div>
 
-<script>
-  parent.postMessage(
-    { pluginMessage: { diagnosticPing: true } },
-    "*"
-  );
-  console.log("[diagnostic] UI loaded, ping enviado");
-</script>
-<script>
+  <script>
+    parent.postMessage(
+      { pluginMessage: { diagnosticPing: true } },
+      "*"
+    );
+    console.log("[diagnostic] UI loaded, ping enviado");
+  </script>
+  <script>
     (() => {
       const tabs = document.querySelectorAll('.tab-btn');
       const panels = document.querySelectorAll('.tab-panel');
@@ -2138,6 +2799,86 @@
             // Log no console para debug (mantido)
             addLog(`📊 Análise concluída: ${report.summary.total} issues encontrados.`, 'info');
             break;
+
+          // ============================================================
+          // LINTER: Node Selection Feedback (from backend)
+          // ============================================================
+          case 'linter:select-node:ok': {
+            const { nodeId, nodeName, message } = msg.payload || {};
+            console.log('[UI] linter:select-node:ok', { nodeId, nodeName });
+
+            // Show success status bar
+            const successMessage = message || 'Elemento localizado e selecionado no Figma.';
+            setLinterStatus('success', '✅ ' + successMessage);
+
+            // Log entry
+            addLog(`🎯 [LINTER/UI] Node selecionado: ${nodeName || nodeId}`, 'info');
+            break;
+          }
+
+          case 'linter:select-node:error': {
+            const { nodeId, reason, detail } = msg.payload || {};
+            console.warn('[UI] linter:select-node:error', { nodeId, reason, detail });
+
+            // Map reason to PT-BR microcopy
+            const errorMessages = {
+              'NODE_NOT_FOUND': 'Não foi possível localizar esse elemento no arquivo. Ele pode ter sido excluído ou movido.',
+              'INVALID_ID': 'ID de elemento inválido. Tente reanalisar o layout.',
+              'INTERNAL_ERROR': 'Ocorreu um erro ao tentar selecionar o elemento. Tente novamente.',
+              'UNKNOWN_ERROR': 'Ocorreu um erro ao tentar selecionar o elemento. Tente novamente.'
+            };
+            const errorMessage = errorMessages[reason] || 'Não foi possível selecionar o elemento. Verifique o layout e tente de novo.';
+
+            // Show error status bar
+            setLinterStatus('error', '❌ ' + errorMessage);
+
+            // Log entry
+            addLog(`❌ [LINTER/UI] Falha ao selecionar node ${nodeId || '?'} (${reason || 'desconhecido'})`, 'error');
+            break;
+          }
+
+          // ============================================================
+          // LINTER: Rename Node Result (from backend)
+          // ============================================================
+          case 'linter-rename-node:result': {
+            const { nodeId, oldName, newName, status, errorMessage } = msg.payload || {};
+            console.log('[UI] linter-rename-node:result', { nodeId, oldName, newName, status });
+
+            // Re-enable rename button
+            const renameBtn = document.getElementById('details-rename-apply');
+            if (renameBtn) {
+              renameBtn.disabled = false;
+              renameBtn.textContent = '✏️ Renomear';
+            }
+
+            if (status === 'ok') {
+              // Show success message
+              setLinterStatus('success', `✅ Layer renomeada: "${oldName}" → "${newName}"`);
+              addLog(`✏️ [LINTER/UI] Layer renomeada: ${oldName} → ${newName}`, 'success');
+              
+              // Update current name display in action panel
+              const currentNameEl = document.getElementById('details-current-name');
+              if (currentNameEl) currentNameEl.textContent = newName;
+              
+              // Update card that has the matching nodeId
+              const card = document.querySelector(`.issue-card-v2[data-node-id="${nodeId}"]`);
+              if (card) {
+                const nodeInfo = card.querySelector('.issue-node-info');
+                if (nodeInfo) nodeInfo.textContent = `📍 ${newName}`;
+                
+                // Hide naming suggestion since it's been applied
+                const suggestionEl = card.querySelector('.issue-naming-suggestion');
+                if (suggestionEl) suggestionEl.innerHTML = `<span style="color: var(--color-success);">✅ Renomeado para: ${newName}</span>`;
+              }
+              
+            } else {
+              // Show error message
+              const errorMsg = errorMessage || 'Erro desconhecido ao renomear layer.';
+              setLinterStatus('error', `❌ ${errorMsg}`);
+              addLog(`❌ [LINTER/UI] Falha ao renomear: ${errorMsg}`, 'error');
+            }
+            break;
+          }
         }
       };
 
@@ -2422,197 +3163,352 @@
         };
       }
 
+      /**
+       * renderLinterReport - Renderiza o relatório do Linter na UI
+       * 
+       * Esta função consome o objeto `report` enviado pelo backend e atualiza
+       * todos os elementos da UI de forma segura, com checagens de null.
+       * Segue os IDs padronizados definidos no PRD.
+       * 
+       * @param {Object} report - { summary, analysis, widgets, guides, metadata }
+       */
       function renderLinterReport(report) {
-        if (!linterPanel || !linterSummary || !linterIssues) return;
+        console.log('[UI] renderLinterReport - report recebido', report);
 
-        linterPanel.style.display = 'block';
-        linterIssues.innerHTML = '';
-        linterSummary.innerHTML = '';
-
+        // ====== Guard: report nulo/undefined ======
         if (!report) {
-          linterSummary.innerHTML = '<div class="linter-empty">Erro ao gerar relatório.</div>';
+          console.warn('[UI] renderLinterReport: report é null/undefined');
           return;
         }
 
-        // Render Summary
-        const scoreColor = report.score >= 90 ? 'success' : report.score >= 70 ? 'warning' : 'error';
-        linterSummary.innerHTML = `
-          <div class="linter-score ${scoreColor}">
-            <div class="score-value">${report.score}</div>
-            <div class="score-label">Score</div>
-          </div>
-          <div class="linter-stats">
-            <div class="stat-item error">
-              <span class="count">${report.stats.errors}</span>
-              <span class="label">Erros</span>
-            </div>
-            <div class="stat-item warning">
-              <span class="count">${report.stats.warnings}</span>
-              <span class="label">Alertas</span>
-            </div>
-          </div>
-        `;
+        // ====== Obter elementos da UI pelos IDs padronizados ======
+        const scoreEl = document.getElementById('linter-score-value');
+        const statusEl = document.getElementById('linter-status-badge');
+        const summaryTextEl = document.getElementById('linter-summary-text');
+        const criticalEl = document.getElementById('linter-critical-count');
+        const warningEl = document.getElementById('linter-warning-count');
+        const infoEl = document.getElementById('linter-info-count');
+        const okEl = document.getElementById('linter-ok-count');
+        const issuesBodyEl = document.getElementById('linter-issues-body');
+        const scoreRingEl = document.getElementById('score-ring-v2');
+        const topProblemsList = document.getElementById('top-problems-list');
 
-        // Render Issues
-        if (report.issues.length === 0) {
-          linterIssues.innerHTML = '<div class="linter-empty">Nenhum problema encontrado! 🎉</div>';
+        // Elementos opcionais de logs
+        const logsContentEl = document.getElementById('linter-logs-content');
+        const logsCopyBtn = document.getElementById('linter-logs-copy');
+        const logsClearBtn = document.getElementById('linter-logs-clear');
+
+        // ====== Guard Clause: elementos críticos ======
+        if (!scoreEl || !statusEl || !issuesBodyEl) {
+          console.warn('[UI] Linter UI não encontrada. Verifique IDs no HTML.', {
+            scoreEl: !!scoreEl,
+            statusEl: !!statusEl,
+            issuesBodyEl: !!issuesBodyEl
+          });
+          return;
+        }
+
+        // ====== Store report globally for copy button ======
+        window.__linterLastReport = report;
+
+        // ====== Extrair dados do report - FIX: ler de múltiplos paths possíveis ======
+        const summary = report.summary || {};
+        const analysis = report.analysis || [];
+
+        // Tentar ler contadores diretamente do summary (conforme contrato do backend)
+        // Fallback: calcular a partir da análise se não existir
+        let criticalCount = 0;
+        let warningCount = 0;
+        let infoCount = 0;
+        let okCount = 0;
+
+        // Primeiro: tentar ler do summary direto (backend novo)
+        if (typeof summary.critical === 'number' || typeof summary.warning === 'number') {
+          criticalCount = summary.critical || 0;
+          warningCount = summary.warning || 0;
+          infoCount = summary.info || 0;
+          okCount = summary.ok || 0;
+        }
+        // Segundo: tentar ler de summary.counts ou summary.by_severity (formato antigo)
+        else if (summary.counts || summary.by_severity) {
+          const counts = summary.by_severity || summary.counts || {};
+          criticalCount = counts.critical || 0;
+          warningCount = counts.major || counts.warning || 0;
+          infoCount = counts.minor || counts.info || 0;
+          okCount = counts.ok || 0;
+        }
+        // Terceiro: calcular a partir do array analysis
+        else if (analysis.length > 0) {
+          analysis.forEach(issue => {
+            const sev = (issue.severity || '').toLowerCase();
+            if (sev === 'critical') criticalCount++;
+            else if (sev === 'major' || sev === 'warning') warningCount++;
+            else if (sev === 'minor' || sev === 'info') infoCount++;
+            else if (sev === 'ok') okCount++;
+          });
+        }
+
+        const totalIssues = summary.totalIssues || summary.total || analysis.length;
+        const totalNodes = report.metadata?.total_nodes || report.metadata?.totalNodes || report.widgets?.length || 0;
+
+        console.log('[UI] Contadores extraídos:', { criticalCount, warningCount, infoCount, okCount, totalIssues, totalNodes });
+
+        // ====== Calcular score ======
+        const score = report.summary?.score !== undefined
+          ? Math.round(report.summary.score)
+          : Math.max(0, 100 - (criticalCount * 15) - (warningCount * 5) - (infoCount * 1));
+
+        // ====== Determinar status ======
+        let status = report.summary?.status || 'warning';
+        if (criticalCount > 0) status = 'critical';
+        else if (warningCount > 0) status = 'warning';
+        else if (totalIssues === 0) status = 'ok';
+
+        // ====== Preencher Score ======
+        scoreEl.textContent = String(score);
+
+        // Atualizar anel de score se existir
+        if (scoreRingEl) {
+          scoreRingEl.classList.remove('success', 'warning', 'critical');
+          if (score >= 80) scoreRingEl.classList.add('success');
+          else if (score >= 40) scoreRingEl.classList.add('warning');
+          else scoreRingEl.classList.add('critical');
+        }
+
+        // ====== Preencher Status Badge ======
+        statusEl.classList.remove('ok', 'warning', 'critical');
+        let statusLabel = 'ATENÇÃO';
+        let statusIcon = '!';
+        if (status === 'ok') {
+          statusLabel = 'OK';
+          statusIcon = '✓';
+          statusEl.classList.add('ok');
+        } else if (status === 'critical') {
+          statusLabel = 'CRÍTICO';
+          statusIcon = '✕';
+          statusEl.classList.add('critical');
         } else {
-          report.issues.forEach(issue => {
-            const issueEl = document.createElement('div');
-            issueEl.className = `linter-issue ${issue.severity}`;
-            issueEl.innerHTML = `
-              <div class="issue-header">
-                <span class="issue-severity ${issue.severity}">${issue.severity === 'error' ? 'Erro' : 'Alerta'}</span>
-                <span class="issue-message">${issue.message}</span>
-              </div>
-              <div class="issue-details">
-                <div class="issue-node">Camada: ${issue.nodeName} (${issue.nodeType})</div>
-                ${issue.suggestion ? `<div class="issue-suggestion">💡 ${issue.suggestion}</div>` : ''}
-                ${issue.fixAvailable ? `<button class="btn tiny primary" data-fix="${issue.ruleId}" data-node="${issue.nodeId}">Corrigir</button>` : ''}
-              </div>
-            `;
+          statusEl.classList.add('warning');
+        }
+        statusEl.innerHTML = `<span class="badge-icon">${statusIcon}</span> ${statusLabel}`;
 
-            // Add click handler for selection
-            issueEl.addEventListener('click', (e) => {
-              if (e.target.tagName !== 'BUTTON') {
-                send('select-node', { nodeId: issue.nodeId });
+        // ====== Preencher Contadores ======
+        if (criticalEl) criticalEl.textContent = String(criticalCount);
+        if (warningEl) warningEl.textContent = String(warningCount);
+        if (infoEl) infoEl.textContent = String(infoCount);
+        if (okEl) okEl.textContent = String(okCount);
+
+        // ====== Preencher Texto Resumo ======
+        if (summaryTextEl) {
+          if (totalIssues === 0) {
+            summaryTextEl.textContent = 'Excelente! Seu layout está seguindo todas as boas práticas. Pronto para exportar!';
+          } else if (criticalCount > 0) {
+            summaryTextEl.textContent = `Encontramos ${totalIssues} problema(s), sendo ${criticalCount} crítico(s). Corrija antes de exportar.`;
+          } else if (warningCount > 0) {
+            summaryTextEl.textContent = `Quase lá! ${totalIssues} item(s) de atenção para revisar.`;
+          } else {
+            summaryTextEl.textContent = `Análise concluída: ${totalIssues} sugestão(ões) em ${totalNodes} elementos analisados.`;
+          }
+        }
+
+        // ====== Renderizar Top 3 Problemas Preview ======
+        if (topProblemsList) {
+          const issues = report.analysis || [];
+          if (issues.length === 0) {
+            topProblemsList.innerHTML = '<p style="color: var(--color-success);">✅ Nenhum problema encontrado!</p>';
+          } else {
+            const top3 = issues.slice(0, 3);
+            topProblemsList.innerHTML = top3.map(issue => {
+              const icon = issue.severity === 'critical' ? '🔴' :
+                issue.severity === 'major' ? '🟠' : '🔵';
+              const title = (issue.message || 'Problema detectado').split('.')[0];
+              return `<div style="padding: 6px 0; border-bottom: 1px solid var(--color-border);">
+                ${icon} <strong>${title}</strong>
+              </div>`;
+            }).join('');
+          }
+        }
+
+        // ====== Renderizar Tabela de Issues ======
+        issuesBodyEl.innerHTML = '';
+        const issues = report.analysis || [];
+
+        // Populate global cache for filtering (used by filters/search)
+        window.__linterAnalysisCache = issues;
+        if (typeof allIssuesData !== 'undefined') {
+          allIssuesData = issues.map(issue => ({
+            ...issue,
+            nodeName: issue.node_name || issue.nodeName || '',
+            nodeId: issue.node_id || issue.nodeId || '',
+            category: (issue.rule || issue.category || 'geral').toLowerCase()
+          }));
+        }
+
+        if (issues.length === 0) {
+          const emptyRow = document.createElement('tr');
+          emptyRow.innerHTML = `
+            <td colspan="3" style="text-align: center; padding: 24px; color: var(--color-text-secondary);">
+              ✨ Nenhum problema encontrado. Seu layout está ótimo!
+            </td>
+          `;
+          issuesBodyEl.appendChild(emptyRow);
+        } else {
+          issues.forEach((issue, idx) => {
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.style.transition = 'background 0.15s';
+            tr.dataset.nodeId = issue.node_id || issue.nodeId || '';
+            tr.dataset.issueIdx = idx;
+            tr.onmouseover = () => { if (!tr.classList.contains('linter-issue--active')) tr.style.background = 'var(--color-bg-secondary)'; };
+            tr.onmouseout = () => { if (!tr.classList.contains('linter-issue--active')) tr.style.background = ''; };
+
+            // Severidade
+            const tdSeverity = document.createElement('td');
+            tdSeverity.style.padding = '8px';
+            const severityIcon = issue.severity === 'critical' ? '🔴' :
+              issue.severity === 'major' || issue.severity === 'warning' ? '🟠' : '🔵';
+            const severityLabel = issue.severity === 'critical' ? 'Crítico' :
+              issue.severity === 'major' || issue.severity === 'warning' ? 'Atenção' : 'Info';
+            tdSeverity.innerHTML = `${severityIcon} ${severityLabel}`;
+
+            // Categoria
+            const tdCategory = document.createElement('td');
+            tdCategory.style.padding = '8px';
+            const category = issue.rule || issue.category || 'geral';
+            const categoryShort = category.includes('auto-layout') ? 'Auto Layout' :
+              category.includes('naming') ? 'Nomenclatura' :
+                category.includes('widget') ? 'Widgets' :
+                  category.includes('image') ? 'Imagens' : 'Estrutura';
+            tdCategory.textContent = categoryShort;
+
+            // Descrição (nodeName + message)
+            const tdDesc = document.createElement('td');
+            tdDesc.style.padding = '8px';
+            const nodeName = issue.node_name || issue.nodeName || '(sem nome)';
+            const message = issue.message || '';
+            tdDesc.innerHTML = `<strong>${nodeName}</strong><br><span style="color: var(--color-text-secondary); font-size: 11px;">${message}</span>`;
+
+            tr.appendChild(tdSeverity);
+            tr.appendChild(tdCategory);
+            tr.appendChild(tdDesc);
+
+            // Click handler: highlight + details + select node
+            tr.addEventListener('click', () => {
+              const nodeId = issue.node_id || issue.nodeId;
+
+              // 1) Remove highlight from all rows, add to this one
+              document.querySelectorAll('#linter-issues-body tr').forEach(row => {
+                row.classList.remove('linter-issue--active');
+                row.style.background = '';
+              });
+              tr.classList.add('linter-issue--active');
+
+              // 2) Update details panel v2
+              updateDetailsPanelV2(issue);
+
+              // 3) Send message to select node in Figma
+              if (nodeId) {
+                send('select-node', { nodeId });
+                console.log('[UI] Selecionando node:', nodeId, nodeName);
               }
             });
 
-            // Add fix handler
-            const fixBtn = issueEl.querySelector('[data-fix]');
-            if (fixBtn) {
-              fixBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                send('fix-issue', { ruleId: issue.ruleId, nodeId: issue.nodeId });
-              });
-            }
-            linterIssues.appendChild(issueEl);
+            issuesBodyEl.appendChild(tr);
           });
+        }
+
+        // ====== Preencher Logs (se existir) ======
+        if (logsContentEl) {
+          try {
+            logsContentEl.value = JSON.stringify(report, null, 2);
+          } catch (e) {
+            logsContentEl.value = '[Erro ao serializar relatório]';
+            console.warn('[UI] Erro ao serializar logs:', e);
+          }
+        }
+
+        // ====== Conectar botões de logs ======
+        if (logsCopyBtn && logsContentEl) {
+          logsCopyBtn.onclick = () => {
+            copyToClipboardSafe(logsContentEl.value || '', 'Logs copiados para a área de transferência!');
+          };
+        }
+
+        if (logsClearBtn && logsContentEl) {
+          logsClearBtn.onclick = () => {
+            logsContentEl.value = '';
+            addLog('Visualização de logs limpa.', 'info');
+          };
+        }
+
+        // ====== Conectar botão Copiar Relatório (btn-copy-report-v2) ======
+        const copyReportBtn = document.getElementById('btn-copy-report-v2');
+        if (copyReportBtn) {
+          copyReportBtn.onclick = () => {
+            if (!window.__linterLastReport) {
+              addLog('Nenhum relatório para copiar. Execute a análise primeiro.', 'warn');
+              return;
+            }
+            const text = JSON.stringify(window.__linterLastReport, null, 2);
+            copyToClipboardSafe(text, 'Relatório copiado para a área de transferência!');
+          };
+        }
+
+        console.log('[UI] renderLinterReport concluído com sucesso');
+      }
+
+      /**
+       * copyToClipboardSafe - Copy text to clipboard with fallback
+       * @param {string} text - Text to copy
+       * @param {string} successMessage - Message to show on success
+       */
+      function copyToClipboardSafe(text, successMessage) {
+        if (!text) {
+          addLog('Nada para copiar.', 'warn');
+          return;
+        }
+
+        // Try modern clipboard API
+        if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(text)
+            .then(() => {
+              addLog(successMessage || 'Copiado!', 'success');
+              console.log('[UI] Texto copiado via navigator.clipboard');
+            })
+            .catch(err => {
+              console.warn('[UI] navigator.clipboard falhou, tentando fallback:', err);
+              copyFallback(text, successMessage);
+            });
+        } else {
+          // Fallback for older browsers or restricted contexts
+          copyFallback(text, successMessage);
         }
       }
-      // Renderiza o relatório do Linter na UI
-      function renderLinterReport(report) {
-        if (!report) return;
-        // 1. Atualizar Score e Stats
-        const totalIssues = report.summary.total || 0;
-        document.getElementById('linter-total-issues').textContent = totalIssues;
 
-        // Atualizar cor do anel baseada no score (opcional, por enquanto fixo)
-        // document.getElementById('linter-score-ring').style.borderColor = ...
-        const counts = report.summary.by_severity || {};
-        document.getElementById('count-critical').textContent = counts.critical || 0;
-        document.getElementById('count-major').textContent = counts.major || 0;
-        document.getElementById('count-minor').textContent = counts.minor || 0;
-        // 2. Renderizar Lista de Issues
-        const issuesList = document.getElementById('linter-issues-list');
-        issuesList.innerHTML = ''; // Limpar lista atual
-        if (totalIssues === 0) {
-          issuesList.innerHTML = `
-            <div class="linter-empty-state">
-              <div class="empty-icon">✨</div>
-              <h3>Nenhum problema encontrado</h3>
-              <p>Seu layout parece estar seguindo todas as boas práticas!</p>
-            </div>`;
-        } else {
-          report.analysis.forEach(issue => {
-            // console.log('📊 [DEBUG] Relatório completo:', report);
-            // console.log('📊 [DEBUG] Primeiro issue:', report.analysis[0]);
-            const card = document.createElement('div');
-            card.className = 'linter-issue-card';
+      function copyFallback(text, successMessage) {
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          textarea.style.top = '0';
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
 
-            // Ícone baseado na regra
-            let icon = '⚠️';
-            if (issue.ruleId === 'auto-layout-required') icon = '📐';
-            if (issue.ruleId === 'widget-naming') icon = '🏷️';
-            if (issue.ruleId === 'spacer-detected') icon = '📏';
-            // Check if naming issue
-            // Check if naming issue
-            const isNamingIssue = issue.rule === 'widget-naming' || issue.rule === 'generic-name-detected';
-            let suggestedName = '';
-            if (isNamingIssue) {
-              const match = issue.message.match(/"([^"]+)"/);
-              if (match) suggestedName = match[1];
-            }
+          const success = document.execCommand('copy');
+          document.body.removeChild(textarea);
 
-            card.innerHTML = `
-              <div class="issue-header">
-                <div class="issue-title">
-                  <span>${icon}</span>
-                  <span>${issue.nodeName || issue.node_name || 'Node'}</span>
-                </div>
-                <span class="issue-badge ${issue.severity}">${issue.severity}</span>
-              </div>
-              <div class="issue-desc">${issue.message}</div>
-              <div class="issue-actions" style="display: flex; gap: 6px; margin-top: 8px;">
-                <button class="btn tiny secondary issue-btn-focus" data-node-id="${issue.nodeId || issue.node_id}">
-                  📍 Ver no Figma
-                </button>
-                ${isNamingIssue && suggestedName ? `
-                  <button class="btn tiny primary issue-btn-rename" data-node-id="${issue.nodeId || issue.node_id}" data-name="${suggestedName}">
-                    ✨ Renomear
-                  </button>
-                ` : ''}
-              </div>
-            `;
-
-            issuesList.appendChild(card);
-
-            // Add click handlers
-            const btnFocus = card.querySelector('.issue-btn-focus');
-            if (btnFocus) {
-              btnFocus.onclick = (e) => {
-                e.stopPropagation();
-                send('focus-node', { nodeId: btnFocus.dataset.nodeId });
-              };
-            }
-
-            const btnRename = card.querySelector('.issue-btn-rename');
-            if (btnRename) {
-              btnRename.onclick = (e) => {
-                e.stopPropagation();
-                send('rename-layer', { nodeId: btnRename.dataset.nodeId, name: btnRename.dataset.name });
-                addLog(`Renomeando para "${btnRename.dataset.name}"...`, 'info');
-              };
-            }
-          });
-        }
-        // 3. Renderizar Tabela de Widgets
-        const widgetsBody = document.getElementById('widgets-table-body');
-        const widgetsCount = document.getElementById('widgets-count');
-
-        widgetsBody.innerHTML = ''; // Limpar tabela
-        widgetsCount.textContent = report.widgets ? report.widgets.length : 0;
-        if (report.widgets && report.widgets.length > 0) {
-          // Mostrar apenas os top 20 para não travar a UI se houver muitos
-          report.widgets.slice(0, 20).forEach(widget => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td><strong>${widget.widget}</strong></td>
-              <td>${widget.node_name}</td>
-              <td>${widget.confidence}</td>
-            `;
-            widgetsBody.appendChild(row);
-          });
-
-          if (report.widgets.length > 20) {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="3" style="text-align:center; color:#888;">... e mais ${report.widgets.length - 20} widgets</td>`;
-            widgetsBody.appendChild(row);
+          if (success) {
+            addLog(successMessage || 'Copiado!', 'success');
+            console.log('[UI] Texto copiado via execCommand fallback');
+          } else {
+            addLog('Falha ao copiar. Tente selecionar e copiar manualmente.', 'error');
           }
-        } else {
-          const row = document.createElement('tr');
-          row.innerHTML = `<td colspan="3" style="text-align:center; padding: 12px;">Nenhum widget detectado</td>`;
-          widgetsBody.appendChild(row);
+        } catch (err) {
+          console.error('[UI] Fallback de cópia falhou:', err);
+          addLog('Não foi possível copiar. Copie manualmente.', 'error');
         }
-
-        // 4. Adicionar handlers para clique nos issues
-        const issueCards = document.querySelectorAll('.linter-issue-card');
-        issueCards.forEach((card, index) => {
-          card.addEventListener('click', () => {
-            showProblemDetails(report.analysis[index], index, report);
-          });
-        });
       }
 
       // ========== PROBLEM DETAILS PANEL LOGIC ==========
@@ -2838,6 +3734,505 @@
           if (panel) panel.style.display = 'none';
           addLog('Problema ignorado', 'info');
         };
+      }
+
+      // ========== LINTER UI v2 LOGIC ==========
+
+      // Sub-tabs navigation
+      const linterSubtabBtns = document.querySelectorAll('.linter-subtab-btn');
+      const linterSubpanels = document.querySelectorAll('.linter-subpanel');
+
+      function switchLinterSubtab(targetId) {
+        linterSubtabBtns.forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.subtab === targetId);
+        });
+        linterSubpanels.forEach(panel => {
+          panel.classList.toggle('active', panel.dataset.subpanel === targetId);
+        });
+      }
+
+      linterSubtabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          switchLinterSubtab(btn.dataset.subtab);
+        });
+      });
+
+      // Filter chips
+      let currentSeverityFilter = 'all';
+      let currentCategoryFilter = 'all';
+      let allIssuesData = []; // Store all issues for filtering
+
+      document.querySelectorAll('[data-filter-severity]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-filter-severity]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentSeverityFilter = btn.dataset.filterSeverity;
+          renderFilteredIssues();
+        });
+      });
+
+      document.querySelectorAll('[data-filter-category]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-filter-category]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentCategoryFilter = btn.dataset.filterCategory;
+          renderFilteredIssues();
+        });
+      });
+
+      // Search with PRD ID: linter-search-input
+      const linterSearchInput = document.getElementById('linter-search-input');
+      let searchDebounceTimer = null;
+      if (linterSearchInput) {
+        linterSearchInput.addEventListener('input', () => {
+          clearTimeout(searchDebounceTimer);
+          searchDebounceTimer = setTimeout(() => {
+            renderFilteredIssues();
+          }, 200);
+        });
+      }
+
+      function renderFilteredIssues() {
+        const searchTerm = (linterSearchInput?.value || '').toLowerCase();
+        const filtered = allIssuesData.filter(issue => {
+          // Map severity: 'major' -> 'warning' for consistency
+          const normalizedSeverity = issue.severity === 'major' ? 'warning' : issue.severity;
+          const matchesSeverity = currentSeverityFilter === 'all' || normalizedSeverity === currentSeverityFilter;
+
+          // Map category from rule field
+          const category = (issue.rule || issue.category || '').toLowerCase();
+          const matchesCategory = currentCategoryFilter === 'all' || category.includes(currentCategoryFilter);
+
+          // Search by nodeName and message
+          const nodeName = issue.node_name || issue.nodeName || '';
+          const message = issue.message || '';
+          const matchesSearch = !searchTerm ||
+            nodeName.toLowerCase().includes(searchTerm) ||
+            message.toLowerCase().includes(searchTerm);
+          return matchesSeverity && matchesCategory && matchesSearch;
+        });
+        renderIssuesListV2(filtered);
+      }
+
+      function renderIssuesListV2(issues) {
+        const container = document.getElementById('issues-list-v2');
+        const emptyState = document.getElementById('issues-empty-state');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (issues.length === 0) {
+          container.innerHTML = `
+            <div class="linter-empty-state">
+              <div class="empty-icon">✨</div>
+              <h3 style="font-size: 14px; margin: 8px 0;">Nenhum problema encontrado</h3>
+              <p style="font-size: 12px; margin: 0;">Seu layout parece estar seguindo todas as boas práticas!</p>
+            </div>`;
+          return;
+        }
+
+        issues.forEach((issue, idx) => {
+          const severityIcon = issue.severity === 'critical' ? '🔴' :
+            issue.severity === 'warning' ? '🟠' : '🔵';
+          const card = document.createElement('div');
+          card.className = `issue-card-v2 ${issue.severity}`;
+          card.dataset.issueIdx = idx;
+          card.dataset.nodeId = issue.node_id || issue.nodeId || '';
+
+          // Extract naming suggestions
+          const naming = issue.naming || {};
+          const recommendedName = naming.recommendedName || issue.widgetType || '';
+          const alternatives = naming.alternatives || [];
+
+          // Build naming suggestion HTML
+          let namingSuggestionHtml = '';
+          if (recommendedName) {
+            namingSuggestionHtml = `
+              <div class="issue-naming-suggestion" style="margin-top: 6px; padding: 6px 8px; background: rgba(59, 130, 246, 0.1); border-radius: 4px; font-size: 11px;">
+                <span style="color: var(--color-text-secondary);">Sugestão:</span>
+                <code style="background: rgba(0,0,0,0.15); padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-family: monospace;">${recommendedName}</code>
+                ${alternatives.length > 0 ? `<span style="color: var(--color-text-secondary); margin-left: 6px;">+${alternatives.length} opções</span>` : ''}
+              </div>
+            `;
+          } else if (issue.ruleId === 'widget-naming' || issue.rule === 'widget-naming' || (issue.category || '').includes('naming')) {
+            // Se é uma issue de naming mas não tem sugestão
+            namingSuggestionHtml = `
+              <div class="issue-naming-suggestion" style="margin-top: 6px; padding: 6px 8px; background: rgba(100,100,100,0.1); border-radius: 4px; font-size: 11px; color: var(--color-text-secondary);">
+                Nenhuma sugestão disponível
+              </div>
+            `;
+          }
+
+          card.innerHTML = `
+            <span class="issue-icon">${severityIcon}</span>
+            <div class="issue-content">
+              <div class="issue-title-row">
+                <span class="issue-title-v2">${issue.title || issue.message}</span>
+                <span class="issue-category-chip">${issue.category || 'geral'}</span>
+              </div>
+              <div class="issue-summary">${issue.summary || issue.message}</div>
+              <div class="issue-node-info">📍 ${issue.nodeName || issue.node_name || 'Node'}</div>
+              ${namingSuggestionHtml}
+            </div>
+          `;
+          card.addEventListener('click', () => {
+            // 1) Visual highlight
+            document.querySelectorAll('.issue-card-v2').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+
+            // 2) Update details panel with naming info
+            updateDetailsPanelV2(issue);
+
+            // 3) Send message to select node in Figma
+            const nodeId = issue.node_id || issue.nodeId;
+            if (nodeId) {
+              send('select-node', { nodeId });
+              console.log('[UI] Card click - selecionando node:', nodeId, issue.nodeName || issue.node_name);
+            } else {
+              console.warn('[UI] Card click - nodeId não disponível para issue:', issue.message);
+            }
+          });
+          container.appendChild(card);
+        });
+      }
+
+      /**
+       * setLinterStatus - Show feedback message in the Linter status bar
+       * @param {'success' | 'error' | 'warning'} state - Status type
+       * @param {string} message - Message to display (with emoji prefix)
+       */
+      function setLinterStatus(state, message) {
+        const statusBar = document.getElementById('linter-status-bar');
+        const statusIcon = document.getElementById('linter-status-icon');
+        const statusText = document.getElementById('linter-status-message');
+
+        if (!statusBar) {
+          console.warn('[LINTER/UI] Status bar element not found');
+          return;
+        }
+
+        // Remove hidden class and previous state classes
+        statusBar.classList.remove('hidden', 'linter-status-bar--success', 'linter-status-bar--warning', 'linter-status-bar--error');
+
+        // Add new state class
+        statusBar.classList.add(`linter-status-bar--${state}`);
+
+        // Update icon
+        if (statusIcon) {
+          const icons = { success: '✅', warning: '⚠️', error: '❌' };
+          statusIcon.textContent = icons[state] || '';
+        }
+
+        // Update message (remove emoji prefix since it's already in the message)
+        if (statusText) {
+          statusText.textContent = message.replace(/^[✅❌⚠️]\s*/, '');
+        }
+
+        // Auto-hide after 8 seconds
+        setTimeout(() => {
+          if (statusBar) {
+            statusBar.classList.add('hidden');
+          }
+        }, 8000);
+
+        console.log(`[LINTER/UI] Status: ${state} - ${message}`);
+      }
+
+      /**
+       * Highlight active issue row in table
+       * @param {string|null} nodeId - Node ID to highlight, or null to clear
+       */
+      function highlightActiveIssue(nodeId) {
+        // Clear previous highlights
+        document.querySelectorAll('.linter-issue--active').forEach(el => {
+          el.classList.remove('linter-issue--active');
+        });
+
+        if (!nodeId) return;
+
+        // Find and highlight the row with matching nodeId
+        const rows = document.querySelectorAll('#linter-issues-body tr[data-node-id]');
+        rows.forEach(row => {
+          if (row.dataset.nodeId === nodeId) {
+            row.classList.add('linter-issue--active');
+          }
+        });
+      }
+
+      /**
+       * updateDetailsPanelV2 - Update the action panel with issue information and rename options
+       * Called when clicking on an issue card
+       * @param {Object} issue - Issue object with message, naming, etc.
+       */
+      let currentSelectedIssue = null; // Store for rename handler
+
+      function updateDetailsPanelV2(issue) {
+        currentSelectedIssue = issue;
+        const panel = document.getElementById('details-panel-v2');
+
+        if (!panel) {
+          console.log('[UI] Panel details-panel-v2 não encontrado');
+          return;
+        }
+
+        // Extract data with fallbacks
+        const nodeName = issue.node_name || issue.nodeName || '—';
+        const nodeId = issue.node_id || issue.nodeId || '';
+        const nodeType = issue.node_type || issue.nodeType || '—';
+        const message = issue.message || 'Problema detectado';
+
+        // Extract naming suggestions
+        const naming = issue.naming || {};
+        const recommendedName = naming.recommendedName || issue.widgetType || '';
+        const alternatives = naming.alternatives || [];
+        const hasNamingSuggestion = !!recommendedName;
+
+        // Build rename options for dropdown
+        const renameOptions = [];
+        if (recommendedName) renameOptions.push(recommendedName);
+        alternatives.forEach(alt => {
+          if (alt && !renameOptions.includes(alt)) renameOptions.push(alt);
+        });
+
+        // Update panel HTML with action-focused layout
+        panel.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h4 style="margin: 0; font-size: 13px; font-weight: 600;">🎯 Ações Rápidas</h4>
+            <button onclick="this.closest('#details-panel-v2').style.display='none'" style="background: none; border: none; cursor: pointer; font-size: 16px;">×</button>
+          </div>
+          
+          <div style="margin-bottom: 12px;">
+            <label style="font-size: 11px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">Nome Atual</label>
+            <div id="details-current-name" style="font-weight: 600; font-size: 13px; padding: 6px 10px; background: var(--color-bg-secondary); border-radius: 4px;">${nodeName}</div>
+          </div>
+          
+          ${hasNamingSuggestion ? `
+            <div style="margin-bottom: 12px;">
+              <label style="font-size: 11px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">Renomear para</label>
+              <div style="display: flex; gap: 8px;">
+                <select id="details-rename-select" style="flex: 1; padding: 8px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 12px; background: var(--color-panel);">
+                  ${renameOptions.map((name, i) => `<option value="${name}" ${i === 0 ? 'selected' : ''}>${name}</option>`).join('')}
+                </select>
+                <button id="details-rename-apply" class="btn btn-primary" style="padding: 8px 12px; font-size: 11px; white-space: nowrap;">
+                  ✏️ Renomear
+                </button>
+              </div>
+              ${alternatives.length > 0 ? `<div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 4px;">${alternatives.length} alternativa(s) disponível(is)</div>` : ''}
+            </div>
+          ` : ''}
+          
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button id="btn-select-node-v2" class="btn btn-secondary" style="flex: 1; padding: 8px 12px; font-size: 11px;" ${!nodeId ? 'disabled' : ''}>
+              🎯 Selecionar no Figma
+            </button>
+          </div>
+          
+          <div style="font-size: 10px; color: var(--color-text-secondary); padding-top: 8px; border-top: 1px solid var(--color-border);">
+            <div id="details-tech-info">Node: ${nodeName} | ID: ${nodeId || '—'}</div>
+          </div>
+        `;
+
+        // Setup rename button handler
+        const renameBtn = document.getElementById('details-rename-apply');
+        const renameSelect = document.getElementById('details-rename-select');
+        if (renameBtn && renameSelect && nodeId) {
+          renameBtn.onclick = () => {
+            const newName = renameSelect.value;
+            if (newName && nodeId) {
+              renameBtn.disabled = true;
+              renameBtn.textContent = '⏳ Renomeando...';
+              send('linter-rename-node', { nodeId, newName });
+              console.log('[UI] Enviando rename:', nodeId, '→', newName);
+            }
+          };
+        }
+
+        // Setup select button handler
+        const selectBtn = document.getElementById('btn-select-node-v2');
+        if (selectBtn && nodeId) {
+          selectBtn.onclick = () => {
+            send('select-node', { nodeId });
+            setLinterStatus('success', '✅ Elemento selecionado no Figma.');
+          };
+        }
+
+        // Show panel
+        panel.classList.add('visible');
+        panel.style.display = 'block';
+
+        console.log('[UI] Action panel atualizado para:', nodeName, hasNamingSuggestion ? `(sugestão: ${recommendedName})` : '(sem sugestão)');
+      }
+
+      /**
+       * resetLinterUI - Reset the Linter UI to initial state before reanalyze
+       * Called when clicking 'Reanalisar' button
+       */
+      function resetLinterUI() {
+        console.log('[UI] Resetando Linter UI...');
+
+        // Reset score
+        const scoreEl = document.getElementById('linter-score-value');
+        if (scoreEl) scoreEl.textContent = '--';
+
+        // Reset ring color
+        const scoreRing = document.getElementById('score-ring-v2');
+        if (scoreRing) {
+          scoreRing.classList.remove('success', 'warning', 'critical');
+        }
+
+        // Reset status badge
+        const statusEl = document.getElementById('linter-status-badge');
+        if (statusEl) {
+          statusEl.classList.remove('ok', 'warning', 'critical');
+          statusEl.classList.add('warning');
+          statusEl.innerHTML = '<span class="badge-icon">⏳</span> ANALISANDO...';
+        }
+
+        // Reset summary text
+        const summaryText = document.getElementById('linter-summary-text');
+        if (summaryText) summaryText.textContent = 'Analisando layout selecionado...';
+
+        // Reset counters
+        ['linter-critical-count', 'linter-warning-count', 'linter-info-count', 'linter-ok-count'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = '--';
+        });
+
+        // Clear issues table
+        const issuesBody = document.getElementById('linter-issues-body');
+        if (issuesBody) {
+          issuesBody.innerHTML = `
+            <tr>
+              <td colspan="3" style="text-align: center; padding: 24px; color: var(--color-text-secondary);">
+                ⏳ Analisando layout... Por favor aguarde.
+              </td>
+            </tr>
+          `;
+        }
+
+        // Clear top problems preview
+        const topProblems = document.getElementById('top-problems-list');
+        if (topProblems) {
+          topProblems.innerHTML = '<p style="color: var(--color-text-secondary);">⏳ Analisando...</p>';
+        }
+
+        // Hide details panel
+        const detailsPanel = document.getElementById('details-panel-v2');
+        if (detailsPanel) {
+          detailsPanel.classList.remove('visible');
+          detailsPanel.style.display = 'none';
+        }
+
+        // Clear logs
+        const logsContent = document.getElementById('linter-logs-content');
+        if (logsContent) logsContent.value = '';
+
+        // Clear global cache
+        window.__linterLastReport = null;
+        window.__linterAnalysisCache = [];
+        if (typeof allIssuesData !== 'undefined') {
+          allIssuesData = [];
+        }
+      }
+
+      function showDetailsV2(issue) {
+        const panel = document.getElementById('details-panel-v2');
+        const title = document.getElementById('details-title');
+        const desc = document.getElementById('details-description');
+        const suggestion = document.getElementById('details-suggestion');
+        const techInfo = document.getElementById('details-tech-info');
+        const selectBtn = document.getElementById('btn-select-node-v2');
+
+        if (!panel) return;
+
+        title.textContent = `🎯 ${issue.title || issue.message}`;
+        desc.textContent = issue.details || issue.message || 'Sem descrição disponível.';
+        suggestion.textContent = issue.suggestion || 'Verifique a estrutura do elemento e ajuste conforme as boas práticas.';
+        techInfo.textContent = `Node: ${issue.nodeName || '—'} | Tipo: ${issue.nodeType || '—'} | ID: ${issue.nodeId || '—'}`;
+
+        selectBtn.disabled = !issue.nodeId;
+        selectBtn.onclick = () => {
+          if (issue.nodeId) {
+            send('select-node', { nodeId: issue.nodeId });
+            addLog(`Selecionando node: ${issue.nodeName}`, 'info');
+          }
+        };
+
+        panel.classList.add('visible');
+      }
+
+      // Close details panel
+      const btnCloseDetailsV2 = document.getElementById('btn-close-details-v2');
+      if (btnCloseDetailsV2) {
+        btnCloseDetailsV2.addEventListener('click', () => {
+          const panel = document.getElementById('details-panel-v2');
+          if (panel) panel.classList.remove('visible');
+        });
+      }
+
+      // Reanalyze button
+      const btnReanalyze = document.getElementById('btn-reanalyze');
+      if (btnReanalyze) {
+        btnReanalyze.addEventListener('click', () => {
+          send('analyze-layout');
+          addLog('Iniciando reanálise de layout...', 'info');
+        });
+      }
+
+      // Copy report button
+      const btnCopyReportV2 = document.getElementById('btn-copy-report-v2');
+      if (btnCopyReportV2) {
+        btnCopyReportV2.addEventListener('click', () => {
+          const score = document.getElementById('score-number-v2')?.textContent || '—';
+          const critical = document.getElementById('stat-critical-v2')?.textContent || '0';
+          const warning = document.getElementById('stat-warning-v2')?.textContent || '0';
+          const info = document.getElementById('stat-info-v2')?.textContent || '0';
+
+          const report = `# Relatório do Linter
+Score: ${score}/100
+Críticos: ${critical}
+Atenção: ${warning}
+Sugestões: ${info}
+
+Gerado em: ${new Date().toLocaleString('pt-BR')}`;
+
+          navigator.clipboard.writeText(report).then(() => {
+            addLog('Relatório copiado para a área de transferência!', 'success');
+          });
+        });
+      }
+
+      // Logs tab buttons
+      const btnCopyLogs = document.getElementById('btn-copy-logs');
+      const btnClearLogs = document.getElementById('btn-clear-logs');
+      const logsTextarea = document.getElementById('logs-textarea-v2');
+
+      if (btnCopyLogs && logsTextarea) {
+        btnCopyLogs.addEventListener('click', () => {
+          navigator.clipboard.writeText(logsTextarea.value || '').then(() => {
+            addLog('Logs copiados!', 'success');
+          });
+        });
+      }
+
+      if (btnClearLogs && logsTextarea) {
+        btnClearLogs.addEventListener('click', () => {
+          logsTextarea.value = '';
+          addLog('Visualização de logs limpa.', 'info');
+        });
+      }
+
+      // generateSuggestion helper for issue details
+      function generateSuggestion(ruleId) {
+        const suggestions = {
+          'auto-layout-required': 'Aplique Auto Layout neste frame para garantir responsividade.',
+          'widget-naming': 'Renomeie o layer usando o prefixo semântico (w:, c:, e:).',
+          'generic-name-detected': 'Use um nome descritivo como "w:button-cta" ou "c:hero-section".',
+          'spacer-detected': 'Use gap e padding em vez de spacers manuais.',
+          'default': 'Verifique a estrutura do elemento e ajuste conforme as boas práticas.'
+        };
+        return suggestions[ruleId] || suggestions.default;
       }
 
     })();
