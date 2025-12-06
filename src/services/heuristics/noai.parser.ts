@@ -1,10 +1,16 @@
 import { rgbToHex, SerializedNode } from '../../utils/serialization_utils';
 import { extractWidgetStyles, extractContainerStyles, buildHtmlFromSegments } from '../../utils/style_utils';
 import { findWidgetDefinition } from '../../config/widget.registry';
+import { DEBUG_SHADOW_V1, DEBUG_V2_EXPLAIN } from '../../config/debug';
 
-// Import heuristics system
-import { evaluateNode, DEFAULT_HEURISTICS } from '../../heuristics';
-import type { NodeSnapshot } from '../../heuristics/types';
+// Import V2 Engine (primary source of truth)
+import { evaluateHeuristics, V2_MIN_CONFIDENCE } from '../../engine/heuristic-registry';
+import { NodeFeatures, PageZone } from '../../engine/types';
+
+// Legacy V1 imports (DEPRECATED - only used for Shadow Mode comparison when DEBUG_SHADOW_V1 = true)
+// These imports are from src/deprecated/v1/ - V1 is NO LONGER used for production decisions
+import { evaluateNode, DEFAULT_HEURISTICS } from '../../deprecated/v1';
+import type { NodeSnapshot } from '../../deprecated/v1/types';
 import type { PipelineSchema, PipelineContainer, PipelineWidget } from '../../types/pipeline.schema';
 
 type MaybeWidget = PipelineWidget | null;
@@ -138,6 +144,106 @@ function isSolidColor(node: any): string | undefined {
     const { r, g, b, a = 1 } = solid.color || {};
     const to255 = (v: number) => Math.round((v || 0) * 255);
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
+}
+
+/**
+ * Convert SerializedNode to NodeFeatures for V2 Engine evaluation.
+ * This is the core bridge between the serialized tree and the V2 DecisionEngine.
+ */
+function toNodeFeaturesFromSerialized(node: SerializedNode): NodeFeatures {
+    const children = Array.isArray((node as any).children) ? (node as any).children as SerializedNode[] : [];
+    const hasText = node.type === 'TEXT' || children.some((c: any) => c.type === 'TEXT');
+    const hasImageFillCheck = isImageFill(node) || children.some((c: any) => isImageFill(c));
+
+    // Count text nodes and images
+    let textCount = 0;
+    let imageCount = 0;
+    let textLength = 0;
+    let maxFontSize = 0;
+    let maxFontWeight = 400;
+
+    if (node.type === 'TEXT') {
+        textCount = 1;
+        textLength = (node as any).characters?.length || 0;
+        maxFontSize = typeof (node as any).fontSize === 'number' ? (node as any).fontSize : 0;
+        const fontName = (node as any).fontName;
+        if (fontName && fontName.style) {
+            const style = fontName.style.toLowerCase();
+            if (style.indexOf('bold') >= 0) maxFontWeight = 700;
+            else if (style.indexOf('semibold') >= 0) maxFontWeight = 600;
+            else if (style.indexOf('medium') >= 0) maxFontWeight = 500;
+        }
+    }
+
+    // Scan children for text/image info
+    for (const child of children) {
+        if (child.type === 'TEXT') {
+            textCount++;
+            textLength += (child as any).characters?.length || 0;
+            const childFontSize = typeof (child as any).fontSize === 'number' ? (child as any).fontSize : 0;
+            if (childFontSize > maxFontSize) maxFontSize = childFontSize;
+        }
+        if (isImageFill(child)) {
+            imageCount++;
+        }
+    }
+
+    // Check for nested frames
+    let hasNestedFrames = false;
+    for (const child of children) {
+        if (child.type === 'FRAME' || child.type === 'GROUP' || child.type === 'COMPONENT' || child.type === 'INSTANCE') {
+            hasNestedFrames = true;
+            break;
+        }
+    }
+
+    // Detect vector nodes
+    const vectorNodeTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE'];
+    const isVectorNode = vectorNodeTypes.indexOf(node.type) >= 0;
+
+    // Layouts
+    const layoutMode = (node as any).layoutMode || 'NONE';
+
+    // Zone detection (simplified)
+    const y = node.y || 0;
+    let zone: PageZone = 'BODY';
+    if (y < 200) zone = 'HEADER';
+    else if (y < 800) zone = 'HERO';
+
+    const width = node.width || 0;
+    const height = node.height || 0;
+
+    return {
+        id: node.id,
+        name: node.name || '',
+        type: node.type,
+        width,
+        height,
+        x: node.x || 0,
+        y,
+        area: width * height,
+        childCount: children.length,
+        layoutMode: layoutMode === 'HORIZONTAL' ? 'HORIZONTAL' : layoutMode === 'VERTICAL' ? 'VERTICAL' : 'NONE',
+        primaryAxisSizingMode: (node as any).primaryAxisSizingMode === 'AUTO' ? 'AUTO' : 'FIXED',
+        counterAxisSizingMode: (node as any).counterAxisSizingMode === 'AUTO' ? 'AUTO' : 'FIXED',
+        hasNestedFrames,
+        hasFill: Array.isArray((node as any).fills) && (node as any).fills.length > 0,
+        hasStroke: Array.isArray((node as any).strokes) && (node as any).strokes.length > 0,
+        hasText,
+        textCount,
+        hasImage: hasImageFillCheck,
+        imageCount,
+        textLength,
+        fontSize: maxFontSize,
+        fontWeight: maxFontWeight,
+        isVectorNode,
+        vectorWidth: isVectorNode ? width : 0,
+        vectorHeight: isVectorNode ? height : 0,
+        parentLayoutMode: 'NONE', // Not available from SerializedNode
+        siblingCount: 0, // Not available from SerializedNode
+        aspectRatio: height > 0 ? width / height : 0,
+        zone
+    };
 }
 
 const BOXED_MIN_PARENT_WIDTH = 1440;
@@ -460,80 +566,104 @@ function detectWidget(node: SerializedNode): MaybeWidget {
     const children = hasChildren ? ((node as any).children as SerializedNode[]) : [];
     const firstImageDeep = findFirstImageId(node);
 
-    // **PHASE 1: Try Heuristics First** (NEW!)
-    // SKIP heuristics if user explicitly named the widget
+    // **PHASE 1: V2 Engine as PRIMARY source of truth**
+    // SKIP heuristics if user explicitly named the widget with w: prefix
     const hasExplicitName = /^(w:|woo:|loop:|media:|e:)/.test(name);
     if (!hasExplicitName) {
         try {
-            const snapshot = toNodeSnapshot(node);
-            const heuristicResults = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
+            // ============================================================
+            // V2 ENGINE - Primary decision source (replaces V1)
+            // ============================================================
+            const v2Features = toNodeFeaturesFromSerialized(node);
+            const v2Candidates = evaluateHeuristics(v2Features);
 
-            if (heuristicResults.length > 0) {
-                const best = heuristicResults[0];
-                console.log('[HEURISTICS] Matched:', best.widget, 'Confidence:', best.confidence, 'Pattern:', best.patternId);
+            // SHADOW MODE: V1 comparison (only when DEBUG_SHADOW_V1 is enabled)
+            // V1 is DEPRECATED and NEVER used for production decisions
+            let v1Widget = 'container';
+            if (DEBUG_SHADOW_V1) {
+                const snapshot = toNodeSnapshot(node);
+                const v1Results = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
+                v1Widget = v1Results.length > 0 ? v1Results[0].widget : 'container';
+            }
 
-                // Use generic structural analysis for all widgets
-                const widgetType = best.widget.replace(/^w:/, '');
-                const analysis = analyzeWidgetStructure(node, widgetType);
+            if (v2Candidates.length > 0) {
+                const best = v2Candidates[0];
+                const v2Widget = best.widget.replace(/^w:/, '');
+                const v2Score = best.score;
 
-                // **NEW: If this is a container/section with child widgets, return null**
-                // This allows toContainer to process it properly with hierarchy
-                if ((widgetType === 'section' || widgetType === 'container') && analysis.childWidgets.length > 0) {
-                    console.log('[HEURISTICS] Container with', analysis.childWidgets.length, 'child widgets - delegating to toContainer');
-                    return null;  // Let toContainer handle it
+                // Shadow Mode logging (V1 vs V2 comparison) - only when enabled
+                if (DEBUG_SHADOW_V1 && v1Widget !== best.widget) {
+                    console.log(`[SHADOW-V1] Node ${node.id} | V1: ${v1Widget} | V2: ${best.widget} (${v2Score.toFixed(2)})`);
                 }
 
-                // Merge all styles
-                const mergedStyles = {
-                    ...styles,
-                    ...analysis.containerStyles,
-                    ...analysis.textStyles
-                };
-
-                // Add node dimensions for image/icon widgets
-                if (typeof node.width === 'number') mergedStyles.width = node.width;
-                if (typeof node.height === 'number') mergedStyles.height = node.height;
-
-                // Add transparent background fallback for buttons
-                if (widgetType === 'button' && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
-                    mergedStyles.fills = [{
-                        type: 'SOLID',
-                        color: { r: 1, g: 1, b: 1 },
-                        opacity: 0,
-                        visible: true
-                    }];
+                // V2 ExplainabilityLayer logging - controlled by DEBUG_V2_EXPLAIN
+                if (DEBUG_V2_EXPLAIN) {
+                    console.log(`[V2-EXPLAIN] Node ${node.id} | ${best.widget} (${v2Score.toFixed(2)}) | Features: type=${v2Features.type}, fontSize=${v2Features.fontSize}, childCount=${v2Features.childCount}`);
                 }
 
-                // Determine content fallback
-                let content = analysis.text;
-                if (!content) {
-                    // Only use node.name if it's NOT a technical identifier
-                    const isTechnicalName = node.name.includes(':') ||
-                        node.name.startsWith('w-') ||
-                        node.name.startsWith('Frame ') ||
-                        node.name.startsWith('Group ');
+                // V2 DECISION: Only accept if score >= threshold
+                if (v2Score >= V2_MIN_CONFIDENCE) {
+                    const widgetType = v2Widget;
+                    const analysis = analyzeWidgetStructure(node, widgetType);
 
-                    if (!isTechnicalName) {
-                        content = node.name;
-                    } else {
-                        // Generic fallback based on type
-                        content = widgetType === 'heading' ? 'Heading' :
-                            widgetType === 'button' ? 'Button' :
-                                widgetType === 'text' ? 'Text Block' : '';
+                    // If this is a container with child widgets, delegate to toContainer
+                    if ((widgetType === 'section' || widgetType === 'container') && analysis.childWidgets.length > 0) {
+                        console.log('[V2-ENGINE] Container with', analysis.childWidgets.length, 'child widgets - delegating to toContainer');
+                        return null;
                     }
-                }
 
-                return {
-                    type: widgetType,
-                    content: content,
-                    imageId: analysis.iconId,
-                    styles: mergedStyles,
-                    children: analysis.childWidgets
-                };
+                    // Merge all styles
+                    const mergedStyles = {
+                        ...styles,
+                        ...analysis.containerStyles,
+                        ...analysis.textStyles
+                    };
+
+                    if (typeof node.width === 'number') mergedStyles.width = node.width;
+                    if (typeof node.height === 'number') mergedStyles.height = node.height;
+
+                    // Button background fallback
+                    if (widgetType === 'button' && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+                        mergedStyles.fills = [{
+                            type: 'SOLID',
+                            color: { r: 1, g: 1, b: 1 },
+                            opacity: 0,
+                            visible: true
+                        }];
+                    }
+
+                    // Content fallback
+                    let content = analysis.text;
+                    if (!content) {
+                        const isTechnicalName = node.name.includes(':') ||
+                            node.name.startsWith('w-') ||
+                            node.name.startsWith('Frame ') ||
+                            node.name.startsWith('Group ');
+
+                        if (!isTechnicalName) {
+                            content = node.name;
+                        } else {
+                            content = widgetType === 'heading' ? 'Heading' :
+                                widgetType === 'button' ? 'Button' :
+                                    widgetType === 'text' ? 'Text Block' : '';
+                        }
+                    }
+
+                    return {
+                        type: widgetType,
+                        content: content,
+                        imageId: analysis.iconId,
+                        styles: mergedStyles,
+                        children: analysis.childWidgets
+                    };
+                } else {
+                    // V2 score too low - log and continue to fallback
+                    console.log(`[V2-ENGINE] Score ${v2Score.toFixed(2)} < ${V2_MIN_CONFIDENCE} for ${best.widget} - falling through to fallback`);
+                }
             }
         } catch (error) {
-            console.log('[HEURISTICS] Error evaluating node:', error);
-            // Fall through to manual detection
+            console.log('[V2-ENGINE] Error evaluating node:', error);
+            // Fall through to registry/fallback detection
         }
     } // End of if (!hasExplicitName)
 

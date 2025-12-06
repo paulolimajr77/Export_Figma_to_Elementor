@@ -2760,7 +2760,538 @@ SA\xCDDA:
 Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 `;
 
-  // src/heuristics/engine.ts
+  // src/config/debug.ts
+  var DEBUG_SHADOW_V1 = false;
+  var DEBUG_V2_EXPLAIN = true;
+
+  // src/engine/heuristic-registry.ts
+  var V2_MIN_CONFIDENCE = 0.7;
+  var BUTTON_MIN_CONFIDENCE = 0.7;
+  var HEADING_MIN_CONFIDENCE = 0.75;
+  var IMAGE_BOX_MIN_CONFIDENCE = 0.65;
+  var TEXT_EDITOR_MIN_CONFIDENCE = 0.6;
+  var CONTAINER_DEFAULT_CONFIDENCE = 0.3;
+  var ButtonRule = {
+    id: "h_button_calibrated",
+    targetWidget: "w:button",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (features.hasText && features.textCount === 1) {
+        score += 0.35;
+        reasons.push("Texto \xFAnico detectado");
+      }
+      if (features.hasFill || features.hasStroke) {
+        score += 0.2;
+        reasons.push("Possui preenchimento ou borda");
+      }
+      if (features.aspectRatio > 1.5 && features.aspectRatio < 8) {
+        score += 0.2;
+        reasons.push("Propor\xE7\xE3o horizontal t\xEDpica de bot\xE3o");
+      }
+      if (features.textLength > 0 && features.textLength < 40) {
+        score += 0.15;
+        reasons.push("Texto curto (< 40 chars)");
+      }
+      if (features.childCount > 2) {
+        score -= 0.4;
+        reasons.push("PENALTY: Muitos filhos (" + features.childCount + ")");
+      }
+      if (features.height > 120) {
+        score -= 0.4;
+        reasons.push("PENALTY: Altura excessiva (" + features.height + "px)");
+      }
+      if (features.hasNestedFrames) {
+        score -= 0.3;
+        reasons.push("PENALTY: Estrutura aninhada complexa");
+      }
+      if (features.area > 15e4) {
+        score -= 0.35;
+        reasons.push("PENALTY: \xC1rea muito grande");
+      }
+      if ((features.zone === "HEADER" || features.zone === "FOOTER") && features.area > 5e4) {
+        score -= 0.2;
+        reasons.push("PENALTY: Container grande em " + features.zone);
+      }
+      if (!features.hasText) {
+        score -= 0.5;
+        reasons.push("PENALTY: Sem texto");
+      }
+      if (score < BUTTON_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:button",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_button_calibrated",
+        reasons
+      };
+    }
+  };
+  var HeadingRule = {
+    id: "h_heading_calibrated",
+    targetWidget: "w:heading",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasText && features.type !== "TEXT") {
+        return null;
+      }
+      if (features.fontSize >= 22) {
+        score += 0.4;
+        reasons.push("Tamanho de fonte tipogr\xE1fica grande (" + features.fontSize + "px)");
+      } else if (features.fontSize >= 18) {
+        score += 0.25;
+        reasons.push("Tamanho de fonte moderado (" + features.fontSize + "px)");
+      }
+      if (features.fontWeight >= 600) {
+        score += 0.25;
+        reasons.push("Peso de fonte bold/semibold");
+      }
+      if (features.textLength > 0 && features.textLength < 80) {
+        score += 0.2;
+        reasons.push("Texto curto (< 80 chars)");
+      }
+      if (features.zone === "HERO" || features.zone === "HEADER") {
+        score += 0.15;
+        reasons.push("Zona com alta probabilidade de heading");
+      }
+      if (features.textLength > 150) {
+        score -= 0.5;
+        reasons.push("PENALTY: Texto muito longo (par\xE1grafo)");
+      }
+      if (features.fontSize > 0 && features.fontSize <= 16) {
+        score -= 0.4;
+        reasons.push("PENALTY: Font size pequeno (" + features.fontSize + "px)");
+      }
+      if (features.fontWeight <= 400 && features.fontSize < 18) {
+        score -= 0.3;
+        reasons.push("PENALTY: Peso leve + fonte pequena");
+      }
+      if (features.zone === "FOOTER") {
+        score -= 0.15;
+        reasons.push("PENALTY: Zona FOOTER");
+      }
+      if (score < HEADING_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:heading",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_heading_calibrated",
+        reasons
+      };
+    }
+  };
+  var TextEditorRule = {
+    id: "h_text_editor",
+    targetWidget: "w:text-editor",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasText && features.type !== "TEXT") {
+        return null;
+      }
+      if (features.fontSize > 0 && features.fontSize < 20) {
+        score += 0.35;
+        reasons.push("Font size de texto corrido");
+      }
+      if (features.textLength > 80) {
+        score += 0.35;
+        reasons.push("Texto longo (par\xE1grafo)");
+      }
+      if (features.fontWeight <= 500) {
+        score += 0.2;
+        reasons.push("Peso de fonte regular");
+      }
+      if (features.zone === "BODY") {
+        score += 0.1;
+        reasons.push("Zona BODY");
+      }
+      if (score < TEXT_EDITOR_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:text-editor",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_text_editor",
+        reasons
+      };
+    }
+  };
+  var ImageBoxRule = {
+    id: "h_image_box_calibrated",
+    targetWidget: "w:image-box",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasImage) {
+        return null;
+      }
+      score += 0.3;
+      reasons.push("Possui imagem");
+      if (features.textCount >= 1 && features.textCount <= 3) {
+        score += 0.3;
+        reasons.push("Quantidade de texto ideal para card");
+      }
+      if (features.childCount >= 2 && features.childCount <= 5) {
+        score += 0.2;
+        reasons.push("Quantidade de filhos t\xEDpica de card");
+      }
+      if (features.aspectRatio > 0.5 && features.aspectRatio < 2.5) {
+        score += 0.15;
+        reasons.push("Propor\xE7\xE3o t\xEDpica de card");
+      }
+      if (features.textCount > 4) {
+        score -= 0.5;
+        reasons.push("PENALTY: Muitos textos (" + features.textCount + ")");
+      }
+      if (features.aspectRatio > 3) {
+        score -= 0.35;
+        reasons.push("PENALTY: Muito horizontal para card");
+      }
+      if (features.area > 3e5) {
+        score -= 0.4;
+        reasons.push("PENALTY: \xC1rea muito grande para card");
+      }
+      if (features.imageCount > 1) {
+        score -= 0.25;
+        reasons.push("PENALTY: M\xFAltiplas imagens (possivelmente grid/gallery)");
+      }
+      if (score < IMAGE_BOX_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:image-box",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_image_box_calibrated",
+        reasons
+      };
+    }
+  };
+  var ImageRule = {
+    id: "h_image_simple",
+    targetWidget: "w:image",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.hasImage && features.type !== "IMAGE") {
+        return null;
+      }
+      if (features.type === "IMAGE") {
+        score += 0.8;
+        reasons.push("N\xF3 do tipo IMAGE");
+      } else if (features.hasImage && features.textCount === 0) {
+        score += 0.7;
+        reasons.push("Possui imagem sem texto");
+      }
+      if (features.textCount > 0) {
+        score -= 0.4;
+        reasons.push("PENALTY: Tem texto (considerar image-box)");
+      }
+      if (score < 0.5) {
+        return null;
+      }
+      return {
+        widget: "w:image",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_image_simple",
+        reasons
+      };
+    }
+  };
+  var ICON_MAX_DIMENSION = 40;
+  var ICON_MIN_CONFIDENCE = 0.7;
+  var IconRule = {
+    id: "h_icon_v2",
+    targetWidget: "w:icon",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (!features.isVectorNode) {
+        return null;
+      }
+      if (features.vectorWidth > 0 && features.vectorWidth <= ICON_MAX_DIMENSION && features.vectorHeight > 0 && features.vectorHeight <= ICON_MAX_DIMENSION) {
+        score += 0.7;
+        reasons.push("Vetor pequeno (<= " + ICON_MAX_DIMENSION + "px)");
+      } else if (features.vectorWidth <= 60 && features.vectorHeight <= 60) {
+        score += 0.5;
+        reasons.push("Vetor m\xE9dio (<= 60px)");
+      } else {
+        return null;
+      }
+      if (features.aspectRatio >= 0.8 && features.aspectRatio <= 1.2) {
+        score += 0.15;
+        reasons.push("Propor\xE7\xE3o quadrada t\xEDpica de \xEDcone");
+      }
+      if (features.hasFill || features.hasStroke) {
+        score += 0.1;
+        reasons.push("Possui preenchimento ou tra\xE7o");
+      }
+      if (score < ICON_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:icon",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_icon_v2",
+        reasons
+      };
+    }
+  };
+  var DIVIDER_MAX_HEIGHT = 5;
+  var DIVIDER_MIN_WIDTH = 100;
+  var DIVIDER_MIN_CONFIDENCE = 0.7;
+  var DividerRule = {
+    id: "h_divider_v2",
+    targetWidget: "w:divider",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (features.type !== "RECTANGLE" && features.type !== "LINE") {
+        return null;
+      }
+      if (features.height <= DIVIDER_MAX_HEIGHT && features.width >= DIVIDER_MIN_WIDTH) {
+        score += 0.7;
+        reasons.push("Ret\xE2ngulo fino e largo (divider horizontal)");
+      }
+      if (features.width <= DIVIDER_MAX_HEIGHT && features.height >= DIVIDER_MIN_WIDTH) {
+        score += 0.65;
+        reasons.push("Ret\xE2ngulo fino e alto (divider vertical)");
+      }
+      if (features.hasFill || features.hasStroke) {
+        score += 0.15;
+        reasons.push("Possui cor vis\xEDvel");
+      }
+      if (features.childCount === 0) {
+        score += 0.1;
+        reasons.push("Elemento simples sem filhos");
+      }
+      if (score < DIVIDER_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:divider",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_divider_v2",
+        reasons
+      };
+    }
+  };
+  var SECTION_MIN_CONFIDENCE = 0.8;
+  var SectionRule = {
+    id: "h_section_strict",
+    targetWidget: "structure:section",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (features.type !== "FRAME" && features.type !== "SECTION" && features.type !== "GROUP") {
+        return null;
+      }
+      if (features.width >= 1200) {
+        score += 0.2;
+        reasons.push("Largura >= 1200px");
+      } else if (features.width >= 900) {
+        score += 0.1;
+        reasons.push("Largura >= 900px");
+      } else {
+        return null;
+      }
+      if (features.height >= 400) {
+        score += 0.2;
+        reasons.push("Altura significativa >= 400px");
+      } else if (features.height >= 200) {
+        score += 0.1;
+        reasons.push("Altura moderada >= 200px");
+      }
+      if (features.childCount >= 3) {
+        score += 0.15;
+        reasons.push("M\xFAltiplos filhos (" + features.childCount + ")");
+      }
+      if (features.layoutMode !== "NONE") {
+        score += 0.15;
+        reasons.push("Auto Layout presente");
+      }
+      if (features.width < 500 && features.hasImage && features.hasText) {
+        score -= 0.5;
+        reasons.push("PENALTY: Parece card, n\xE3o section");
+      }
+      if (features.childCount < 2) {
+        score -= 0.4;
+        reasons.push("PENALTY: Poucos filhos para section");
+      }
+      if (features.siblingCount > 5) {
+        score -= 0.3;
+        reasons.push("PENALTY: Muitos irm\xE3os (n\xE3o \xE9 top-level)");
+      }
+      if (score < SECTION_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "structure:section",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_section_strict",
+        reasons
+      };
+    }
+  };
+  var FORM_MIN_CONFIDENCE = 0.8;
+  var FormRule = {
+    id: "h_form_strict",
+    targetWidget: "e:form",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (features.layoutMode !== "VERTICAL") {
+        return null;
+      }
+      if (features.childCount < 3) {
+        return null;
+      }
+      score += 0.3;
+      reasons.push("Layout vertical com filhos");
+      if (features.height >= 200) {
+        score += 0.2;
+        reasons.push("Altura >= 200px");
+      }
+      if (features.hasNestedFrames) {
+        score += 0.15;
+        reasons.push("Cont\xE9m frames aninhados (inputs)");
+      }
+      if (features.hasText && features.textCount >= 2) {
+        score += 0.15;
+        reasons.push("M\xFAltiplos textos (labels)");
+      }
+      if (features.hasImage && features.imageCount > 0) {
+        score -= 0.5;
+        reasons.push("PENALTY: Cont\xE9m imagem (provavelmente card)");
+      }
+      if (features.width > 600) {
+        score -= 0.3;
+        reasons.push("PENALTY: Muito largo para form");
+      }
+      if (features.textCount > 6) {
+        score -= 0.4;
+        reasons.push("PENALTY: Muitos textos (bloco de conte\xFAdo)");
+      }
+      if (score < FORM_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "e:form",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_form_strict",
+        reasons
+      };
+    }
+  };
+  var COUNTDOWN_MIN_CONFIDENCE = 0.85;
+  var CountdownRule = {
+    id: "h_countdown_pattern",
+    targetWidget: "w:countdown",
+    evaluate: function(features) {
+      var score = 0;
+      var reasons = [];
+      if (features.layoutMode !== "HORIZONTAL") {
+        return null;
+      }
+      if (features.childCount < 2 || features.childCount > 8) {
+        return null;
+      }
+      if (features.textCount >= 4) {
+        score += 0.5;
+        reasons.push("M\xFAltiplos textos: " + features.textCount);
+      } else if (features.textCount >= 2) {
+        score += 0.25;
+        reasons.push("Alguns textos: " + features.textCount);
+      } else {
+        return null;
+      }
+      if (features.height <= 200 && features.height >= 40) {
+        score += 0.2;
+        reasons.push("Altura compacta t\xEDpica de countdown");
+      }
+      if (features.aspectRatio > 2) {
+        score += 0.15;
+        reasons.push("Propor\xE7\xE3o horizontal");
+      }
+      if (features.hasNestedFrames && features.childCount >= 2) {
+        score += 0.1;
+        reasons.push("Cont\xE9m frames de unidade");
+      }
+      if (features.hasImage) {
+        score -= 0.4;
+        reasons.push("PENALTY: Cont\xE9m imagem");
+      }
+      if (score < COUNTDOWN_MIN_CONFIDENCE) {
+        return null;
+      }
+      return {
+        widget: "w:countdown",
+        score: score > 1 ? 1 : score,
+        ruleId: "h_countdown_pattern",
+        reasons
+      };
+    }
+  };
+  var ContainerRule = {
+    id: "h_container_fallback",
+    targetWidget: "w:container",
+    evaluate: function(features) {
+      var score = CONTAINER_DEFAULT_CONFIDENCE;
+      var reasons = ["Fallback seguro para estrutura gen\xE9rica"];
+      if (features.layoutMode !== "NONE") {
+        score += 0.1;
+        reasons.push("Possui Auto Layout");
+      }
+      if (features.childCount > 0) {
+        score += 0.1;
+        reasons.push("Possui filhos");
+      }
+      return {
+        widget: "w:container",
+        score: score > 0.5 ? 0.5 : score,
+        // Cap at 0.5 to never beat specific widgets
+        ruleId: "h_container_fallback",
+        reasons
+      };
+    }
+  };
+  var heuristicRules = [
+    CountdownRule,
+    // Pattern detection first
+    IconRule,
+    // Check icons first (vectors)
+    DividerRule,
+    // Check dividers early (rectangles)
+    ButtonRule,
+    HeadingRule,
+    TextEditorRule,
+    ImageRule,
+    ImageBoxRule,
+    SectionRule,
+    // Strict section detection
+    FormRule,
+    // Strict form detection
+    ContainerRule
+    // Fallback sempre por último
+  ];
+  function evaluateHeuristics(features) {
+    var results = [];
+    for (var i = 0; i < heuristicRules.length; i++) {
+      var rule = heuristicRules[i];
+      var candidate = rule.evaluate(features);
+      if (candidate && candidate.score > 0) {
+        results.push(candidate);
+      }
+    }
+    results.sort(function(a, b) {
+      return b.score - a.score;
+    });
+    return results;
+  }
+
+  // src/deprecated/v1/engine.ts
   function evaluateNode(node, heuristics, options = {}) {
     var _a;
     const minConfidence = (_a = options.minConfidence) != null ? _a : 0.3;
@@ -2785,7 +3316,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return results;
   }
 
-  // src/heuristics/rules/utils.ts
+  // src/deprecated/v1/rules/utils.ts
   function areWidthsRoughlyEqual(widths, tolerance = 12) {
     if (widths.length < 2) return false;
     const min = Math.min(...widths);
@@ -2799,7 +3330,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return node.type === "FRAME" || node.type === "SECTION" || node.type === "COMPONENT" || node.type === "INSTANCE";
   }
 
-  // src/heuristics/rules/layout.ts
+  // src/deprecated/v1/rules/layout.ts
   var LAYOUT_COLUMNS = {
     id: "layout.columns",
     priority: 70,
@@ -2844,7 +3375,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     LAYOUT_GRID
   ];
 
-  // src/heuristics/rules/sections.ts
+  // src/deprecated/v1/rules/sections.ts
   var SECTION_GENERIC = {
     id: "section.generic",
     priority: 60,
@@ -2904,7 +3435,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     SECTION_GENERIC
   ];
 
-  // src/heuristics/rules/navigation.ts
+  // src/deprecated/v1/rules/navigation.ts
   var HEADER_NAVBAR = {
     id: "navigation.header-navbar",
     priority: 75,
@@ -2942,7 +3473,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     FOOTER_MAIN
   ];
 
-  // src/heuristics/rules/typography.ts
+  // src/deprecated/v1/rules/typography.ts
   var HEADING_GENERIC = {
     id: "typography.heading-generic",
     priority: 80,
@@ -2986,7 +3517,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     PARAGRAPH_GENERIC
   ];
 
-  // src/heuristics/rules/media.ts
+  // src/deprecated/v1/rules/media.ts
   var IMAGE_SINGLE = {
     id: "media.image-single",
     priority: 65,
@@ -3024,7 +3555,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     IMAGE_SINGLE
   ];
 
-  // src/heuristics/widgets/elementor-basic.ts
+  // src/deprecated/v1/widgets/elementor-basic.ts
   var ELEM_HEADING = {
     id: "widget.elementor.heading",
     priority: 90,
@@ -3196,7 +3727,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     ELEM_SPACER
   ];
 
-  // src/heuristics/widgets/elementor-pro.ts
+  // src/deprecated/v1/widgets/elementor-pro.ts
   var ELEM_PRO_FORM = {
     id: "widget.elementor-pro.form",
     priority: 88,
@@ -3255,7 +3786,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     ELEM_PRO_SLIDES
   ];
 
-  // src/heuristics/widgets/wordpress-core.ts
+  // src/deprecated/v1/widgets/wordpress-core.ts
   var WP_SEARCH = {
     id: "widget.wp.search",
     priority: 70,
@@ -3310,7 +3841,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     WP_CATEGORIES_LIST
   ];
 
-  // src/heuristics/widgets/woocommerce.ts
+  // src/deprecated/v1/widgets/woocommerce.ts
   var WOO_PRODUCT_GRID = {
     id: "widget.woo.product-grid",
     priority: 85,
@@ -3367,7 +3898,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     WOO_CART_LIKE
   ];
 
-  // src/heuristics/index.ts
+  // src/deprecated/v1/index.ts
   var DEFAULT_HEURISTICS = [
     ...LAYOUT_HEURISTICS,
     ...SECTION_HEURISTICS,
@@ -3487,6 +4018,89 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const { r, g, b, a = 1 } = solid.color || {};
     const to255 = (v) => Math.round((v || 0) * 255);
     return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a})`;
+  }
+  function toNodeFeaturesFromSerialized(node) {
+    var _a, _b;
+    const children = Array.isArray(node.children) ? node.children : [];
+    const hasText = node.type === "TEXT" || children.some((c) => c.type === "TEXT");
+    const hasImageFillCheck = isImageFill(node) || children.some((c) => isImageFill(c));
+    let textCount = 0;
+    let imageCount = 0;
+    let textLength = 0;
+    let maxFontSize = 0;
+    let maxFontWeight = 400;
+    if (node.type === "TEXT") {
+      textCount = 1;
+      textLength = ((_a = node.characters) == null ? void 0 : _a.length) || 0;
+      maxFontSize = typeof node.fontSize === "number" ? node.fontSize : 0;
+      const fontName = node.fontName;
+      if (fontName && fontName.style) {
+        const style = fontName.style.toLowerCase();
+        if (style.indexOf("bold") >= 0) maxFontWeight = 700;
+        else if (style.indexOf("semibold") >= 0) maxFontWeight = 600;
+        else if (style.indexOf("medium") >= 0) maxFontWeight = 500;
+      }
+    }
+    for (const child of children) {
+      if (child.type === "TEXT") {
+        textCount++;
+        textLength += ((_b = child.characters) == null ? void 0 : _b.length) || 0;
+        const childFontSize = typeof child.fontSize === "number" ? child.fontSize : 0;
+        if (childFontSize > maxFontSize) maxFontSize = childFontSize;
+      }
+      if (isImageFill(child)) {
+        imageCount++;
+      }
+    }
+    let hasNestedFrames = false;
+    for (const child of children) {
+      if (child.type === "FRAME" || child.type === "GROUP" || child.type === "COMPONENT" || child.type === "INSTANCE") {
+        hasNestedFrames = true;
+        break;
+      }
+    }
+    const vectorNodeTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE"];
+    const isVectorNode = vectorNodeTypes.indexOf(node.type) >= 0;
+    const layoutMode = node.layoutMode || "NONE";
+    const y = node.y || 0;
+    let zone = "BODY";
+    if (y < 200) zone = "HEADER";
+    else if (y < 800) zone = "HERO";
+    const width = node.width || 0;
+    const height = node.height || 0;
+    return {
+      id: node.id,
+      name: node.name || "",
+      type: node.type,
+      width,
+      height,
+      x: node.x || 0,
+      y,
+      area: width * height,
+      childCount: children.length,
+      layoutMode: layoutMode === "HORIZONTAL" ? "HORIZONTAL" : layoutMode === "VERTICAL" ? "VERTICAL" : "NONE",
+      primaryAxisSizingMode: node.primaryAxisSizingMode === "AUTO" ? "AUTO" : "FIXED",
+      counterAxisSizingMode: node.counterAxisSizingMode === "AUTO" ? "AUTO" : "FIXED",
+      hasNestedFrames,
+      hasFill: Array.isArray(node.fills) && node.fills.length > 0,
+      hasStroke: Array.isArray(node.strokes) && node.strokes.length > 0,
+      hasText,
+      textCount,
+      hasImage: hasImageFillCheck,
+      imageCount,
+      textLength,
+      fontSize: maxFontSize,
+      fontWeight: maxFontWeight,
+      isVectorNode,
+      vectorWidth: isVectorNode ? width : 0,
+      vectorHeight: isVectorNode ? height : 0,
+      parentLayoutMode: "NONE",
+      // Not available from SerializedNode
+      siblingCount: 0,
+      // Not available from SerializedNode
+      aspectRatio: height > 0 ? width / height : 0,
+      zone
+    };
   }
   function unwrapBoxedInner(node) {
     const rawChildren = Array.isArray(node.children) ? node.children : [];
@@ -3698,47 +4312,64 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     const hasExplicitName = /^(w:|woo:|loop:|media:|e:)/.test(name);
     if (!hasExplicitName) {
       try {
-        const snapshot = toNodeSnapshot(node);
-        const heuristicResults = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
-        if (heuristicResults.length > 0) {
-          const best = heuristicResults[0];
-          console.log("[HEURISTICS] Matched:", best.widget, "Confidence:", best.confidence, "Pattern:", best.patternId);
-          const widgetType = best.widget.replace(/^w:/, "");
-          const analysis = analyzeWidgetStructure(node, widgetType);
-          if ((widgetType === "section" || widgetType === "container") && analysis.childWidgets.length > 0) {
-            console.log("[HEURISTICS] Container with", analysis.childWidgets.length, "child widgets - delegating to toContainer");
-            return null;
+        const v2Features = toNodeFeaturesFromSerialized(node);
+        const v2Candidates = evaluateHeuristics(v2Features);
+        let v1Widget = "container";
+        if (DEBUG_SHADOW_V1) {
+          const snapshot = toNodeSnapshot(node);
+          const v1Results = evaluateNode(snapshot, DEFAULT_HEURISTICS, { minConfidence: 0.75 });
+          v1Widget = v1Results.length > 0 ? v1Results[0].widget : "container";
+        }
+        if (v2Candidates.length > 0) {
+          const best = v2Candidates[0];
+          const v2Widget = best.widget.replace(/^w:/, "");
+          const v2Score = best.score;
+          if (DEBUG_SHADOW_V1 && v1Widget !== best.widget) {
+            console.log(`[SHADOW-V1] Node ${node.id} | V1: ${v1Widget} | V2: ${best.widget} (${v2Score.toFixed(2)})`);
           }
-          const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), analysis.containerStyles), analysis.textStyles);
-          if (typeof node.width === "number") mergedStyles.width = node.width;
-          if (typeof node.height === "number") mergedStyles.height = node.height;
-          if (widgetType === "button" && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
-            mergedStyles.fills = [{
-              type: "SOLID",
-              color: { r: 1, g: 1, b: 1 },
-              opacity: 0,
-              visible: true
-            }];
+          if (DEBUG_V2_EXPLAIN) {
+            console.log(`[V2-EXPLAIN] Node ${node.id} | ${best.widget} (${v2Score.toFixed(2)}) | Features: type=${v2Features.type}, fontSize=${v2Features.fontSize}, childCount=${v2Features.childCount}`);
           }
-          let content = analysis.text;
-          if (!content) {
-            const isTechnicalName = node.name.includes(":") || node.name.startsWith("w-") || node.name.startsWith("Frame ") || node.name.startsWith("Group ");
-            if (!isTechnicalName) {
-              content = node.name;
-            } else {
-              content = widgetType === "heading" ? "Heading" : widgetType === "button" ? "Button" : widgetType === "text" ? "Text Block" : "";
+          if (v2Score >= V2_MIN_CONFIDENCE) {
+            const widgetType = v2Widget;
+            const analysis = analyzeWidgetStructure(node, widgetType);
+            if ((widgetType === "section" || widgetType === "container") && analysis.childWidgets.length > 0) {
+              console.log("[V2-ENGINE] Container with", analysis.childWidgets.length, "child widgets - delegating to toContainer");
+              return null;
             }
+            const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), analysis.containerStyles), analysis.textStyles);
+            if (typeof node.width === "number") mergedStyles.width = node.width;
+            if (typeof node.height === "number") mergedStyles.height = node.height;
+            if (widgetType === "button" && !mergedStyles.background && (!node.fills || node.fills.length === 0)) {
+              mergedStyles.fills = [{
+                type: "SOLID",
+                color: { r: 1, g: 1, b: 1 },
+                opacity: 0,
+                visible: true
+              }];
+            }
+            let content = analysis.text;
+            if (!content) {
+              const isTechnicalName = node.name.includes(":") || node.name.startsWith("w-") || node.name.startsWith("Frame ") || node.name.startsWith("Group ");
+              if (!isTechnicalName) {
+                content = node.name;
+              } else {
+                content = widgetType === "heading" ? "Heading" : widgetType === "button" ? "Button" : widgetType === "text" ? "Text Block" : "";
+              }
+            }
+            return {
+              type: widgetType,
+              content,
+              imageId: analysis.iconId,
+              styles: mergedStyles,
+              children: analysis.childWidgets
+            };
+          } else {
+            console.log(`[V2-ENGINE] Score ${v2Score.toFixed(2)} < ${V2_MIN_CONFIDENCE} for ${best.widget} - falling through to fallback`);
           }
-          return {
-            type: widgetType,
-            content,
-            imageId: analysis.iconId,
-            styles: mergedStyles,
-            children: analysis.childWidgets
-          };
         }
       } catch (error) {
-        console.log("[HEURISTICS] Error evaluating node:", error);
+        console.log("[V2-ENGINE] Error evaluating node:", error);
       }
     }
     const registryDef = findWidgetDefinition(name, node.type);
@@ -4504,7 +5135,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     { name: "widgets-estrutural.md", content: widgets_estrutural_default }
   ];
 
-  // src/heuristics/adapter.ts
+  // src/deprecated/v1/adapter.ts
   function createNodeSnapshot(node) {
     var _a;
     const { width, height, x, y } = node;
@@ -8564,373 +9195,9 @@ ${detection.justification}
     return features;
   }
 
-  // src/engine/heuristic-registry.ts
-  var BUTTON_MIN_CONFIDENCE = 0.7;
-  var HEADING_MIN_CONFIDENCE = 0.75;
-  var IMAGE_BOX_MIN_CONFIDENCE = 0.65;
-  var TEXT_EDITOR_MIN_CONFIDENCE = 0.6;
-  var CONTAINER_DEFAULT_CONFIDENCE = 0.3;
-  var ButtonRule = {
-    id: "h_button_calibrated",
-    targetWidget: "w:button",
-    evaluate: function(features) {
-      var score = 0;
-      var reasons = [];
-      if (features.hasText && features.textCount === 1) {
-        score += 0.35;
-        reasons.push("Texto \xFAnico detectado");
-      }
-      if (features.hasFill || features.hasStroke) {
-        score += 0.2;
-        reasons.push("Possui preenchimento ou borda");
-      }
-      if (features.aspectRatio > 1.5 && features.aspectRatio < 8) {
-        score += 0.2;
-        reasons.push("Propor\xE7\xE3o horizontal t\xEDpica de bot\xE3o");
-      }
-      if (features.textLength > 0 && features.textLength < 40) {
-        score += 0.15;
-        reasons.push("Texto curto (< 40 chars)");
-      }
-      if (features.childCount > 2) {
-        score -= 0.4;
-        reasons.push("PENALTY: Muitos filhos (" + features.childCount + ")");
-      }
-      if (features.height > 120) {
-        score -= 0.4;
-        reasons.push("PENALTY: Altura excessiva (" + features.height + "px)");
-      }
-      if (features.hasNestedFrames) {
-        score -= 0.3;
-        reasons.push("PENALTY: Estrutura aninhada complexa");
-      }
-      if (features.area > 15e4) {
-        score -= 0.35;
-        reasons.push("PENALTY: \xC1rea muito grande");
-      }
-      if ((features.zone === "HEADER" || features.zone === "FOOTER") && features.area > 5e4) {
-        score -= 0.2;
-        reasons.push("PENALTY: Container grande em " + features.zone);
-      }
-      if (!features.hasText) {
-        score -= 0.5;
-        reasons.push("PENALTY: Sem texto");
-      }
-      if (score < BUTTON_MIN_CONFIDENCE) {
-        return null;
-      }
-      return {
-        widget: "w:button",
-        score: score > 1 ? 1 : score,
-        ruleId: "h_button_calibrated",
-        reasons
-      };
-    }
-  };
-  var HeadingRule = {
-    id: "h_heading_calibrated",
-    targetWidget: "w:heading",
-    evaluate: function(features) {
-      var score = 0;
-      var reasons = [];
-      if (!features.hasText && features.type !== "TEXT") {
-        return null;
-      }
-      if (features.fontSize >= 22) {
-        score += 0.4;
-        reasons.push("Tamanho de fonte tipogr\xE1fica grande (" + features.fontSize + "px)");
-      } else if (features.fontSize >= 18) {
-        score += 0.25;
-        reasons.push("Tamanho de fonte moderado (" + features.fontSize + "px)");
-      }
-      if (features.fontWeight >= 600) {
-        score += 0.25;
-        reasons.push("Peso de fonte bold/semibold");
-      }
-      if (features.textLength > 0 && features.textLength < 80) {
-        score += 0.2;
-        reasons.push("Texto curto (< 80 chars)");
-      }
-      if (features.zone === "HERO" || features.zone === "HEADER") {
-        score += 0.15;
-        reasons.push("Zona com alta probabilidade de heading");
-      }
-      if (features.textLength > 150) {
-        score -= 0.5;
-        reasons.push("PENALTY: Texto muito longo (par\xE1grafo)");
-      }
-      if (features.fontSize > 0 && features.fontSize <= 16) {
-        score -= 0.4;
-        reasons.push("PENALTY: Font size pequeno (" + features.fontSize + "px)");
-      }
-      if (features.fontWeight <= 400 && features.fontSize < 18) {
-        score -= 0.3;
-        reasons.push("PENALTY: Peso leve + fonte pequena");
-      }
-      if (features.zone === "FOOTER") {
-        score -= 0.15;
-        reasons.push("PENALTY: Zona FOOTER");
-      }
-      if (score < HEADING_MIN_CONFIDENCE) {
-        return null;
-      }
-      return {
-        widget: "w:heading",
-        score: score > 1 ? 1 : score,
-        ruleId: "h_heading_calibrated",
-        reasons
-      };
-    }
-  };
-  var TextEditorRule = {
-    id: "h_text_editor",
-    targetWidget: "w:text-editor",
-    evaluate: function(features) {
-      var score = 0;
-      var reasons = [];
-      if (!features.hasText && features.type !== "TEXT") {
-        return null;
-      }
-      if (features.fontSize > 0 && features.fontSize < 20) {
-        score += 0.35;
-        reasons.push("Font size de texto corrido");
-      }
-      if (features.textLength > 80) {
-        score += 0.35;
-        reasons.push("Texto longo (par\xE1grafo)");
-      }
-      if (features.fontWeight <= 500) {
-        score += 0.2;
-        reasons.push("Peso de fonte regular");
-      }
-      if (features.zone === "BODY") {
-        score += 0.1;
-        reasons.push("Zona BODY");
-      }
-      if (score < TEXT_EDITOR_MIN_CONFIDENCE) {
-        return null;
-      }
-      return {
-        widget: "w:text-editor",
-        score: score > 1 ? 1 : score,
-        ruleId: "h_text_editor",
-        reasons
-      };
-    }
-  };
-  var ImageBoxRule = {
-    id: "h_image_box_calibrated",
-    targetWidget: "w:image-box",
-    evaluate: function(features) {
-      var score = 0;
-      var reasons = [];
-      if (!features.hasImage) {
-        return null;
-      }
-      score += 0.3;
-      reasons.push("Possui imagem");
-      if (features.textCount >= 1 && features.textCount <= 3) {
-        score += 0.3;
-        reasons.push("Quantidade de texto ideal para card");
-      }
-      if (features.childCount >= 2 && features.childCount <= 5) {
-        score += 0.2;
-        reasons.push("Quantidade de filhos t\xEDpica de card");
-      }
-      if (features.aspectRatio > 0.5 && features.aspectRatio < 2.5) {
-        score += 0.15;
-        reasons.push("Propor\xE7\xE3o t\xEDpica de card");
-      }
-      if (features.textCount > 4) {
-        score -= 0.5;
-        reasons.push("PENALTY: Muitos textos (" + features.textCount + ")");
-      }
-      if (features.aspectRatio > 3) {
-        score -= 0.35;
-        reasons.push("PENALTY: Muito horizontal para card");
-      }
-      if (features.area > 3e5) {
-        score -= 0.4;
-        reasons.push("PENALTY: \xC1rea muito grande para card");
-      }
-      if (features.imageCount > 1) {
-        score -= 0.25;
-        reasons.push("PENALTY: M\xFAltiplas imagens (possivelmente grid/gallery)");
-      }
-      if (score < IMAGE_BOX_MIN_CONFIDENCE) {
-        return null;
-      }
-      return {
-        widget: "w:image-box",
-        score: score > 1 ? 1 : score,
-        ruleId: "h_image_box_calibrated",
-        reasons
-      };
-    }
-  };
-  var ImageRule = {
-    id: "h_image_simple",
-    targetWidget: "w:image",
-    evaluate: function(features) {
-      var score = 0;
-      var reasons = [];
-      if (!features.hasImage && features.type !== "IMAGE") {
-        return null;
-      }
-      if (features.type === "IMAGE") {
-        score += 0.8;
-        reasons.push("N\xF3 do tipo IMAGE");
-      } else if (features.hasImage && features.textCount === 0) {
-        score += 0.7;
-        reasons.push("Possui imagem sem texto");
-      }
-      if (features.textCount > 0) {
-        score -= 0.4;
-        reasons.push("PENALTY: Tem texto (considerar image-box)");
-      }
-      if (score < 0.5) {
-        return null;
-      }
-      return {
-        widget: "w:image",
-        score: score > 1 ? 1 : score,
-        ruleId: "h_image_simple",
-        reasons
-      };
-    }
-  };
-  var ICON_MAX_DIMENSION = 40;
-  var ICON_MIN_CONFIDENCE = 0.7;
-  var IconRule = {
-    id: "h_icon_v2",
-    targetWidget: "w:icon",
-    evaluate: function(features) {
-      var score = 0;
-      var reasons = [];
-      if (!features.isVectorNode) {
-        return null;
-      }
-      if (features.vectorWidth > 0 && features.vectorWidth <= ICON_MAX_DIMENSION && features.vectorHeight > 0 && features.vectorHeight <= ICON_MAX_DIMENSION) {
-        score += 0.7;
-        reasons.push("Vetor pequeno (<= " + ICON_MAX_DIMENSION + "px)");
-      } else if (features.vectorWidth <= 60 && features.vectorHeight <= 60) {
-        score += 0.5;
-        reasons.push("Vetor m\xE9dio (<= 60px)");
-      } else {
-        return null;
-      }
-      if (features.aspectRatio >= 0.8 && features.aspectRatio <= 1.2) {
-        score += 0.15;
-        reasons.push("Propor\xE7\xE3o quadrada t\xEDpica de \xEDcone");
-      }
-      if (features.hasFill || features.hasStroke) {
-        score += 0.1;
-        reasons.push("Possui preenchimento ou tra\xE7o");
-      }
-      if (score < ICON_MIN_CONFIDENCE) {
-        return null;
-      }
-      return {
-        widget: "w:icon",
-        score: score > 1 ? 1 : score,
-        ruleId: "h_icon_v2",
-        reasons
-      };
-    }
-  };
-  var DIVIDER_MAX_HEIGHT = 5;
-  var DIVIDER_MIN_WIDTH = 100;
-  var DIVIDER_MIN_CONFIDENCE = 0.7;
-  var DividerRule = {
-    id: "h_divider_v2",
-    targetWidget: "w:divider",
-    evaluate: function(features) {
-      var score = 0;
-      var reasons = [];
-      if (features.type !== "RECTANGLE" && features.type !== "LINE") {
-        return null;
-      }
-      if (features.height <= DIVIDER_MAX_HEIGHT && features.width >= DIVIDER_MIN_WIDTH) {
-        score += 0.7;
-        reasons.push("Ret\xE2ngulo fino e largo (divider horizontal)");
-      }
-      if (features.width <= DIVIDER_MAX_HEIGHT && features.height >= DIVIDER_MIN_WIDTH) {
-        score += 0.65;
-        reasons.push("Ret\xE2ngulo fino e alto (divider vertical)");
-      }
-      if (features.hasFill || features.hasStroke) {
-        score += 0.15;
-        reasons.push("Possui cor vis\xEDvel");
-      }
-      if (features.childCount === 0) {
-        score += 0.1;
-        reasons.push("Elemento simples sem filhos");
-      }
-      if (score < DIVIDER_MIN_CONFIDENCE) {
-        return null;
-      }
-      return {
-        widget: "w:divider",
-        score: score > 1 ? 1 : score,
-        ruleId: "h_divider_v2",
-        reasons
-      };
-    }
-  };
-  var ContainerRule = {
-    id: "h_container_fallback",
-    targetWidget: "w:container",
-    evaluate: function(features) {
-      var score = CONTAINER_DEFAULT_CONFIDENCE;
-      var reasons = ["Fallback seguro para estrutura gen\xE9rica"];
-      if (features.layoutMode !== "NONE") {
-        score += 0.1;
-        reasons.push("Possui Auto Layout");
-      }
-      if (features.childCount > 0) {
-        score += 0.1;
-        reasons.push("Possui filhos");
-      }
-      return {
-        widget: "w:container",
-        score: score > 0.5 ? 0.5 : score,
-        // Cap at 0.5 to never beat specific widgets
-        ruleId: "h_container_fallback",
-        reasons
-      };
-    }
-  };
-  var heuristicRules = [
-    IconRule,
-    // Check icons first (vectors)
-    DividerRule,
-    // Check dividers early (rectangles)
-    ButtonRule,
-    HeadingRule,
-    TextEditorRule,
-    ImageRule,
-    ImageBoxRule,
-    ContainerRule
-    // Fallback sempre por último
-  ];
-  function evaluateHeuristics(features) {
-    var results = [];
-    for (var i = 0; i < heuristicRules.length; i++) {
-      var rule = heuristicRules[i];
-      var candidate = rule.evaluate(features);
-      if (candidate && candidate.score > 0) {
-        results.push(candidate);
-      }
-    }
-    results.sort(function(a, b) {
-      return b.score - a.score;
-    });
-    return results;
-  }
-
   // src/engine/decision-engine.ts
   var EXPLAIN_ENABLED = true;
-  var V2_MIN_CONFIDENCE = 0.7;
+  var V2_MIN_CONFIDENCE2 = 0.7;
   function explainDecision(explanation) {
     if (!EXPLAIN_ENABLED) return;
     const candidateList = explanation.candidates.slice(0, 3).map((c) => `${c.widget}(${c.score.toFixed(2)})`).join(", ");
@@ -8958,8 +9225,8 @@ ${detection.justification}
     var decisionReason = "no candidates";
     if (candidates.length > 0) {
       bestMatch = candidates[0];
-      if (bestMatch.score < V2_MIN_CONFIDENCE) {
-        decisionReason = `score ${bestMatch.score.toFixed(2)} < threshold ${V2_MIN_CONFIDENCE}`;
+      if (bestMatch.score < V2_MIN_CONFIDENCE2) {
+        decisionReason = `score ${bestMatch.score.toFixed(2)} < threshold ${V2_MIN_CONFIDENCE2}`;
         bestMatch = {
           widget: "w:container",
           score: 0.3,

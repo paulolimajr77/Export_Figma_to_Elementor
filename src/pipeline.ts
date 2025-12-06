@@ -10,8 +10,8 @@ import { SchemaProvider, GenerateSchemaInput, PipelineRunOptions, DeterministicD
 import { ANALYZE_RECREATE_PROMPT, OPTIMIZE_SCHEMA_PROMPT } from './config/prompts';
 import { convertToFlexSchema } from './pipeline/noai.parser';
 import { referenceDocs } from './reference_docs';
-import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
-import { createNodeSnapshot } from './heuristics/adapter';
+import { evaluateNode, DEFAULT_HEURISTICS } from './deprecated/v1/index';
+import { createNodeSnapshot } from './deprecated/v1/adapter';
 import type { DeterministicPipeline, DeterministicPipelineOptions } from './core/deterministic/deterministic.pipeline';
 import { debug } from './utils/debug';
 

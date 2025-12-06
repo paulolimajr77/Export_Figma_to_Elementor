@@ -7,8 +7,8 @@ import { SchemaProvider, DeterministicDiffMode, PipelineRunOptions } from './typ
 import { analyzeTreeWithHeuristics, convertToFlexSchema } from './pipeline/noai.parser';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
-import { createNodeSnapshot } from './heuristics/adapter';
-import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
+import { createNodeSnapshot } from './deprecated/v1/adapter';
+import { evaluateNode, DEFAULT_HEURISTICS } from './deprecated/v1/index';
 import { FileLogger } from './utils/logger';
 import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } from './linter';
 import { enforceWidgetTypes } from './services/heuristics';
