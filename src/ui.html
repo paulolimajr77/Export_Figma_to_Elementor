@@ -1227,9 +1227,6 @@
 <body>
   <div id="runtime-health" style="display:none"></div>
   <input id="useDeterministic" type="checkbox" style="display:none" aria-hidden="true" />
-  <input id="telemetryEnabled" type="checkbox" style="display:none" aria-hidden="true" />
-  <input id="telemetryStoreDiffs" type="checkbox" style="display:none" aria-hidden="true" />
-  <input id="telemetryStoreSnapshots" type="checkbox" style="display:none" aria-hidden="true" />
   <div class="app">
     <header class="topbar">
       <div class="brand">
@@ -1534,9 +1531,6 @@
           includeReferences: fields.include_references?.checked !== false,
           autoRename: fields.auto_rename_layers?.checked || false,
           useDeterministic: fields.use_deterministic?.checked || false,
-          telemetryEnabled: fields.telemetry_enabled?.checked || false,
-          telemetryStoreDiffs: fields.telemetry_store_diffs?.checked || false,
-          telemetryStoreSnapshots: fields.telemetry_store_snapshots?.checked || false
         };
         // ... rest of generate logic
         send('generate-json', payload);
@@ -1561,9 +1555,6 @@
       const fields = {
         use_ai: document.getElementById('use_ai'),
         use_deterministic: document.getElementById('useDeterministic'),
-        telemetry_enabled: document.getElementById('telemetryEnabled'),
-        telemetry_store_diffs: document.getElementById('telemetryStoreDiffs'),
-        telemetry_store_snapshots: document.getElementById('telemetryStoreSnapshots'),
         provider_ai: document.getElementById('provider_ai'),
         gemini_api_key: document.getElementById('gemini_api_key'),
         gemini_model: document.getElementById('gemini_model'),
@@ -1577,7 +1568,8 @@
         wp_export_images: document.getElementById('wp_export_images'),
         wp_webp_quality: document.getElementById('wp_webp_quality'),
         webp_quality_group: document.getElementById('webp_quality_group'),
-        webp_quality_value: document.getElementById('webp_quality_value')
+        webp_quality_value: document.getElementById('webp_quality_value'),
+        wp_status: document.getElementById('wp-status')
       };
       const aiSettings = document.getElementById('ai_settings');
 
@@ -1592,6 +1584,23 @@
           });
         }
       };
+
+      function updateWpStatus(message, state = 'info') {
+        if (!fields.wp_status) return;
+        const text = message || '';
+        fields.wp_status.textContent = text;
+        fields.wp_status.dataset.state = state;
+        fields.wp_status.style.display = text ? 'block' : 'none';
+      }
+
+      function updateExportImagesControls(enabled) {
+        if (!fields.wp_export_images) return;
+        const isEnabled = !!enabled;
+        fields.wp_export_images.checked = isEnabled;
+        if (fields.webp_quality_group) {
+          fields.webp_quality_group.style.display = isEnabled ? 'block' : 'none';
+        }
+      }
 
       function debounce(fn, wait = 300) {
         let t;
@@ -1733,11 +1742,7 @@
         if (fields.wp_user) fields.wp_user.value = payload.wpUser || '';
         if (fields.wp_token) fields.wp_token.value = payload.wpToken || '';
         if (fields.wp_export_images) {
-          fields.wp_export_images.checked = !!payload.exportImages;
-          // Toggle slider visibility based on export images checkbox
-          if (fields.webp_quality_group) {
-            fields.webp_quality_group.style.display = payload.exportImages ? 'block' : 'none';
-          }
+          updateExportImagesControls(payload.exportImages);
         }
         if (fields.wp_webp_quality) {
           const quality = payload.webpQuality !== undefined ? payload.webpQuality : 85;
@@ -1781,10 +1786,7 @@
           fields.wp_export_images.addEventListener('change', () => {
             const checked = fields.wp_export_images.checked;
             send('save-setting', { key: 'gptel_export_images', value: checked });
-            // Toggle slider visibility
-            if (fields.webp_quality_group) {
-              fields.webp_quality_group.style.display = checked ? 'block' : 'none';
-            }
+            updateExportImagesControls(checked);
           });
         }
         if (fields.wp_webp_quality) {
@@ -1823,9 +1825,6 @@
               includeScreenshot: fields.include_screenshot?.checked !== false,
               includeReferences: fields.include_references?.checked !== false,
               useDeterministic: fields.use_deterministic?.checked || false,
-              telemetryEnabled: fields.telemetry_enabled?.checked || false,
-              telemetryStoreDiffs: fields.telemetry_store_diffs?.checked || false,
-              telemetryStoreSnapshots: fields.telemetry_store_snapshots?.checked || false
             };
             if (payload.geminiModel) {
               send('save-setting', { key: 'gemini_model', value: payload.geminiModel });
@@ -1880,7 +1879,11 @@
                 break;
               case 'test-gemini': send('test-gemini', { apiKey: payload.apiKey }); break;
               case 'test-gpt': send('test-gpt', { apiKey: payload.gptApiKey, model: payload.gptModel || fields.gpt_model?.value }); break;
-              case 'test-wp': send('test-wp', { wpConfig: payload.wpConfig }); break;
+              case 'test-wp':
+                updateWpStatus('Testando conexão...', 'pending');
+                addLog('Testando conexão com WordPress...', 'info');
+                send('test-wp', { wpConfig: payload.wpConfig });
+                break;
               case 'resize-ui': send('resize-ui', { width: Math.min(window.innerWidth + 200, 1400), height: Math.min(window.innerHeight + 200, 1000) }); break;
               default: send(action || 'noop', payload);
             }
@@ -2039,6 +2042,19 @@
             const gptStatus = document.getElementById('gpt-status');
             if (gptStatus) gptStatus.textContent = msg.message;
             break;
+          case 'wp-status': {
+            const isSuccess = msg.success === true;
+            const isFailure = msg.success === false;
+            const fallback = isSuccess
+              ? 'Conexao com WordPress verificada.'
+              : isFailure
+                ? 'Falha na conexao com WordPress.'
+                : 'Status do WordPress atualizado.';
+            const logType = isSuccess ? 'success' : isFailure ? 'error' : 'info';
+            updateWpStatus(msg.message || fallback, logType);
+            addLog(msg.message || fallback, logType);
+            break;
+          }
           case 'upload-image-request':
             uploadImage(msg);
             break;
@@ -2090,8 +2106,15 @@
               if (fields.use_ai !== undefined) {
                 fields.use_ai.checked = msg.payload.useAI !== false;
               }
-              if (fields.export_images !== undefined) {
-                fields.export_images.checked = msg.payload.exportImages === true;
+              if (fields.wp_export_images) {
+                const enabled = msg.payload.exportImages === true;
+                updateExportImagesControls(enabled);
+              }
+              if (fields.wp_webp_quality && typeof msg.payload.webpQuality === 'number') {
+                fields.wp_webp_quality.value = msg.payload.webpQuality;
+                if (fields.webp_quality_value) {
+                  fields.webp_quality_value.textContent = msg.payload.webpQuality;
+                }
               }
               if (fields.auto_page !== undefined) {
                 fields.auto_page.checked = msg.payload.autoPage === true;

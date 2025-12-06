@@ -34,12 +34,6 @@ export interface SchemaProvider {
 
 export type DeterministicDiffMode = 'log' | 'store';
 
-export interface PipelineTelemetryOptions {
-    enabled?: boolean;
-    storeDiffs?: boolean;
-    storeSnapshots?: boolean;
-}
-
 export interface PipelineRunOptions {
     debug?: boolean;
     provider?: SchemaProvider;
@@ -50,5 +44,4 @@ export interface PipelineRunOptions {
     autoRename?: boolean;
     useDeterministic?: boolean;
     deterministicDiffMode?: DeterministicDiffMode;
-    telemetry?: PipelineTelemetryOptions;
 }

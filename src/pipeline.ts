@@ -6,14 +6,14 @@ import { ImageUploader } from './media/uploader';
 import { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipeline.schema';
 import { ElementorJSON, WPConfig } from './types/elementor.types';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from './utils/validation';
-import { SchemaProvider, GenerateSchemaInput, PipelineRunOptions, DeterministicDiffMode, PipelineTelemetryOptions } from './types/providers';
+import { SchemaProvider, GenerateSchemaInput, PipelineRunOptions, DeterministicDiffMode } from './types/providers';
 import { ANALYZE_RECREATE_PROMPT, OPTIMIZE_SCHEMA_PROMPT } from './config/prompts';
 import { convertToFlexSchema } from './pipeline/noai.parser';
 import { referenceDocs } from './reference_docs';
 import { evaluateNode, DEFAULT_HEURISTICS } from './heuristics/index';
 import { createNodeSnapshot } from './heuristics/adapter';
 import type { DeterministicPipeline, DeterministicPipelineOptions } from './core/deterministic/deterministic.pipeline';
-import { TelemetryService } from './services/telemetry';
+import { debug } from './utils/debug';
 
 interface PreprocessedData {
     pageTitle: string;
@@ -64,7 +64,6 @@ export class ConversionPipeline {
         this.compiler.setWPConfig(normalizedWP);
         this.imageUploader.setWPConfig(normalizedWP);
 
-        const telemetry = this.createTelemetry(options?.telemetry);
         const provider = options?.provider || geminiProvider;
         this.autoFixLayout = !!options?.autoFixLayout;
         this.autoRename = !!options?.autoRename;
@@ -72,26 +71,14 @@ export class ConversionPipeline {
         const decision = this.shouldUseDeterministic(options);
 
         if (decision.allowed && this.deterministicPipeline) {
-            void telemetry.log('deterministic_start', {
-                nodeId: node.id,
-                diffMode: options?.deterministicDiffMode
-            });
-            const deterministicStart = Date.now();
-            const deterministicResult = await this.runDeterministicFlow(node, wpConfig, normalizedWP, telemetry, options);
-            const deterministicDuration = Date.now() - deterministicStart;
-            void telemetry.metric('deterministic_duration_ms', deterministicDuration);
-            void telemetry.log('deterministic_end', {
-                duration: deterministicDuration,
-                ...this.summarizeSchema(deterministicResult.schema)
-            });
+            debug.log('deterministic_pipeline:start', { diffMode: options?.deterministicDiffMode, nodeId: node.id });
+            const deterministicResult = await this.runDeterministicFlow(node, wpConfig, normalizedWP, options);
+            debug.log('deterministic_pipeline:end', { ...this.summarizeSchema(deterministicResult.schema) });
 
             if (options?.deterministicDiffMode) {
-                const legacyResult = await this.runLegacyFlowWithTelemetry(node, wpConfig, normalizedWP, provider, options, telemetry);
+                const legacyResult = await this.runLegacyFlow(node, wpConfig, normalizedWP, provider, options);
                 const diffSnapshot = this.compareDeterministicSchemas(options.deterministicDiffMode, deterministicResult.schema, legacyResult.schema);
-                void telemetry.diff('pipeline_schema', deterministicResult.schema, legacyResult.schema, {
-                    mode: options.deterministicDiffMode,
-                    matches: diffSnapshot.matches
-                });
+                debug.log('deterministic_pipeline:diff', diffSnapshot);
                 return this.formatRunResult(legacyResult, options);
             }
             return this.formatRunResult(deterministicResult, options);
@@ -101,7 +88,7 @@ export class ConversionPipeline {
             console.info('[PIPELINE] Deterministic pipeline desativado:', decision.reason || 'motivo desconhecido');
         }
 
-        const legacyResult = await this.runLegacyFlowWithTelemetry(node, wpConfig, normalizedWP, provider, options, telemetry);
+        const legacyResult = await this.runLegacyFlow(node, wpConfig, normalizedWP, provider, options);
         return this.formatRunResult(legacyResult, options);
     }
 
@@ -142,7 +129,6 @@ export class ConversionPipeline {
         node: SceneNode,
         originalWP: WPConfig,
         normalizedWP: WPConfig,
-        telemetry: TelemetryService,
         options?: PipelineRunOptions
     ): Promise<PipelineExecutionResult> {
         if (!this.deterministicPipeline) {
@@ -153,8 +139,7 @@ export class ConversionPipeline {
         const canUpload = this.canUploadMedia(normalizedWP);
         const simulateUploads = !!options?.deterministicDiffMode || !canUpload;
         const deterministicOptions: DeterministicPipelineOptions = {
-            media: { simulate: simulateUploads },
-            telemetry
+            media: { simulate: simulateUploads }
         };
         if (canUpload) {
             deterministicOptions.wpConfig = normalizedWP;
@@ -217,36 +202,6 @@ export class ConversionPipeline {
         };
         schema.containers?.forEach(walk);
         return { totalContainers: containers, totalWidgets: widgets };
-    }
-
-    private async runLegacyFlowWithTelemetry(
-        node: SceneNode,
-        wpConfig: WPConfig,
-        normalizedWP: WPConfig,
-        provider: SchemaProvider,
-        options: PipelineRunOptions | undefined,
-        telemetry: TelemetryService
-    ): Promise<PipelineExecutionResult> {
-        void telemetry.log('legacy_start', {
-            nodeId: node.id,
-            provider: provider.id
-        });
-        const start = Date.now();
-        const result = await this.runLegacyFlow(node, wpConfig, normalizedWP, provider, options);
-        const duration = Date.now() - start;
-        void telemetry.metric('legacy_duration_ms', duration);
-        void telemetry.log('legacy_end', {
-            duration,
-            ...this.summarizeSchema(result.schema)
-        });
-        return result;
-    }
-
-    private createTelemetry(config?: PipelineTelemetryOptions): TelemetryService {
-        return new TelemetryService(!!config?.enabled, {
-            storeDiffs: !!config?.storeDiffs,
-            storeSnapshots: !!config?.storeSnapshots
-        });
     }
 
     private logSchemaSummary(schema: PipelineSchema) {

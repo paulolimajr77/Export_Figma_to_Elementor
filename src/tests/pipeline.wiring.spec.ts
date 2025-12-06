@@ -4,8 +4,6 @@ import { ConversionPipeline } from '../pipeline';
 import type { DeterministicPipeline } from '../core/deterministic/deterministic.pipeline';
 import type { PipelineSchema } from '../types/pipeline.schema';
 import type { ElementorJSON } from '../types/elementor.types';
-import { TelemetryService } from './services/telemetry';
-
 
 const fakeNode = {
     id: 'node-1',
@@ -82,29 +80,4 @@ describe('ConversionPipeline wiring', () => {
         expect(result).toBe(legacyExecution.elementorJson);
     });
 
-    it('telemetry diff records schema comparison when enabled', async () => {
-        const pipeline = new ConversionPipeline();
-        pipeline.attachDeterministicPipeline({ run: vi.fn() } as unknown as DeterministicPipeline);
-        const deterministicExecution = createExecution('deterministic');
-        const legacyExecution = createExecution('legacy');
-
-        const deterministicSpy = vi.spyOn(pipeline as any, 'runDeterministicFlow').mockResolvedValue(deterministicExecution);
-        const legacySpy = vi.spyOn(pipeline as any, 'runLegacyFlow').mockResolvedValue(legacyExecution);
-
-        const diffSpy = vi.spyOn(TelemetryService.prototype, 'diff').mockResolvedValue();
-        vi.spyOn(TelemetryService.prototype, 'log').mockResolvedValue();
-        vi.spyOn(TelemetryService.prototype, 'metric').mockResolvedValue();
-        vi.spyOn(TelemetryService.prototype, 'snapshot').mockResolvedValue();
-
-        const result = await pipeline.run(fakeNode, {}, {
-            useDeterministic: true,
-            deterministicDiffMode: 'log',
-            telemetry: { enabled: true, storeDiffs: true }
-        });
-
-        expect(deterministicSpy).toHaveBeenCalledTimes(1);
-        expect(legacySpy).toHaveBeenCalledTimes(1);
-        expect(diffSpy).toHaveBeenCalledTimes(1);
-        expect(result).toBe(legacyExecution.elementorJson);
-    });
 });

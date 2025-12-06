@@ -13,7 +13,6 @@ import { FileLogger } from './utils/logger';
 import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } from './linter';
 import { enforceWidgetTypes } from './services/heuristics';
 import { initializeCompatLayer, safeGet, safeGetArray, safeGetNumber, safeGetString, safeGetBoolean, safeInvoke } from './compat';
-import { TelemetryServiceStub as TelemetryService } from './services/telemetry/telemetry.stub';
 
 const runtimeHealth = initializeCompatLayer({
     logger: (event, payload) => {
@@ -251,14 +250,6 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
     const diffModeValue = safeGet(aiPayload, 'deterministicDiffMode');
     const deterministicDiffMode: DeterministicDiffMode | undefined =
         diffModeValue === 'log' || diffModeValue === 'store' ? diffModeValue : undefined;
-    const telemetryConfig = safeGet(aiPayload, 'telemetryEnabled') === true
-        ? {
-            enabled: true,
-            storeDiffs: safeGet(aiPayload, 'telemetryStoreDiffs') === true,
-            storeSnapshots: safeGet(aiPayload, 'telemetryStoreSnapshots') === true
-        }
-        : undefined;
-
     if (!useAI) {
         log('Iniciando pipeline (NO-AI)...', 'info');
         const elementorJson = await runPipelineWithoutAI(serialized, wpConfig);
@@ -284,10 +275,6 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
     if (deterministicDiffMode) {
         runOptions.deterministicDiffMode = deterministicDiffMode;
     }
-    if (telemetryConfig) {
-        runOptions.telemetry = telemetryConfig;
-    }
-
     const result = await pipeline.run(node, wpConfig, runOptions) as any;
     log('Pipeline concluido.', 'success');
     if (debug && result.elementorJson) {

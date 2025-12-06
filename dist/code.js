@@ -4653,53 +4653,10 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return snapshot;
   }
 
-  // src/services/telemetry/telemetry.stub.ts
-  var TelemetryServiceStub = class {
-    constructor(_options) {
-    }
-    // ---- Métodos de log ----
-    log(_msg, _data) {
-      return;
-    }
-    event(_name, _data) {
-      return;
-    }
-    metric(_name, _value) {
-      return;
-    }
-    // ---- Ciclo de execução ----
-    start(_label) {
-      return;
-    }
-    end(_label) {
-      return;
-    }
-    // ---- Comparação e inspeção ----
-    snapshot(_label, _payload) {
-      return;
-    }
-    diff(_label, _before, _after) {
-      return;
-    }
-    // ---- Controle ----
-    enable() {
-      return;
-    }
-    disable() {
-      return;
-    }
-    setOptions(_opts) {
-      return;
-    }
-    attach(_context) {
-      return;
-    }
-    // ---- Finalização ----
-    flush() {
-      return;
-    }
-    write() {
-      return;
+  // src/utils/debug.ts
+  var debug = {
+    log: (...args) => {
+      console.log("[debug]", ...args);
     }
   };
 
@@ -4724,30 +4681,18 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       const normalizedWP = __spreadProps(__spreadValues({}, wpConfig), { password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token) });
       this.compiler.setWPConfig(normalizedWP);
       this.imageUploader.setWPConfig(normalizedWP);
-      const telemetry = this.createTelemetry(options == null ? void 0 : options.telemetry);
       const provider = (options == null ? void 0 : options.provider) || geminiProvider;
       this.autoFixLayout = !!(options == null ? void 0 : options.autoFixLayout);
       this.autoRename = !!(options == null ? void 0 : options.autoRename);
       const decision = this.shouldUseDeterministic(options);
       if (decision.allowed && this.deterministicPipeline) {
-        void telemetry.log("deterministic_start", {
-          nodeId: node.id,
-          diffMode: options == null ? void 0 : options.deterministicDiffMode
-        });
-        const deterministicStart = Date.now();
-        const deterministicResult = await this.runDeterministicFlow(node, wpConfig, normalizedWP, telemetry, options);
-        const deterministicDuration = Date.now() - deterministicStart;
-        void telemetry.metric("deterministic_duration_ms", deterministicDuration);
-        void telemetry.log("deterministic_end", __spreadValues({
-          duration: deterministicDuration
-        }, this.summarizeSchema(deterministicResult.schema)));
+        debug.log("deterministic_pipeline:start", { diffMode: options == null ? void 0 : options.deterministicDiffMode, nodeId: node.id });
+        const deterministicResult = await this.runDeterministicFlow(node, wpConfig, normalizedWP, options);
+        debug.log("deterministic_pipeline:end", __spreadValues({}, this.summarizeSchema(deterministicResult.schema)));
         if (options == null ? void 0 : options.deterministicDiffMode) {
-          const legacyResult2 = await this.runLegacyFlowWithTelemetry(node, wpConfig, normalizedWP, provider, options, telemetry);
+          const legacyResult2 = await this.runLegacyFlow(node, wpConfig, normalizedWP, provider, options);
           const diffSnapshot = this.compareDeterministicSchemas(options.deterministicDiffMode, deterministicResult.schema, legacyResult2.schema);
-          void telemetry.diff("pipeline_schema", deterministicResult.schema, legacyResult2.schema, {
-            mode: options.deterministicDiffMode,
-            matches: diffSnapshot.matches
-          });
+          debug.log("deterministic_pipeline:diff", diffSnapshot);
           return this.formatRunResult(legacyResult2, options);
         }
         return this.formatRunResult(deterministicResult, options);
@@ -4755,7 +4700,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       if (options == null ? void 0 : options.useDeterministic) {
         console.info("[PIPELINE] Deterministic pipeline desativado:", decision.reason || "motivo desconhecido");
       }
-      const legacyResult = await this.runLegacyFlowWithTelemetry(node, wpConfig, normalizedWP, provider, options, telemetry);
+      const legacyResult = await this.runLegacyFlow(node, wpConfig, normalizedWP, provider, options);
       return this.formatRunResult(legacyResult, options);
     }
     formatRunResult(result, options) {
@@ -4780,7 +4725,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       const includeDebug = !!(options == null ? void 0 : options.debug) || !!(options == null ? void 0 : options.deterministicDiffMode);
       return this.buildExecutionResult(schema, originalWP, preprocessed, includeDebug);
     }
-    async runDeterministicFlow(node, originalWP, normalizedWP, telemetry, options) {
+    async runDeterministicFlow(node, originalWP, normalizedWP, options) {
       if (!this.deterministicPipeline) {
         throw new Error("Deterministic pipeline indisponivel.");
       }
@@ -4788,8 +4733,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       const canUpload = this.canUploadMedia(normalizedWP);
       const simulateUploads = !!(options == null ? void 0 : options.deterministicDiffMode) || !canUpload;
       const deterministicOptions = {
-        media: { simulate: simulateUploads },
-        telemetry
+        media: { simulate: simulateUploads }
       };
       if (canUpload) {
         deterministicOptions.wpConfig = normalizedWP;
@@ -4841,26 +4785,6 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       };
       (_a = schema.containers) == null ? void 0 : _a.forEach(walk);
       return { totalContainers: containers, totalWidgets: widgets };
-    }
-    async runLegacyFlowWithTelemetry(node, wpConfig, normalizedWP, provider, options, telemetry) {
-      void telemetry.log("legacy_start", {
-        nodeId: node.id,
-        provider: provider.id
-      });
-      const start = Date.now();
-      const result = await this.runLegacyFlow(node, wpConfig, normalizedWP, provider, options);
-      const duration = Date.now() - start;
-      void telemetry.metric("legacy_duration_ms", duration);
-      void telemetry.log("legacy_end", __spreadValues({
-        duration
-      }, this.summarizeSchema(result.schema)));
-      return result;
-    }
-    createTelemetry(config) {
-      return new TelemetryServiceStub(!!(config == null ? void 0 : config.enabled), {
-        storeDiffs: !!(config == null ? void 0 : config.storeDiffs),
-        storeSnapshots: !!(config == null ? void 0 : config.storeSnapshots)
-      });
     }
     logSchemaSummary(schema) {
       var _a, _b, _c, _d, _e;
@@ -8558,7 +8482,7 @@ ${detection.justification}
     }
     return selection[0];
   }
-  async function generateElementorJSON(aiPayload, customWP, debug) {
+  async function generateElementorJSON(aiPayload, customWP, debug2) {
     const node = getSelectedNode();
     log(
       `[DEBUG] Selected Node: ${safeGetString(node, "name", "unknown")} (ID: ${safeGetString(node, "id", "n/a")}, Type: ${safeGetString(node, "type", "unknown")}, Locked: ${safeGetBoolean(node, "locked", false)})`,
@@ -8575,11 +8499,6 @@ ${detection.justification}
     const useDeterministic = safeGet(aiPayload, "useDeterministic") === true;
     const diffModeValue = safeGet(aiPayload, "deterministicDiffMode");
     const deterministicDiffMode = diffModeValue === "log" || diffModeValue === "store" ? diffModeValue : void 0;
-    const telemetryConfig = safeGet(aiPayload, "telemetryEnabled") === true ? {
-      enabled: true,
-      storeDiffs: safeGet(aiPayload, "telemetryStoreDiffs") === true,
-      storeSnapshots: safeGet(aiPayload, "telemetryStoreSnapshots") === true
-    } : void 0;
     if (!useAI) {
       log("Iniciando pipeline (NO-AI)...", "info");
       const elementorJson = await runPipelineWithoutAI(serialized, wpConfig);
@@ -8592,7 +8511,7 @@ ${detection.justification}
     const autoFixLayout = await loadSetting("auto_fix_layout", false);
     log(`Iniciando pipeline (${providerId.toUpperCase()})...`, "info");
     const runOptions = {
-      debug: !!debug,
+      debug: !!debug2,
       provider,
       apiKey,
       autoFixLayout,
@@ -8604,12 +8523,9 @@ ${detection.justification}
     if (deterministicDiffMode) {
       runOptions.deterministicDiffMode = deterministicDiffMode;
     }
-    if (telemetryConfig) {
-      runOptions.telemetry = telemetryConfig;
-    }
     const result = await pipeline.run(node, wpConfig, runOptions);
     log("Pipeline concluido.", "success");
-    if (debug && result.elementorJson) {
+    if (debug2 && result.elementorJson) {
       return result;
     }
     return { elementorJson: result };
@@ -8870,8 +8786,8 @@ ${detection.justification}
         try {
           figma.ui.postMessage({ type: "generation-start" });
           const wpConfig = msg.wpConfig;
-          const debug = !!msg.debug;
-          const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug);
+          const debug2 = !!msg.debug;
+          const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug2);
           await deliverResult(elementorJson, debugInfo);
         } catch (error) {
           const message = safeGet(error, "message") || String(error);
