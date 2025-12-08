@@ -679,7 +679,14 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 type: 'image-box',
                 content: boxContent.title || node.name,
                 imageId: boxContent.imageId || findFirstImageId(node) || null,
-                styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
+                styles: { 
+                    ...styles, 
+                    title_text: boxContent.title, 
+                    description_text: boxContent.description,
+                    titleStyles: boxContent.titleStyles,
+                    descriptionStyles: boxContent.descriptionStyles,
+                    customCss: boxContent.customCss
+                }
             };
         }
         if (widgetType === 'icon-box') {
@@ -688,7 +695,14 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 type: 'icon-box',
                 content: boxContent.title || node.name,
                 imageId: boxContent.imageId || findFirstImageId(node) || null,
-                styles: { ...styles, title_text: boxContent.title, description_text: boxContent.description }
+                styles: { 
+                    ...styles, 
+                    title_text: boxContent.title, 
+                    description_text: boxContent.description,
+                    titleStyles: boxContent.titleStyles,
+                    descriptionStyles: boxContent.descriptionStyles,
+                    customCss: boxContent.customCss
+                }
             };
         }
         if (widgetType === 'icon-list') {
@@ -1507,11 +1521,20 @@ export function convertToFlexSchema(analyzedTree: SerializedNode): PipelineSchem
     };
 }
 
-function extractBoxContent(node: SerializedNode): { imageId: string | null, title: string, description: string } {
+function extractBoxContent(node: SerializedNode): {
+    imageId: string | null,
+    title: string,
+    description: string,
+    titleStyles?: TypographyStyles,
+    descriptionStyles?: TypographyStyles,
+    customCss?: string | null
+} {
     const children = (node as any).children || [];
     let imageId: string | null = null;
     let title = '';
     let description = '';
+    let titleNode: SerializedNode | null = null;
+    let descriptionNode: SerializedNode | null = null;
 
     console.log('[EXTRACT BOX] Processing node:', node.name, 'with', children.length, 'children');
 
@@ -1566,11 +1589,13 @@ function extractBoxContent(node: SerializedNode): { imageId: string | null, titl
         if (childName.startsWith('w:heading') || childName.includes('title') || childName.includes('heading')) {
             if (child.type === 'TEXT') {
                 title = (child as any).characters || child.name;
+                titleNode = child;
                 console.log('[EXTRACT BOX] ✅ Found title:', title);
             }
         } else if (childName.startsWith('w:text-editor') || childName.startsWith('w:text') || childName.includes('description') || childName.includes('desc')) {
             if (child.type === 'TEXT') {
                 description = (child as any).characters || child.name;
+                descriptionNode = child;
                 console.log('[EXTRACT BOX] ✅ Found description:', description.substring(0, 50) + '...');
             }
         } else if (child.type === 'TEXT' && !title && !description) {
@@ -1601,14 +1626,189 @@ function extractBoxContent(node: SerializedNode): { imageId: string | null, titl
 
         if (textNodes.length > 0) {
             title = (textNodes[0] as any).characters || textNodes[0].name;
+            titleNode = textNodes[0];
             console.log('[EXTRACT BOX] ✅ Fallback title:', title);
         }
         if (textNodes.length > 1) {
             description = (textNodes[1] as any).characters || textNodes[1].name;
+            descriptionNode = textNodes[1];
             console.log('[EXTRACT BOX] ✅ Fallback description:', description.substring(0, 50) + '...');
         }
     }
 
+    // Extract typography styles from title and description nodes
+    const titleStyles = titleNode ? extractTypographyFromTextNode(titleNode) : undefined;
+    const descriptionStyles = descriptionNode ? extractTypographyFromTextNode(descriptionNode) : undefined;
+
+    // Generate custom CSS from frame styles (fills, strokes, cornerRadius)
+    const customCss = generateCardCustomCSSFromNode(node);
+
     console.log('[EXTRACT BOX] Final result - imageId:', imageId, 'title:', title, 'description:', description ? description.substring(0, 30) + '...' : 'empty');
-    return { imageId, title, description };
+    console.log('[EXTRACT BOX] Typography - titleStyles:', titleStyles ? 'extracted' : 'none', 'descriptionStyles:', descriptionStyles ? 'extracted' : 'none');
+    console.log('[EXTRACT BOX] customCss:', customCss ? 'generated' : 'none');
+
+    return { imageId, title, description, titleStyles, descriptionStyles, customCss };
 }
+
+/**
+ * Typography styles extracted from TEXT nodes
+ */
+interface TypographyStyles {
+    fontFamily?: string;
+    fontWeight?: number | string;
+    fontSize?: number;
+    lineHeight?: number;
+    letterSpacing?: number;
+    color?: string;
+    textAlign?: string;
+    textTransform?: string;
+}
+
+/**
+ * Extracts typography properties from a TEXT node
+ * @param node - Figma TEXT node (serialized)
+ * @returns TypographyStyles object with font properties and color
+ */
+function extractTypographyFromTextNode(node: SerializedNode): TypographyStyles | undefined {
+    if (node.type !== 'TEXT') return undefined;
+
+    const styles: TypographyStyles = {};
+    const nodeAny = node as any;
+
+    // Font family - from fontName or styledTextSegments
+    if (nodeAny.fontName?.family) {
+        styles.fontFamily = nodeAny.fontName.family;
+    } else if (nodeAny.styledTextSegments?.[0]?.fontName?.family) {
+        styles.fontFamily = nodeAny.styledTextSegments[0].fontName.family;
+    }
+
+    // Font weight - from fontWeight or fontName.style
+    if (nodeAny.fontWeight) {
+        styles.fontWeight = nodeAny.fontWeight;
+    } else if (nodeAny.fontName?.style) {
+        // Map style names to numeric weights
+        const styleWeightMap: Record<string, number> = {
+            'Thin': 100, 'ExtraLight': 200, 'Light': 300, 'Regular': 400,
+            'Medium': 500, 'SemiBold': 600, 'Bold': 700, 'ExtraBold': 800, 'Black': 900
+        };
+        const styleName = nodeAny.fontName.style.replace(/\s+/g, '');
+        for (const [name, weight] of Object.entries(styleWeightMap)) {
+            if (styleName.includes(name)) {
+                styles.fontWeight = weight;
+                break;
+            }
+        }
+    }
+
+    // Font size
+    if (nodeAny.fontSize) {
+        styles.fontSize = nodeAny.fontSize;
+    }
+
+    // Line height - convert to px
+    if (nodeAny.lineHeight) {
+        if (typeof nodeAny.lineHeight === 'number') {
+            styles.lineHeight = nodeAny.lineHeight;
+        } else if (nodeAny.lineHeight.value && nodeAny.lineHeight.unit !== 'AUTO') {
+            styles.lineHeight = nodeAny.lineHeight.value;
+        }
+    }
+
+    // Letter spacing
+    if (nodeAny.letterSpacing) {
+        if (typeof nodeAny.letterSpacing === 'number') {
+            styles.letterSpacing = nodeAny.letterSpacing;
+        } else if (nodeAny.letterSpacing.value) {
+            // Convert PERCENT to px if needed (using fontSize as base)
+            if (nodeAny.letterSpacing.unit === 'PERCENT' && styles.fontSize) {
+                styles.letterSpacing = (nodeAny.letterSpacing.value / 100) * styles.fontSize;
+            } else {
+                styles.letterSpacing = nodeAny.letterSpacing.value;
+            }
+        }
+    }
+
+    // Color - from fills or styledTextSegments
+    const fills = nodeAny.fills || nodeAny.styledTextSegments?.[0]?.fills;
+    if (fills && Array.isArray(fills) && fills.length > 0) {
+        const solidFill = fills.find((f: any) => f.type === 'SOLID' && f.visible !== false);
+        if (solidFill?.color) {
+            const { r, g, b } = solidFill.color;
+            const a = solidFill.opacity ?? 1;
+            styles.color = a >= 1
+                ? `#${Math.round(r * 255).toString(16).padStart(2, '0')}${Math.round(g * 255).toString(16).padStart(2, '0')}${Math.round(b * 255).toString(16).padStart(2, '0')}`.toUpperCase()
+                : `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+        }
+    }
+
+    // Text alignment
+    if (nodeAny.textAlignHorizontal) {
+        const alignMap: Record<string, string> = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'justify' };
+        styles.textAlign = alignMap[nodeAny.textAlignHorizontal] || 'left';
+    }
+
+    // Text transform (case)
+    if (nodeAny.textCase) {
+        const caseMap: Record<string, string> = { UPPER: 'uppercase', LOWER: 'lowercase', TITLE: 'capitalize' };
+        styles.textTransform = caseMap[nodeAny.textCase];
+    }
+
+    // Only return if we have at least one style
+    const hasStyles = Object.keys(styles).length > 0;
+    return hasStyles ? styles : undefined;
+}
+
+/**
+ * Generates custom CSS from a node's visual properties (fills, strokes, cornerRadius)
+ * @param node - Figma frame node (serialized)
+ * @returns CSS string with selector placeholder or null
+ */
+function generateCardCustomCSSFromNode(node: SerializedNode): string | null {
+    const nodeAny = node as any;
+    const cssRules: string[] = [];
+
+    // 1. Background from fills (SOLID only)
+    if (nodeAny.fills && Array.isArray(nodeAny.fills)) {
+        const solidFill = nodeAny.fills.find((f: any) =>
+            f.type === 'SOLID' &&
+            f.visible !== false &&
+            f.color
+        );
+
+        if (solidFill?.color) {
+            const { r, g, b } = solidFill.color;
+            const opacity = solidFill.opacity ?? 1;
+            if (opacity >= 1) {
+                const hex = `#${Math.round(r * 255).toString(16).padStart(2, '0')}${Math.round(g * 255).toString(16).padStart(2, '0')}${Math.round(b * 255).toString(16).padStart(2, '0')}`.toUpperCase();
+                cssRules.push(`background-color: ${hex}`);
+            } else {
+                cssRules.push(`background-color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+            }
+        }
+    }
+
+    // 2. Border from strokes
+    if (nodeAny.strokes && Array.isArray(nodeAny.strokes) && nodeAny.strokes.length > 0) {
+        const stroke = nodeAny.strokes[0];
+        if (stroke.type === 'SOLID' && stroke.color) {
+            const { r, g, b } = stroke.color;
+            const strokeWeight = nodeAny.strokeWeight || 1;
+            const opacity = stroke.opacity ?? 1;
+            cssRules.push(`border: ${strokeWeight}px solid rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+        }
+    }
+
+    // 3. Border radius
+    if (nodeAny.cornerRadius !== undefined && nodeAny.cornerRadius > 0) {
+        cssRules.push(`border-radius: ${nodeAny.cornerRadius}px`);
+        cssRules.push(`overflow: hidden`);
+    }
+
+    // If no rules, return null
+    if (cssRules.length === 0) {
+        return null;
+    }
+
+    return `selector {\n  ${cssRules.join(';\n  ')};\n}`;
+}
+

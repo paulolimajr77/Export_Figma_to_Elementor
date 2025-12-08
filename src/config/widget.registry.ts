@@ -307,15 +307,53 @@ const registry: WidgetDefinition[] = [
         aliases: generateAliases('image-box', ['caixa de imagem', 'box imagem', 'card com imagem'], ['image box', 'box image', 'card image', 'feature box', 'service box']),
         compile: (w, base) => {
             const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
-            return {
-                widgetType: 'image-box',
-                settings: {
-                    ...base,
-                    image: { url: base.image_url || '', id: isNaN(imgId) ? '' : imgId },
-                    title_text: w.content || base.title_text || 'Title',
-                    description_text: base.description_text || ''
-                }
+            const settings: any = {
+                ...base,
+                image: { url: base.image_url || '', id: isNaN(imgId) ? '' : imgId },
+                title_text: w.content || base.title_text || w.styles?.title_text || 'Title',
+                description_text: base.description_text || w.styles?.description_text || ''
             };
+
+            // ===== TITLE TYPOGRAPHY (from w.styles.titleStyles) =====
+            const titleStyles = w.styles?.titleStyles;
+            if (titleStyles) {
+                settings.title_typography_typography = 'custom';
+                if (titleStyles.fontFamily) settings.title_typography_font_family = titleStyles.fontFamily;
+                if (titleStyles.fontWeight) settings.title_typography_font_weight = String(titleStyles.fontWeight);
+                if (titleStyles.fontSize) settings.title_typography_font_size = { unit: 'px', size: titleStyles.fontSize, sizes: [] };
+                if (titleStyles.lineHeight) settings.title_typography_line_height = { unit: 'px', size: titleStyles.lineHeight, sizes: [] };
+                if (titleStyles.letterSpacing) settings.title_typography_letter_spacing = { unit: 'px', size: titleStyles.letterSpacing, sizes: [] };
+                if (titleStyles.textTransform) settings.title_typography_text_transform = titleStyles.textTransform;
+                if (titleStyles.color) settings.title_color = titleStyles.color;
+            }
+
+            // ===== DESCRIPTION TYPOGRAPHY (from w.styles.descriptionStyles) =====
+            const descStyles = w.styles?.descriptionStyles;
+            if (descStyles) {
+                settings.description_typography_typography = 'custom';
+                if (descStyles.fontFamily) settings.description_typography_font_family = descStyles.fontFamily;
+                if (descStyles.fontWeight) settings.description_typography_font_weight = String(descStyles.fontWeight);
+                if (descStyles.fontSize) settings.description_typography_font_size = { unit: 'px', size: descStyles.fontSize, sizes: [] };
+                if (descStyles.lineHeight) settings.description_typography_line_height = { unit: 'px', size: descStyles.lineHeight, sizes: [] };
+                if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: 'px', size: descStyles.letterSpacing, sizes: [] };
+                if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
+                if (descStyles.color) settings.description_color = descStyles.color;
+            }
+
+            // ===== CUSTOM CSS (background, border, radius from frame) =====
+            if (w.styles?.customCss) {
+                settings.custom_css = w.styles.customCss;
+            }
+
+            console.log('[IMAGE-BOX COMPILE] Typography applied:', {
+                titleFamily: titleStyles?.fontFamily,
+                titleColor: settings.title_color,
+                descFamily: descStyles?.fontFamily,
+                descColor: settings.description_color,
+                hasCustomCss: !!settings.custom_css
+            });
+
+            return { widgetType: 'image-box', settings };
         }
     },
     {
@@ -323,16 +361,56 @@ const registry: WidgetDefinition[] = [
         widgetType: 'icon-box',
         family: 'media',
         aliases: generateAliases('icon-box', ['caixa de ícone', 'box ícone', 'card com ícone'], ['icon box', 'box icon', 'card icon', 'feature icon']),
-        compile: (w, base) => ({
-            widgetType: 'icon-box',
-            settings: {
+        compile: (w, base) => {
+            const settings: any = {
                 ...base,
                 // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
                 selected_icon: w.styles?.selected_icon || base.selected_icon || { value: 'fas fa-star', library: 'fa-solid' },
                 title_text: w.content || base.title_text || w.styles?.title_text || 'Title',
                 description_text: base.description_text || w.styles?.description_text || ''
+            };
+
+            // ===== TITLE TYPOGRAPHY (from w.styles.titleStyles) =====
+            const titleStyles = w.styles?.titleStyles;
+            if (titleStyles) {
+                settings.title_typography_typography = 'custom';
+                if (titleStyles.fontFamily) settings.title_typography_font_family = titleStyles.fontFamily;
+                if (titleStyles.fontWeight) settings.title_typography_font_weight = String(titleStyles.fontWeight);
+                if (titleStyles.fontSize) settings.title_typography_font_size = { unit: 'px', size: titleStyles.fontSize, sizes: [] };
+                if (titleStyles.lineHeight) settings.title_typography_line_height = { unit: 'px', size: titleStyles.lineHeight, sizes: [] };
+                if (titleStyles.letterSpacing) settings.title_typography_letter_spacing = { unit: 'px', size: titleStyles.letterSpacing, sizes: [] };
+                if (titleStyles.textTransform) settings.title_typography_text_transform = titleStyles.textTransform;
+                if (titleStyles.color) settings.title_color = titleStyles.color;
             }
-        })
+
+            // ===== DESCRIPTION TYPOGRAPHY (from w.styles.descriptionStyles) =====
+            const descStyles = w.styles?.descriptionStyles;
+            if (descStyles) {
+                settings.description_typography_typography = 'custom';
+                if (descStyles.fontFamily) settings.description_typography_font_family = descStyles.fontFamily;
+                if (descStyles.fontWeight) settings.description_typography_font_weight = String(descStyles.fontWeight);
+                if (descStyles.fontSize) settings.description_typography_font_size = { unit: 'px', size: descStyles.fontSize, sizes: [] };
+                if (descStyles.lineHeight) settings.description_typography_line_height = { unit: 'px', size: descStyles.lineHeight, sizes: [] };
+                if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: 'px', size: descStyles.letterSpacing, sizes: [] };
+                if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
+                if (descStyles.color) settings.description_color = descStyles.color;
+            }
+
+            // ===== CUSTOM CSS (background, border, radius from frame) =====
+            if (w.styles?.customCss) {
+                settings.custom_css = w.styles.customCss;
+            }
+
+            console.log('[ICON-BOX COMPILE] Typography applied:', {
+                titleFamily: titleStyles?.fontFamily,
+                titleColor: settings.title_color,
+                descFamily: descStyles?.fontFamily,
+                descColor: settings.description_color,
+                hasCustomCss: !!settings.custom_css
+            });
+
+            return { widgetType: 'icon-box', settings };
+        }
     },
     {
         key: 'icon_list',

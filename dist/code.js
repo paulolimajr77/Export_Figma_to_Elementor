@@ -857,15 +857,46 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("image-box", ["caixa de imagem", "box imagem", "card com imagem"], ["image box", "box image", "card image", "feature box", "service box"]),
       compile: (w, base) => {
+        var _a, _b, _c, _d, _e;
         const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
-        return {
-          widgetType: "image-box",
-          settings: __spreadProps(__spreadValues({}, base), {
-            image: { url: base.image_url || "", id: isNaN(imgId) ? "" : imgId },
-            title_text: w.content || base.title_text || "Title",
-            description_text: base.description_text || ""
-          })
-        };
+        const settings = __spreadProps(__spreadValues({}, base), {
+          image: { url: base.image_url || "", id: isNaN(imgId) ? "" : imgId },
+          title_text: w.content || base.title_text || ((_a = w.styles) == null ? void 0 : _a.title_text) || "Title",
+          description_text: base.description_text || ((_b = w.styles) == null ? void 0 : _b.description_text) || ""
+        });
+        const titleStyles = (_c = w.styles) == null ? void 0 : _c.titleStyles;
+        if (titleStyles) {
+          settings.title_typography_typography = "custom";
+          if (titleStyles.fontFamily) settings.title_typography_font_family = titleStyles.fontFamily;
+          if (titleStyles.fontWeight) settings.title_typography_font_weight = String(titleStyles.fontWeight);
+          if (titleStyles.fontSize) settings.title_typography_font_size = { unit: "px", size: titleStyles.fontSize, sizes: [] };
+          if (titleStyles.lineHeight) settings.title_typography_line_height = { unit: "px", size: titleStyles.lineHeight, sizes: [] };
+          if (titleStyles.letterSpacing) settings.title_typography_letter_spacing = { unit: "px", size: titleStyles.letterSpacing, sizes: [] };
+          if (titleStyles.textTransform) settings.title_typography_text_transform = titleStyles.textTransform;
+          if (titleStyles.color) settings.title_color = titleStyles.color;
+        }
+        const descStyles = (_d = w.styles) == null ? void 0 : _d.descriptionStyles;
+        if (descStyles) {
+          settings.description_typography_typography = "custom";
+          if (descStyles.fontFamily) settings.description_typography_font_family = descStyles.fontFamily;
+          if (descStyles.fontWeight) settings.description_typography_font_weight = String(descStyles.fontWeight);
+          if (descStyles.fontSize) settings.description_typography_font_size = { unit: "px", size: descStyles.fontSize, sizes: [] };
+          if (descStyles.lineHeight) settings.description_typography_line_height = { unit: "px", size: descStyles.lineHeight, sizes: [] };
+          if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: "px", size: descStyles.letterSpacing, sizes: [] };
+          if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
+          if (descStyles.color) settings.description_color = descStyles.color;
+        }
+        if ((_e = w.styles) == null ? void 0 : _e.customCss) {
+          settings.custom_css = w.styles.customCss;
+        }
+        console.log("[IMAGE-BOX COMPILE] Typography applied:", {
+          titleFamily: titleStyles == null ? void 0 : titleStyles.fontFamily,
+          titleColor: settings.title_color,
+          descFamily: descStyles == null ? void 0 : descStyles.fontFamily,
+          descColor: settings.description_color,
+          hasCustomCss: !!settings.custom_css
+        });
+        return { widgetType: "image-box", settings };
       }
     },
     {
@@ -874,16 +905,46 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("icon-box", ["caixa de \xEDcone", "box \xEDcone", "card com \xEDcone"], ["icon box", "box icon", "card icon", "feature icon"]),
       compile: (w, base) => {
-        var _a, _b, _c;
-        return {
-          widgetType: "icon-box",
-          settings: __spreadProps(__spreadValues({}, base), {
-            // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
-            selected_icon: ((_a = w.styles) == null ? void 0 : _a.selected_icon) || base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
-            title_text: w.content || base.title_text || ((_b = w.styles) == null ? void 0 : _b.title_text) || "Title",
-            description_text: base.description_text || ((_c = w.styles) == null ? void 0 : _c.description_text) || ""
-          })
-        };
+        var _a, _b, _c, _d, _e, _f;
+        const settings = __spreadProps(__spreadValues({}, base), {
+          // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
+          selected_icon: ((_a = w.styles) == null ? void 0 : _a.selected_icon) || base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
+          title_text: w.content || base.title_text || ((_b = w.styles) == null ? void 0 : _b.title_text) || "Title",
+          description_text: base.description_text || ((_c = w.styles) == null ? void 0 : _c.description_text) || ""
+        });
+        const titleStyles = (_d = w.styles) == null ? void 0 : _d.titleStyles;
+        if (titleStyles) {
+          settings.title_typography_typography = "custom";
+          if (titleStyles.fontFamily) settings.title_typography_font_family = titleStyles.fontFamily;
+          if (titleStyles.fontWeight) settings.title_typography_font_weight = String(titleStyles.fontWeight);
+          if (titleStyles.fontSize) settings.title_typography_font_size = { unit: "px", size: titleStyles.fontSize, sizes: [] };
+          if (titleStyles.lineHeight) settings.title_typography_line_height = { unit: "px", size: titleStyles.lineHeight, sizes: [] };
+          if (titleStyles.letterSpacing) settings.title_typography_letter_spacing = { unit: "px", size: titleStyles.letterSpacing, sizes: [] };
+          if (titleStyles.textTransform) settings.title_typography_text_transform = titleStyles.textTransform;
+          if (titleStyles.color) settings.title_color = titleStyles.color;
+        }
+        const descStyles = (_e = w.styles) == null ? void 0 : _e.descriptionStyles;
+        if (descStyles) {
+          settings.description_typography_typography = "custom";
+          if (descStyles.fontFamily) settings.description_typography_font_family = descStyles.fontFamily;
+          if (descStyles.fontWeight) settings.description_typography_font_weight = String(descStyles.fontWeight);
+          if (descStyles.fontSize) settings.description_typography_font_size = { unit: "px", size: descStyles.fontSize, sizes: [] };
+          if (descStyles.lineHeight) settings.description_typography_line_height = { unit: "px", size: descStyles.lineHeight, sizes: [] };
+          if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: "px", size: descStyles.letterSpacing, sizes: [] };
+          if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
+          if (descStyles.color) settings.description_color = descStyles.color;
+        }
+        if ((_f = w.styles) == null ? void 0 : _f.customCss) {
+          settings.custom_css = w.styles.customCss;
+        }
+        console.log("[ICON-BOX COMPILE] Typography applied:", {
+          titleFamily: titleStyles == null ? void 0 : titleStyles.fontFamily,
+          titleColor: settings.title_color,
+          descFamily: descStyles == null ? void 0 : descStyles.fontFamily,
+          descColor: settings.description_color,
+          hasCustomCss: !!settings.custom_css
+        });
+        return { widgetType: "icon-box", settings };
       }
     },
     {
@@ -4382,7 +4443,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           type: "image-box",
           content: boxContent.title || node.name,
           imageId: boxContent.imageId || findFirstImageId(node) || null,
-          styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+          styles: __spreadProps(__spreadValues({}, styles), {
+            title_text: boxContent.title,
+            description_text: boxContent.description,
+            titleStyles: boxContent.titleStyles,
+            descriptionStyles: boxContent.descriptionStyles,
+            customCss: boxContent.customCss
+          })
         };
       }
       if (widgetType === "icon-box") {
@@ -4391,7 +4458,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
           type: "icon-box",
           content: boxContent.title || node.name,
           imageId: boxContent.imageId || findFirstImageId(node) || null,
-          styles: __spreadProps(__spreadValues({}, styles), { title_text: boxContent.title, description_text: boxContent.description })
+          styles: __spreadProps(__spreadValues({}, styles), {
+            title_text: boxContent.title,
+            description_text: boxContent.description,
+            titleStyles: boxContent.titleStyles,
+            descriptionStyles: boxContent.descriptionStyles,
+            customCss: boxContent.customCss
+          })
         };
       }
       if (widgetType === "icon-list") {
@@ -5037,6 +5110,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     let imageId = null;
     let title = "";
     let description = "";
+    let titleNode = null;
+    let descriptionNode = null;
     console.log("[EXTRACT BOX] Processing node:", node.name, "with", children.length, "children");
     for (const child of children) {
       const childName = (child.name || "").toLowerCase();
@@ -5081,11 +5156,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       if (childName.startsWith("w:heading") || childName.includes("title") || childName.includes("heading")) {
         if (child.type === "TEXT") {
           title = child.characters || child.name;
+          titleNode = child;
           console.log("[EXTRACT BOX] \u2705 Found title:", title);
         }
       } else if (childName.startsWith("w:text-editor") || childName.startsWith("w:text") || childName.includes("description") || childName.includes("desc")) {
         if (child.type === "TEXT") {
           description = child.characters || child.name;
+          descriptionNode = child;
           console.log("[EXTRACT BOX] \u2705 Found description:", description.substring(0, 50) + "...");
         }
       } else if (child.type === "TEXT" && !title && !description) {
@@ -5112,15 +5189,134 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       }
       if (textNodes.length > 0) {
         title = textNodes[0].characters || textNodes[0].name;
+        titleNode = textNodes[0];
         console.log("[EXTRACT BOX] \u2705 Fallback title:", title);
       }
       if (textNodes.length > 1) {
         description = textNodes[1].characters || textNodes[1].name;
+        descriptionNode = textNodes[1];
         console.log("[EXTRACT BOX] \u2705 Fallback description:", description.substring(0, 50) + "...");
       }
     }
+    const titleStyles = titleNode ? extractTypographyFromTextNode(titleNode) : void 0;
+    const descriptionStyles = descriptionNode ? extractTypographyFromTextNode(descriptionNode) : void 0;
+    const customCss = generateCardCustomCSSFromNode(node);
     console.log("[EXTRACT BOX] Final result - imageId:", imageId, "title:", title, "description:", description ? description.substring(0, 30) + "..." : "empty");
-    return { imageId, title, description };
+    console.log("[EXTRACT BOX] Typography - titleStyles:", titleStyles ? "extracted" : "none", "descriptionStyles:", descriptionStyles ? "extracted" : "none");
+    console.log("[EXTRACT BOX] customCss:", customCss ? "generated" : "none");
+    return { imageId, title, description, titleStyles, descriptionStyles, customCss };
+  }
+  function extractTypographyFromTextNode(node) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    if (node.type !== "TEXT") return void 0;
+    const styles = {};
+    const nodeAny = node;
+    if ((_a = nodeAny.fontName) == null ? void 0 : _a.family) {
+      styles.fontFamily = nodeAny.fontName.family;
+    } else if ((_d = (_c = (_b = nodeAny.styledTextSegments) == null ? void 0 : _b[0]) == null ? void 0 : _c.fontName) == null ? void 0 : _d.family) {
+      styles.fontFamily = nodeAny.styledTextSegments[0].fontName.family;
+    }
+    if (nodeAny.fontWeight) {
+      styles.fontWeight = nodeAny.fontWeight;
+    } else if ((_e = nodeAny.fontName) == null ? void 0 : _e.style) {
+      const styleWeightMap = {
+        "Thin": 100,
+        "ExtraLight": 200,
+        "Light": 300,
+        "Regular": 400,
+        "Medium": 500,
+        "SemiBold": 600,
+        "Bold": 700,
+        "ExtraBold": 800,
+        "Black": 900
+      };
+      const styleName = nodeAny.fontName.style.replace(/\s+/g, "");
+      for (const [name, weight] of Object.entries(styleWeightMap)) {
+        if (styleName.includes(name)) {
+          styles.fontWeight = weight;
+          break;
+        }
+      }
+    }
+    if (nodeAny.fontSize) {
+      styles.fontSize = nodeAny.fontSize;
+    }
+    if (nodeAny.lineHeight) {
+      if (typeof nodeAny.lineHeight === "number") {
+        styles.lineHeight = nodeAny.lineHeight;
+      } else if (nodeAny.lineHeight.value && nodeAny.lineHeight.unit !== "AUTO") {
+        styles.lineHeight = nodeAny.lineHeight.value;
+      }
+    }
+    if (nodeAny.letterSpacing) {
+      if (typeof nodeAny.letterSpacing === "number") {
+        styles.letterSpacing = nodeAny.letterSpacing;
+      } else if (nodeAny.letterSpacing.value) {
+        if (nodeAny.letterSpacing.unit === "PERCENT" && styles.fontSize) {
+          styles.letterSpacing = nodeAny.letterSpacing.value / 100 * styles.fontSize;
+        } else {
+          styles.letterSpacing = nodeAny.letterSpacing.value;
+        }
+      }
+    }
+    const fills = nodeAny.fills || ((_g = (_f = nodeAny.styledTextSegments) == null ? void 0 : _f[0]) == null ? void 0 : _g.fills);
+    if (fills && Array.isArray(fills) && fills.length > 0) {
+      const solidFill = fills.find((f) => f.type === "SOLID" && f.visible !== false);
+      if (solidFill == null ? void 0 : solidFill.color) {
+        const { r, g, b } = solidFill.color;
+        const a = (_h = solidFill.opacity) != null ? _h : 1;
+        styles.color = a >= 1 ? `#${Math.round(r * 255).toString(16).padStart(2, "0")}${Math.round(g * 255).toString(16).padStart(2, "0")}${Math.round(b * 255).toString(16).padStart(2, "0")}`.toUpperCase() : `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+      }
+    }
+    if (nodeAny.textAlignHorizontal) {
+      const alignMap = { LEFT: "left", CENTER: "center", RIGHT: "right", JUSTIFIED: "justify" };
+      styles.textAlign = alignMap[nodeAny.textAlignHorizontal] || "left";
+    }
+    if (nodeAny.textCase) {
+      const caseMap = { UPPER: "uppercase", LOWER: "lowercase", TITLE: "capitalize" };
+      styles.textTransform = caseMap[nodeAny.textCase];
+    }
+    const hasStyles = Object.keys(styles).length > 0;
+    return hasStyles ? styles : void 0;
+  }
+  function generateCardCustomCSSFromNode(node) {
+    var _a, _b;
+    const nodeAny = node;
+    const cssRules = [];
+    if (nodeAny.fills && Array.isArray(nodeAny.fills)) {
+      const solidFill = nodeAny.fills.find(
+        (f) => f.type === "SOLID" && f.visible !== false && f.color
+      );
+      if (solidFill == null ? void 0 : solidFill.color) {
+        const { r, g, b } = solidFill.color;
+        const opacity = (_a = solidFill.opacity) != null ? _a : 1;
+        if (opacity >= 1) {
+          const hex = `#${Math.round(r * 255).toString(16).padStart(2, "0")}${Math.round(g * 255).toString(16).padStart(2, "0")}${Math.round(b * 255).toString(16).padStart(2, "0")}`.toUpperCase();
+          cssRules.push(`background-color: ${hex}`);
+        } else {
+          cssRules.push(`background-color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+        }
+      }
+    }
+    if (nodeAny.strokes && Array.isArray(nodeAny.strokes) && nodeAny.strokes.length > 0) {
+      const stroke = nodeAny.strokes[0];
+      if (stroke.type === "SOLID" && stroke.color) {
+        const { r, g, b } = stroke.color;
+        const strokeWeight = nodeAny.strokeWeight || 1;
+        const opacity = (_b = stroke.opacity) != null ? _b : 1;
+        cssRules.push(`border: ${strokeWeight}px solid rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+      }
+    }
+    if (nodeAny.cornerRadius !== void 0 && nodeAny.cornerRadius > 0) {
+      cssRules.push(`border-radius: ${nodeAny.cornerRadius}px`);
+      cssRules.push(`overflow: hidden`);
+    }
+    if (cssRules.length === 0) {
+      return null;
+    }
+    return `selector {
+  ${cssRules.join(";\n  ")};
+}`;
   }
 
   // markdown-elementor/elementor-widgets-html-structure.md
