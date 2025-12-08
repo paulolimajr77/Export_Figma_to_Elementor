@@ -7,40 +7,86 @@
   <title>Figma to WP Elementor</title>
   <style>
     /* tokens - NEW BRAND PALETTE v3.1 */
+    /* ========================================= */
+    /*   DESIGN SYSTEM v3.0 - TOKENS & THEMES    */
+    /* ========================================= */
     :root {
-      --font: "Inter", sans-serif;
-      --space-1: 8px;
-      --space-2: 16px;
-      --space-3: 24px;
-      --space-4: 32px;
-      --radius: 12px;
+      /* Typography */
+      --font-stack: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+      /* Colors Scale - Light Theme (Default) */
+      --color-primary: #6C4BFF;
+      --color-primary-hover: #5734F2;
+      --color-bg: #FFFFFF;
+      --color-surface: #F5F7FA;
+      --color-surface-alt: #FFFFFF;
+      --color-border: #D8DFE8;
+
+      /* Text Colors */
+      --color-text: #111111;
+      --color-text-secondary: #444444;
+      --color-text-tertiary: #666666;
+      --color-text-inverse: #FFFFFF;
+
+      /* Feedback Colors */
+      --color-success: #2ECC71;
+      --color-warning: #E4A11B;
+      --color-critical: #E84545;
+      --color-info: #3498DB;
+
+      /* UI Elements */
+      --radius-xs: 4px;
       --radius-sm: 8px;
-      --color-bg: #f8fafc;
-      --color-panel: #ffffff;
-      --color-border: #e2e8f0;
-      --color-text: #0f172a;
-      --color-text-secondary: #64748b;
-      --color-primary: #c437ff;
-      --color-primary-hover: #a020d0;
-      --color-secondary: #5848ff;
-      --color-accent: #ff5c8a;
-      --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.08);
-      --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.12);
-      --gradient-brand: linear-gradient(135deg, #5848ff 0%, #c437ff 50%, #ff5c8a 100%);
+      --radius-md: 12px;
+      --radius-lg: 20px;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+      /* Spacing */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 16px;
+      --space-4: 24px;
+      --space-5: 32px;
+
+      /* Transitions */
+      --anim-fast: 150ms ease;
+      --anim-normal: 250ms ease;
     }
 
-    :root.dark {
-      --color-bg: #0f172a;
-      --color-panel: #1e293b;
-      --color-border: #334155;
-      --color-text: #f1f5f9;
-      --color-text-secondary: rgba(255, 255, 255, 0.72);
-      --color-primary: #c437ff;
-      --color-primary-hover: #d862ff;
-      --color-secondary: #818cf8;
-      --color-accent: #ff5c8a;
-      --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.35);
-      --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+    /* Dark Theme Override */
+
+    :root[data-theme="dark"],
+    :root.dark,
+    html.dark,
+    body.dark {
+      /* Colors Scale - Dark Theme */
+      --color-primary: #A875FF;
+      --color-primary-hover: #C391FF;
+      --color-bg: #0F111A;
+      --color-surface: #1A1D27;
+      --color-surface-alt: #242837;
+      --color-border: #303545;
+
+      /* Text Colors */
+      --color-text: #F6F6F6;
+      --color-text-secondary: #C4C8D0;
+      --color-text-tertiary: #9AA0AE;
+      --color-text-inverse: #0F111A;
+
+      /* Feedback Colors - Dark Adjusted */
+      --color-success: #63E6BE;
+      --color-warning: #FFCC67;
+      --color-critical: #FF6B6B;
+      --color-info: #6EC6FF;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+      --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
     }
 
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
@@ -55,42 +101,65 @@
 
     body {
       margin: 0;
-      font-family: var(--font, 'Inter'), system-ui, -apple-system, sans-serif;
+      font-family: var(--font-stack);
       background: var(--color-bg);
       color: var(--color-text);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--color-text-tertiary);
     }
 
     .app {
       width: 100%;
-      /* max-width: 800px; */
       margin: 0 auto;
       min-height: 100vh;
-      padding: var(--space-3);
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-4);
+      gap: var(--space-4);
     }
 
     .topbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: var(--space-2);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--color-border);
     }
 
     .brand {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: var(--space-1);
     }
 
     .brand-header {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-3);
     }
 
     .brand-icon {
       width: 120px;
       height: 56px;
-      /* border-radius: 8px; */
       flex-shrink: 0;
     }
 
@@ -98,85 +167,104 @@
       font-weight: 700;
       font-size: 18px;
       color: var(--color-text);
-      background: var(--gradient-brand);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      /* background: var(--gradient-brand); */
+      /* -webkit-background-clip: text; */
+      /* -webkit-text-fill-color: transparent; */
+      /* background-clip: text; */
     }
 
     .brand-subtitle {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--color-text-secondary);
-      /* margin-left: 42px; */
+      font-weight: 500;
     }
 
     .top-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-2);
     }
 
+    /* Buttons */
     .btn {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 10px 14px;
-      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 16px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 13px;
       cursor: pointer;
-      transition: transform var(--anim), box-shadow var(--anim), background var(--anim);
-      font-size: 0.7em !important;
-      text-wrap: nowrap;
+      transition: all var(--anim-fast);
+      white-space: nowrap;
+      user-select: none;
     }
 
-    .btn:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-1);
+    .btn:active {
+      transform: translateY(1px);
     }
 
     .btn.primary {
       background: var(--color-primary);
-      border-color: var(--color-primary);
-      color: #fff;
+      color: #FFFFFF;
+      box-shadow: var(--shadow-sm);
     }
 
     .btn.primary:hover {
       background: var(--color-primary-hover);
-      border-color: var(--color-primary-hover);
+      box-shadow: var(--shadow-md);
     }
 
     .btn.secondary {
-      background: var(--color-panel);
+      background: var(--color-surface);
       color: var(--color-text);
       border-color: var(--color-border);
     }
 
+    .btn.secondary:hover {
+      background: var(--color-bg);
+      border-color: var(--color-text-tertiary);
+    }
+
     .btn.ghost {
-      background: var(--color-panel);
+      background: transparent;
       color: var(--color-text-secondary);
-      border-color: var(--color-border);
     }
 
-    .btn.small {
-      padding: 6px 10px;
-      font-size: 12px;
+    .btn.ghost:hover {
+      background: var(--color-surface);
+      color: var(--color-text);
     }
 
+    .btn.critical {
+      background: var(--color-critical);
+      color: #FFFFFF;
+    }
+
+    .btn.small,
     .btn.tiny {
-      padding: 6px 10px;
+      height: 28px;
+      padding: 0 12px;
       font-size: 12px;
+      border-radius: var(--radius-xs);
     }
 
     .btn:disabled {
-      opacity: 0.45;
+      opacity: 0.5;
       cursor: not-allowed;
+      pointer-events: none;
       box-shadow: none;
-      transform: none;
     }
 
+    /* Theme Switch */
     .switch {
       position: relative;
       display: inline-block;
-      width: 56px;
-      height: 30px;
+      width: 52px;
+      height: 28px;
     }
 
     .switch input {
@@ -187,120 +275,131 @@
       position: absolute;
       inset: 0;
       cursor: pointer;
-      background: var(--color-border);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
       border-radius: 999px;
-      transition: var(--anim);
+      transition: var(--anim-fast);
     }
 
     .slider:before {
       content: "";
       position: absolute;
-      left: 4px;
-      top: 4px;
-      width: 22px;
-      height: 22px;
-      background: var(--color-panel);
+      left: 3px;
+      top: 3px;
+      width: 20px;
+      height: 20px;
+      background: var(--color-text-secondary);
       border-radius: 50%;
-      box-shadow: var(--shadow-1);
-      transition: var(--anim);
+      box-shadow: var(--shadow-sm);
+      transition: var(--anim-fast);
       z-index: 2;
     }
 
     .slider .sun,
     .slider .moon {
       position: absolute;
-      font-size: 13px;
-      top: 7px;
-      transition: var(--anim);
+      font-size: 12px;
+      top: 6px;
+      transition: var(--anim-fast);
+      pointer-events: none;
     }
 
     .slider .sun {
-      left: 10px;
+      left: 7px;
       opacity: 1;
+      color: #FDB813;
     }
 
     .slider .moon {
-      right: 10px;
+      right: 7px;
       opacity: 0;
+      color: #FFFFFF;
     }
 
     input:checked+.slider {
-      background: var(--color-primary);
+      background: var(--color-surface);
+      border-color: var(--color-primary);
     }
 
     input:checked+.slider:before {
-      transform: translateX(26px);
+      transform: translateX(24px);
+      background: var(--color-primary);
     }
 
     input:checked+.slider .sun {
       opacity: 0;
-      transform: translateX(-6px);
+      transform: translateX(-4px);
     }
 
     input:checked+.slider .moon {
       opacity: 1;
-      transform: translateX(6px);
+      transform: translateX(4px);
     }
 
+    /* Tabs Navigation */
     .tabs {
       display: flex;
-      gap: 0;
-      background: var(--color-panel);
+      background: var(--color-surface);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      gap: 4px;
       position: relative;
-      overflow: hidden;
     }
 
     .tab-btn {
       flex: 1;
-      padding: var(--space-2);
+      padding: 8px 12px;
       border: none;
+      border-radius: var(--radius-sm);
       background: transparent;
-      font-weight: 400;
+      font-weight: 500;
+      font-size: 13px;
       color: var(--color-text-secondary);
       cursor: pointer;
-      position: relative;
-      transition: color var(--anim), background var(--anim);
-      font-size: 0.75em !important;
-      text-wrap: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all var(--anim-fast);
+      white-space: nowrap;
     }
 
+    /* Active Tab Style - "segmented control" look */
     .tab-btn.active {
+      background: var(--color-surface-alt);
       color: var(--color-primary);
+      box-shadow: var(--shadow-sm);
+      font-weight: 600;
     }
 
-    .tab-btn:hover {
-      background: rgba(0, 0, 0, 0.02);
+    .tab-btn:hover:not(.active) {
+      background: rgba(0, 0, 0, 0.03);
+      color: var(--color-text);
     }
 
     .tab-indicator {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 3px;
-      width: 25%;
-      background: var(--color-primary);
-      transition: transform var(--anim), width var(--anim);
+      display: none;
+      /* Removing underline style in favor of segmented control */
     }
 
     .tab-panels {
-      margin-top: var(--space-2);
+      margin-top: var(--space-4);
     }
 
     .tab-panel {
       display: none;
-      animation: fadeIn var(--anim);
+      animation: navFadeIn var(--anim-fast);
     }
 
     .tab-panel.active {
       display: block;
     }
 
-    @keyframes fadeIn {
+    @keyframes navFadeIn {
       from {
         opacity: 0;
-        transform: translateY(4px);
+        transform: translateY(2px);
       }
 
       to {
@@ -311,296 +410,173 @@
 
     .row {
       display: flex;
-      gap: 16px;
-      margin-bottom: 12px;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
     }
 
+    /* Cards */
     .card {
-      background: var(--color-panel);
+      background: var(--color-surface);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: var(--space-3);
-      margin-bottom: var(--space-3);
-      box-shadow: var(--shadow-1);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+      box-shadow: var(--shadow-sm);
     }
 
     .card-title {
-      font-weight: 900;
-      margin-bottom: var(--space-2);
+      font-weight: 700;
+      margin-bottom: var(--space-3);
       color: var(--color-text);
-      font-size: 0.75em !important;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .actions {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      display: flex;
+      flex-wrap: wrap;
       gap: var(--space-2);
+      margin-top: var(--space-3);
     }
 
-    select {
-      padding: 6px 12px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      font-size: 14px;
-      background: #fff;
-      color: var(--color-text);
+    /* Forms */
+    .input-group {
+      margin-bottom: var(--space-3);
     }
 
     .input-label {
       display: block;
-      margin: var(--space-2) 0 var(--space-1);
-      font-weight: 600;
+      margin-bottom: var(--space-1);
+      font-weight: 500;
       color: var(--color-text-secondary);
+      font-size: 12px;
     }
 
     input[type="text"],
-    input[type="password"] {
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    select,
+    textarea {
       width: 100%;
-      padding: 6px 12px;
+      padding: 8px 12px;
       border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      font-size: 14px;
-      background: #fff;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      background: var(--color-surface-alt);
       color: var(--color-text);
+      transition: all var(--anim-fast);
+      outline: none;
+      font-family: var(--font-stack);
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(108, 75, 255, 0.2);
+      /* Use primary color with opacity */
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: var(--color-text-tertiary);
+    }
+
+    /* Select specific fix (R3) */
+    select {
+      max-width: 100%;
+      text-overflow: '';
+      /* Removes default arrow in some browsers */
+      cursor: pointer;
     }
 
     .checkbox {
       display: flex;
-      gap: 8px;
       align-items: center;
-      margin: 6px 0;
-      color: var(--color-text-secondary);
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      color: var(--color-text);
+      font-size: 13px;
     }
 
-    #output {
+    .checkbox input {
+      margin: 0;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--color-primary);
+    }
+
+    /* Outputs */
+    #output,
+    #figma-json-output {
       width: 100%;
       min-height: 160px;
       border: 1px solid var(--color-border);
-      border-radius: var(--radius);
+      border-radius: var(--radius-md);
       padding: 12px;
-      font-family: "SFMono-Regular", Consolas, monospace;
-      background: #f5f6f8;
-      resize: vertical;
+      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      background: var(--color-bg);
+      /* Contrast against surface cards */
       color: var(--color-text);
+      resize: vertical;
+      line-height: 1.6;
     }
 
     .logs {
-      margin-top: 10px;
-      min-height: 80px;
+      margin-top: var(--space-3);
+      min-height: 100px;
+      max-height: 200px;
       border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 10px;
-      background: var(--color-panel);
-      font-size: 12px;
-      color: var(--color-text);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      background: var(--color-bg);
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--color-text-secondary);
       overflow-y: auto;
     }
 
-    .status {
-      margin-top: 10px;
-      font-size: 13px;
-      color: var(--color-text-secondary);
-    }
-
-    .provider-block {
-      display: none;
-    }
-
-    body[data-provider="gemini"] .provider-gemini,
-    body[data-provider="gpt"] .provider-gpt {
-      display: block;
-    }
-
-    .ai-hidden {
-      display: none !important;
-    }
-
+    /* Help Grid */
     .help-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: var(--space-2);
     }
 
     .help-item {
       padding: var(--space-2);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      background: #f9fafb;
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-alt);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      transition: transform var(--anim-fast);
+    }
+
+    .help-item:hover {
+      border-color: var(--color-primary);
+      transform: translateY(-1px);
     }
 
     .help-item .label {
-      font-weight: 600;
+      font-weight: 500;
       color: var(--color-text);
+      font-size: 12px;
     }
 
     .muted {
-      color: var(--color-text-secondary);
+      color: var(--color-text-tertiary);
       font-size: 12px;
       margin-top: var(--space-2);
     }
 
-    body.dark {
-      background: var(--color-bg);
-      color: var(--color-text);
-    }
-
-    body.dark .tabs {
-      border-color: var(--color-border);
-      background: var(--color-panel);
-    }
-
-    body.dark .tab-btn {
-      color: var(--color-text-secondary);
-    }
-
-    body.dark .tab-btn.active {
-      color: var(--color-primary);
-    }
-
-    /* ========================================
-       DARK MODE OVERRIDES v1.0 
-       ======================================== */
-
-    body.dark .card {
-      background: var(--color-panel) !important;
-      border-color: var(--color-border) !important;
-    }
-
-    body.dark .card-title {
-      color: var(--color-text) !important;
-    }
-
-    body.dark .btn.secondary {
-      background: var(--color-border) !important;
-      color: var(--color-text) !important;
-    }
-
-    body.dark .btn.ghost {
-      background: var(--color-panel) !important;
-      color: var(--color-text) !important;
-    }
-
-    /* ALL INPUTS, SELECTS, TEXTAREAS - Dark Mode */
-    body.dark input,
-    body.dark input[type="text"],
-    body.dark input[type="password"],
-    body.dark input[type="url"],
-    body.dark input[type="email"],
-    body.dark input[type="number"],
-    body.dark select,
-    body.dark textarea {
-      background: #11151c !important;
-      border: 1px solid #2c323d !important;
-      color: #e6e6e6 !important;
-    }
-
-    body.dark input::placeholder,
-    body.dark textarea::placeholder {
-      color: #666 !important;
-    }
-
-    body.dark input:focus,
-    body.dark select:focus,
-    body.dark textarea:focus {
-      border-color: var(--color-primary) !important;
-      box-shadow: 0 0 0 2px rgba(196, 55, 255, 0.2) !important;
-      outline: none !important;
-    }
-
-    body.dark #output,
-    body.dark #figma-json-output {
-      background: #11151c !important;
-      color: #e6e6e6 !important;
-      border-color: #2c323d !important;
-    }
-
-    body.dark .logs {
-      background: #11151c !important;
-      color: #aaa !important;
-      border-color: #2c323d !important;
-    }
-
-    /* HELP TAB - Widget Cards Text Fix */
-    body.dark .help-item {
-      background: var(--color-panel) !important;
-      border-color: var(--color-border) !important;
-    }
-
-    body.dark .help-item .label,
-    body.dark .help-item.compact .label,
-    body.dark .help-grid .label,
-    body.dark .item-header .label,
-    body.dark .help-item .label,
-    body.dark .help-item.compact .label,
-    body.dark .help-grid .label,
-    body.dark .help-grid.compact .help-item .label,
-    body.dark .help-grid.compact .help-item.compact .label,
-    body.dark .help-grid.compact .help-item.compact .item-header .label,
-    body.dark span.label,
-    body.dark .card.compact .help-grid .help-item .item-header .label {
-      color: #f1f5f9 !important;
-      opacity: 1 !important;
-      visibility: visible !important;
-    }
-
-    body.dark .help-item .item-icon,
-    body.dark .help-item.compact .item-icon,
-    body.dark .item-header .item-icon {
-      color: var(--color-primary) !important;
-    }
-
-    /* Card compact dark mode */
-    body.dark .card.compact {
-      background: var(--color-panel) !important;
-      border-color: var(--color-border) !important;
-    }
-
-    body.dark .card.compact .card-title,
-    body.dark .card.compact .card-title.small {
-      color: var(--color-text) !important;
-    }
-
-    /* Labels and form text */
-    body.dark label,
-    body.dark .form-label {
-      color: var(--color-text) !important;
-    }
-
-    /* Slider track */
-    body.dark input[type="range"] {
-      background: transparent !important;
-    }
-
-    body.dark input[type="range"]::-webkit-slider-track {
-      background: #2c323d !important;
-    }
-
-    body.dark input[type="range"]::-webkit-slider-thumb {
-      background: var(--color-primary) !important;
-    }
-
-    /* Checkbox styling */
-    body.dark input[type="checkbox"] {
-      accent-color: var(--color-primary) !important;
-    }
-
-    /* LINTER TABLE - Dark Mode Fixes */
-    body.dark #linter-issues-body tr {
-      background: var(--color-panel) !important;
-      border-color: var(--color-border) !important;
-    }
-
-    body.dark #linter-issues-body td {
-      color: var(--color-text) !important;
-      border-color: var(--color-border) !important;
-    }
-
-    body.dark #linter-issues-body tr:hover {
-      background: rgba(196, 55, 255, 0.08) !important;
-    }
+    /* Old overrides removed - now using Design System v3.0 tokens */
 
     /* LINTER - Inline Rename Controls */
     #linter-issues-body select,
@@ -1525,76 +1501,91 @@
       letter-spacing: 0.5px;
     }
 
+    /* Status Badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
     .status-badge.ok {
-      background: rgba(34, 197, 94, 0.15);
+      background: rgba(46, 204, 113, 0.15);
       color: var(--color-success);
     }
 
     .status-badge.warning {
-      background: rgba(249, 115, 22, 0.15);
+      background: rgba(228, 161, 27, 0.15);
       color: var(--color-warning);
     }
 
     .status-badge.critical {
-      background: rgba(239, 68, 68, 0.15);
+      background: rgba(232, 69, 69, 0.15);
       color: var(--color-critical);
     }
 
-    .status-badge .badge-icon {
-      font-size: 14px;
-    }
-
-    /* Summary Header */
+    /* Linter Summary Header */
     .linter-summary-v2 {
       display: flex;
-      gap: 20px;
+      gap: var(--space-3);
       align-items: flex-start;
-      padding: 16px;
-      background: var(--color-panel);
-      border-radius: 12px;
+      padding: var(--space-3);
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
       border: 1px solid var(--color-border);
-      margin-bottom: 16px;
+      margin-bottom: var(--space-3);
     }
 
     .linter-summary-content {
       flex: 1;
+      min-width: 0;
     }
 
     .linter-summary-title {
       font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 8px;
+      font-weight: 700;
+      margin-bottom: var(--space-2);
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
+      color: var(--color-text);
     }
 
     .linter-microcopy {
       font-size: 12px;
       color: var(--color-text-secondary);
       line-height: 1.5;
-      margin-bottom: 12px;
+      margin-bottom: var(--space-3);
     }
 
-    /* Stats Cards Row */
+    /* Stats Cards */
     .linter-stats-row {
-      display: flex;
-      gap: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-2);
     }
 
     .stat-card {
-      flex: 1;
-      padding: 10px;
-      background: var(--color-bg);
-      border-radius: 8px;
+      padding: 8px;
+      background: var(--color-surface-alt);
+      border-radius: var(--radius-sm);
       text-align: center;
       border: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
     .stat-card .stat-number {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 700;
-      line-height: 1;
+      line-height: 1.2;
+      color: var(--color-text);
     }
 
     .stat-card.critical .stat-number {
@@ -1609,19 +1600,23 @@
       color: var(--color-info);
     }
 
+    .stat-card.ok .stat-number {
+      color: var(--color-success);
+    }
+
     .stat-card .stat-label {
       font-size: 10px;
-      color: var(--color-text-secondary);
-      margin-top: 4px;
-      text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      font-weight: 500;
+      margin-top: 2px;
     }
 
     /* Filter Chips */
     .filter-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
     }
 
     .filter-group {
@@ -1631,15 +1626,15 @@
     }
 
     .filter-chip {
-      padding: 5px 10px;
-      border-radius: 16px;
+      padding: 6px 12px;
+      border-radius: 99px;
       font-size: 11px;
       font-weight: 500;
       border: 1px solid var(--color-border);
-      background: var(--color-panel);
+      background: var(--color-surface);
       color: var(--color-text-secondary);
       cursor: pointer;
-      transition: all 0.15s;
+      transition: all var(--anim-fast);
     }
 
     .filter-chip:hover {
@@ -1650,7 +1645,7 @@
     .filter-chip.active {
       background: var(--color-primary);
       border-color: var(--color-primary);
-      color: #fff;
+      color: #FFFFFF;
     }
 
     .filter-chip.critical.active {
@@ -1671,18 +1666,18 @@
     .filter-separator {
       width: 1px;
       background: var(--color-border);
-      margin: 0 6px;
+      margin: 0 4px;
     }
 
-    /* Issues List v2 */
+    /* Issues List & Cards */
     .issues-list-v2 {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      max-height: 350px;
+      gap: var(--space-2);
+      max-height: 400px;
       overflow-y: auto;
       overflow-x: hidden;
-      max-width: 100%;
+      scroll-behavior: smooth;
     }
 
     .issue-card-v2 {
@@ -1690,28 +1685,24 @@
       align-items: flex-start;
       gap: 12px;
       padding: 12px;
-      background: var(--color-panel);
+      background: var(--color-surface);
       border: 1px solid var(--color-border);
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: all 0.15s;
-      border-left: 4px solid transparent;
-      max-width: 100%;
-      width: 100%;
+      transition: transform var(--anim-fast), box-shadow var(--anim-fast);
+      border-left: 3px solid transparent;
+      position: relative;
       overflow: hidden;
-    }
-
-    .issue-card-v2 .issue-content,
-    .issue-card-v2 .issue-summary,
-    .issue-card-v2 .issue-title-v2 {
-      white-space: normal;
-      overflow-wrap: break-word;
-      word-break: break-word;
+      flex-shrink: 0;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: max-content;
     }
 
     .issue-card-v2:hover {
-      transform: translateX(2px);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transform: translateX(4px);
+      box-shadow: var(--shadow-sm);
+      border-color: var(--color-text-tertiary);
     }
 
     .issue-card-v2.critical {
@@ -1726,85 +1717,33 @@
       border-left-color: var(--color-info);
     }
 
+    /* Active/Selected State */
+    .issue-card-v2.linter-issue--active,
     .issue-card-v2.selected {
-      background: rgba(12, 123, 255, 0.05);
+      background: var(--color-surface-alt);
       border-color: var(--color-primary);
-    }
-
-    /* Linter Status Bar - Feedback Visual */
-    .linter-status-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11px;
-      padding: 8px 12px;
-      border-radius: 6px;
-      margin-bottom: 12px;
-      transition: all 0.2s ease;
-      background: var(--color-bg-secondary);
-      border: 1px solid transparent;
-    }
-
-    .linter-status-bar.hidden {
-      display: none;
-    }
-
-    .linter-status-bar--success {
-      background: rgba(46, 204, 113, 0.12);
-      color: #2ecc71;
-      border-color: rgba(46, 204, 113, 0.25);
-    }
-
-    .linter-status-bar--warning {
-      background: rgba(241, 196, 15, 0.12);
-      color: #f1c40f;
-      border-color: rgba(241, 196, 15, 0.25);
-    }
-
-    .linter-status-bar--error {
-      background: rgba(231, 76, 60, 0.12);
-      color: #e74c3c;
-      border-color: rgba(231, 76, 60, 0.25);
-    }
-
-    .linter-status-bar .status-icon {
-      flex-shrink: 0;
-    }
-
-    .linter-status-bar .status-text {
-      flex: 1;
-      line-height: 1.4;
-    }
-
-    /* Active Issue Highlight */
-    .linter-issue--active,
-    #linter-issues-body tr.linter-issue--active {
-      background: rgba(52, 152, 219, 0.08) !important;
-      outline: 2px solid rgba(52, 152, 219, 0.3);
-      outline-offset: -2px;
-    }
-
-    .issue-icon {
-      font-size: 16px;
-      flex-shrink: 0;
+      box-shadow: var(--shadow-md);
     }
 
     .issue-content {
       flex: 1;
       min-width: 0;
+      /* Critical for text-overflow */
     }
 
     .issue-title-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       margin-bottom: 4px;
+      gap: 8px;
     }
 
     .issue-title-v2 {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--color-text);
+      line-height: 1.3;
     }
 
     .issue-category-chip {
@@ -1812,22 +1751,63 @@
       padding: 2px 6px;
       border-radius: 4px;
       background: var(--color-bg);
-      color: var(--color-text-secondary);
+      color: var(--color-text-tertiary);
+      border: 1px solid var(--color-border);
+      flex-shrink: 0;
     }
 
     .issue-summary {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--color-text-secondary);
       line-height: 1.4;
+      margin-bottom: 6px;
+      overflow-wrap: break-word;
     }
 
     .issue-node-info {
-      font-size: 10px;
-      color: var(--color-text-secondary);
-      margin-top: 6px;
-      font-family: monospace;
-      opacity: 0.8;
+      font-size: 11px;
+      color: var(--color-text-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
+
+    /* Feedback Status Bar */
+    .linter-status-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-3);
+      border: 1px solid transparent;
+      font-weight: 500;
+    }
+
+    .linter-status-bar.hidden {
+      display: none;
+    }
+
+    .linter-status-bar--success {
+      background: rgba(46, 204, 113, 0.1);
+      color: var(--color-success);
+      border-color: rgba(46, 204, 113, 0.2);
+    }
+
+    .linter-status-bar--warning {
+      background: rgba(228, 161, 27, 0.1);
+      color: var(--color-warning);
+      border-color: rgba(228, 161, 27, 0.2);
+    }
+
+    .linter-status-bar--error {
+      background: rgba(232, 69, 69, 0.1);
+      color: var(--color-critical);
+      border-color: rgba(232, 69, 69, 0.2);
+    }
+
+
 
     /* Details Panel v2 */
     .details-panel-v2 {
@@ -2014,12 +1994,40 @@
     </header>
 
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="layout">Layout &rarr; Elementor</button>
-      <button class="tab-btn" data-tab="linter">Linter</button>
-      <button class="tab-btn" data-tab="ai">Configura&#231;&#227;o da IA</button>
-      <button class="tab-btn" data-tab="wp">WordPress</button>
-      <button class="tab-btn" data-tab="help">Ajuda</button>
-      <span class="tab-indicator"></span>
+      <button class="tab-btn active" data-tab="layout" title="Conversão de Layout">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z" />
+        </svg>
+        Export Layout
+      </button>
+      <button class="tab-btn" data-tab="linter" title="Verificação de Erros">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" />
+        </svg>
+        Validador
+      </button>
+      <button class="tab-btn" data-tab="ai" title="Inteligência Artificial">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 2l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 2 6.5 9.5 2 12l4.5 2.5L9 22l2.5-7.5L19 12l-7.5-2.5z" />
+        </svg>
+        IA
+      </button>
+      <button class="tab-btn" data-tab="wp" title="Exportar para WordPress">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1h1v1h1v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-1.07 3.9-2.7 5.06z" />
+        </svg>
+        WordPress
+      </button>
+      <button class="tab-btn" data-tab="help" title="Ajuda e Widgets">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" />
+        </svg>
+        Widgets
+      </button>
     </nav>
 
     <main class="tab-panels">
@@ -2174,25 +2182,14 @@
               <span class="status-text" id="linter-status-message">Pronto</span>
             </div>
 
-            <!-- Issues Table with standardized ID: linter-issues-body -->
+            <!-- Issues List Container (Cards) -->
             <div class="issues-list-v2" id="issues-list-v2">
-              <table class="linter-issues-table" style="width:100%; font-size:12px; border-collapse: collapse;">
-                <thead>
-                  <tr style="background: var(--color-bg-tertiary); text-align: left;">
-                    <th style="padding: 8px; width: 80px;">Severidade</th>
-                    <th style="padding: 8px; width: 100px;">Categoria</th>
-                    <th style="padding: 8px;">Descrição</th>
-                  </tr>
-                </thead>
-                <tbody id="linter-issues-body">
-                  <!-- Issues serão renderizados aqui -->
-                  <tr>
-                    <td colspan="3" style="text-align: center; padding: 24px; color: var(--color-text-secondary);">
-                      ✨ Nenhum problema encontrado. Execute a análise para ver resultados.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <!-- Issues will be rendered here as cards via JS -->
+              <div class="linter-empty-state">
+                <div class="empty-icon">✨</div>
+                <h3 style="font-size: 14px; margin: 8px 0;">Nenhum problema encontrado</h3>
+                <p style="font-size: 12px; margin: 0;">Seu layout parece estar seguindo todas as boas práticas!</p>
+              </div>
             </div>
 
             <!-- Details Panel (contextual, appears when issue selected) -->
@@ -2309,6 +2306,23 @@
       </section>
 
       <section class="tab-panel" data-panel="wp">
+        <div class="card" style="border-left: 3px solid var(--color-primary); background: var(--color-surface-alt);">
+          <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+              fill="var(--color-primary)">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+            </svg>
+            Plugin Obrigatório
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px; line-height: 1.4;">
+            Para gerar menus automaticamente, você deve baixar e instalar nosso plugin auxiliar no WordPress.
+          </p>
+          <a href="https://pljr.com.br/plugins/figtoel-remote-menus.zip" target="_blank"
+            class="btn secondary small full-width" style="text-align: center; text-decoration: none; display: block;">
+            📥 Baixar Plugin Auxiliar
+          </a>
+        </div>
         <div class="card">
           <div class="card-title">WordPress</div>
           <label class="input-label" for="wp_url">WP URL</label>
@@ -3381,7 +3395,6 @@
         const warningEl = document.getElementById('linter-warning-count');
         const infoEl = document.getElementById('linter-info-count');
         const okEl = document.getElementById('linter-ok-count');
-        const issuesBodyEl = document.getElementById('linter-issues-body');
         const scoreRingEl = document.getElementById('score-ring-v2');
         const topProblemsList = document.getElementById('top-problems-list');
 
@@ -3390,76 +3403,83 @@
         const logsCopyBtn = document.getElementById('linter-logs-copy');
         const logsClearBtn = document.getElementById('linter-logs-clear');
 
-        // ====== Guard Clause: elementos críticos ======
-        if (!scoreEl || !statusEl || !issuesBodyEl) {
-          console.warn('[UI] Linter UI não encontrada. Verifique IDs no HTML.', {
-            scoreEl: !!scoreEl,
-            statusEl: !!statusEl,
-            issuesBodyEl: !!issuesBodyEl
-          });
-          return;
-        }
-
         // ====== Store report globally for copy button ======
         window.__linterLastReport = report;
 
-        // ====== Extrair dados do report - FIX: ler de múltiplos paths possíveis ======
-        const summary = report.summary || {};
+        // ====== Step 1: Normalize Issues Data ======
         const analysis = report.analysis || [];
 
-        // Tentar ler contadores diretamente do summary (conforme contrato do backend)
-        // Fallback: calcular a partir da análise se não existir
+        // Normalize severity to lowercase english: critical, warning, info
+        // Map 'major' -> 'warning', 'minor' -> 'info'
+        const normalizedIssues = analysis.map(issue => {
+          let severity = (issue.severity || 'info').toLowerCase();
+          if (severity === 'major') severity = 'warning';
+          if (severity === 'minor') severity = 'info';
+          if (severity === 'ok') severity = 'info'; // Fallback if backend sends 'ok' as severity for an issue
+
+          return {
+            ...issue,
+            severity,
+            nodeName: issue.node_name || issue.nodeName || '',
+            nodeId: issue.node_id || issue.nodeId || '',
+            category: (issue.rule || issue.category || 'geral').toLowerCase()
+          };
+        });
+
+        // Store globally for filtering
+        window.__linterAnalysisCache = normalizedIssues;
+        allIssuesData = normalizedIssues;
+
+        // ====== Step 2: Calculate Counters (Robust Logic) ======
         let criticalCount = 0;
         let warningCount = 0;
         let infoCount = 0;
+
+        normalizedIssues.forEach(issue => {
+          if (issue.severity === 'critical') criticalCount++;
+          else if (issue.severity === 'warning') warningCount++;
+          else infoCount++;
+        });
+
+        const totalIssues = normalizedIssues.length;
+        const totalNodes = report.metadata?.total_nodes || report.metadata?.totalNodes ||
+          (report.widgets ? report.widgets.length : 0);
+
+        // Calculate OK Count: Total Nodes - Unique Nodes with Issues
+        // If totalNodes is 0 or missing, we can't calculate perfectly, so default to 0
         let okCount = 0;
-
-        // Primeiro: tentar ler do summary direto (backend novo)
-        if (typeof summary.critical === 'number' || typeof summary.warning === 'number') {
-          criticalCount = summary.critical || 0;
-          warningCount = summary.warning || 0;
-          infoCount = summary.info || 0;
-          okCount = summary.ok || 0;
-        }
-        // Segundo: tentar ler de summary.counts ou summary.by_severity (formato antigo)
-        else if (summary.counts || summary.by_severity) {
-          const counts = summary.by_severity || summary.counts || {};
-          criticalCount = counts.critical || 0;
-          warningCount = counts.major || counts.warning || 0;
-          infoCount = counts.minor || counts.info || 0;
-          okCount = counts.ok || 0;
-        }
-        // Terceiro: calcular a partir do array analysis
-        else if (analysis.length > 0) {
-          analysis.forEach(issue => {
-            const sev = (issue.severity || '').toLowerCase();
-            if (sev === 'critical') criticalCount++;
-            else if (sev === 'major' || sev === 'warning') warningCount++;
-            else if (sev === 'minor' || sev === 'info') infoCount++;
-            else if (sev === 'ok') okCount++;
-          });
+        if (totalNodes > 0) {
+          const uniqueIssueNodes = new Set(normalizedIssues.map(i => i.nodeId)).size;
+          okCount = Math.max(0, totalNodes - uniqueIssueNodes);
         }
 
-        const totalIssues = summary.totalIssues || summary.total || analysis.length;
-        const totalNodes = report.metadata?.total_nodes || report.metadata?.totalNodes || report.widgets?.length || 0;
+        // If backend explicitly provided summary counts, favor valid numbers
+        const summary = report.summary || {};
+        if (summary.counts && typeof summary.counts.ok === 'number') {
+          // Trust backend if available
+          okCount = summary.counts.ok;
+          // Also trust other counts if needed, but calculating from issues is safer for UI consistency
+        }
 
-        console.log('[UI] Contadores extraídos:', { criticalCount, warningCount, infoCount, okCount, totalIssues, totalNodes });
+        console.log('[UI] Contadores:', { criticalCount, warningCount, infoCount, okCount, totalIssues, totalNodes });
 
-        // ====== Calcular score ======
-        const score = report.summary?.score !== undefined
-          ? Math.round(report.summary.score)
+        // ====== Step 3: Calculate Score ======
+        const score = summary.score !== undefined
+          ? Math.round(summary.score)
           : Math.max(0, 100 - (criticalCount * 15) - (warningCount * 5) - (infoCount * 1));
 
-        // ====== Determinar status ======
-        let status = report.summary?.status || 'warning';
+        // ====== Step 4: Determine Overall Status ======
+        let status = 'warning';
         if (criticalCount > 0) status = 'critical';
         else if (warningCount > 0) status = 'warning';
         else if (totalIssues === 0) status = 'ok';
 
-        // ====== Preencher Score ======
-        scoreEl.textContent = String(score);
+        // ====== Update UI Elements ======
 
-        // Atualizar anel de score se existir
+        // Score
+        if (scoreEl) scoreEl.textContent = String(score);
+
+        // Score Ring Color
         if (scoreRingEl) {
           scoreRingEl.classList.remove('success', 'warning', 'critical');
           if (score >= 80) scoreRingEl.classList.add('success');
@@ -3467,30 +3487,32 @@
           else scoreRingEl.classList.add('critical');
         }
 
-        // ====== Preencher Status Badge ======
-        statusEl.classList.remove('ok', 'warning', 'critical');
-        let statusLabel = 'ATENÇÃO';
-        let statusIcon = '!';
-        if (status === 'ok') {
-          statusLabel = 'OK';
-          statusIcon = '✓';
-          statusEl.classList.add('ok');
-        } else if (status === 'critical') {
-          statusLabel = 'CRÍTICO';
-          statusIcon = '✕';
-          statusEl.classList.add('critical');
-        } else {
-          statusEl.classList.add('warning');
+        // Status Badge
+        if (statusEl) {
+          statusEl.classList.remove('ok', 'warning', 'critical');
+          let statusLabel = 'ATENÇÃO';
+          let statusIcon = '!';
+          if (status === 'ok') {
+            statusLabel = 'OK';
+            statusIcon = '✓';
+            statusEl.classList.add('ok');
+          } else if (status === 'critical') {
+            statusLabel = 'CRÍTICO';
+            statusIcon = '✕';
+            statusEl.classList.add('critical');
+          } else {
+            statusEl.classList.add('warning');
+          }
+          statusEl.innerHTML = `<span class="badge-icon">${statusIcon}</span> ${statusLabel}`;
         }
-        statusEl.innerHTML = `<span class="badge-icon">${statusIcon}</span> ${statusLabel}`;
 
-        // ====== Preencher Contadores ======
+        // Counters
         if (criticalEl) criticalEl.textContent = String(criticalCount);
         if (warningEl) warningEl.textContent = String(warningCount);
         if (infoEl) infoEl.textContent = String(infoCount);
         if (okEl) okEl.textContent = String(okCount);
 
-        // ====== Preencher Texto Resumo ======
+        // Summary Text
         if (summaryTextEl) {
           if (totalIssues === 0) {
             summaryTextEl.textContent = 'Excelente! Seu layout está seguindo todas as boas práticas. Pronto para exportar!';
@@ -3499,180 +3521,59 @@
           } else if (warningCount > 0) {
             summaryTextEl.textContent = `Quase lá! ${totalIssues} item(s) de atenção para revisar.`;
           } else {
-            summaryTextEl.textContent = `Análise concluída: ${totalIssues} sugestão(ões) em ${totalNodes} elementos analisados.`;
+            summaryTextEl.textContent = `Análise concluída: ${totalIssues} sugestão(ões).`;
           }
         }
 
-        // ====== Renderizar Top 3 Problemas Preview ======
+        // Top Problems Preview
         if (topProblemsList) {
-          const issues = report.analysis || [];
-          if (issues.length === 0) {
+          if (normalizedIssues.length === 0) {
             topProblemsList.innerHTML = '<p style="color: var(--color-success);">✅ Nenhum problema encontrado!</p>';
           } else {
-            const top3 = issues.slice(0, 3);
+            const top3 = normalizedIssues.slice(0, 3);
             topProblemsList.innerHTML = top3.map(issue => {
               const icon = issue.severity === 'critical' ? '🔴' :
-                issue.severity === 'major' ? '🟠' : '🔵';
+                issue.severity === 'warning' ? '🟠' : '🔵';
               const title = (issue.message || 'Problema detectado').split('.')[0];
-              return `<div style="padding: 6px 0; border-bottom: 1px solid var(--color-border);">
+              return `<div style="padding: 6px 0; border-bottom: 1px solid var(--color-border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 ${icon} <strong>${title}</strong>
               </div>`;
             }).join('');
           }
         }
 
-        // ====== Renderizar Tabela de Issues ======
-        issuesBodyEl.innerHTML = '';
-        const issues = report.analysis || [];
+        // ====== Step 5: Render Issues ListView (Reset filters) ======
+        // Reset filters in UI
+        document.querySelectorAll('[data-filter-severity]').forEach(b => b.classList.remove('active'));
+        document.getElementById('filter-severity-all')?.classList.add('active');
+        document.querySelectorAll('[data-filter-category]').forEach(b => b.classList.remove('active'));
+        document.getElementById('filter-category-all')?.classList.add('active');
 
-        // Populate global cache for filtering (used by filters/search)
-        window.__linterAnalysisCache = issues;
-        if (typeof allIssuesData !== 'undefined') {
-          allIssuesData = issues.map(issue => ({
-            ...issue,
-            nodeName: issue.node_name || issue.nodeName || '',
-            nodeId: issue.node_id || issue.nodeId || '',
-            category: (issue.rule || issue.category || 'geral').toLowerCase()
-          }));
-        }
+        currentSeverityFilter = 'all';
+        currentCategoryFilter = 'all';
 
-        if (issues.length === 0) {
-          const emptyRow = document.createElement('tr');
-          emptyRow.innerHTML = `
-            <td colspan="3" style="text-align: center; padding: 24px; color: var(--color-text-secondary);">
-              ✨ Nenhum problema encontrado. Seu layout está ótimo!
-            </td>
-          `;
-          issuesBodyEl.appendChild(emptyRow);
+        // This function will handle the rendering of Cards
+        if (typeof renderFilteredIssues === 'function') {
+          renderFilteredIssues();
         } else {
-          issues.forEach((issue, idx) => {
-            const tr = document.createElement('tr');
-            tr.style.cursor = 'pointer';
-            tr.style.transition = 'background 0.15s';
-            const nodeId = issue.node_id || issue.nodeId || '';
-            const nodeName = issue.node_name || issue.nodeName || '(sem nome)';
-            tr.dataset.nodeId = nodeId;
-            tr.dataset.issueIdx = idx;
-            tr.onmouseover = () => { if (!tr.classList.contains('linter-issue--active')) tr.style.background = 'var(--color-bg-secondary)'; };
-            tr.onmouseout = () => { if (!tr.classList.contains('linter-issue--active')) tr.style.background = ''; };
-
-            // Severidade
-            const tdSeverity = document.createElement('td');
-            tdSeverity.style.padding = '8px';
-            const severityIcon = issue.severity === 'critical' ? '🔴' :
-              issue.severity === 'major' || issue.severity === 'warning' ? '🟠' : '🔵';
-            const severityLabel = issue.severity === 'critical' ? 'Crítico' :
-              issue.severity === 'major' || issue.severity === 'warning' ? 'Atenção' : 'Info';
-            tdSeverity.innerHTML = `${severityIcon} ${severityLabel}`;
-
-            // Categoria
-            const tdCategory = document.createElement('td');
-            tdCategory.style.padding = '8px';
-            const category = issue.rule || issue.category || 'geral';
-            const categoryShort = category.includes('auto-layout') ? 'Auto Layout' :
-              category.includes('naming') ? 'Nomenclatura' :
-                category.includes('widget') ? 'Widgets' :
-                  category.includes('image') ? 'Imagens' : 'Estrutura';
-            tdCategory.textContent = categoryShort;
-
-            // Descrição (nodeName + message + inline rename controls if widget-naming)
-            const tdDesc = document.createElement('td');
-            tdDesc.style.padding = '8px';
-            const message = issue.message || '';
-
-            // Extract naming suggestions for inline controls
-            const naming = issue.naming || {};
-            const recommendedName = naming.recommendedName || issue.widgetType || '';
-            const alternatives = naming.alternatives || [];
-            const hasNamingSuggestion = !!recommendedName && !!nodeId;
-            const isNamingIssue = issue.rule === 'widget-naming' || (issue.category || '').includes('naming');
-
-            // Build rename options
-            const renameOptions = [];
-            if (recommendedName) renameOptions.push(recommendedName);
-            alternatives.forEach(alt => {
-              if (alt && !renameOptions.includes(alt)) renameOptions.push(alt);
-            });
-
-            // Build inline rename controls HTML
-            let inlineRenameHtml = '';
-            if (isNamingIssue && hasNamingSuggestion) {
-              inlineRenameHtml = `
-                <div class="inline-rename-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(59, 130, 246, 0.08); border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.2);">
-                  <select class="rename-select-inline" data-node-id="${nodeId}" style="flex: 1; padding: 5px 6px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 11px; background: var(--color-panel); color: var(--color-text); cursor: pointer;">
-                    ${renameOptions.map((name, i) => `<option value="${name}" ${i === 0 ? 'selected' : ''}>${name}</option>`).join('')}
-                  </select>
-                  <button class="btn-rename-row" data-node-id="${nodeId}" style="padding: 5px 10px; font-size: 11px; background: var(--color-primary, #3b82f6); color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">
-                    ✏️ Renomear
-                  </button>
-                </div>
-              `;
-            } else if (isNamingIssue && !hasNamingSuggestion) {
-              inlineRenameHtml = `<div style="margin-top: 6px; font-size: 10px; color: var(--color-text-secondary);">Nenhuma sugestão disponível</div>`;
-            }
-
-            tdDesc.innerHTML = `<strong>${nodeName}</strong><br><span style="color: var(--color-text-secondary); font-size: 11px;">${message}</span>${inlineRenameHtml}`;
-
-            // Setup inline rename handlers (after appending to prevent multiple bindings)
-            const renameSelect = tdDesc.querySelector('.rename-select-inline');
-            const renameBtn = tdDesc.querySelector('.btn-rename-row');
-            if (renameSelect && renameBtn) {
-              // Stop propagation on select and button to prevent row click
-              renameSelect.addEventListener('click', e => e.stopPropagation());
-              renameBtn.addEventListener('click', e => {
-                e.stopPropagation();
-                const newName = renameSelect.value;
-                const targetNodeId = renameBtn.dataset.nodeId;
-                if (newName && targetNodeId) {
-                  renameBtn.disabled = true;
-                  renameBtn.textContent = '⏳...';
-                  send('linter-rename-node', { nodeId: targetNodeId, newName });
-                  console.log('[UI] Table inline rename:', targetNodeId, '→', newName);
-                }
-              });
-            }
-
-            tr.appendChild(tdSeverity);
-            tr.appendChild(tdCategory);
-            tr.appendChild(tdDesc);
-
-            // Click handler: highlight + select node
-            tr.addEventListener('click', () => {
-              // 1) Remove highlight from all rows, add to this one
-              document.querySelectorAll('#linter-issues-body tr').forEach(row => {
-                row.classList.remove('linter-issue--active');
-                row.style.background = '';
-              });
-              tr.classList.add('linter-issue--active');
-
-              // 2) Send message to select node in Figma
-              if (nodeId) {
-                send('select-node', { nodeId });
-                console.log('[UI] Selecionando node:', nodeId, nodeName);
-              }
-            });
-
-            issuesBodyEl.appendChild(tr);
-          });
+          console.error('[UI] renderFilteredIssues não encontrada!');
         }
 
-        // ====== Preencher Logs (se existir) ======
+        // ====== Logs Tab Content ======
         if (logsContentEl) {
           try {
             logsContentEl.value = JSON.stringify(report, null, 2);
           } catch (e) {
             logsContentEl.value = '[Erro ao serializar relatório]';
-            console.warn('[UI] Erro ao serializar logs:', e);
           }
         }
 
-        // ====== Conectar botões de logs ======
+        // Connect logs buttons
         if (logsCopyBtn && logsContentEl) {
           logsCopyBtn.onclick = () => {
             copyToClipboardSafe(logsContentEl.value || '', 'Logs copiados para a área de transferência!');
           };
         }
-
         if (logsClearBtn && logsContentEl) {
           logsClearBtn.onclick = () => {
             logsContentEl.value = '';
@@ -3680,12 +3581,12 @@
           };
         }
 
-        // ====== Conectar botão Copiar Relatório (btn-copy-report-v2) ======
+        // Connect Report Copy Button
         const copyReportBtn = document.getElementById('btn-copy-report-v2');
         if (copyReportBtn) {
           copyReportBtn.onclick = () => {
             if (!window.__linterLastReport) {
-              addLog('Nenhum relatório para copiar. Execute a análise primeiro.', 'warn');
+              addLog('Nenhum relatório para copiar.', 'warn');
               return;
             }
             const text = JSON.stringify(window.__linterLastReport, null, 2);
@@ -4032,54 +3933,72 @@
       }
 
       function renderFilteredIssues() {
-        const searchTerm = (linterSearchInput?.value || '').toLowerCase();
-        const filtered = allIssuesData.filter(issue => {
-          // Map severity: 'major' -> 'warning' for consistency
-          const normalizedSeverity = issue.severity === 'major' ? 'warning' : issue.severity;
-          const matchesSeverity = currentSeverityFilter === 'all' || normalizedSeverity === currentSeverityFilter;
+        // Guard against undefined data
+        if (!allIssuesData) {
+          console.warn('[UI] allIssuesData está vazio ou indefinido.');
+          return;
+        }
 
-          // Map category from rule field
-          const category = (issue.rule || issue.category || '').toLowerCase();
+        const searchTerm = (linterSearchInput?.value || '').toLowerCase();
+
+        const filtered = allIssuesData.filter(issue => {
+          // Severity check: trust normalized data (critical, warning, info)
+          const matchesSeverity = currentSeverityFilter === 'all' || issue.severity === currentSeverityFilter;
+
+          // Category check
+          const category = (issue.category || 'geral').toLowerCase();
           const matchesCategory = currentCategoryFilter === 'all' || category.includes(currentCategoryFilter);
 
-          // Search by nodeName and message
-          const nodeName = issue.node_name || issue.nodeName || '';
-          const message = issue.message || '';
+          // Search check
+          const nodeName = (issue.nodeName || '').toLowerCase();
+          const message = (issue.message || '').toLowerCase();
           const matchesSearch = !searchTerm ||
-            nodeName.toLowerCase().includes(searchTerm) ||
-            message.toLowerCase().includes(searchTerm);
+            nodeName.includes(searchTerm) ||
+            message.includes(searchTerm);
+
           return matchesSeverity && matchesCategory && matchesSearch;
         });
+
+        console.log(`[UI] Filtrando issues: ${filtered.length} resultados (Filtro: ${currentSeverityFilter}, ${currentCategoryFilter})`);
         renderIssuesListV2(filtered);
       }
 
       function renderIssuesListV2(issues) {
         const container = document.getElementById('issues-list-v2');
-        const emptyState = document.getElementById('issues-empty-state');
 
         if (!container) return;
 
         container.innerHTML = '';
 
         if (issues.length === 0) {
+          // Determine empty state message based on filter
+          let emptyMessage = "Seu layout parece estar seguindo todas as boas práticas!";
+          if (currentSeverityFilter !== 'all' || currentCategoryFilter !== 'all') {
+            emptyMessage = "Nenhum problema encontrado para este filtro.";
+          }
+
           container.innerHTML = `
             <div class="linter-empty-state">
               <div class="empty-icon">✨</div>
               <h3 style="font-size: 14px; margin: 8px 0;">Nenhum problema encontrado</h3>
-              <p style="font-size: 12px; margin: 0;">Seu layout parece estar seguindo todas as boas práticas!</p>
+              <p style="font-size: 12px; margin: 0;">${emptyMessage}</p>
             </div>`;
           return;
         }
 
         issues.forEach((issue, idx) => {
           const severityIcon = issue.severity === 'critical' ? '🔴' :
-            issue.severity === 'warning' ? '🟠' : '🔵';
+            (issue.severity === 'warning' ? '🟠' : '🔵');
+
           const card = document.createElement('div');
           card.className = `issue-card-v2 ${issue.severity}`;
           card.dataset.issueIdx = idx;
-          card.dataset.nodeId = issue.node_id || issue.nodeId || '';
-          const nodeId = issue.node_id || issue.nodeId || '';
-          const nodeName = issue.nodeName || issue.node_name || 'Node';
+          const nodeId = issue.nodeId || '';
+
+          // Avoid duplicate data attributes
+          if (nodeId) card.dataset.nodeId = nodeId;
+
+          const nodeName = issue.nodeName || 'Node';
 
           // Extract naming suggestions
           const naming = issue.naming || {};
@@ -4104,7 +4023,7 @@
                     ${renameOptions.map((name, i) => `<option value="${name}" ${i === 0 ? 'selected' : ''}>${name}</option>`).join('')}
                   </select>
                   <button class="btn-rename-inline" data-node-id="${nodeId}" style="padding: 6px 12px; font-size: 11px; background: var(--color-primary, #3b82f6); color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">
-                    ✏️ Renomear
+                    Renomear
                   </button>
                 </div>
                 ${alternatives.length > 0 ? `<div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 4px;">${alternatives.length} alternativa(s) disponível(is)</div>` : ''}
@@ -4123,10 +4042,10 @@
             <span class="issue-icon">${severityIcon}</span>
             <div class="issue-content" style="flex: 1;">
               <div class="issue-title-row">
-                <span class="issue-title-v2">${issue.title || issue.message}</span>
-                <span class="issue-category-chip">${issue.category || 'geral'}</span>
+                <span class="issue-title-v2">${issue.title || issue.message.split('.')[0]}</span>
+                <span class="issue-category-chip">${issue.category}</span>
               </div>
-              <div class="issue-summary">${issue.summary || issue.message}</div>
+              <div class="issue-summary">${issue.message}</div>
               <div class="issue-node-info">📍 ${nodeName}</div>
               ${inlineRenameHtml}
             </div>
@@ -4150,7 +4069,7 @@
                 renameBtn.disabled = true;
                 renameBtn.textContent = '⏳...';
                 send('linter-rename-node', { nodeId: targetNodeId, newName });
-                console.log('[UI] Inline rename:', targetNodeId, '→', newName);
+                console.log('[UI] Inline rename:', targetNodeId, '→', newName); // Log for debug
               }
             });
           }
