@@ -1,5 +1,5 @@
 {
-    "name": "Figma to Elementor",
+    "name": "Figma → WP Elementor",
     "id": "figma-to-elementor",
     "api": "1.0.0",
     "main": "dist/code.js",
