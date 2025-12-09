@@ -12,11 +12,13 @@
 
 export const LICENSE_BACKEND_URL = 'https://figmatoelementor.pljr.com.br';
 export const LICENSE_VALIDATE_ENDPOINT = '/wp-json/figtoel/v1/license/validate';
+export const LICENSE_ACTIVATE_ENDPOINT = '/wp-json/figtoel/v1/license/activate';
 export const LICENSE_COMPILE_ENDPOINT = '/wp-json/figtoel/v1/usage/compile';
 export const LICENSE_PLANS_URL = 'https://figmatoelementor.pljr.com.br/planos/';
 export const LICENSE_STORAGE_KEY = 'figtoel_license_state';
 export const CLIENT_ID_STORAGE_KEY = 'figtoel_client_id_v1';
-export const PLUGIN_VERSION = '1.2.0';
+export const DEVICE_ID_STORAGE_KEY = 'figtoel_device_id';
+export const PLUGIN_VERSION = '1.3.0';
 
 // ============================================================
 // PLAN LABEL MAPPING
@@ -50,6 +52,7 @@ export interface LicenseRequestPayload {
     site_domain: string;
     plugin_version?: string;
     figma_user_id?: string;
+    device_id?: string;
     client_id?: string;
 }
 
@@ -109,6 +112,8 @@ export type LicenseErrorCode =
     | 'missing_params'
     | 'network_error'
     | 'license_user_mismatch'
+    | 'device_mismatch'
+    | 'device_or_user_mismatch'
     | 'figma_user_required';
 
 /**
@@ -137,11 +142,13 @@ export interface LicenseStorageConfig {
     licenseKey: string;
     siteDomain: string;
     clientId: string;
+    deviceId: string;
     lastUsage: UsageSnapshot | null;
     lastValidationAt: string;  // ISO datetime
     planSlug: string | null;
     figmaUserIdBound: string;
-    lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch';
+    deviceIdBound: string;
+    lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch' | 'device_mismatch';
 }
 
 // ============================================================
@@ -153,7 +160,7 @@ export interface LicenseStorageConfig {
  */
 export interface LicenseCheckResult {
     allowed: boolean;
-    status: 'ok' | 'limit_reached' | 'license_error' | 'network_error' | 'not_configured' | 'license_user_mismatch';
+    status: 'ok' | 'limit_reached' | 'license_error' | 'network_error' | 'not_configured' | 'license_user_mismatch' | 'device_mismatch';
     message: string;
     usage?: UsageInfo;
     planSlug?: string | null;
@@ -186,6 +193,8 @@ export const ERROR_MESSAGES: Record<LicenseErrorCode, string> = {
     missing_params: 'Chave de licença e domínio são obrigatórios.',
     network_error: 'Servidor temporariamente indisponível. Verifique sua conexão.',
     license_user_mismatch: 'Esta licença já está vinculada a outra conta Figma.',
+    device_mismatch: 'Esta licença já está ativada em outro computador.',
+    device_or_user_mismatch: 'Licença vinculada a outro usuário ou dispositivo.',
     figma_user_required: 'Não foi possível identificar sua conta Figma. Reabra o plugin.'
 };
 

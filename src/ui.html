@@ -1990,12 +1990,16 @@
       justify-content: center;
       opacity: 0;
       visibility: hidden;
+      pointer-events: none;
+      /* CRITICAL: Allow clicks through when hidden */
       transition: opacity 0.3s ease, visibility 0.3s ease;
     }
 
     .onboarding-overlay.visible {
       opacity: 1;
       visibility: visible;
+      pointer-events: auto;
+      /* Enable clicks when visible */
     }
 
     .onboarding-card {
@@ -3623,8 +3627,14 @@
             // Reset form
             const keyInput = document.getElementById('license_key');
             const domainInput = document.getElementById('license_domain');
-            if (keyInput) keyInput.value = '';
-            if (domainInput) domainInput.value = '';
+            if (keyInput) {
+              keyInput.value = '';
+              keyInput.disabled = false;
+            }
+            if (domainInput) {
+              domainInput.value = '';
+              domainInput.disabled = false;
+            }
 
             // Reset badge
             const badge = document.getElementById('license-status-badge');

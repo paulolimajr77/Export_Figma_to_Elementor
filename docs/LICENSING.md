@@ -1,24 +1,38 @@
-# 🔑 Módulo de Licenciamento v1.2
+# 🔑 Módulo de Licenciamento v1.3
 
 ## Visão Geral
 
 O módulo de licenciamento do plugin **Figma → Elementor** controla o acesso às funcionalidades de conversão através de um sistema de chaves de licença com:
 
-- Vinculação por conta Figma (figma_user_id)
+- **Vinculação por conta Figma** (figma_user_id)
+- **Vinculação por dispositivo** (device_id) - NOVO v1.3
 - Limite de uso mensal de compilações
 - Controle de sites/domínios
-- Endpoints separados para validação (não consome) e compilação (consome uso)
+- Endpoints separados para validação, ativação e compilação
 
 ---
 
-## Novidades v1.2
+## Novidades v1.3
 
-- **Formatação de data por locale**: Datas exibidas conforme idioma do navegador (pt-BR: dd/mm/yyyy, en-US: mm/dd/yyyy)
-- **Endpoints separados**:
-  - `/license/validate` - Valida licença SEM consumir uso
-  - `/usage/compile` - Registra compilação e consome 1 uso
-- **Labels de planos amigáveis**: Mapeamento de slugs para textos legíveis
-- **Parser de datas robusto**: Suporte a MySQL datetime, timestamp Unix e ISO
+### Restrição 1 Usuário + 1 Máquina
+
+Cada licença agora só pode ser utilizada por:
+- **1 único usuário Figma** (figma_user_id)
+- **Em 1 única máquina** (device_id)
+
+### Novo Endpoint de Ativação
+
+```
+POST /figtoel/v1/license/activate
+```
+
+Vincula a licença ao usuário e dispositivo. Deve ser chamado na primeira ativação.
+
+### Device ID
+
+- Gerado automaticamente como UUID v4
+- Persiste no `clientStorage` do Figma (`figtoel_device_id`)
+- Único por máquina/instalação do Figma
 
 ---
 
@@ -27,15 +41,43 @@ O módulo de licenciamento do plugin **Figma → Elementor** controla o acesso �
 ```
 src/licensing/
 ├── index.ts              # Exports do módulo
-├── LicenseConfig.ts      # Tipos, constantes, helpers (v1.2)
-└── LicenseService.ts     # Lógica de negócio (v1.2)
+├── LicenseConfig.ts      # Tipos, constantes, helpers (v1.3)
+└── LicenseService.ts     # Lógica de negócio (v1.3)
 ```
 
 ---
 
 ## Endpoints
 
-### 1. Validar Licença (Não consome uso)
+### 1. Ativar Licença (Bind user + device)
+
+```http
+POST /wp-json/figtoel/v1/license/activate
+```
+
+**Uso**: Primeira ativação da licença no plugin.
+
+**Payload**:
+```json
+{
+  "license_key": "FTEL-5GKGTD5HOEZS",
+  "figma_user_id": "123456789012345678",
+  "device_id": "550e8400-e29b-41d4-a716-446655440000",
+  "site_domain": "dev.pljr.com.br",
+  "plugin_version": "1.3.0"
+}
+```
+
+**Respostas**:
+
+| Mode | Descrição |
+|------|-----------|
+| `bound_first_time` | Primeiro bind - user e device gravados |
+| `already_bound` | Mesmo user + device - OK |
+| `device_mismatch` | Mesmo user, device diferente - ERRO |
+| `figma_mismatch` | User diferente - ERRO |
+
+### 2. Validar Licença (Não consome uso)
 
 ```http
 POST /wp-json/figtoel/v1/license/validate
@@ -43,7 +85,7 @@ POST /wp-json/figtoel/v1/license/validate
 
 **Uso**: Tela de configuração de licença, ao abrir o plugin.
 
-### 2. Registrar Compilação (Consome 1 uso)
+### 3. Registrar Compilação (Consome 1 uso)
 
 ```http
 POST /wp-json/figtoel/v1/usage/compile
@@ -51,83 +93,44 @@ POST /wp-json/figtoel/v1/usage/compile
 
 **Uso**: Antes de cada compilação de layout.
 
-### Payload (ambos)
+---
 
-```json
-{
-  "license_key": "FTEL-5GKGTD5HOEZS",
-  "site_domain": "dev.pljr.com.br",
-  "plugin_version": "1.2.0",
-  "figma_user_id": "123456789012345678",
-  "client_id": "550e8400-e29b-41d4-a716-446655440000"
-}
+## Fluxo de Ativação
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Usuário insere license_key                 │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│    Plugin gera/carrega device_id do clientStorage       │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│   POST /license/activate com figma_user_id + device_id  │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+         ┌─────────────┼─────────────┐
+         │             │             │
+         ▼             ▼             ▼
+   Primeiro bind    Já vinculado   Mismatch
+   (grava IDs)      (OK)           (ERRO)
 ```
 
 ---
 
-## Formatação de Datas
+## Códigos de Erro
 
-A formatação de datas agora usa `navigator.language` para detectar automaticamente o idioma do usuário:
-
-| Locale | Formato | Exemplo |
-|--------|---------|---------|
-| pt-BR | dd/mm/yyyy | 31/12/2025 |
-| en-US | mm/dd/yyyy | 12/31/2025 |
-| de-DE | dd.mm.yyyy | 31.12.2025 |
-| ja-JP | yyyy/mm/dd | 2025/12/31 |
-
-### Formatos de Entrada Suportados
-
-- **Unix timestamp (segundos)**: `1735689600`
-- **Unix timestamp (milissegundos)**: `1735689600000`
-- **MySQL datetime**: `"2025-12-31 23:59:59"`
-- **ISO string**: `"2025-12-31T23:59:59Z"`
-- **Timestamp como string**: `"1735689600"`
-
----
-
-## Labels de Planos
-
-| Slug | Label Amigável |
-|------|----------------|
-| `mensal` | Assinatura Mensal |
-| `anual` | Assinatura Anual |
-| `lifetime` | Licença Vitalícia |
-| `trial` | Período de Teste |
-| `free` | Plano Gratuito |
-| (outro) | O próprio slug |
-
----
-
-## Funções Principais
-
-### `validateLicense(licenseKey, siteDomain, figmaUserId?)`
-
-Valida licença **sem** consumir uso. Retorna status e informações de uso.
-
-### `registerCompileUsage(figmaUserId?)`
-
-Registra compilação e **consome 1 uso**. Chamada antes de cada compilação.
-
-### `checkAndConsumeLicenseUsage(figmaUserId?)`
-
-Alias para `registerCompileUsage` (compatibilidade).
-
-### `validateAndSaveLicense(licenseKey, siteDomain, figmaUserId?)`
-
-Alias para `validateLicense` (compatibilidade).
-
-### `getPlanLabel(planSlug)`
-
-Retorna label amigável para o slug do plano.
-
-### `formatResetDate(resetsAt, userLocale?)`
-
-Formata data de reset para exibição, usando locale do navegador.
-
-### `maskLicenseKey(key)`
-
-Mascara a chave de licença: `FTEL-5GKGTD5HOEZS` → `**********HOEZS`
+| Código | Mensagem | Descrição |
+|--------|----------|-----------|
+| `license_not_found` | Chave não encontrada | Chave inválida |
+| `license_inactive` | Licença não ativa | Expirada/cancelada |
+| `figma_mismatch` | Outra conta Figma | Licença vinculada a outro user |
+| `device_mismatch` | Outro computador | Licença vinculada a outro device |
+| `device_or_user_mismatch` | User ou device diferente | Validação falhou no compile |
+| `network_error` | Servidor indisponível | Problema de conexão |
 
 ---
 
@@ -139,68 +142,73 @@ Mascara a chave de licença: `FTEL-5GKGTD5HOEZS` → `**********HOEZS`
 interface LicenseStorageConfig {
   licenseKey: string;
   siteDomain: string;
-  clientId: string;          // UUID único
-  lastUsage: {
-    used: number;
-    limit: number;
-    warning: 'soft_limit' | null;
-    resetsAt: string | number | null;
-  } | null;
-  lastValidationAt: string;  // ISO datetime
+  clientId: string;
+  deviceId: string;              // NOVO v1.3
+  lastUsage: UsageSnapshot | null;
+  lastValidationAt: string;
   planSlug: string | null;
   figmaUserIdBound: string;
-  lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch';
+  deviceIdBound: string;         // NOVO v1.3
+  lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch' | 'device_mismatch';
 }
 ```
 
+### Chave: `figtoel_device_id`
+
+UUID único gerado na primeira execução do plugin nesta máquina.
+
 ---
 
-## Códigos de Erro
+## Campos no CCT Licenças (WordPress)
 
-| Código | Mensagem |
-|--------|----------|
-| `license_not_found` | Chave de licença não encontrada |
-| `license_inactive` | Licença não está ativa |
-| `limit_sites_reached` | Limite de domínios atingido |
-| `license_user_mismatch` | Licença vinculada a outra conta Figma |
-| `network_error` | Servidor indisponível |
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `license_key` | string | Chave da licença |
+| `status_licenca` | string | 'active', 'cancelled', etc |
+| `figma_user_id_primary` | string | ID do usuário Figma vinculado |
+| `figma_device_id_primary` | string | ID do dispositivo vinculado |
+| `figma_user_ids_extra` | string | CSV de IDs extras (se necessário) |
 
 ---
 
 ## Segurança
 
 - ✅ Chave nunca aparece em logs (usa `maskLicenseKey`)
-- ✅ Campo de entrada com `type="password"`
-- ✅ Proteção contra cópia (oncopy, oncut, ondrag)
+- ✅ Device ID é UUID gerado localmente
 - ✅ Apenas HTTPS
+- ✅ IDs exibidos parcialmente em erros (-8 chars)
 
 ---
 
-## Critérios de Aceitação
+## Fluxo Típico do Usuário
 
-- [x] Validar licença não consome uso
-- [x] Compilar layout consome exatamente 1 uso
-- [x] Datas formatadas conforme locale do usuário
-- [x] Labels de planos amigáveis
-- [x] Chave nunca aparece em logs
-- [x] Suporte a figma_user_id para vínculo
+1. **Primeira ativação**: Plugin gera device_id, chama `/activate`, grava IDs
+2. **Aberturas seguintes**: Valida via `/validate` com device_id
+3. **Cada compilação**: Consome uso via `/compile` com device_id
+4. **Outra máquina**: Erro `device_mismatch` ao tentar usar
 
 ---
 
 ## Changelog
+
+### v1.3.0 (2025-12-08)
+
+- [FEAT] Restrição 1 usuário + 1 máquina por licença
+- [FEAT] Novo endpoint `/license/activate`
+- [FEAT] Geração e persistência de `device_id`
+- [FEAT] Validação de device em todas as chamadas
+- [FEAT] Novos erros: `device_mismatch`, `device_or_user_mismatch`
 
 ### v1.2.0 (2025-12-08)
 
 - [FEAT] Endpoints separados: `/license/validate` e `/usage/compile`
 - [FEAT] Formatação de data por locale do navegador
 - [FEAT] Mapeamento de plan_slug para labels amigáveis
-- [FIX] Parser de datas robusto (MySQL, timestamp, ISO)
 
 ### v1.1.0 (2025-12-08)
 
 - [FEAT] Vinculação por figma_user_id
 - [FEAT] Geração de client_id único
-- [FEAT] Tratamento de license_user_mismatch
 
 ### v1.0.0 (2025-12-08)
 

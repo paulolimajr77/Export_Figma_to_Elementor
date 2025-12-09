@@ -9191,7 +9191,8 @@ ${detection.justification}
   var LICENSE_PLANS_URL = "https://figmatoelementor.pljr.com.br/planos/";
   var LICENSE_STORAGE_KEY = "figtoel_license_state";
   var CLIENT_ID_STORAGE_KEY = "figtoel_client_id_v1";
-  var PLUGIN_VERSION = "1.2.0";
+  var DEVICE_ID_STORAGE_KEY = "figtoel_device_id";
+  var PLUGIN_VERSION = "1.3.0";
   var PLAN_LABELS = {
     "mensal": "Assinatura Mensal",
     "anual": "Assinatura Anual",
@@ -9212,6 +9213,8 @@ ${detection.justification}
     missing_params: "Chave de licen\xE7a e dom\xEDnio s\xE3o obrigat\xF3rios.",
     network_error: "Servidor temporariamente indispon\xEDvel. Verifique sua conex\xE3o.",
     license_user_mismatch: "Esta licen\xE7a j\xE1 est\xE1 vinculada a outra conta Figma.",
+    device_mismatch: "Esta licen\xE7a j\xE1 est\xE1 ativada em outro computador.",
+    device_or_user_mismatch: "Licen\xE7a vinculada a outro usu\xE1rio ou dispositivo.",
     figma_user_required: "N\xE3o foi poss\xEDvel identificar sua conta Figma. Reabra o plugin."
   };
   function getErrorMessage(code) {
@@ -9246,6 +9249,20 @@ ${detection.justification}
       return clientId;
     } catch (e) {
       console.warn("[LICENSE] Erro ao gerenciar client_id");
+      return generateClientId();
+    }
+  }
+  async function getOrCreateDeviceId() {
+    try {
+      let deviceId = await figma.clientStorage.getAsync(DEVICE_ID_STORAGE_KEY);
+      if (!deviceId) {
+        deviceId = generateClientId();
+        await figma.clientStorage.setAsync(DEVICE_ID_STORAGE_KEY, deviceId);
+        console.log("[LICENSE] Novo device_id gerado");
+      }
+      return deviceId;
+    } catch (e) {
+      console.warn("[LICENSE] Erro ao gerenciar device_id");
       return generateClientId();
     }
   }
@@ -9293,19 +9310,43 @@ ${detection.justification}
         },
         body: JSON.stringify(request)
       });
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error("[LICENSE] Resposta inv\xE1lida (n\xE3o JSON):", response.status);
+        return {
+          status: "error",
+          code: "network_error",
+          message: `Erro no servidor (${response.status}). JSON inv\xE1lido.`
+        };
+      }
       const safeData = __spreadValues({}, data);
       if (safeData.license_key) {
         safeData.license_key = maskLicenseKey(safeData.license_key);
       }
       console.log("[LICENSE] Resposta:", safeData);
+      if (!response.ok) {
+        if (data.code === "rest_no_route") {
+          return {
+            status: "error",
+            code: "network_error",
+            message: "API de licenciamento n\xE3o encontrada. Verifique se o plugin est\xE1 atualizado no servidor."
+          };
+        }
+        return {
+          status: "error",
+          code: "network_error",
+          message: data.message || `Erro no servidor (${response.status})`
+        };
+      }
       return data;
     } catch (error) {
-      console.error("[LICENSE] Erro de rede");
+      console.error("[LICENSE] Erro de rede:", error);
       return {
         status: "error",
         code: "network_error",
-        message: "Servidor temporariamente indispon\xEDvel"
+        message: "Falha na conex\xE3o. Verifique sua internet."
       };
     }
   }
@@ -9320,11 +9361,13 @@ ${detection.justification}
       };
     }
     const clientId = await getOrCreateClientId();
+    const deviceId = await getOrCreateDeviceId();
     const response = await callLicenseEndpoint(LICENSE_VALIDATE_ENDPOINT, {
       license_key: cleanKey,
       site_domain: cleanDomain,
       plugin_version: PLUGIN_VERSION,
-      figma_user_id: figmaUserId,
+      figma_user_id: figmaUserId || "",
+      device_id: deviceId,
       client_id: clientId
     });
     if (response.status === "error") {
@@ -9336,10 +9379,12 @@ ${detection.justification}
         licenseKey: cleanKey,
         siteDomain: cleanDomain,
         clientId,
+        deviceId,
         lastUsage: null,
         lastValidationAt: (/* @__PURE__ */ new Date()).toISOString(),
         planSlug: null,
         figmaUserIdBound: figmaUserId || "",
+        deviceIdBound: deviceId,
         lastStatus
       };
       await saveLicenseConfig(config2);
@@ -9355,6 +9400,7 @@ ${detection.justification}
         licenseKey: cleanKey,
         siteDomain: cleanDomain,
         clientId,
+        deviceId,
         lastUsage: {
           used: successResponse.usage.used,
           limit: successResponse.usage.limit,
@@ -9364,6 +9410,7 @@ ${detection.justification}
         lastValidationAt: (/* @__PURE__ */ new Date()).toISOString(),
         planSlug: successResponse.plan_slug,
         figmaUserIdBound: figmaUserId || "",
+        deviceIdBound: deviceId,
         lastStatus: "limit_reached"
       };
       await saveLicenseConfig(config2);
@@ -9380,6 +9427,7 @@ ${detection.justification}
       licenseKey: cleanKey,
       siteDomain: cleanDomain,
       clientId,
+      deviceId,
       lastUsage: {
         used: successResponse.usage.used,
         limit: successResponse.usage.limit,
@@ -9389,6 +9437,7 @@ ${detection.justification}
       lastValidationAt: (/* @__PURE__ */ new Date()).toISOString(),
       planSlug: successResponse.plan_slug,
       figmaUserIdBound: figmaUserId || "",
+      deviceIdBound: deviceId,
       lastStatus: "ok"
     };
     await saveLicenseConfig(config);
@@ -9415,11 +9464,13 @@ ${detection.justification}
       };
     }
     const clientId = config.clientId || await getOrCreateClientId();
+    const deviceId = config.deviceId || await getOrCreateDeviceId();
     const response = await callLicenseEndpoint(LICENSE_COMPILE_ENDPOINT, {
       license_key: config.licenseKey,
       site_domain: config.siteDomain,
       plugin_version: PLUGIN_VERSION,
-      figma_user_id: figmaUserId,
+      figma_user_id: figmaUserId || "",
+      device_id: deviceId,
       client_id: clientId
     });
     if (response.status === "error") {
