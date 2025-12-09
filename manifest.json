@@ -9,6 +9,9 @@
     "editorType": [
         "figma"
     ],
+    "permissions": [
+        "currentuser"
+    ],
     "networkAccess": {
         "allowedDomains": [
             "*"

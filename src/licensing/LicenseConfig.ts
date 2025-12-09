@@ -2,7 +2,7 @@
  * Figma → Elementor License Module
  * Types and Interfaces for License Management
  * 
- * @version 1.0.0
+ * @version 1.1.0
  * @module licensing/LicenseConfig
  */
 
@@ -14,7 +14,8 @@ export const LICENSE_BACKEND_URL = 'https://figmatoelementor.pljr.com.br';
 export const LICENSE_ENDPOINT = '/wp-json/figtoel/v1/usage/compile';
 export const LICENSE_PLANS_URL = 'https://figmatoelementor.pljr.com.br/planos/';
 export const LICENSE_STORAGE_KEY = 'figtoel_license_config_v1';
-export const PLUGIN_VERSION = '1.0.0';
+export const CLIENT_ID_STORAGE_KEY = 'figtoel_client_id_v1';
+export const PLUGIN_VERSION = '1.1.0';
 
 // ============================================================
 // REQUEST TYPES
@@ -27,6 +28,8 @@ export interface LicenseUsageRequest {
     license_key: string;
     site_domain: string;
     plugin_version?: string;
+    figma_user_id: string;    // ID do usuário Figma (obrigatório v1.1)
+    client_id?: string;       // UUID único por instalação
 }
 
 // ============================================================
@@ -63,11 +66,13 @@ export interface LicenseErrorResponse {
     status: 'error';
     code: LicenseErrorCode;
     message?: string;
-    license_status?: 'cancelled' | 'expired' | 'pending';
+    license_status?: 'cancelled' | 'expired' | 'pending' | 'on-hold';
     data?: {
         status?: string;
         current_sites?: number;
         limit?: number;
+        figma_user_id_primary?: string;
+        figma_user_id_request?: string;
     };
 }
 
@@ -81,7 +86,9 @@ export type LicenseErrorCode =
     | 'site_register_error'
     | 'usage_error'
     | 'missing_params'
-    | 'network_error';
+    | 'network_error'
+    | 'license_user_mismatch'  // Nova v1.1: chave vinculada a outra conta Figma
+    | 'figma_user_required';   // Nova v1.1: figma_user_id não fornecido
 
 /**
  * União de todos os tipos de resposta
@@ -109,7 +116,9 @@ export interface LicenseStorageConfig {
     licenseKey: string;
     siteDomain: string;
     pluginVersion: string;
-    lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured';
+    figmaUserIdBound: string;    // Nova v1.1: ID do usuário Figma vinculado
+    clientId: string;            // Nova v1.1: UUID único desta instalação
+    lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch';
     planSlug: string | null;
     usageSnapshot: UsageSnapshot | null;
     lastValidatedAt: string; // ISO datetime
@@ -124,7 +133,7 @@ export interface LicenseStorageConfig {
  */
 export interface LicenseCheckResult {
     allowed: boolean;
-    status: 'ok' | 'limit_reached' | 'license_error' | 'network_error' | 'not_configured';
+    status: 'ok' | 'limit_reached' | 'license_error' | 'network_error' | 'not_configured' | 'license_user_mismatch';
     message: string;
     usage?: UsageInfo;
     planSlug?: string | null;
@@ -140,7 +149,8 @@ export type LicenseDisplayState =
     | 'soft_limit'
     | 'limit_reached'
     | 'invalid'
-    | 'network_error';
+    | 'network_error'
+    | 'user_mismatch';  // Nova v1.1
 
 // ============================================================
 // ERROR MESSAGES (PT-BR)
@@ -153,7 +163,9 @@ export const ERROR_MESSAGES: Record<LicenseErrorCode, string> = {
     site_register_error: 'Não foi possível registrar este domínio para sua licença. Tente novamente ou contate o suporte.',
     usage_error: 'Erro ao registrar uso da licença. Tente novamente mais tarde ou contate o suporte.',
     missing_params: 'Dados incompletos. Verifique a chave e o domínio.',
-    network_error: 'Erro de conexão com o servidor de licenças. Verifique sua internet e tente novamente.'
+    network_error: 'Servidor temporariamente indisponível. Verifique sua conexão e tente novamente.',
+    license_user_mismatch: 'Esta chave já está vinculada a outra conta Figma. Use a conta original ou adquira uma nova licença.',
+    figma_user_required: 'Não foi possível identificar sua conta Figma. Recarregue o plugin e tente novamente.'
 };
 
 /**
@@ -164,18 +176,45 @@ export function getErrorMessage(code: LicenseErrorCode): string {
 }
 
 /**
- * Formata data de reset para exibição
+ * Mascara a chave de licença para exibição segura
+ * Exemplo: FTEL-5GKGTD5HOEZS → FTEL-*****HOEZS
+ */
+export function maskLicenseKey(key: string): string {
+    if (!key || key.length < 10) return '****';
+    const prefix = key.substring(0, 5);  // "FTEL-"
+    const suffix = key.substring(key.length - 5);
+    return `${prefix}*****${suffix}`;
+}
+
+/**
+ * Formata data de reset para exibição (suporta MySQL datetime)
+ * Aceita: Unix timestamp, ISO string, ou MySQL datetime string
  */
 export function formatResetDate(resetsAt: string | number | null): string {
     if (!resetsAt) return 'Indefinido';
 
     try {
-        const date = typeof resetsAt === 'number'
-            ? new Date(resetsAt * 1000) // Unix timestamp
-            : new Date(resetsAt);
+        let date: Date;
+
+        if (typeof resetsAt === 'number') {
+            // Unix timestamp (segundos)
+            date = new Date(resetsAt * 1000);
+        } else if (typeof resetsAt === 'string') {
+            // Tentar parse de MySQL datetime (YYYY-MM-DD HH:MM:SS)
+            // ou ISO string
+            if (resetsAt.includes(' ') && !resetsAt.includes('T')) {
+                // MySQL format: "2025-01-01 00:00:00"
+                date = new Date(resetsAt.replace(' ', 'T') + 'Z');
+            } else {
+                date = new Date(resetsAt);
+            }
+        } else {
+            return 'Indefinido';
+        }
 
         if (isNaN(date.getTime())) return 'Indefinido';
 
+        // Formato brasileiro: DD/MM/YYYY
         return date.toLocaleDateString('pt-BR', {
             day: '2-digit',
             month: '2-digit',
@@ -184,4 +223,16 @@ export function formatResetDate(resetsAt: string | number | null): string {
     } catch {
         return 'Indefinido';
     }
+}
+
+/**
+ * Gera um UUID v4 para client_id
+ */
+export function generateClientId(): string {
+    // Implementação simples de UUID v4
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
 }

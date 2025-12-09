@@ -5,7 +5,7 @@
  * Handles HTTP calls to backend, clientStorage persistence,
  * and pre-compile license validation.
  * 
- * @version 1.0.0
+ * @version 1.1.0
  * @module licensing/LicenseService
  */
 
@@ -13,6 +13,7 @@ import {
     LICENSE_BACKEND_URL,
     LICENSE_ENDPOINT,
     LICENSE_STORAGE_KEY,
+    CLIENT_ID_STORAGE_KEY,
     PLUGIN_VERSION,
     LicenseUsageRequest,
     LicenseResponse,
@@ -22,12 +23,32 @@ import {
     LicenseCheckResult,
     UsageSnapshot,
     getErrorMessage,
+    maskLicenseKey,
+    generateClientId,
     LicenseErrorCode
 } from './LicenseConfig';
 
 // ============================================================
 // STORAGE HELPERS
 // ============================================================
+
+/**
+ * Carrega ou gera o client_id único desta instalação
+ */
+export async function getOrCreateClientId(): Promise<string> {
+    try {
+        let clientId = await figma.clientStorage.getAsync(CLIENT_ID_STORAGE_KEY);
+        if (!clientId) {
+            clientId = generateClientId();
+            await figma.clientStorage.setAsync(CLIENT_ID_STORAGE_KEY, clientId);
+            console.log('[LICENSE] Novo client_id gerado');
+        }
+        return clientId;
+    } catch (e) {
+        console.warn('[LICENSE] Erro ao gerenciar client_id:', e);
+        return generateClientId(); // Fallback sem persistência
+    }
+}
 
 /**
  * Carrega configuração de licença do clientStorage
@@ -38,7 +59,7 @@ export async function loadLicenseConfig(): Promise<LicenseStorageConfig | null> 
         if (!stored) return null;
         return stored as LicenseStorageConfig;
     } catch (e) {
-        console.warn('[LICENSE] Erro ao carregar configuração:', e);
+        console.warn('[LICENSE] Erro ao carregar configuração');
         return null;
     }
 }
@@ -49,9 +70,9 @@ export async function loadLicenseConfig(): Promise<LicenseStorageConfig | null> 
 export async function saveLicenseConfig(config: LicenseStorageConfig): Promise<void> {
     try {
         await figma.clientStorage.setAsync(LICENSE_STORAGE_KEY, config);
-        console.log('[LICENSE] Configuração salva com sucesso');
+        console.log('[LICENSE] Configuração salva');
     } catch (e) {
-        console.error('[LICENSE] Erro ao salvar configuração:', e);
+        console.error('[LICENSE] Erro ao salvar configuração');
         throw new Error('Não foi possível salvar a configuração da licença.');
     }
 }
@@ -64,7 +85,7 @@ export async function clearLicenseConfig(): Promise<void> {
         await figma.clientStorage.deleteAsync(LICENSE_STORAGE_KEY);
         console.log('[LICENSE] Configuração removida');
     } catch (e) {
-        console.warn('[LICENSE] Erro ao limpar configuração:', e);
+        console.warn('[LICENSE] Erro ao limpar configuração');
     }
 }
 
@@ -82,12 +103,19 @@ export async function isLicenseConfigured(): Promise<boolean> {
 
 /**
  * Faz chamada HTTP ao endpoint de licenciamento
+ * ATENÇÃO: Nunca logar license_key completa
  */
 async function callLicenseEndpoint(request: LicenseUsageRequest): Promise<LicenseResponse> {
     const url = `${LICENSE_BACKEND_URL}${LICENSE_ENDPOINT}`;
 
+    // Log seguro - chave mascarada
     console.log('[LICENSE] Chamando endpoint:', url);
-    console.log('[LICENSE] Payload:', { ...request, license_key: '****' + request.license_key.slice(-4) });
+    console.log('[LICENSE] Payload:', {
+        license_key: maskLicenseKey(request.license_key),
+        site_domain: request.site_domain,
+        figma_user_id: request.figma_user_id ? '***' + request.figma_user_id.slice(-4) : 'N/A',
+        client_id: request.client_id ? '***' + request.client_id.slice(-4) : 'N/A'
+    });
 
     try {
         const response = await fetch(url, {
@@ -100,15 +128,21 @@ async function callLicenseEndpoint(request: LicenseUsageRequest): Promise<Licens
         });
 
         const data = await response.json();
-        console.log('[LICENSE] Resposta:', data);
+
+        // Log seguro da resposta (sem expor chave completa)
+        const safeData = { ...data };
+        if (safeData.license_key) {
+            safeData.license_key = maskLicenseKey(safeData.license_key);
+        }
+        console.log('[LICENSE] Resposta:', safeData);
 
         return data as LicenseResponse;
     } catch (error: any) {
-        console.error('[LICENSE] Erro de rede:', error);
+        console.error('[LICENSE] Erro de rede');
         return {
             status: 'error',
             code: 'network_error',
-            message: error.message || 'Erro de conexão'
+            message: 'Servidor temporariamente indisponível'
         } as LicenseErrorResponse;
     }
 }
@@ -120,10 +154,15 @@ async function callLicenseEndpoint(request: LicenseUsageRequest): Promise<Licens
 /**
  * Valida e salva uma nova configuração de licença
  * Usado pela tela de configuração
+ * 
+ * @param licenseKey - Chave de licença
+ * @param siteDomain - Domínio do site WordPress
+ * @param figmaUserId - ID do usuário Figma (de figma.currentUser.id)
  */
 export async function validateAndSaveLicense(
     licenseKey: string,
-    siteDomain: string
+    siteDomain: string,
+    figmaUserId: string
 ): Promise<LicenseCheckResult> {
 
     // Limpar domínio (remover protocolo, trailing slashes)
@@ -143,24 +182,45 @@ export async function validateAndSaveLicense(
         };
     }
 
+    if (!figmaUserId) {
+        return {
+            allowed: false,
+            status: 'license_error',
+            message: getErrorMessage('figma_user_required')
+        };
+    }
+
+    // Obter ou criar client_id
+    const clientId = await getOrCreateClientId();
+
     // Chamar endpoint
     const response = await callLicenseEndpoint({
         license_key: cleanKey,
         site_domain: cleanDomain,
-        plugin_version: PLUGIN_VERSION
+        plugin_version: PLUGIN_VERSION,
+        figma_user_id: figmaUserId,
+        client_id: clientId
     });
 
     // Processar resposta
     if (response.status === 'error') {
         const errorResponse = response as LicenseErrorResponse;
-        const errorMessage = getErrorMessage(errorResponse.code as LicenseErrorCode);
+        const errorCode = errorResponse.code as LicenseErrorCode;
+        const errorMessage = getErrorMessage(errorCode);
+
+        // Determinar status específico
+        const lastStatus = errorCode === 'license_user_mismatch'
+            ? 'license_user_mismatch'
+            : 'error';
 
         // Salvar status de erro para referência
         const config: LicenseStorageConfig = {
             licenseKey: cleanKey,
             siteDomain: cleanDomain,
             pluginVersion: PLUGIN_VERSION,
-            lastStatus: 'error',
+            figmaUserIdBound: '',
+            clientId: clientId,
+            lastStatus: lastStatus,
             planSlug: null,
             usageSnapshot: null,
             lastValidatedAt: new Date().toISOString()
@@ -169,7 +229,7 @@ export async function validateAndSaveLicense(
 
         return {
             allowed: false,
-            status: 'license_error',
+            status: errorCode === 'license_user_mismatch' ? 'license_user_mismatch' : 'license_error',
             message: errorMessage
         };
     }
@@ -182,6 +242,8 @@ export async function validateAndSaveLicense(
             licenseKey: cleanKey,
             siteDomain: cleanDomain,
             pluginVersion: PLUGIN_VERSION,
+            figmaUserIdBound: figmaUserId,
+            clientId: clientId,
             lastStatus: 'limit_reached',
             planSlug: successResponse.plan_slug,
             usageSnapshot: {
@@ -208,6 +270,8 @@ export async function validateAndSaveLicense(
         licenseKey: cleanKey,
         siteDomain: cleanDomain,
         pluginVersion: PLUGIN_VERSION,
+        figmaUserIdBound: figmaUserId,
+        clientId: clientId,
         lastStatus: 'ok',
         planSlug: successResponse.plan_slug,
         usageSnapshot: {
@@ -238,9 +302,10 @@ export async function validateAndSaveLicense(
  * Verifica e consome uso de licença antes de compilar
  * Esta função DEVE ser chamada antes de qualquer compilação
  * 
+ * @param figmaUserId - ID do usuário Figma atual (de figma.currentUser.id)
  * @returns LicenseCheckResult indicando se a compilação pode prosseguir
  */
-export async function checkAndConsumeLicenseUsage(): Promise<LicenseCheckResult> {
+export async function checkAndConsumeLicenseUsage(figmaUserId: string): Promise<LicenseCheckResult> {
     // 1) Carregar configuração salva
     const config = await loadLicenseConfig();
 
@@ -252,26 +317,48 @@ export async function checkAndConsumeLicenseUsage(): Promise<LicenseCheckResult>
         };
     }
 
-    // 2) Chamar endpoint para validar e registrar uso
+    // 2) Verificar figma_user_id
+    if (!figmaUserId) {
+        return {
+            allowed: false,
+            status: 'license_error',
+            message: getErrorMessage('figma_user_required')
+        };
+    }
+
+    // 3) Obter client_id
+    const clientId = config.clientId || await getOrCreateClientId();
+
+    // 4) Chamar endpoint para validar e registrar uso
     const response = await callLicenseEndpoint({
         license_key: config.licenseKey,
         site_domain: config.siteDomain,
-        plugin_version: PLUGIN_VERSION
+        plugin_version: PLUGIN_VERSION,
+        figma_user_id: figmaUserId,
+        client_id: clientId
     });
 
-    // 3) Processar resposta
+    // 5) Processar resposta
     if (response.status === 'error') {
         const errorResponse = response as LicenseErrorResponse;
         const errorCode = errorResponse.code as LicenseErrorCode;
         const errorMessage = getErrorMessage(errorCode);
 
         // Atualizar status local
-        config.lastStatus = 'error';
+        config.lastStatus = errorCode === 'license_user_mismatch' ? 'license_user_mismatch' : 'error';
         config.lastValidatedAt = new Date().toISOString();
         await saveLicenseConfig(config);
 
-        // Network error: podemos permitir modo offline limitado?
-        // Por segurança, bloqueamos
+        // Retornar status específico para user mismatch
+        if (errorCode === 'license_user_mismatch') {
+            return {
+                allowed: false,
+                status: 'license_user_mismatch',
+                message: errorMessage
+            };
+        }
+
+        // Network error: bloquear por segurança
         if (errorCode === 'network_error') {
             return {
                 allowed: false,
@@ -292,6 +379,7 @@ export async function checkAndConsumeLicenseUsage(): Promise<LicenseCheckResult>
     // Atualizar snapshot local
     config.lastStatus = successResponse.status === 'limit_reached' ? 'limit_reached' : 'ok';
     config.planSlug = successResponse.plan_slug;
+    config.figmaUserIdBound = figmaUserId; // Confirmar vínculo
     config.usageSnapshot = {
         used: successResponse.usage.used,
         limit: successResponse.usage.limit,
@@ -301,7 +389,7 @@ export async function checkAndConsumeLicenseUsage(): Promise<LicenseCheckResult>
     config.lastValidatedAt = new Date().toISOString();
     await saveLicenseConfig(config);
 
-    // 4) Verificar limite
+    // 6) Verificar limite
     if (successResponse.status === 'limit_reached' || successResponse.usage.status === 'limit_reached') {
         return {
             allowed: false,
@@ -312,7 +400,7 @@ export async function checkAndConsumeLicenseUsage(): Promise<LicenseCheckResult>
         };
     }
 
-    // 5) Sucesso (pode compilar)
+    // 7) Sucesso (pode compilar)
     let message = `Compilação autorizada (${successResponse.usage.used}/${successResponse.usage.limit} este mês).`;
 
     return {
@@ -330,12 +418,14 @@ export async function checkAndConsumeLicenseUsage(): Promise<LicenseCheckResult>
  */
 export async function getLicenseDisplayInfo(): Promise<{
     configured: boolean;
-    licenseKey: string;
+    licenseKey: string;       // Retorna mascarada
+    licenseKeyMasked: string; // Versão mascarada para exibição
     siteDomain: string;
     planSlug: string | null;
     usage: UsageSnapshot | null;
     status: string;
     lastValidated: string | null;
+    figmaUserIdBound: string;
 }> {
     const config = await loadLicenseConfig();
 
@@ -343,21 +433,25 @@ export async function getLicenseDisplayInfo(): Promise<{
         return {
             configured: false,
             licenseKey: '',
+            licenseKeyMasked: '',
             siteDomain: '',
             planSlug: null,
             usage: null,
             status: 'not_configured',
-            lastValidated: null
+            lastValidated: null,
+            figmaUserIdBound: ''
         };
     }
 
     return {
         configured: true,
         licenseKey: config.licenseKey,
+        licenseKeyMasked: maskLicenseKey(config.licenseKey),
         siteDomain: config.siteDomain,
         planSlug: config.planSlug,
         usage: config.usageSnapshot,
         status: config.lastStatus,
-        lastValidated: config.lastValidatedAt
+        lastValidated: config.lastValidatedAt,
+        figmaUserIdBound: config.figmaUserIdBound || ''
     };
 }

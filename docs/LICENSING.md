@@ -1,8 +1,18 @@
-# 🔑 Módulo de Licenciamento v1.0
+# 🔑 Módulo de Licenciamento v1.1
 
 ## Visão Geral
 
-O módulo de licenciamento do plugin **Figma → Elementor** controla o acesso às funcionalidades de conversão através de um sistema de chaves de licença com limite de uso mensal.
+O módulo de licenciamento do plugin **Figma → Elementor** controla o acesso às funcionalidades de conversão através de um sistema de chaves de licença vinculadas a uma conta Figma específica, com limite de uso mensal e controle de sites.
+
+---
+
+## Novidades v1.1
+
+- **Vinculação por Conta Figma**: Cada licença é vinculada ao primeiro `figma_user_id` que a ativar
+- **Client ID**: UUID único por instalação para rastreamento
+- **Erro de Mismatch**: Tratamento específico quando outra conta Figma tenta usar a mesma licença
+- **Logs Seguros**: A chave de licença nunca aparece completa em logs
+- **Datas MySQL**: Suporte completo a datetime do MySQL (YYYY-MM-DD HH:MM:SS)
 
 ---
 
@@ -11,7 +21,7 @@ O módulo de licenciamento do plugin **Figma → Elementor** controla o acesso �
 ```
 src/licensing/
 ├── index.ts              # Exports do módulo
-├── LicenseConfig.ts      # Tipos, interfaces e constantes
+├── LicenseConfig.ts      # Tipos, interfaces, constantes, helpers
 └── LicenseService.ts     # Lógica de negócio (HTTP + Storage)
 ```
 
@@ -19,53 +29,71 @@ src/licensing/
 
 ## Fluxo de Funcionamento
 
-### 1. Primeira Execução
+### 1. Primeira Ativação
 
-Ao abrir o plugin pela primeira vez:
+1. Usuário insere chave de licença e domínio
+2. Plugin envia ao backend:
+   - `license_key`: Chave de licença
+   - `site_domain`: Domínio do WordPress
+   - `figma_user_id`: ID da conta Figma (de `figma.currentUser.id`)
+   - `client_id`: UUID único desta instalação
+   - `plugin_version`: Versão do plugin
+3. Backend grava `figma_user_id_primary` e permite uso
+4. Plugin salva configuração em `clientStorage`
 
-1. O sistema verifica se existe configuração de licença salva em `figma.clientStorage`
-2. Se não existir, a aba "Licença" indica que a configuração é necessária
-3. O usuário deve inserir sua chave de licença (formato `FTEL-XXXXX`) e o domínio do site WordPress
+### 2. Uso Normal (Mesmo Usuário)
 
-### 2. Validação de Licença
+1. Antes de cada compilação, plugin chama `checkAndConsumeLicenseUsage(figmaUserId)`
+2. Backend verifica se `figma_user_id` corresponde ao `figma_user_id_primary`
+3. Se corresponder → incrementa uso e permite
+4. Se diferir → retorna erro `license_user_mismatch`
 
-Ao clicar em "Validar e Salvar":
+### 3. Tentativa com Outra Conta Figma
 
-1. Os dados são enviados ao endpoint:
-   ```
-   POST https://figmatoelementor.pljr.com.br/wp-json/figtoel/v1/usage/compile
-   ```
+1. Plugin envia `figma_user_id` diferente do original
+2. Backend retorna: `{ status: "error", code: "license_user_mismatch" }`
+3. Plugin exibe: "Esta chave já está vinculada a outra conta Figma"
+4. Usuário precisa usar a conta original ou comprar nova licença
 
-2. O backend valida:
-   - Se a chave existe
-   - Se a licença está ativa
-   - Se o limite de sites não foi excedido
-   - Se há saldo de compilações no mês
+---
 
-3. Em caso de sucesso, a configuração é salva em `clientStorage`
+## Payload da Requisição
 
-### 3. Controle de Uso (Antes da Compilação)
-
-Antes de cada compilação, o sistema:
-
-1. Carrega a configuração salva
-2. Faz uma chamada ao backend para verificar e registrar o uso
-3. Se permitido, incrementa o contador de uso e libera a compilação
-4. Se bloqueado (limite atingido, licença inválida, etc.), exibe mensagem e bloqueia
+```json
+{
+  "license_key": "FTEL-5GKGTD5HOEZS",
+  "site_domain": "dev.pljr.com.br",
+  "plugin_version": "1.1.0",
+  "figma_user_id": "123456789012345678",
+  "client_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
+}
+```
 
 ---
 
 ## Códigos de Erro
 
+| Código | Descrição |
+|--------|-----------|
+| `license_not_found` | Chave não existe |
+| `license_inactive` | Licença cancelada/expirada/pendente |
+| `limit_sites_reached` | Limite de sites atingido |
+| `license_user_mismatch` | **NOVO v1.1**: Licença vinculada a outra conta Figma |
+| `figma_user_required` | **NOVO v1.1**: figma_user_id não fornecido |
+| `site_register_error` | Falha ao registrar domínio |
+| `usage_error` | Falha ao registrar uso |
+| `missing_params` | Dados incompletos |
+| `network_error` | Falha de conexão |
+
+---
+
+## Mensagens de Erro (PT-BR)
+
 | Código | Mensagem Amigável |
 |--------|-------------------|
-| `license_not_found` | Não encontramos essa chave de licença |
-| `license_inactive` | Licença não está ativa |
-| `limit_sites_reached` | Limite máximo de sites atingido |
-| `site_register_error` | Erro ao registrar domínio |
-| `usage_error` | Erro ao registrar uso |
-| `missing_params` | Dados incompletos |
-| `network_error` | Erro de conexão |
+| `license_user_mismatch` | Esta chave já está vinculada a outra conta Figma. Use a conta original ou adquira uma nova licença. |
+| `figma_user_required` | Não foi possível identificar sua conta Figma. Recarregue o plugin e tente novamente. |
+| `network_error` | Servidor temporariamente indisponível. Verifique sua conexão e tente novamente. |
 
 ---
 
@@ -75,117 +103,98 @@ Antes de cada compilação, o sistema:
 
 ```typescript
 interface LicenseStorageConfig {
-  licenseKey: string;        // FTEL-XXXXXX
-  siteDomain: string;        // meusite.com.br
-  pluginVersion: string;     // 1.0.0
-  lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured';
-  planSlug: string | null;   // mensal, anual, etc.
+  licenseKey: string;           // FTEL-XXXXXX
+  siteDomain: string;           // meusite.com.br
+  pluginVersion: string;        // 1.1.0
+  figmaUserIdBound: string;     // ID do usuário Figma vinculado ← NOVO
+  clientId: string;             // UUID único desta instalação ← NOVO
+  lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch';
+  planSlug: string | null;
   usageSnapshot: {
-    used: number;            // Compilações usadas
-    limit: number;           // Limite do plano
+    used: number;
+    limit: number;
     warning: 'soft_limit' | null;
-    resetsAt: string | null; // Data de reset
+    resetsAt: string | null;    // MySQL datetime ou ISO string
   } | null;
-  lastValidatedAt: string;   // ISO datetime
+  lastValidatedAt: string;      // ISO datetime
 }
 ```
 
----
+### Chave: `figtoel_client_id_v1`
 
-## UI de Licenciamento
-
-### Aba "Licença"
-
-A interface contém:
-
-1. **Formulário de Configuração**
-   - Campo para chave de licença
-   - Campo para domínio do site
-   - Botão "Validar e Salvar"
-   - Botão "Desconectar" (quando configurado)
-
-2. **Painel de Status**
-   - Nome do plano
-   - Status da licença
-   - Uso mensal (usado/limite)
-   - Data de renovação
-   - Barra de progresso de uso
-
-3. **Link para Compra**
-   - Card com link para `https://figmatoelementor.pljr.com.br/planos/`
+UUID único gerado na primeira execução e persistido independentemente.
 
 ---
 
-## Integração com code.ts
+## Segurança
 
-### Import
+### Mascaramento de Chave
 
 ```typescript
-import {
-    checkAndConsumeLicenseUsage,
-    validateAndSaveLicense,
-    clearLicenseConfig,
-    getLicenseDisplayInfo,
-    LICENSE_PLANS_URL
-} from './licensing';
+// FTEL-5GKGTD5HOEZS → FTEL-*****HOEZS
+function maskLicenseKey(key: string): string
 ```
 
-### Verificação Antes da Compilação
+### Logs Seguros
+
+- ❌ NUNCA: `console.log('Key:', licenseKey)`
+- ✅ CORRETO: `console.log('Key:', maskLicenseKey(licenseKey))`
+
+### Proteção no Campo de Entrada
+
+- `type="password"` no input
+- `oncopy="return false"`
+- `user-select: none`
+- Menu de contexto desabilitado
+
+---
+
+## Formatação de Datas
+
+O módulo suporta múltiplos formatos de data do backend:
 
 ```typescript
-case 'generate-json':
-    const licenseCheck = await checkAndConsumeLicenseUsage();
-    
-    if (!licenseCheck.allowed) {
-        // Bloquear compilação
-        figma.ui.postMessage({ 
-            type: 'license-blocked', 
-            message: licenseCheck.message 
-        });
-        break;
-    }
-    
-    // Prosseguir com compilação...
+formatResetDate(resetsAt):
+  - Unix timestamp (número): 1735689600 → "01/01/2025"
+  - MySQL datetime: "2025-01-01 00:00:00" → "01/01/2025"
+  - ISO string: "2025-01-01T00:00:00Z" → "01/01/2025"
 ```
 
 ---
 
-## Mensagens UI ↔ Backend
+## Estados da UI
 
-### Enviadas pela UI
-
-| Tipo | Payload | Descrição |
-|------|---------|-----------|
-| `license-validate` | `{ licenseKey, siteDomain }` | Validar e salvar licença |
-| `license-load` | - | Carregar info da licença salva |
-| `license-clear` | - | Desconectar licença |
-
-### Recebidas pela UI
-
-| Tipo | Payload | Descrição |
-|------|---------|-----------|
-| `license-validating` | - | Indicar loading |
-| `license-validate-result` | `{ success, message, usage, planSlug }` | Resultado da validação |
-| `license-info` | `{ configured, licenseKey, usage, ... }` | Info carregada |
-| `license-cleared` | `{ success }` | Resultado da desconexão |
-| `license-blocked` | `{ message, usage }` | Compilação bloqueada |
-| `license-usage-updated` | `{ usage }` | Atualização de uso |
+| Estado | Badge | Cor |
+|--------|-------|-----|
+| Ativa | "Ativa" | Verde |
+| Limite Atingido | "Limite Atingido" | Amarelo |
+| Conta Diferente | "Conta Diferente" | Vermelho |
+| Inválida | "Inválida" | Vermelho |
+| Não configurada | "Não configurada" | Cinza |
 
 ---
 
 ## Critérios de Aceitação
 
-- [x] AC1 – Tela de licença exibida obrigatoriamente se não configurada
-- [x] AC2 – Validação salva em clientStorage com sucesso
-- [x] AC3 – Link para planos abre no navegador
-- [x] AC4 – Compilação válida incrementa uso e prossegue
-- [x] AC5 – Limite atingido exibe mensagem clara e bloqueia
-- [x] AC6 – Licença inválida bloqueia e orienta usuário
-- [x] AC7 – Erro de rede tratado sem quebrar o plugin
+- [x] AC1 – Primeira ativação grava figma_user_id_primary no backend
+- [x] AC2 – Mesma licença com mesma conta funciona normalmente
+- [x] AC3 – Mesma licença com outra conta retorna `license_user_mismatch`
+- [x] AC4 – UI mostra estado, uso e link para /planos/
+- [x] AC5 – Nenhuma license_key completa aparece em logs
+- [x] AC6 – Compilação bloqueada em caso de erro/limite/mismatch
 
 ---
 
 ## Changelog
+
+### v1.1.0 (2025-12-08)
+
+- [FEAT] Vinculação de licença por `figma_user_id`
+- [FEAT] Geração e persistência de `client_id` único
+- [FEAT] Tratamento de erro `license_user_mismatch`
+- [FEAT] Suporte a datas MySQL datetime
+- [SEC] Mascaramento de chave em todos os logs
+- [SEC] Campo de chave com `type="password"` e proteção contra cópia
 
 ### v1.0.0 (2025-12-08)
 
@@ -194,7 +203,6 @@ case 'generate-json':
 - UI de configuração de licença
 - Verificação pré-compilação
 - Persistência em clientStorage
-- Tratamento de erros amigável
 
 ---
 

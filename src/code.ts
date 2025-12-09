@@ -655,7 +655,13 @@ figma.ui.onmessage = async (msg) => {
 
                 // ====== LICENSE CHECK ======
                 log('Verificando licença...', 'info');
-                const licenseCheck = await checkAndConsumeLicenseUsage();
+                const figmaUserId = figma.currentUser?.id || '';
+                if (!figmaUserId) {
+                    log('Não foi possível identificar o usuário Figma.', 'error');
+                    figma.ui.postMessage({ type: 'generation-error', message: 'Não foi possível identificar sua conta Figma. Recarregue o plugin.' });
+                    break;
+                }
+                const licenseCheck = await checkAndConsumeLicenseUsage(figmaUserId);
 
                 if (!licenseCheck.allowed) {
                     log(`Licença: ${licenseCheck.message}`, 'error');
@@ -823,8 +829,20 @@ figma.ui.onmessage = async (msg) => {
                 figma.ui.postMessage({ type: 'license-validating' });
                 const licenseKey = (msg.licenseKey as string) || '';
                 const siteDomain = (msg.siteDomain as string) || '';
+                const figmaUserIdForValidation = figma.currentUser?.id || '';
 
-                const result = await validateAndSaveLicense(licenseKey, siteDomain);
+                if (!figmaUserIdForValidation) {
+                    figma.ui.postMessage({
+                        type: 'license-validate-result',
+                        success: false,
+                        status: 'license_error',
+                        message: 'Não foi possível identificar sua conta Figma. Recarregue o plugin.',
+                        plansUrl: LICENSE_PLANS_URL
+                    });
+                    break;
+                }
+
+                const result = await validateAndSaveLicense(licenseKey, siteDomain, figmaUserIdForValidation);
 
                 figma.ui.postMessage({
                     type: 'license-validate-result',

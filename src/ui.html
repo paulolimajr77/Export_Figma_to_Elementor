@@ -3231,6 +3231,10 @@
                 badge.textContent = 'Limite Atingido';
                 badge.style.background = 'var(--color-warning)';
                 badge.style.color = '#000';
+              } else if (msg.status === 'license_user_mismatch') {
+                badge.textContent = 'Conta Diferente';
+                badge.style.background = 'var(--color-critical)';
+                badge.style.color = '#fff';
               } else {
                 badge.textContent = 'Inválida';
                 badge.style.background = 'var(--color-critical)';
@@ -3273,6 +3277,10 @@
                 badge.textContent = 'Limite Atingido';
                 badge.style.background = 'var(--color-warning)';
                 badge.style.color = '#000';
+              } else if (msg.status === 'license_user_mismatch') {
+                badge.textContent = 'Conta Diferente';
+                badge.style.background = 'var(--color-critical)';
+                badge.style.color = '#fff';
               } else if (msg.configured) {
                 badge.textContent = 'Verificar';
                 badge.style.background = 'var(--color-surface-alt)';
@@ -3379,9 +3387,20 @@
       function formatResetDate(resetsAt) {
         if (!resetsAt) return 'Indefinido';
         try {
-          const date = typeof resetsAt === 'number'
-            ? new Date(resetsAt * 1000)
-            : new Date(resetsAt);
+          let date;
+          if (typeof resetsAt === 'number') {
+            // Unix timestamp (segundos)
+            date = new Date(resetsAt * 1000);
+          } else if (typeof resetsAt === 'string') {
+            // MySQL datetime format: "2025-01-01 00:00:00"
+            if (resetsAt.includes(' ') && !resetsAt.includes('T')) {
+              date = new Date(resetsAt.replace(' ', 'T') + 'Z');
+            } else {
+              date = new Date(resetsAt);
+            }
+          } else {
+            return 'Indefinido';
+          }
           if (isNaN(date.getTime())) return 'Indefinido';
           return date.toLocaleDateString('pt-BR', {
             day: '2-digit',
@@ -3412,6 +3431,9 @@
           } else if (data.status === 'limit_reached') {
             statusEl.textContent = 'Limite Atingido';
             statusEl.style.color = 'var(--color-warning)';
+          } else if (data.status === 'license_user_mismatch') {
+            statusEl.textContent = 'Conta Diferente';
+            statusEl.style.color = 'var(--color-critical)';
           } else {
             statusEl.textContent = 'Inativa';
             statusEl.style.color = 'var(--color-critical)';
