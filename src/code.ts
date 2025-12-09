@@ -17,10 +17,14 @@ import { initializeCompatLayer, safeGet, safeGetArray, safeGetNumber, safeGetStr
 // Licensing Module
 import {
     checkAndConsumeLicenseUsage,
+    registerCompileUsage,
+    validateLicense,
     validateAndSaveLicense,
     clearLicenseConfig,
     getLicenseDisplayInfo,
     isLicenseConfigured,
+    getPlanLabel,
+    formatResetDate,
     LICENSE_PLANS_URL
 } from './licensing';
 
@@ -912,6 +916,41 @@ figma.ui.onmessage = async (msg) => {
                 type: 'open-external-url',
                 url: LICENSE_PLANS_URL
             });
+            break;
+
+        // ============================================================
+        // ONBOARDING: Handlers
+        // ============================================================
+        case 'onboarding-load':
+            try {
+                const onboardingHidden = await figma.clientStorage.getAsync('figtoel_onboarding_hidden');
+                figma.ui.postMessage({
+                    type: 'onboarding-state',
+                    hidden: !!onboardingHidden
+                });
+            } catch (e) {
+                figma.ui.postMessage({
+                    type: 'onboarding-state',
+                    hidden: false
+                });
+            }
+            break;
+
+        case 'onboarding-save-hidden':
+            try {
+                const hidden = safeGetBoolean(msg, 'hidden', false);
+                await figma.clientStorage.setAsync('figtoel_onboarding_hidden', hidden);
+                figma.ui.postMessage({
+                    type: 'onboarding-saved',
+                    success: true
+                });
+            } catch (error: any) {
+                figma.ui.postMessage({
+                    type: 'onboarding-saved',
+                    success: false,
+                    error: (safeGet(error, 'message') as string) || String(error)
+                });
+            }
             break;
 
         case 'resize-ui':

@@ -1972,10 +1972,324 @@
     body.dark .linter-v2 .logs-textarea {
       background: #1f1f22;
     }
+
+    /* ============================================================
+       ONBOARDING OVERLAY STYLES
+       ============================================================ */
+    .onboarding-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 9999;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .onboarding-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .onboarding-card {
+      max-width: 720px;
+      width: calc(100% - 48px);
+      max-height: 90vh;
+      overflow-y: auto;
+      border-radius: 16px;
+      padding: 28px 32px;
+      background: linear-gradient(135deg, #0b1120 0%, #1a1d2f 100%);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      color: #e5e7eb;
+      transform: translateY(20px) scale(0.95);
+      transition: transform 0.3s ease;
+    }
+
+    .onboarding-overlay.visible .onboarding-card {
+      transform: translateY(0) scale(1);
+    }
+
+    .onboarding-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .onboarding-header-text h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 6px 0;
+      background: linear-gradient(90deg, #a875ff, #63e6be);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .onboarding-header-text p {
+      font-size: 13px;
+      color: #9aa0ae;
+      margin: 0;
+    }
+
+    .onboarding-close-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      color: #9aa0ae;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .onboarding-close-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .onboarding-section {
+      margin-bottom: 20px;
+    }
+
+    .onboarding-section h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #a875ff;
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .onboarding-section h2::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 16px;
+      background: linear-gradient(180deg, #a875ff, #63e6be);
+      border-radius: 2px;
+    }
+
+    .onboarding-section ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .onboarding-section li {
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: #c4c8d0;
+      margin-bottom: 4px;
+    }
+
+    .onboarding-section p,
+    .onboarding-section .rich-text {
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: #c4c8d0;
+      margin: 0;
+    }
+
+    .onboarding-section .rich-text strong {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .onboarding-footer {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .onboarding-checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .onboarding-checkbox-wrapper input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #a875ff;
+      cursor: pointer;
+    }
+
+    .onboarding-checkbox-wrapper label {
+      font-size: 12px;
+      color: #9aa0ae;
+      cursor: pointer;
+    }
+
+    .onboarding-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .onboarding-primary-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #a875ff 0%, #6c4bff 100%);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 16px rgba(108, 75, 255, 0.3);
+    }
+
+    .onboarding-primary-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(108, 75, 255, 0.4);
+    }
+
+    .onboarding-docs-link {
+      font-size: 12px;
+      color: #63e6be;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: color 0.15s ease;
+    }
+
+    .onboarding-docs-link:hover {
+      color: #a875ff;
+      text-decoration: underline;
+    }
+
+    /* Scrollbar for onboarding card */
+    .onboarding-card::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .onboarding-card::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    .onboarding-card::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    .onboarding-card::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
   </style>
 </head>
 
 <body>
+  <!-- ONBOARDING OVERLAY -->
+  <div id="onboarding-overlay" class="onboarding-overlay">
+    <div class="onboarding-card">
+      <div class="onboarding-header">
+        <div class="onboarding-header-text">
+          <h1>Bem-vindo ao Figma → Elementor</h1>
+          <p>Veja em 1 minuto como funciona o fluxo completo antes de começar.</p>
+        </div>
+        <button id="onboarding-close-x" class="onboarding-close-btn" aria-label="Fechar introdução">✕</button>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Fluxo geral em 4 passos</h2>
+        <ul>
+          <li><strong>1. Examinar</strong> o layout Figma (Linter) – corrigir auto layout, nomes e estrutura.</li>
+          <li><strong>2. Configurar</strong> chaves: Licença do plugin + chave de IA (opcional).</li>
+          <li><strong>3. Conectar</strong> ao seu WordPress – informar URL do site e testar conexão.</li>
+          <li><strong>4. Converter</strong> para Elementor – gerar JSON, menus, imagens e ícones.</li>
+        </ul>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Examinar layout e Linter</h2>
+        <div class="rich-text">
+          • Use a aba <strong>Validador / Análise</strong> para examinar o frame selecionado.<br>
+          • O plugin identifica problemas: falta de Auto Layout, grupos desnecessários, textos soltos.<br>
+          • Corrija o layout no Figma antes de compilar para melhores resultados.
+        </div>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Compilação com e sem IA</h2>
+        <div class="rich-text">
+          • <strong>Modo sem IA (No-AI)</strong> – usa regras fixas e heurísticas.<br>
+          • <strong>Modo com IA</strong> – envia um snapshot para sua IA configurada.<br>
+          • A IA ajuda a detectar padrões complexos (cards, grids, seções especiais).
+        </div>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Chave de IA do usuário</h2>
+        <div class="rich-text">
+          • O plugin não fornece créditos de IA: você conecta sua conta (OpenAI, Google Gemini).<br>
+          • Na aba <strong>Configurações de IA</strong>, informe sua API key e modelo.<br>
+          • Sem chave de IA, o plugin funciona apenas em modo No-AI.
+        </div>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Conectando ao WordPress</h2>
+        <div class="rich-text">
+          • Na aba <strong>Conexão WordPress</strong>, configure a URL do site (ex: https://seusite.com).<br>
+          • Valide sua licença através do portal figmatoelementor.pljr.com.br.<br>
+          • Uma vez conectado, você pode enviar JSON, imagens e menus diretamente.
+        </div>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Exportar imagens e ícones</h2>
+        <div class="rich-text">
+          • Ao compilar, o plugin exporta imagens e ícones marcados para export.<br>
+          • Os arquivos são enviados otimizados para a Biblioteca Media do WordPress.<br>
+          • No JSON gerado, os widgets de imagem já apontam para as URLs corretas.
+        </div>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Dica: Agrupar elementos em uma única imagem</h2>
+        <div class="rich-text">
+          • Para fundos complexos ou colagens, agrupe os elementos no Figma.<br>
+          • <strong>Trave o grupo (lock)</strong> para indicar que deve ser exportado inteiro.<br>
+          • Isso simplifica o HTML no Elementor e melhora a performance.
+        </div>
+      </div>
+
+      <div class="onboarding-footer">
+        <div class="onboarding-checkbox-wrapper">
+          <input type="checkbox" id="onboarding-dont-show-again" />
+          <label for="onboarding-dont-show-again">Não mostrar esta explicação novamente</label>
+        </div>
+        <div class="onboarding-actions">
+          <a href="https://figmatoelementor.pljr.com.br/docs/" target="_blank" class="onboarding-docs-link">
+            📖 Ver documentação completa
+          </a>
+          <button id="onboarding-close-btn" class="onboarding-primary-btn">Entendi, vamos começar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="runtime-health" style="display:none"></div>
   <input id="useDeterministic" type="checkbox" style="display:none" aria-hidden="true" />
   <div class="app">
@@ -3367,6 +3681,28 @@
             }
             break;
           }
+
+          // ============================================================
+          // ONBOARDING: Message Handlers
+          // ============================================================
+          case 'onboarding-state': {
+            console.log('[ONBOARDING] Estado recebido:', msg);
+            onboardingHidden = !!msg.hidden;
+
+            // Se licença foi validada com sucesso e onboarding não está oculto
+            if (!onboardingHidden) {
+              showOnboarding();
+            }
+            break;
+          }
+
+          case 'onboarding-saved': {
+            console.log('[ONBOARDING] Preferência salva:', msg);
+            if (msg.success) {
+              addLog('✅ Preferência de onboarding salva', 'info');
+            }
+            break;
+          }
         }
       };
 
@@ -3381,28 +3717,125 @@
       if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
 
       // ============================================================
-      // LICENSE: Helper Functions
+      // ONBOARDING OVERLAY CONTROLLER
       // ============================================================
+
+      const ONBOARDING_STORAGE_KEY = 'figtoel_onboarding_hidden';
+      let onboardingOverlay = null;
+      let onboardingHidden = false;
+
+      function initOnboarding() {
+        onboardingOverlay = document.getElementById('onboarding-overlay');
+        if (!onboardingOverlay) return;
+
+        // Get close buttons
+        const closeX = document.getElementById('onboarding-close-x');
+        const closeBtn = document.getElementById('onboarding-close-btn');
+        const dontShowAgain = document.getElementById('onboarding-dont-show-again');
+
+        // Close handler
+        function closeOnboarding() {
+          if (dontShowAgain && dontShowAgain.checked) {
+            // Save to backend (clientStorage)
+            send('onboarding-save-hidden', { hidden: true });
+            onboardingHidden = true;
+          }
+          onboardingOverlay.classList.remove('visible');
+          addLog('📖 Onboarding fechado', 'info');
+        }
+
+        if (closeX) closeX.addEventListener('click', () => {
+          onboardingOverlay.classList.remove('visible');
+        });
+
+        if (closeBtn) closeBtn.addEventListener('click', closeOnboarding);
+
+        // Click outside to close
+        onboardingOverlay.addEventListener('click', (e) => {
+          if (e.target === onboardingOverlay) {
+            onboardingOverlay.classList.remove('visible');
+          }
+        });
+
+        // Esc key to close
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && onboardingOverlay.classList.contains('visible')) {
+            onboardingOverlay.classList.remove('visible');
+          }
+        });
+
+        // Load onboarding state from backend
+        send('onboarding-load');
+      }
+
+      function showOnboarding() {
+        if (onboardingOverlay && !onboardingHidden) {
+          onboardingOverlay.classList.add('visible');
+        }
+      }
+
+      function forceShowOnboarding() {
+        if (onboardingOverlay) {
+          onboardingOverlay.classList.add('visible');
+        }
+      }
+
+      // Initialize onboarding
+      initOnboarding();
+
+      // ============================================================
+      // LICENSE: Helper Functions and Constants
+      // ============================================================
+
+      const PLAN_LABELS = {
+        'mensal': 'Assinatura Mensal',
+        'anual': 'Assinatura Anual',
+        'lifetime': 'Licença Vitalícia',
+        'trial': 'Período de Teste',
+        'free': 'Plano Gratuito'
+      };
+
+      function getPlanLabel(planSlug) {
+        if (!planSlug) return 'Indefinido';
+        return PLAN_LABELS[planSlug.toLowerCase()] || planSlug;
+      }
 
       function formatResetDate(resetsAt) {
         if (!resetsAt) return 'Indefinido';
         try {
           let date;
           if (typeof resetsAt === 'number') {
-            // Unix timestamp (segundos)
-            date = new Date(resetsAt * 1000);
-          } else if (typeof resetsAt === 'string') {
-            // MySQL datetime format: "2025-01-01 00:00:00"
-            if (resetsAt.includes(' ') && !resetsAt.includes('T')) {
-              date = new Date(resetsAt.replace(' ', 'T') + 'Z');
+            // Verificar timestamp em segundos ou milissegundos
+            if (resetsAt < 10000000000) {
+              date = new Date(resetsAt * 1000);
             } else {
               date = new Date(resetsAt);
+            }
+          } else if (typeof resetsAt === 'string') {
+            // Tentar parse numérico primeiro
+            const numValue = Number(resetsAt);
+            if (!isNaN(numValue) && numValue > 0) {
+              if (numValue < 10000000000) {
+                date = new Date(numValue * 1000);
+              } else {
+                date = new Date(numValue);
+              }
+            } else {
+              // MySQL datetime format: "2025-12-31 23:59:59"
+              if (resetsAt.includes(' ') && !resetsAt.includes('T')) {
+                date = new Date(resetsAt.replace(' ', 'T'));
+              } else {
+                date = new Date(resetsAt);
+              }
             }
           } else {
             return 'Indefinido';
           }
           if (isNaN(date.getTime())) return 'Indefinido';
-          return date.toLocaleDateString('pt-BR', {
+
+          // Usar locale do navegador (detectado automaticamente)
+          const userLocale = navigator.language || 'pt-BR';
+          return date.toLocaleDateString(userLocale, {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
@@ -3418,9 +3851,11 @@
 
         panel.style.display = 'block';
 
-        // Plan
+        // Plan - usar label amigável
         const planEl = document.getElementById('license-plan');
-        if (planEl) planEl.textContent = data.planSlug || 'Indefinido';
+        if (planEl) {
+          planEl.textContent = data.planLabel || getPlanLabel(data.planSlug) || 'Indefinido';
+        }
 
         // Status
         const statusEl = document.getElementById('license-status-text');

@@ -5,17 +5,18 @@
  * Handles HTTP calls to backend, clientStorage persistence,
  * and pre-compile license validation.
  * 
- * @version 1.1.0
+ * @version 1.2.0
  * @module licensing/LicenseService
  */
 
 import {
     LICENSE_BACKEND_URL,
-    LICENSE_ENDPOINT,
+    LICENSE_VALIDATE_ENDPOINT,
+    LICENSE_COMPILE_ENDPOINT,
     LICENSE_STORAGE_KEY,
     CLIENT_ID_STORAGE_KEY,
     PLUGIN_VERSION,
-    LicenseUsageRequest,
+    LicenseRequestPayload,
     LicenseResponse,
     LicenseSuccessResponse,
     LicenseErrorResponse,
@@ -23,7 +24,9 @@ import {
     LicenseCheckResult,
     UsageSnapshot,
     getErrorMessage,
+    getPlanLabel,
     maskLicenseKey,
+    normalizeDomain,
     generateClientId,
     LicenseErrorCode
 } from './LicenseConfig';
@@ -45,8 +48,8 @@ export async function getOrCreateClientId(): Promise<string> {
         }
         return clientId;
     } catch (e) {
-        console.warn('[LICENSE] Erro ao gerenciar client_id:', e);
-        return generateClientId(); // Fallback sem persistência
+        console.warn('[LICENSE] Erro ao gerenciar client_id');
+        return generateClientId();
     }
 }
 
@@ -102,19 +105,21 @@ export async function isLicenseConfigured(): Promise<boolean> {
 // ============================================================
 
 /**
- * Faz chamada HTTP ao endpoint de licenciamento
+ * Faz chamada HTTP ao endpoint especificado
  * ATENÇÃO: Nunca logar license_key completa
  */
-async function callLicenseEndpoint(request: LicenseUsageRequest): Promise<LicenseResponse> {
-    const url = `${LICENSE_BACKEND_URL}${LICENSE_ENDPOINT}`;
+async function callLicenseEndpoint(
+    endpoint: string,
+    request: LicenseRequestPayload
+): Promise<LicenseResponse> {
+    const url = `${LICENSE_BACKEND_URL}${endpoint}`;
 
     // Log seguro - chave mascarada
-    console.log('[LICENSE] Chamando endpoint:', url);
+    console.log('[LICENSE] Endpoint:', endpoint);
     console.log('[LICENSE] Payload:', {
         license_key: maskLicenseKey(request.license_key),
         site_domain: request.site_domain,
-        figma_user_id: request.figma_user_id ? '***' + request.figma_user_id.slice(-4) : 'N/A',
-        client_id: request.client_id ? '***' + request.client_id.slice(-4) : 'N/A'
+        figma_user_id: request.figma_user_id ? '***' + request.figma_user_id.slice(-4) : 'N/A'
     });
 
     try {
@@ -129,7 +134,7 @@ async function callLicenseEndpoint(request: LicenseUsageRequest): Promise<Licens
 
         const data = await response.json();
 
-        // Log seguro da resposta (sem expor chave completa)
+        // Log seguro da resposta
         const safeData = { ...data };
         if (safeData.license_key) {
             safeData.license_key = maskLicenseKey(safeData.license_key);
@@ -152,26 +157,20 @@ async function callLicenseEndpoint(request: LicenseUsageRequest): Promise<Licens
 // ============================================================
 
 /**
- * Valida e salva uma nova configuração de licença
- * Usado pela tela de configuração
+ * Valida licença SEM consumir uso mensal
+ * Usado na tela de configuração e ao abrir o plugin
  * 
  * @param licenseKey - Chave de licença
  * @param siteDomain - Domínio do site WordPress
  * @param figmaUserId - ID do usuário Figma (de figma.currentUser.id)
  */
-export async function validateAndSaveLicense(
+export async function validateLicense(
     licenseKey: string,
     siteDomain: string,
-    figmaUserId: string
+    figmaUserId?: string
 ): Promise<LicenseCheckResult> {
 
-    // Limpar domínio (remover protocolo, trailing slashes)
-    const cleanDomain = siteDomain
-        .replace(/^https?:\/\//, '')
-        .replace(/\/+$/, '')
-        .toLowerCase()
-        .trim();
-
+    const cleanDomain = normalizeDomain(siteDomain);
     const cleanKey = licenseKey.trim().toUpperCase();
 
     if (!cleanKey || !cleanDomain) {
@@ -182,19 +181,11 @@ export async function validateAndSaveLicense(
         };
     }
 
-    if (!figmaUserId) {
-        return {
-            allowed: false,
-            status: 'license_error',
-            message: getErrorMessage('figma_user_required')
-        };
-    }
-
     // Obter ou criar client_id
     const clientId = await getOrCreateClientId();
 
-    // Chamar endpoint
-    const response = await callLicenseEndpoint({
+    // Chamar endpoint de VALIDAÇÃO (não consome uso)
+    const response = await callLicenseEndpoint(LICENSE_VALIDATE_ENDPOINT, {
         license_key: cleanKey,
         site_domain: cleanDomain,
         plugin_version: PLUGIN_VERSION,
@@ -208,22 +199,20 @@ export async function validateAndSaveLicense(
         const errorCode = errorResponse.code as LicenseErrorCode;
         const errorMessage = getErrorMessage(errorCode);
 
-        // Determinar status específico
         const lastStatus = errorCode === 'license_user_mismatch'
             ? 'license_user_mismatch'
             : 'error';
 
-        // Salvar status de erro para referência
+        // Salvar status de erro
         const config: LicenseStorageConfig = {
             licenseKey: cleanKey,
             siteDomain: cleanDomain,
-            pluginVersion: PLUGIN_VERSION,
-            figmaUserIdBound: '',
             clientId: clientId,
-            lastStatus: lastStatus,
+            lastUsage: null,
+            lastValidationAt: new Date().toISOString(),
             planSlug: null,
-            usageSnapshot: null,
-            lastValidatedAt: new Date().toISOString()
+            figmaUserIdBound: figmaUserId || '',
+            lastStatus: lastStatus
         };
         await saveLicenseConfig(config);
 
@@ -241,27 +230,27 @@ export async function validateAndSaveLicense(
         const config: LicenseStorageConfig = {
             licenseKey: cleanKey,
             siteDomain: cleanDomain,
-            pluginVersion: PLUGIN_VERSION,
-            figmaUserIdBound: figmaUserId,
             clientId: clientId,
-            lastStatus: 'limit_reached',
-            planSlug: successResponse.plan_slug,
-            usageSnapshot: {
+            lastUsage: {
                 used: successResponse.usage.used,
                 limit: successResponse.usage.limit,
                 warning: successResponse.usage.warning,
                 resetsAt: successResponse.usage.resets_at
             },
-            lastValidatedAt: new Date().toISOString()
+            lastValidationAt: new Date().toISOString(),
+            planSlug: successResponse.plan_slug,
+            figmaUserIdBound: figmaUserId || '',
+            lastStatus: 'limit_reached'
         };
         await saveLicenseConfig(config);
 
         return {
             allowed: false,
             status: 'limit_reached',
-            message: `Limite mensal atingido (${successResponse.usage.used}/${successResponse.usage.limit} compilações).`,
+            message: `Limite mensal atingido (${successResponse.usage.used}/${successResponse.usage.limit}).`,
             usage: successResponse.usage,
-            planSlug: successResponse.plan_slug
+            planSlug: successResponse.plan_slug,
+            planLabel: getPlanLabel(successResponse.plan_slug)
         };
     }
 
@@ -269,24 +258,23 @@ export async function validateAndSaveLicense(
     const config: LicenseStorageConfig = {
         licenseKey: cleanKey,
         siteDomain: cleanDomain,
-        pluginVersion: PLUGIN_VERSION,
-        figmaUserIdBound: figmaUserId,
         clientId: clientId,
-        lastStatus: 'ok',
-        planSlug: successResponse.plan_slug,
-        usageSnapshot: {
+        lastUsage: {
             used: successResponse.usage.used,
             limit: successResponse.usage.limit,
             warning: successResponse.usage.warning,
             resetsAt: successResponse.usage.resets_at
         },
-        lastValidatedAt: new Date().toISOString()
+        lastValidationAt: new Date().toISOString(),
+        planSlug: successResponse.plan_slug,
+        figmaUserIdBound: figmaUserId || '',
+        lastStatus: 'ok'
     };
     await saveLicenseConfig(config);
 
     let message = 'Licença validada com sucesso!';
     if (successResponse.usage.warning === 'soft_limit') {
-        message = `Licença válida. Atenção: você já usou ${successResponse.usage.used} de ${successResponse.usage.limit} compilações este mês.`;
+        message = `Licença válida. Atenção: ${successResponse.usage.used}/${successResponse.usage.limit} compilações usadas.`;
     }
 
     return {
@@ -294,18 +282,19 @@ export async function validateAndSaveLicense(
         status: 'ok',
         message,
         usage: successResponse.usage,
-        planSlug: successResponse.plan_slug
+        planSlug: successResponse.plan_slug,
+        planLabel: getPlanLabel(successResponse.plan_slug)
     };
 }
 
 /**
- * Verifica e consome uso de licença antes de compilar
- * Esta função DEVE ser chamada antes de qualquer compilação
+ * Registra uma compilação, CONSUMINDO 1 uso mensal
+ * Esta função DEVE ser chamada antes de cada compilação
  * 
- * @param figmaUserId - ID do usuário Figma atual (de figma.currentUser.id)
+ * @param figmaUserId - ID do usuário Figma atual
  * @returns LicenseCheckResult indicando se a compilação pode prosseguir
  */
-export async function checkAndConsumeLicenseUsage(figmaUserId: string): Promise<LicenseCheckResult> {
+export async function registerCompileUsage(figmaUserId?: string): Promise<LicenseCheckResult> {
     // 1) Carregar configuração salva
     const config = await loadLicenseConfig();
 
@@ -313,24 +302,15 @@ export async function checkAndConsumeLicenseUsage(figmaUserId: string): Promise<
         return {
             allowed: false,
             status: 'not_configured',
-            message: 'Licença não configurada. Configure sua chave de licença na aba "Licença".'
+            message: 'Configure sua licença na aba "Licença" antes de compilar.'
         };
     }
 
-    // 2) Verificar figma_user_id
-    if (!figmaUserId) {
-        return {
-            allowed: false,
-            status: 'license_error',
-            message: getErrorMessage('figma_user_required')
-        };
-    }
-
-    // 3) Obter client_id
+    // 2) Obter client_id
     const clientId = config.clientId || await getOrCreateClientId();
 
-    // 4) Chamar endpoint para validar e registrar uso
-    const response = await callLicenseEndpoint({
+    // 3) Chamar endpoint de COMPILAÇÃO (consome 1 uso)
+    const response = await callLicenseEndpoint(LICENSE_COMPILE_ENDPOINT, {
         license_key: config.licenseKey,
         site_domain: config.siteDomain,
         plugin_version: PLUGIN_VERSION,
@@ -338,18 +318,16 @@ export async function checkAndConsumeLicenseUsage(figmaUserId: string): Promise<
         client_id: clientId
     });
 
-    // 5) Processar resposta
+    // 4) Processar resposta
     if (response.status === 'error') {
         const errorResponse = response as LicenseErrorResponse;
         const errorCode = errorResponse.code as LicenseErrorCode;
         const errorMessage = getErrorMessage(errorCode);
 
-        // Atualizar status local
         config.lastStatus = errorCode === 'license_user_mismatch' ? 'license_user_mismatch' : 'error';
-        config.lastValidatedAt = new Date().toISOString();
+        config.lastValidationAt = new Date().toISOString();
         await saveLicenseConfig(config);
 
-        // Retornar status específico para user mismatch
         if (errorCode === 'license_user_mismatch') {
             return {
                 allowed: false,
@@ -358,7 +336,6 @@ export async function checkAndConsumeLicenseUsage(figmaUserId: string): Promise<
             };
         }
 
-        // Network error: bloquear por segurança
         if (errorCode === 'network_error') {
             return {
                 allowed: false,
@@ -379,36 +356,35 @@ export async function checkAndConsumeLicenseUsage(figmaUserId: string): Promise<
     // Atualizar snapshot local
     config.lastStatus = successResponse.status === 'limit_reached' ? 'limit_reached' : 'ok';
     config.planSlug = successResponse.plan_slug;
-    config.figmaUserIdBound = figmaUserId; // Confirmar vínculo
-    config.usageSnapshot = {
+    config.lastUsage = {
         used: successResponse.usage.used,
         limit: successResponse.usage.limit,
         warning: successResponse.usage.warning,
         resetsAt: successResponse.usage.resets_at
     };
-    config.lastValidatedAt = new Date().toISOString();
+    config.lastValidationAt = new Date().toISOString();
     await saveLicenseConfig(config);
 
-    // 6) Verificar limite
+    // 5) Verificar limite
     if (successResponse.status === 'limit_reached' || successResponse.usage.status === 'limit_reached') {
         return {
             allowed: false,
             status: 'limit_reached',
-            message: `Limite mensal de compilações atingido (${successResponse.usage.used}/${successResponse.usage.limit}). Renova em breve.`,
+            message: `Você atingiu o limite de ${successResponse.usage.limit} compilações mensais.`,
             usage: successResponse.usage,
-            planSlug: successResponse.plan_slug
+            planSlug: successResponse.plan_slug,
+            planLabel: getPlanLabel(successResponse.plan_slug)
         };
     }
 
-    // 7) Sucesso (pode compilar)
-    let message = `Compilação autorizada (${successResponse.usage.used}/${successResponse.usage.limit} este mês).`;
-
+    // 6) Sucesso (pode compilar)
     return {
         allowed: true,
         status: 'ok',
-        message,
+        message: `Compilação autorizada (${successResponse.usage.used}/${successResponse.usage.limit}).`,
         usage: successResponse.usage,
-        planSlug: successResponse.plan_slug
+        planSlug: successResponse.plan_slug,
+        planLabel: getPlanLabel(successResponse.plan_slug)
     };
 }
 
@@ -418,10 +394,11 @@ export async function checkAndConsumeLicenseUsage(figmaUserId: string): Promise<
  */
 export async function getLicenseDisplayInfo(): Promise<{
     configured: boolean;
-    licenseKey: string;       // Retorna mascarada
-    licenseKeyMasked: string; // Versão mascarada para exibição
+    licenseKey: string;
+    licenseKeyMasked: string;
     siteDomain: string;
     planSlug: string | null;
+    planLabel: string;
     usage: UsageSnapshot | null;
     status: string;
     lastValidated: string | null;
@@ -436,6 +413,7 @@ export async function getLicenseDisplayInfo(): Promise<{
             licenseKeyMasked: '',
             siteDomain: '',
             planSlug: null,
+            planLabel: 'Indefinido',
             usage: null,
             status: 'not_configured',
             lastValidated: null,
@@ -449,9 +427,32 @@ export async function getLicenseDisplayInfo(): Promise<{
         licenseKeyMasked: maskLicenseKey(config.licenseKey),
         siteDomain: config.siteDomain,
         planSlug: config.planSlug,
-        usage: config.usageSnapshot,
+        planLabel: getPlanLabel(config.planSlug),
+        usage: config.lastUsage,
         status: config.lastStatus,
-        lastValidated: config.lastValidatedAt,
+        lastValidated: config.lastValidationAt,
         figmaUserIdBound: config.figmaUserIdBound || ''
     };
+}
+
+// ============================================================
+// LEGACY COMPATIBILITY
+// ============================================================
+
+/**
+ * Alias para registerCompileUsage (compatibilidade com código existente)
+ */
+export async function checkAndConsumeLicenseUsage(figmaUserId?: string): Promise<LicenseCheckResult> {
+    return registerCompileUsage(figmaUserId);
+}
+
+/**
+ * Alias para validateLicense (compatibilidade com código existente)
+ */
+export async function validateAndSaveLicense(
+    licenseKey: string,
+    siteDomain: string,
+    figmaUserId?: string
+): Promise<LicenseCheckResult> {
+    return validateLicense(licenseKey, siteDomain, figmaUserId);
 }

@@ -2,7 +2,7 @@
  * Figma → Elementor License Module
  * Types and Interfaces for License Management
  * 
- * @version 1.1.0
+ * @version 1.2.0
  * @module licensing/LicenseConfig
  */
 
@@ -11,25 +11,46 @@
 // ============================================================
 
 export const LICENSE_BACKEND_URL = 'https://figmatoelementor.pljr.com.br';
-export const LICENSE_ENDPOINT = '/wp-json/figtoel/v1/usage/compile';
+export const LICENSE_VALIDATE_ENDPOINT = '/wp-json/figtoel/v1/license/validate';
+export const LICENSE_COMPILE_ENDPOINT = '/wp-json/figtoel/v1/usage/compile';
 export const LICENSE_PLANS_URL = 'https://figmatoelementor.pljr.com.br/planos/';
-export const LICENSE_STORAGE_KEY = 'figtoel_license_config_v1';
+export const LICENSE_STORAGE_KEY = 'figtoel_license_state';
 export const CLIENT_ID_STORAGE_KEY = 'figtoel_client_id_v1';
-export const PLUGIN_VERSION = '1.1.0';
+export const PLUGIN_VERSION = '1.2.0';
+
+// ============================================================
+// PLAN LABEL MAPPING
+// ============================================================
+
+export const PLAN_LABELS: Record<string, string> = {
+    'mensal': 'Assinatura Mensal',
+    'anual': 'Assinatura Anual',
+    'lifetime': 'Licença Vitalícia',
+    'trial': 'Período de Teste',
+    'free': 'Plano Gratuito'
+};
+
+/**
+ * Obtém label amigável do plano
+ */
+export function getPlanLabel(planSlug: string | null): string {
+    if (!planSlug) return 'Indefinido';
+    return PLAN_LABELS[planSlug.toLowerCase()] || planSlug;
+}
 
 // ============================================================
 // REQUEST TYPES
 // ============================================================
 
 /**
- * Payload enviado ao endpoint de licenciamento
+ * Payload enviado aos endpoints de licenciamento
  */
-export interface LicenseUsageRequest {
+export interface LicenseRequestPayload {
     license_key: string;
     site_domain: string;
     plugin_version?: string;
-    figma_user_id: string;    // ID do usuário Figma (obrigatório v1.1)
-    client_id?: string;       // UUID único por instalação
+    figma_user_id?: string;
+    client_id?: string;
 }
 
 // ============================================================
@@ -87,8 +108,8 @@ export type LicenseErrorCode =
     | 'usage_error'
     | 'missing_params'
     | 'network_error'
-    | 'license_user_mismatch'  // Nova v1.1: chave vinculada a outra conta Figma
-    | 'figma_user_required';   // Nova v1.1: figma_user_id não fornecido
+    | 'license_user_mismatch'
+    | 'figma_user_required';
 
 /**
  * União de todos os tipos de resposta
@@ -115,13 +136,12 @@ export interface UsageSnapshot {
 export interface LicenseStorageConfig {
     licenseKey: string;
     siteDomain: string;
-    pluginVersion: string;
-    figmaUserIdBound: string;    // Nova v1.1: ID do usuário Figma vinculado
-    clientId: string;            // Nova v1.1: UUID único desta instalação
-    lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch';
+    clientId: string;
+    lastUsage: UsageSnapshot | null;
+    lastValidationAt: string;  // ISO datetime
     planSlug: string | null;
-    usageSnapshot: UsageSnapshot | null;
-    lastValidatedAt: string; // ISO datetime
+    figmaUserIdBound: string;
+    lastStatus: 'ok' | 'error' | 'limit_reached' | 'not_configured' | 'license_user_mismatch';
 }
 
 // ============================================================
@@ -129,7 +149,7 @@ export interface LicenseStorageConfig {
 // ============================================================
 
 /**
- * Resultado do check de licença antes da compilação
+ * Resultado do check de licença
  */
 export interface LicenseCheckResult {
     allowed: boolean;
@@ -137,6 +157,7 @@ export interface LicenseCheckResult {
     message: string;
     usage?: UsageInfo;
     planSlug?: string | null;
+    planLabel?: string;
 }
 
 /**
@@ -150,63 +171,79 @@ export type LicenseDisplayState =
     | 'limit_reached'
     | 'invalid'
     | 'network_error'
-    | 'user_mismatch';  // Nova v1.1
+    | 'user_mismatch';
 
 // ============================================================
 // ERROR MESSAGES (PT-BR)
 // ============================================================
 
 export const ERROR_MESSAGES: Record<LicenseErrorCode, string> = {
-    license_not_found: 'Não encontramos essa chave de licença. Verifique se digitou corretamente ou adquira um plano.',
-    license_inactive: 'Sua licença não está ativa. Regularize seu plano em /planos/.',
-    limit_sites_reached: 'Limite máximo de sites atingido para esta licença. Gerencie seus sites na área do cliente.',
-    site_register_error: 'Não foi possível registrar este domínio para sua licença. Tente novamente ou contate o suporte.',
-    usage_error: 'Erro ao registrar uso da licença. Tente novamente mais tarde ou contate o suporte.',
-    missing_params: 'Dados incompletos. Verifique a chave e o domínio.',
-    network_error: 'Servidor temporariamente indisponível. Verifique sua conexão e tente novamente.',
-    license_user_mismatch: 'Esta chave já está vinculada a outra conta Figma. Use a conta original ou adquira uma nova licença.',
-    figma_user_required: 'Não foi possível identificar sua conta Figma. Recarregue o plugin e tente novamente.'
+    license_not_found: 'Chave de licença não encontrada. Verifique se digitou corretamente.',
+    license_inactive: 'Sua licença não está ativa. Regularize seu plano.',
+    limit_sites_reached: 'Número máximo de domínios atingido para esta licença.',
+    site_register_error: 'Não foi possível vincular este domínio à sua licença.',
+    usage_error: 'Erro ao registrar uso. Tente novamente.',
+    missing_params: 'Chave de licença e domínio são obrigatórios.',
+    network_error: 'Servidor temporariamente indisponível. Verifique sua conexão.',
+    license_user_mismatch: 'Esta licença já está vinculada a outra conta Figma.',
+    figma_user_required: 'Não foi possível identificar sua conta Figma. Reabra o plugin.'
 };
 
 /**
  * Obtém mensagem de erro amigável
  */
 export function getErrorMessage(code: LicenseErrorCode): string {
-    return ERROR_MESSAGES[code] || 'Erro desconhecido. Contate o suporte.';
+    return ERROR_MESSAGES[code] || 'Erro inesperado. Contate o suporte.';
 }
 
 /**
  * Mascara a chave de licença para exibição segura
- * Exemplo: FTEL-5GKGTD5HOEZS → FTEL-*****HOEZS
+ * Exemplo: FTEL-5GKGTD5HOEZS → **********HOEZS
  */
 export function maskLicenseKey(key: string): string {
-    if (!key || key.length < 10) return '****';
-    const prefix = key.substring(0, 5);  // "FTEL-"
+    if (!key || key.length < 5) return '****';
     const suffix = key.substring(key.length - 5);
-    return `${prefix}*****${suffix}`;
+    return `**********${suffix}`;
 }
 
 /**
- * Formata data de reset para exibição (suporta MySQL datetime)
- * Aceita: Unix timestamp, ISO string, ou MySQL datetime string
+ * Formata data para exibição baseada no locale do usuário
+ * Detecta automaticamente o idioma do navegador/sistema
+ * 
+ * @param resetsAt - Data em formato MySQL, ISO ou timestamp
+ * @param userLocale - Locale opcional (se não fornecido, usa navigator.language)
  */
-export function formatResetDate(resetsAt: string | number | null): string {
+export function formatResetDate(resetsAt: string | number | null, userLocale?: string): string {
     if (!resetsAt) return 'Indefinido';
 
     try {
         let date: Date;
 
         if (typeof resetsAt === 'number') {
-            // Unix timestamp (segundos)
-            date = new Date(resetsAt * 1000);
-        } else if (typeof resetsAt === 'string') {
-            // Tentar parse de MySQL datetime (YYYY-MM-DD HH:MM:SS)
-            // ou ISO string
-            if (resetsAt.includes(' ') && !resetsAt.includes('T')) {
-                // MySQL format: "2025-01-01 00:00:00"
-                date = new Date(resetsAt.replace(' ', 'T') + 'Z');
+            // Verificar se é timestamp em segundos ou milissegundos
+            if (resetsAt < 10000000000) {
+                // Segundos (Unix timestamp)
+                date = new Date(resetsAt * 1000);
             } else {
+                // Milissegundos
                 date = new Date(resetsAt);
+            }
+        } else if (typeof resetsAt === 'string') {
+            // Tentar parse numérico primeiro
+            const numValue = Number(resetsAt);
+            if (!isNaN(numValue) && numValue > 0) {
+                if (numValue < 10000000000) {
+                    date = new Date(numValue * 1000);
+                } else {
+                    date = new Date(numValue);
+                }
+            } else {
+                // MySQL datetime format: "2025-12-31 23:59:59"
+                if (resetsAt.includes(' ') && !resetsAt.includes('T')) {
+                    date = new Date(resetsAt.replace(' ', 'T'));
+                } else {
+                    date = new Date(resetsAt);
+                }
             }
         } else {
             return 'Indefinido';
@@ -214,8 +251,10 @@ export function formatResetDate(resetsAt: string | number | null): string {
 
         if (isNaN(date.getTime())) return 'Indefinido';
 
-        // Formato brasileiro: DD/MM/YYYY
-        return date.toLocaleDateString('pt-BR', {
+        // Usar locale do usuário (navegador) ou fallback para pt-BR
+        const locale = userLocale || (typeof navigator !== 'undefined' ? navigator.language : 'pt-BR');
+
+        return date.toLocaleDateString(locale, {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
@@ -229,10 +268,23 @@ export function formatResetDate(resetsAt: string | number | null): string {
  * Gera um UUID v4 para client_id
  */
 export function generateClientId(): string {
-    // Implementação simples de UUID v4
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
+}
+
+/**
+ * Normaliza domínio removendo protocolo, www e barras
+ */
+export function normalizeDomain(input: string): string {
+    if (!input) return '';
+    return input
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .replace(/\/+$/, '')
+        .replace(/\s+/g, '');
 }
