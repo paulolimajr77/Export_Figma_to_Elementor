@@ -9374,7 +9374,7 @@ ${detection.justification}
       const errorResponse = response;
       const errorCode = errorResponse.code;
       const errorMessage = getErrorMessage(errorCode);
-      const lastStatus = errorCode === "license_user_mismatch" ? "license_user_mismatch" : "error";
+      const lastStatus = errorCode === "license_user_mismatch" ? "license_user_mismatch" : errorCode === "device_mismatch" ? "device_mismatch" : "error";
       const config2 = {
         licenseKey: cleanKey,
         siteDomain: cleanDomain,
@@ -9390,69 +9390,44 @@ ${detection.justification}
       await saveLicenseConfig(config2);
       return {
         allowed: false,
-        status: errorCode === "license_user_mismatch" ? "license_user_mismatch" : "license_error",
+        status: errorCode === "license_user_mismatch" ? "license_user_mismatch" : errorCode === "device_mismatch" ? "device_mismatch" : "license_error",
         message: errorMessage
       };
     }
-    const successResponse = response;
-    if (successResponse.status === "limit_reached" || successResponse.usage.status === "limit_reached") {
-      const config2 = {
-        licenseKey: cleanKey,
-        siteDomain: cleanDomain,
-        clientId,
-        deviceId,
-        lastUsage: {
-          used: successResponse.usage.used,
-          limit: successResponse.usage.limit,
-          warning: successResponse.usage.warning,
-          resetsAt: successResponse.usage.resets_at
-        },
-        lastValidationAt: (/* @__PURE__ */ new Date()).toISOString(),
-        planSlug: successResponse.plan_slug,
-        figmaUserIdBound: figmaUserId || "",
-        deviceIdBound: deviceId,
-        lastStatus: "limit_reached"
-      };
-      await saveLicenseConfig(config2);
-      return {
-        allowed: false,
-        status: "limit_reached",
-        message: `Limite mensal atingido (${successResponse.usage.used}/${successResponse.usage.limit}).`,
-        usage: successResponse.usage,
-        planSlug: successResponse.plan_slug,
-        planLabel: getPlanLabel(successResponse.plan_slug)
-      };
+    const data = response;
+    let message = "Licen\xE7a validada com sucesso!";
+    if (data.mode === "device_bound_now" || data.mode === "bound_first_time") {
+      message = "Licen\xE7a vinculada a este dispositivo com sucesso.";
+    } else if (data.mode === "already_bound") {
+      message = "Licen\xE7a j\xE1 vinculada a este dispositivo.";
+    } else if (data.mode === "allowed_extra") {
+      message = "Licen\xE7a validada (usu\xE1rio extra autorizado).";
     }
     const config = {
       licenseKey: cleanKey,
       siteDomain: cleanDomain,
       clientId,
       deviceId,
-      lastUsage: {
-        used: successResponse.usage.used,
-        limit: successResponse.usage.limit,
-        warning: successResponse.usage.warning,
-        resetsAt: successResponse.usage.resets_at
-      },
+      lastUsage: null,
+      // Usage info não vem do /validate
       lastValidationAt: (/* @__PURE__ */ new Date()).toISOString(),
-      planSlug: successResponse.plan_slug,
+      planSlug: data.plan_slug || null,
+      // Se o endpoint retornar
       figmaUserIdBound: figmaUserId || "",
       deviceIdBound: deviceId,
       lastStatus: "ok"
     };
     await saveLicenseConfig(config);
-    let message = "Licen\xE7a validada com sucesso!";
-    if (successResponse.usage.warning === "soft_limit") {
-      message = `Licen\xE7a v\xE1lida. Aten\xE7\xE3o: ${successResponse.usage.used}/${successResponse.usage.limit} compila\xE7\xF5es usadas.`;
-    }
-    return {
+    const result = {
       allowed: true,
       status: "ok",
       message,
-      usage: successResponse.usage,
-      planSlug: successResponse.plan_slug,
-      planLabel: getPlanLabel(successResponse.plan_slug)
+      planSlug: data.plan_slug || null
     };
+    if (data.plan_slug) {
+      result.planLabel = getPlanLabel(data.plan_slug);
+    }
+    return result;
   }
   async function registerCompileUsage(figmaUserId) {
     const config = await loadLicenseConfig();

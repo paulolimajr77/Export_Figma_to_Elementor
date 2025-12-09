@@ -254,7 +254,9 @@ export async function validateLicense(
 
         const lastStatus = errorCode === 'license_user_mismatch'
             ? 'license_user_mismatch'
-            : 'error';
+            : errorCode === 'device_mismatch'
+                ? 'device_mismatch'
+                : 'error';
 
         // Salvar status de erro
         const config: LicenseStorageConfig = {
@@ -273,77 +275,58 @@ export async function validateLicense(
 
         return {
             allowed: false,
-            status: errorCode === 'license_user_mismatch' ? 'license_user_mismatch' : 'license_error',
+            status: errorCode === 'license_user_mismatch'
+                ? 'license_user_mismatch'
+                : errorCode === 'device_mismatch'
+                    ? 'device_mismatch'
+                    : 'license_error',
             message: errorMessage
         };
     }
 
-    const successResponse = response as LicenseSuccessResponse;
+    // Response OK - parse actual shape from /license/validate
+    // Expected: {status: 'ok', mode: 'device_bound_now' | 'already_bound' | ..., license_key, figma_user_id, device_id}
+    const data = response as any;
 
-    // Verificar se limite foi atingido
-    if (successResponse.status === 'limit_reached' || successResponse.usage.status === 'limit_reached') {
-        const config: LicenseStorageConfig = {
-            licenseKey: cleanKey,
-            siteDomain: cleanDomain,
-            clientId: clientId,
-            deviceId: deviceId,
-            lastUsage: {
-                used: successResponse.usage.used,
-                limit: successResponse.usage.limit,
-                warning: successResponse.usage.warning,
-                resetsAt: successResponse.usage.resets_at
-            },
-            lastValidationAt: new Date().toISOString(),
-            planSlug: successResponse.plan_slug,
-            figmaUserIdBound: figmaUserId || '',
-            deviceIdBound: deviceId,
-            lastStatus: 'limit_reached'
-        };
-        await saveLicenseConfig(config);
-
-        return {
-            allowed: false,
-            status: 'limit_reached',
-            message: `Limite mensal atingido (${successResponse.usage.used}/${successResponse.usage.limit}).`,
-            usage: successResponse.usage,
-            planSlug: successResponse.plan_slug,
-            planLabel: getPlanLabel(successResponse.plan_slug)
-        };
+    // Determinar mensagem baseada no mode
+    let message = 'Licença validada com sucesso!';
+    if (data.mode === 'device_bound_now' || data.mode === 'bound_first_time') {
+        message = 'Licença vinculada a este dispositivo com sucesso.';
+    } else if (data.mode === 'already_bound') {
+        message = 'Licença já vinculada a este dispositivo.';
+    } else if (data.mode === 'allowed_extra') {
+        message = 'Licença validada (usuário extra autorizado).';
     }
 
-    // Sucesso!
+    // Salvar configuração (sem usage, que virá via /usage/compile depois)
     const config: LicenseStorageConfig = {
         licenseKey: cleanKey,
         siteDomain: cleanDomain,
         clientId: clientId,
         deviceId: deviceId,
-        lastUsage: {
-            used: successResponse.usage.used,
-            limit: successResponse.usage.limit,
-            warning: successResponse.usage.warning,
-            resetsAt: successResponse.usage.resets_at
-        },
+        lastUsage: null, // Usage info não vem do /validate
         lastValidationAt: new Date().toISOString(),
-        planSlug: successResponse.plan_slug,
+        planSlug: data.plan_slug || null, // Se o endpoint retornar
         figmaUserIdBound: figmaUserId || '',
         deviceIdBound: deviceId,
         lastStatus: 'ok'
     };
     await saveLicenseConfig(config);
 
-    let message = 'Licença validada com sucesso!';
-    if (successResponse.usage.warning === 'soft_limit') {
-        message = `Licença válida. Atenção: ${successResponse.usage.used}/${successResponse.usage.limit} compilações usadas.`;
-    }
-
-    return {
+    // Build result object
+    const result: LicenseCheckResult = {
         allowed: true,
         status: 'ok',
         message,
-        usage: successResponse.usage,
-        planSlug: successResponse.plan_slug,
-        planLabel: getPlanLabel(successResponse.plan_slug)
+        planSlug: data.plan_slug || null
     };
+
+    // Add planLabel only if plan_slug exists
+    if (data.plan_slug) {
+        result.planLabel = getPlanLabel(data.plan_slug);
+    }
+
+    return result;
 }
 
 /**

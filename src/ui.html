@@ -3268,19 +3268,186 @@
         }
       }
 
+      // ============================================================
+      // LICENSE: UI Helpers
+      // ============================================================
+      function setLicenseInputsEnabled(enabled) {
+        const keyInput = document.getElementById('license_key');
+        const domainInput = document.getElementById('license_domain');
+        if (keyInput) keyInput.disabled = !enabled;
+        if (domainInput) domainInput.disabled = !enabled;
+      }
+
+      function setLicenseLoading(isLoading) {
+        const btnText = document.getElementById('license-btn-text');
+        const spinner = document.getElementById('license-spinner');
+        const validateBtn = document.getElementById('btn-license-validate');
+
+        if (btnText) btnText.style.display = isLoading ? 'none' : 'inline';
+        if (spinner) spinner.style.display = isLoading ? 'inline' : 'none';
+        if (validateBtn) validateBtn.disabled = isLoading;
+
+        // Ensure inputs are never disabled during loading, 
+        // effectively allowing user to fix typos even while "validating" 
+        // (though usually we wait, but user requirement is "NEVER permanently disabled")
+        // We will keep them enabled or at least ensure they are enabled on result.
+      }
+
       window.onmessage = (event) => {
         const msg = (event.data || {}).pluginMessage;
         if (!msg) return;
         switch (msg.type) {
-          case 'runtime-health': {
-            const runtimeEl = document.getElementById('runtime-health');
-            if (runtimeEl) {
-              runtimeEl.textContent = msg.status || 'unknown';
-              runtimeEl.dataset.status = msg.status || 'unknown';
-              if (Array.isArray(msg.warnings)) {
-                runtimeEl.dataset.warnings = msg.warnings.join(',');
+          // ... (previous cases omitted)
+
+          // ============================================================
+          // LICENSE: Handlers for license management UI
+          // ============================================================
+          case 'license-validating': {
+            setLicenseLoading(true);
+            // Do NOT disable inputs here to avoid them getting stuck
+            setLicenseInputsEnabled(true);
+            break;
+          }
+
+          case 'license-validate-result': {
+            console.log('[LICENSE UI] Resultado da validação:', msg);
+            setLicenseLoading(false);
+            setLicenseInputsEnabled(true); // Always re-enable inputs
+
+            // Safe property access
+            const success = msg && msg.success === true;
+            const status = (msg && msg.status) || 'error';
+            const message = (msg && msg.message) || (success ? 'Licença ativa.' : 'Erro na validação.');
+
+            // Update message area
+            const msgEl = document.getElementById('license-message');
+            if (msgEl) {
+              msgEl.textContent = message;
+              msgEl.style.color = success ? 'var(--color-success)' : 'var(--color-critical)';
+            }
+
+            // Update status badge
+            const badge = document.getElementById('license-status-badge');
+            if (badge) {
+              badge.style.color = '#fff'; // reset
+              if (success) {
+                badge.textContent = 'Ativa';
+                badge.style.background = 'var(--color-success)';
+              } else if (status === 'limit_reached') {
+                badge.textContent = 'Limite Atingido';
+                badge.style.background = 'var(--color-warning)';
+                badge.style.color = '#000';
+              } else if (status === 'license_user_mismatch') {
+                badge.textContent = 'Conta Diferente';
+                badge.style.background = 'var(--color-critical)';
+              } else if (status === 'device_mismatch') {
+                badge.textContent = 'Outro PC';
+                badge.style.background = 'var(--color-critical)';
+              } else {
+                badge.textContent = 'Inválida';
+                badge.style.background = 'var(--color-critical)';
               }
             }
+
+            // Update status panel if success or if usage info is available
+            if (success || (msg && msg.usage)) {
+              updateLicenseStatusPanel(msg);
+            }
+
+            // Show disconnect button only if success
+            const clearBtn = document.getElementById('btn-license-clear');
+            if (clearBtn) {
+              clearBtn.style.display = success ? 'inline-block' : 'none';
+            }
+
+            addLog(`🔑 Licença: ${message}`, success ? 'success' : 'error');
+            break;
+          }
+
+          case 'license-info': {
+            console.log('[LICENSE UI] Info recebida:', msg);
+            // Ensure inputs are enabled
+            setLicenseInputsEnabled(true);
+
+            // Populate form fields properly
+            const keyInput = document.getElementById('license_key');
+            const domainInput = document.getElementById('license_domain');
+            if (keyInput && msg.licenseKey) keyInput.value = msg.licenseKey;
+            if (domainInput && msg.siteDomain) domainInput.value = msg.siteDomain;
+
+            const status = msg.status || 'not_configured';
+
+            // Update badge
+            const badge = document.getElementById('license-status-badge');
+            if (badge) {
+              badge.style.color = '#fff';
+              if (status === 'ok') {
+                badge.textContent = 'Ativa';
+                badge.style.background = 'var(--color-success)';
+              } else if (status === 'limit_reached') {
+                badge.textContent = 'Limite Atingido';
+                badge.style.background = 'var(--color-warning)';
+                badge.style.color = '#000';
+              } else if (status === 'license_user_mismatch') {
+                badge.textContent = 'Conta Diferente';
+                badge.style.background = 'var(--color-critical)';
+              } else if (status === 'device_mismatch') {
+                badge.textContent = 'Outro PC';
+                badge.style.background = 'var(--color-critical)';
+              } else if (msg.configured) {
+                badge.textContent = 'Verificar';
+                badge.style.background = 'var(--color-surface-alt)';
+                badge.style.color = 'var(--color-text-secondary)';
+              } else {
+                badge.textContent = 'Não configurada';
+                badge.style.background = 'var(--color-active-secondary)'; // Changed from surface-alt to be consistent
+                badge.style.color = 'var(--color-text-secondary)';
+              }
+            }
+
+            // Show status panel and disconnect button if configured
+            if (msg.configured && msg.usage) {
+              updateLicenseStatusPanel(msg);
+            }
+            const clearBtn = document.getElementById('btn-license-clear');
+            if (clearBtn) {
+              clearBtn.style.display = msg.configured ? 'inline-block' : 'none';
+            }
+            break;
+          }
+
+          case 'license-cleared': {
+            console.log('[LICENSE UI] Licença desconectada');
+            setLicenseInputsEnabled(true); // Force enable inputs
+
+            // Reset form
+            const keyInput = document.getElementById('license_key');
+            const domainInput = document.getElementById('license_domain');
+            if (keyInput) keyInput.value = '';
+            if (domainInput) domainInput.value = '';
+
+            // Reset badge
+            const badge = document.getElementById('license-status-badge');
+            if (badge) {
+              badge.textContent = 'Não configurada';
+              badge.style.background = 'var(--color-surface-alt)';
+              badge.style.color = 'var(--color-text-secondary)';
+            }
+
+            // Hide status panel and disconnect button
+            const panel = document.getElementById('license-status-panel');
+            const clearBtn = document.getElementById('btn-license-clear');
+            if (panel) panel.style.display = 'none';
+            if (clearBtn) clearBtn.style.display = 'none';
+
+            // Show message
+            const msgEl = document.getElementById('license-message');
+            if (msgEl) {
+              msgEl.textContent = msg.success ? 'Licença desconectada.' : 'Erro ao desconectar (mas inputs liberados).';
+              msgEl.style.color = 'var(--color-text-secondary)';
+            }
+
+            addLog('🔓 Licença desconectada', 'info');
             break;
           }
           case 'preview':
