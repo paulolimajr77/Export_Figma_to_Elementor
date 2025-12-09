@@ -8,5 +8,11 @@
     "enableProposedApi": false,
     "editorType": [
         "figma"
-    ]
+    ],
+    "networkAccess": {
+        "allowedDomains": [
+            "*"
+        ],
+        "reasoning": "This plugin needs network access to: (1) Validate license keys with our licensing server at figmatoelementor.pljr.com.br, (2) Upload images to WordPress sites configured by the user, (3) Connect to AI providers (Google Gemini, OpenAI) for intelligent layout conversion, (4) Export generated JSON to user's WordPress installations."
+    }
 }

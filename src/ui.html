@@ -222,6 +222,10 @@
       background: var(--color-surface);
       color: var(--color-text);
       border-color: var(--color-border);
+      display: flex !important;
+      align-content: center;
+      justify-content: center;
+      gap: 20px;
     }
 
     .btn.secondary:hover {
@@ -339,6 +343,7 @@
     /* Tabs Navigation */
     .tabs {
       display: flex;
+      flex-wrap: wrap;
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
@@ -410,6 +415,7 @@
 
     .row {
       display: flex;
+      flex-wrap: wrap;
       gap: var(--space-3);
       margin-bottom: var(--space-3);
     }
@@ -419,7 +425,7 @@
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      padding: var(--space-4);
+      padding: var(--space-3);
       margin-bottom: var(--space-4);
       box-shadow: var(--shadow-sm);
     }
@@ -2028,6 +2034,13 @@
         </svg>
         Widgets
       </button>
+      <button class="tab-btn" data-tab="license" title="Gerenciar Licença">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+        </svg>
+        Licença
+      </button>
     </nav>
 
     <main class="tab-panels">
@@ -2364,6 +2377,95 @@
             placeholder="Buscar widget (ex: button, woo, pro)..." autocomplete="off" />
         </div>
         <div id="widget-list-container"></div>
+      </section>
+
+      <!-- ===== LICENSE TAB ===== -->
+      <section class="tab-panel" data-panel="license">
+        <div class="card" style="border-left: 3px solid var(--color-primary);">
+          <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+              fill="var(--color-primary)">
+              <path
+                d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+            </svg>
+            Gerenciamento de Licença
+            <span id="license-status-badge" class="status-badge"
+              style="margin-left: auto; font-size: 10px; padding: 4px 8px; border-radius: 12px; background: var(--color-surface-alt); color: var(--color-text-secondary);">Não
+              configurada</span>
+          </div>
+
+          <p style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 16px; line-height: 1.5;">
+            Para usar o plugin, você precisa de uma licença válida. Insira sua chave de licença e o domínio do site
+            WordPress onde será usado.
+          </p>
+
+          <!-- License Form -->
+          <div id="license-form">
+            <label class="input-label" for="license_key">Chave de Licença</label>
+            <input id="license_key" type="password" autocomplete="off" placeholder="FTEL-XXXXXXXX-XXXX"
+              style="text-transform: uppercase; -webkit-user-select: none; user-select: none; -webkit-text-security: disc;"
+              oncontextmenu="return false;" oncopy="return false;" oncut="return false;" ondrag="return false;" />
+
+            <label class="input-label" for="license_domain" style="margin-top: 12px;">Domínio do Site WordPress</label>
+            <input id="license_domain" type="text" autocomplete="off" placeholder="ex: meusite.com.br" />
+
+            <div class="actions" style="margin-top: 16px;">
+              <button class="btn primary" id="btn-license-validate">
+                <span id="license-btn-text">Validar e Salvar</span>
+                <span id="license-spinner" style="display: none;">⏳ Validando...</span>
+              </button>
+              <button class="btn ghost" id="btn-license-clear" style="display: none;">Desconectar</button>
+            </div>
+          </div>
+
+          <!-- License Status Panel (hidden by default) -->
+          <div id="license-status-panel"
+            style="display: none; margin-top: 16px; padding: 16px; background: var(--color-surface-alt); border-radius: var(--radius-sm);">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <div style="font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px;">Plano</div>
+                <div id="license-plan" style="font-size: 14px; font-weight: 600; color: var(--color-text);">-</div>
+              </div>
+              <div>
+                <div style="font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px;">Status</div>
+                <div id="license-status-text" style="font-size: 14px; font-weight: 600; color: var(--color-success);">-
+                </div>
+              </div>
+              <div>
+                <div style="font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px;">Uso Mensal</div>
+                <div id="license-usage" style="font-size: 14px; font-weight: 600; color: var(--color-text);">-</div>
+              </div>
+              <div>
+                <div style="font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px;">Renova em</div>
+                <div id="license-reset-date" style="font-size: 14px; font-weight: 600; color: var(--color-text);">-
+                </div>
+              </div>
+            </div>
+
+            <!-- Usage Progress Bar -->
+            <div style="margin-top: 12px;">
+              <div style="height: 6px; background: var(--color-border); border-radius: 3px; overflow: hidden;">
+                <div id="license-usage-bar"
+                  style="height: 100%; width: 0%; background: var(--color-primary); transition: width 0.3s ease;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- License Message -->
+          <div id="license-message" class="status" style="margin-top: 12px;"></div>
+        </div>
+
+        <!-- Plans Link Card -->
+        <div class="card" style="margin-top: 12px;">
+          <div class="card-title">Precisa de uma licença?</div>
+          <p style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px;">
+            Adquira seu plano e comece a converter layouts do Figma para Elementor com facilidade.
+          </p>
+          <a href="https://figmatoelementor.pljr.com.br/planos/" target="_blank" class="btn secondary full-width"
+            style="text-align: center; text-decoration: none; display: block;">
+            🛒 Ver Planos e Comprar
+          </a>
+        </div>
       </section>
     </main>
   </div>
@@ -3085,6 +3187,178 @@
             }
             break;
           }
+
+          // ============================================================
+          // LICENSE: Handlers for license management UI
+          // ============================================================
+          case 'license-validating': {
+            // Show loading state
+            const btnText = document.getElementById('license-btn-text');
+            const spinner = document.getElementById('license-spinner');
+            const validateBtn = document.getElementById('btn-license-validate');
+            if (btnText) btnText.style.display = 'none';
+            if (spinner) spinner.style.display = 'inline';
+            if (validateBtn) validateBtn.disabled = true;
+            break;
+          }
+
+          case 'license-validate-result': {
+            console.log('[LICENSE UI] Resultado da validação:', msg);
+
+            // Hide loading state
+            const btnText = document.getElementById('license-btn-text');
+            const spinner = document.getElementById('license-spinner');
+            const validateBtn = document.getElementById('btn-license-validate');
+            if (btnText) btnText.style.display = 'inline';
+            if (spinner) spinner.style.display = 'none';
+            if (validateBtn) validateBtn.disabled = false;
+
+            // Update message area
+            const msgEl = document.getElementById('license-message');
+            if (msgEl) {
+              msgEl.textContent = msg.message || '';
+              msgEl.style.color = msg.success ? 'var(--color-success)' : 'var(--color-critical)';
+            }
+
+            // Update status badge
+            const badge = document.getElementById('license-status-badge');
+            if (badge) {
+              if (msg.success) {
+                badge.textContent = 'Ativa';
+                badge.style.background = 'var(--color-success)';
+                badge.style.color = '#fff';
+              } else if (msg.status === 'limit_reached') {
+                badge.textContent = 'Limite Atingido';
+                badge.style.background = 'var(--color-warning)';
+                badge.style.color = '#000';
+              } else {
+                badge.textContent = 'Inválida';
+                badge.style.background = 'var(--color-critical)';
+                badge.style.color = '#fff';
+              }
+            }
+
+            // Update status panel if success
+            if (msg.success || msg.usage) {
+              updateLicenseStatusPanel(msg);
+            }
+
+            // Show disconnect button if configured
+            const clearBtn = document.getElementById('btn-license-clear');
+            if (clearBtn) {
+              clearBtn.style.display = msg.success ? 'inline-block' : 'none';
+            }
+
+            addLog(`🔑 Licença: ${msg.message}`, msg.success ? 'success' : 'error');
+            break;
+          }
+
+          case 'license-info': {
+            console.log('[LICENSE UI] Info recebida:', msg);
+
+            // Populate form fields
+            const keyInput = document.getElementById('license_key');
+            const domainInput = document.getElementById('license_domain');
+            if (keyInput && msg.licenseKey) keyInput.value = msg.licenseKey;
+            if (domainInput && msg.siteDomain) domainInput.value = msg.siteDomain;
+
+            // Update badge
+            const badge = document.getElementById('license-status-badge');
+            if (badge) {
+              if (msg.status === 'ok') {
+                badge.textContent = 'Ativa';
+                badge.style.background = 'var(--color-success)';
+                badge.style.color = '#fff';
+              } else if (msg.status === 'limit_reached') {
+                badge.textContent = 'Limite Atingido';
+                badge.style.background = 'var(--color-warning)';
+                badge.style.color = '#000';
+              } else if (msg.configured) {
+                badge.textContent = 'Verificar';
+                badge.style.background = 'var(--color-surface-alt)';
+                badge.style.color = 'var(--color-text-secondary)';
+              } else {
+                badge.textContent = 'Não configurada';
+                badge.style.background = 'var(--color-surface-alt)';
+                badge.style.color = 'var(--color-text-secondary)';
+              }
+            }
+
+            // Show status panel and disconnect button if configured
+            if (msg.configured && msg.usage) {
+              updateLicenseStatusPanel(msg);
+            }
+            const clearBtn = document.getElementById('btn-license-clear');
+            if (clearBtn) {
+              clearBtn.style.display = msg.configured ? 'inline-block' : 'none';
+            }
+            break;
+          }
+
+          case 'license-cleared': {
+            console.log('[LICENSE UI] Licença desconectada');
+
+            // Reset form
+            const keyInput = document.getElementById('license_key');
+            const domainInput = document.getElementById('license_domain');
+            if (keyInput) keyInput.value = '';
+            if (domainInput) domainInput.value = '';
+
+            // Reset badge
+            const badge = document.getElementById('license-status-badge');
+            if (badge) {
+              badge.textContent = 'Não configurada';
+              badge.style.background = 'var(--color-surface-alt)';
+              badge.style.color = 'var(--color-text-secondary)';
+            }
+
+            // Hide status panel and disconnect button
+            const panel = document.getElementById('license-status-panel');
+            const clearBtn = document.getElementById('btn-license-clear');
+            if (panel) panel.style.display = 'none';
+            if (clearBtn) clearBtn.style.display = 'none';
+
+            // Show message
+            const msgEl = document.getElementById('license-message');
+            if (msgEl) {
+              msgEl.textContent = msg.success ? 'Licença desconectada.' : 'Erro ao desconectar.';
+              msgEl.style.color = 'var(--color-text-secondary)';
+            }
+
+            addLog('🔓 Licença desconectada', 'info');
+            break;
+          }
+
+          case 'license-blocked': {
+            console.warn('[LICENSE UI] Compilação bloqueada:', msg);
+
+            // Show blocking modal/alert
+            const alertMsg = msg.message + (msg.usage
+              ? `\n\nUso: ${msg.usage.used}/${msg.usage.limit} compilações`
+              : '');
+            alert(`⚠️ Licença Bloqueada\n\n${alertMsg}\n\nAcesse a aba "Licença" para gerenciar.`);
+
+            // Switch to license tab
+            setActiveTab('license');
+
+            addLog(`🚫 ${msg.message}`, 'error');
+            break;
+          }
+
+          case 'license-usage-updated': {
+            console.log('[LICENSE UI] Uso atualizado:', msg.usage);
+            if (msg.usage) {
+              updateLicenseUsageDisplay(msg.usage);
+            }
+            break;
+          }
+
+          case 'open-external-url': {
+            if (msg.url) {
+              window.open(msg.url, '_blank');
+            }
+            break;
+          }
         }
       };
 
@@ -3094,8 +3368,141 @@
       setProvider(fields.provider_ai?.value || 'gemini');
       toggleAIFields(fields.use_ai?.checked !== false);
       send('load-settings');
+      send('license-load'); // Load license info on startup
       setActiveTab('layout');
       if (fields.wp_token) fields.wp_token.setAttribute('type', 'password');
+
+      // ============================================================
+      // LICENSE: Helper Functions
+      // ============================================================
+
+      function formatResetDate(resetsAt) {
+        if (!resetsAt) return 'Indefinido';
+        try {
+          const date = typeof resetsAt === 'number'
+            ? new Date(resetsAt * 1000)
+            : new Date(resetsAt);
+          if (isNaN(date.getTime())) return 'Indefinido';
+          return date.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } catch {
+          return 'Indefinido';
+        }
+      }
+
+      function updateLicenseStatusPanel(data) {
+        const panel = document.getElementById('license-status-panel');
+        if (!panel) return;
+
+        panel.style.display = 'block';
+
+        // Plan
+        const planEl = document.getElementById('license-plan');
+        if (planEl) planEl.textContent = data.planSlug || 'Indefinido';
+
+        // Status
+        const statusEl = document.getElementById('license-status-text');
+        if (statusEl) {
+          if (data.status === 'ok' || data.success) {
+            statusEl.textContent = 'Ativa';
+            statusEl.style.color = 'var(--color-success)';
+          } else if (data.status === 'limit_reached') {
+            statusEl.textContent = 'Limite Atingido';
+            statusEl.style.color = 'var(--color-warning)';
+          } else {
+            statusEl.textContent = 'Inativa';
+            statusEl.style.color = 'var(--color-critical)';
+          }
+        }
+
+        // Usage
+        const usage = data.usage || data.usageSnapshot;
+        if (usage) {
+          updateLicenseUsageDisplay(usage);
+        }
+      }
+
+      function updateLicenseUsageDisplay(usage) {
+        const usageEl = document.getElementById('license-usage');
+        const resetEl = document.getElementById('license-reset-date');
+        const barEl = document.getElementById('license-usage-bar');
+
+        if (usageEl) {
+          usageEl.textContent = `${usage.used || 0} / ${usage.limit || 0}`;
+        }
+
+        if (resetEl) {
+          resetEl.textContent = formatResetDate(usage.resetsAt || usage.resets_at);
+        }
+
+        if (barEl && usage.limit > 0) {
+          const pct = Math.min(100, (usage.used / usage.limit) * 100);
+          barEl.style.width = pct + '%';
+
+          // Color based on usage
+          if (pct >= 90) {
+            barEl.style.background = 'var(--color-critical)';
+          } else if (pct >= 70) {
+            barEl.style.background = 'var(--color-warning)';
+          } else {
+            barEl.style.background = 'var(--color-primary)';
+          }
+        }
+      }
+
+      // ============================================================
+      // LICENSE: Event Listeners
+      // ============================================================
+
+      const btnLicenseValidate = document.getElementById('btn-license-validate');
+      const btnLicenseClear = document.getElementById('btn-license-clear');
+      const licenseKeyInput = document.getElementById('license_key');
+      const licenseDomainInput = document.getElementById('license_domain');
+
+      if (btnLicenseValidate) {
+        btnLicenseValidate.addEventListener('click', () => {
+          const key = licenseKeyInput?.value?.trim() || '';
+          const domain = licenseDomainInput?.value?.trim() || '';
+
+          if (!key) {
+            const msgEl = document.getElementById('license-message');
+            if (msgEl) {
+              msgEl.textContent = 'Por favor, insira uma chave de licença.';
+              msgEl.style.color = 'var(--color-critical)';
+            }
+            return;
+          }
+
+          if (!domain) {
+            const msgEl = document.getElementById('license-message');
+            if (msgEl) {
+              msgEl.textContent = 'Por favor, insira o domínio do site WordPress.';
+              msgEl.style.color = 'var(--color-critical)';
+            }
+            return;
+          }
+
+          send('license-validate', { licenseKey: key, siteDomain: domain });
+        });
+      }
+
+      if (btnLicenseClear) {
+        btnLicenseClear.addEventListener('click', () => {
+          if (confirm('Tem certeza que deseja desconectar a licença?')) {
+            send('license-clear');
+          }
+        });
+      }
+
+      // Auto-uppercase license key input
+      if (licenseKeyInput) {
+        licenseKeyInput.addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase();
+        });
+      }
 
       function toggleResultButtons(enabled) {
         if (btnCopy) btnCopy.disabled = !enabled;

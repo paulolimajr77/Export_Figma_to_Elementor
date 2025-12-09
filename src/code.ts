@@ -14,6 +14,16 @@ import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } 
 import { enforceWidgetTypes } from './services/heuristics';
 import { initializeCompatLayer, safeGet, safeGetArray, safeGetNumber, safeGetString, safeGetBoolean, safeInvoke } from './compat';
 
+// Licensing Module
+import {
+    checkAndConsumeLicenseUsage,
+    validateAndSaveLicense,
+    clearLicenseConfig,
+    getLicenseDisplayInfo,
+    isLicenseConfigured,
+    LICENSE_PLANS_URL
+} from './licensing';
+
 // ============================================================
 // SHADOW MODE V2 - Lint Engine V2 Integration
 // When enabled, runs the new WidgetEngine in parallel with V1
@@ -642,6 +652,35 @@ figma.ui.onmessage = async (msg) => {
         case 'generate-json':
             try {
                 figma.ui.postMessage({ type: 'generation-start' });
+
+                // ====== LICENSE CHECK ======
+                log('Verificando licença...', 'info');
+                const licenseCheck = await checkAndConsumeLicenseUsage();
+
+                if (!licenseCheck.allowed) {
+                    log(`Licença: ${licenseCheck.message}`, 'error');
+                    figma.ui.postMessage({
+                        type: 'license-blocked',
+                        status: licenseCheck.status,
+                        message: licenseCheck.message,
+                        usage: licenseCheck.usage,
+                        plansUrl: LICENSE_PLANS_URL
+                    });
+                    figma.ui.postMessage({ type: 'generation-error', message: licenseCheck.message });
+                    figma.notify(`⚠️ ${licenseCheck.message}`, { timeout: 6000 });
+                    break;
+                }
+
+                // Licença OK - atualizar UI com uso
+                if (licenseCheck.usage) {
+                    figma.ui.postMessage({
+                        type: 'license-usage-updated',
+                        usage: licenseCheck.usage
+                    });
+                }
+                log(`Licença OK: ${licenseCheck.message}`, 'success');
+                // ====== END LICENSE CHECK ======
+
                 const wpConfig = msg.wpConfig as WPConfig | undefined;
                 const debug = !!msg.debug;
                 const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug);
@@ -773,6 +812,88 @@ figma.ui.onmessage = async (msg) => {
 
         case 'reset':
             lastJSON = null;
+            break;
+
+        // ============================================================
+        // LICENSE HANDLERS
+        // ============================================================
+
+        case 'license-validate':
+            try {
+                figma.ui.postMessage({ type: 'license-validating' });
+                const licenseKey = (msg.licenseKey as string) || '';
+                const siteDomain = (msg.siteDomain as string) || '';
+
+                const result = await validateAndSaveLicense(licenseKey, siteDomain);
+
+                figma.ui.postMessage({
+                    type: 'license-validate-result',
+                    success: result.allowed,
+                    status: result.status,
+                    message: result.message,
+                    usage: result.usage,
+                    planSlug: result.planSlug,
+                    plansUrl: LICENSE_PLANS_URL
+                });
+
+                if (result.allowed) {
+                    figma.notify('✅ Licença validada com sucesso!', { timeout: 3000 });
+                } else {
+                    figma.notify(`⚠️ ${result.message}`, { timeout: 5000 });
+                }
+            } catch (error: any) {
+                const errorMsg = (safeGet(error, 'message') as string) || String(error);
+                figma.ui.postMessage({
+                    type: 'license-validate-result',
+                    success: false,
+                    status: 'license_error',
+                    message: errorMsg,
+                    plansUrl: LICENSE_PLANS_URL
+                });
+            }
+            break;
+
+        case 'license-load':
+            try {
+                const info = await getLicenseDisplayInfo();
+                figma.ui.postMessage({
+                    type: 'license-info',
+                    ...info,
+                    plansUrl: LICENSE_PLANS_URL
+                });
+            } catch (error: any) {
+                figma.ui.postMessage({
+                    type: 'license-info',
+                    configured: false,
+                    status: 'error',
+                    plansUrl: LICENSE_PLANS_URL
+                });
+            }
+            break;
+
+        case 'license-clear':
+            try {
+                await clearLicenseConfig();
+                figma.ui.postMessage({
+                    type: 'license-cleared',
+                    success: true
+                });
+                figma.notify('🔓 Licença desconectada.', { timeout: 3000 });
+            } catch (error: any) {
+                figma.ui.postMessage({
+                    type: 'license-cleared',
+                    success: false,
+                    error: (safeGet(error, 'message') as string) || String(error)
+                });
+            }
+            break;
+
+        case 'license-open-plans':
+            // UI abrirá o link externamente
+            figma.ui.postMessage({
+                type: 'open-external-url',
+                url: LICENSE_PLANS_URL
+            });
             break;
 
         case 'resize-ui':

@@ -9184,6 +9184,251 @@ ${detection.justification}
     return compatState;
   }
 
+  // src/licensing/LicenseConfig.ts
+  var LICENSE_BACKEND_URL = "https://figmatoelementor.pljr.com.br";
+  var LICENSE_ENDPOINT = "/wp-json/figtoel/v1/usage/compile";
+  var LICENSE_PLANS_URL = "https://figmatoelementor.pljr.com.br/planos/";
+  var LICENSE_STORAGE_KEY = "figtoel_license_config_v1";
+  var PLUGIN_VERSION = "1.0.0";
+  var ERROR_MESSAGES = {
+    license_not_found: "N\xE3o encontramos essa chave de licen\xE7a. Verifique se digitou corretamente ou adquira um plano.",
+    license_inactive: "Sua licen\xE7a n\xE3o est\xE1 ativa. Regularize seu plano em /planos/.",
+    limit_sites_reached: "Limite m\xE1ximo de sites atingido para esta licen\xE7a. Gerencie seus sites na \xE1rea do cliente.",
+    site_register_error: "N\xE3o foi poss\xEDvel registrar este dom\xEDnio para sua licen\xE7a. Tente novamente ou contate o suporte.",
+    usage_error: "Erro ao registrar uso da licen\xE7a. Tente novamente mais tarde ou contate o suporte.",
+    missing_params: "Dados incompletos. Verifique a chave e o dom\xEDnio.",
+    network_error: "Erro de conex\xE3o com o servidor de licen\xE7as. Verifique sua internet e tente novamente."
+  };
+  function getErrorMessage(code) {
+    return ERROR_MESSAGES[code] || "Erro desconhecido. Contate o suporte.";
+  }
+
+  // src/licensing/LicenseService.ts
+  async function loadLicenseConfig() {
+    try {
+      const stored = await figma.clientStorage.getAsync(LICENSE_STORAGE_KEY);
+      if (!stored) return null;
+      return stored;
+    } catch (e) {
+      console.warn("[LICENSE] Erro ao carregar configura\xE7\xE3o:", e);
+      return null;
+    }
+  }
+  async function saveLicenseConfig(config) {
+    try {
+      await figma.clientStorage.setAsync(LICENSE_STORAGE_KEY, config);
+      console.log("[LICENSE] Configura\xE7\xE3o salva com sucesso");
+    } catch (e) {
+      console.error("[LICENSE] Erro ao salvar configura\xE7\xE3o:", e);
+      throw new Error("N\xE3o foi poss\xEDvel salvar a configura\xE7\xE3o da licen\xE7a.");
+    }
+  }
+  async function clearLicenseConfig() {
+    try {
+      await figma.clientStorage.deleteAsync(LICENSE_STORAGE_KEY);
+      console.log("[LICENSE] Configura\xE7\xE3o removida");
+    } catch (e) {
+      console.warn("[LICENSE] Erro ao limpar configura\xE7\xE3o:", e);
+    }
+  }
+  async function callLicenseEndpoint(request) {
+    const url = `${LICENSE_BACKEND_URL}${LICENSE_ENDPOINT}`;
+    console.log("[LICENSE] Chamando endpoint:", url);
+    console.log("[LICENSE] Payload:", __spreadProps(__spreadValues({}, request), { license_key: "****" + request.license_key.slice(-4) }));
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": `Figma-To-Elementor/${PLUGIN_VERSION}`
+        },
+        body: JSON.stringify(request)
+      });
+      const data = await response.json();
+      console.log("[LICENSE] Resposta:", data);
+      return data;
+    } catch (error) {
+      console.error("[LICENSE] Erro de rede:", error);
+      return {
+        status: "error",
+        code: "network_error",
+        message: error.message || "Erro de conex\xE3o"
+      };
+    }
+  }
+  async function validateAndSaveLicense(licenseKey, siteDomain) {
+    const cleanDomain = siteDomain.replace(/^https?:\/\//, "").replace(/\/+$/, "").toLowerCase().trim();
+    const cleanKey = licenseKey.trim().toUpperCase();
+    if (!cleanKey || !cleanDomain) {
+      return {
+        allowed: false,
+        status: "not_configured",
+        message: "Chave de licen\xE7a e dom\xEDnio s\xE3o obrigat\xF3rios."
+      };
+    }
+    const response = await callLicenseEndpoint({
+      license_key: cleanKey,
+      site_domain: cleanDomain,
+      plugin_version: PLUGIN_VERSION
+    });
+    if (response.status === "error") {
+      const errorResponse = response;
+      const errorMessage = getErrorMessage(errorResponse.code);
+      const config2 = {
+        licenseKey: cleanKey,
+        siteDomain: cleanDomain,
+        pluginVersion: PLUGIN_VERSION,
+        lastStatus: "error",
+        planSlug: null,
+        usageSnapshot: null,
+        lastValidatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      await saveLicenseConfig(config2);
+      return {
+        allowed: false,
+        status: "license_error",
+        message: errorMessage
+      };
+    }
+    const successResponse = response;
+    if (successResponse.status === "limit_reached" || successResponse.usage.status === "limit_reached") {
+      const config2 = {
+        licenseKey: cleanKey,
+        siteDomain: cleanDomain,
+        pluginVersion: PLUGIN_VERSION,
+        lastStatus: "limit_reached",
+        planSlug: successResponse.plan_slug,
+        usageSnapshot: {
+          used: successResponse.usage.used,
+          limit: successResponse.usage.limit,
+          warning: successResponse.usage.warning,
+          resetsAt: successResponse.usage.resets_at
+        },
+        lastValidatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      await saveLicenseConfig(config2);
+      return {
+        allowed: false,
+        status: "limit_reached",
+        message: `Limite mensal atingido (${successResponse.usage.used}/${successResponse.usage.limit} compila\xE7\xF5es).`,
+        usage: successResponse.usage,
+        planSlug: successResponse.plan_slug
+      };
+    }
+    const config = {
+      licenseKey: cleanKey,
+      siteDomain: cleanDomain,
+      pluginVersion: PLUGIN_VERSION,
+      lastStatus: "ok",
+      planSlug: successResponse.plan_slug,
+      usageSnapshot: {
+        used: successResponse.usage.used,
+        limit: successResponse.usage.limit,
+        warning: successResponse.usage.warning,
+        resetsAt: successResponse.usage.resets_at
+      },
+      lastValidatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    await saveLicenseConfig(config);
+    let message = "Licen\xE7a validada com sucesso!";
+    if (successResponse.usage.warning === "soft_limit") {
+      message = `Licen\xE7a v\xE1lida. Aten\xE7\xE3o: voc\xEA j\xE1 usou ${successResponse.usage.used} de ${successResponse.usage.limit} compila\xE7\xF5es este m\xEAs.`;
+    }
+    return {
+      allowed: true,
+      status: "ok",
+      message,
+      usage: successResponse.usage,
+      planSlug: successResponse.plan_slug
+    };
+  }
+  async function checkAndConsumeLicenseUsage() {
+    const config = await loadLicenseConfig();
+    if (!config || !config.licenseKey || !config.siteDomain) {
+      return {
+        allowed: false,
+        status: "not_configured",
+        message: 'Licen\xE7a n\xE3o configurada. Configure sua chave de licen\xE7a na aba "Licen\xE7a".'
+      };
+    }
+    const response = await callLicenseEndpoint({
+      license_key: config.licenseKey,
+      site_domain: config.siteDomain,
+      plugin_version: PLUGIN_VERSION
+    });
+    if (response.status === "error") {
+      const errorResponse = response;
+      const errorCode = errorResponse.code;
+      const errorMessage = getErrorMessage(errorCode);
+      config.lastStatus = "error";
+      config.lastValidatedAt = (/* @__PURE__ */ new Date()).toISOString();
+      await saveLicenseConfig(config);
+      if (errorCode === "network_error") {
+        return {
+          allowed: false,
+          status: "network_error",
+          message: errorMessage
+        };
+      }
+      return {
+        allowed: false,
+        status: "license_error",
+        message: errorMessage
+      };
+    }
+    const successResponse = response;
+    config.lastStatus = successResponse.status === "limit_reached" ? "limit_reached" : "ok";
+    config.planSlug = successResponse.plan_slug;
+    config.usageSnapshot = {
+      used: successResponse.usage.used,
+      limit: successResponse.usage.limit,
+      warning: successResponse.usage.warning,
+      resetsAt: successResponse.usage.resets_at
+    };
+    config.lastValidatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    await saveLicenseConfig(config);
+    if (successResponse.status === "limit_reached" || successResponse.usage.status === "limit_reached") {
+      return {
+        allowed: false,
+        status: "limit_reached",
+        message: `Limite mensal de compila\xE7\xF5es atingido (${successResponse.usage.used}/${successResponse.usage.limit}). Renova em breve.`,
+        usage: successResponse.usage,
+        planSlug: successResponse.plan_slug
+      };
+    }
+    let message = `Compila\xE7\xE3o autorizada (${successResponse.usage.used}/${successResponse.usage.limit} este m\xEAs).`;
+    return {
+      allowed: true,
+      status: "ok",
+      message,
+      usage: successResponse.usage,
+      planSlug: successResponse.plan_slug
+    };
+  }
+  async function getLicenseDisplayInfo() {
+    const config = await loadLicenseConfig();
+    if (!config) {
+      return {
+        configured: false,
+        licenseKey: "",
+        siteDomain: "",
+        planSlug: null,
+        usage: null,
+        status: "not_configured",
+        lastValidated: null
+      };
+    }
+    return {
+      configured: true,
+      licenseKey: config.licenseKey,
+      siteDomain: config.siteDomain,
+      planSlug: config.planSlug,
+      usage: config.usageSnapshot,
+      status: config.lastStatus,
+      lastValidated: config.lastValidatedAt
+    };
+  }
+
   // src/engine/zone-detector.ts
   function detectZone(nodeY, rootHeight) {
     if (!rootHeight || rootHeight <= 0) {
@@ -9999,6 +10244,28 @@ ${detection.justification}
       case "generate-json":
         try {
           figma.ui.postMessage({ type: "generation-start" });
+          log("Verificando licen\xE7a...", "info");
+          const licenseCheck = await checkAndConsumeLicenseUsage();
+          if (!licenseCheck.allowed) {
+            log(`Licen\xE7a: ${licenseCheck.message}`, "error");
+            figma.ui.postMessage({
+              type: "license-blocked",
+              status: licenseCheck.status,
+              message: licenseCheck.message,
+              usage: licenseCheck.usage,
+              plansUrl: LICENSE_PLANS_URL
+            });
+            figma.ui.postMessage({ type: "generation-error", message: licenseCheck.message });
+            figma.notify(`\u26A0\uFE0F ${licenseCheck.message}`, { timeout: 6e3 });
+            break;
+          }
+          if (licenseCheck.usage) {
+            figma.ui.postMessage({
+              type: "license-usage-updated",
+              usage: licenseCheck.usage
+            });
+          }
+          log(`Licen\xE7a OK: ${licenseCheck.message}`, "success");
           const wpConfig = msg.wpConfig;
           const debug2 = !!msg.debug;
           const { elementorJson, debugInfo } = await generateElementorJSON(msg, wpConfig, debug2);
@@ -10120,6 +10387,79 @@ ${detection.justification}
         break;
       case "reset":
         lastJSON = null;
+        break;
+      // ============================================================
+      // LICENSE HANDLERS
+      // ============================================================
+      case "license-validate":
+        try {
+          figma.ui.postMessage({ type: "license-validating" });
+          const licenseKey = msg.licenseKey || "";
+          const siteDomain = msg.siteDomain || "";
+          const result = await validateAndSaveLicense(licenseKey, siteDomain);
+          figma.ui.postMessage({
+            type: "license-validate-result",
+            success: result.allowed,
+            status: result.status,
+            message: result.message,
+            usage: result.usage,
+            planSlug: result.planSlug,
+            plansUrl: LICENSE_PLANS_URL
+          });
+          if (result.allowed) {
+            figma.notify("\u2705 Licen\xE7a validada com sucesso!", { timeout: 3e3 });
+          } else {
+            figma.notify(`\u26A0\uFE0F ${result.message}`, { timeout: 5e3 });
+          }
+        } catch (error) {
+          const errorMsg = safeGet(error, "message") || String(error);
+          figma.ui.postMessage({
+            type: "license-validate-result",
+            success: false,
+            status: "license_error",
+            message: errorMsg,
+            plansUrl: LICENSE_PLANS_URL
+          });
+        }
+        break;
+      case "license-load":
+        try {
+          const info = await getLicenseDisplayInfo();
+          figma.ui.postMessage(__spreadProps(__spreadValues({
+            type: "license-info"
+          }, info), {
+            plansUrl: LICENSE_PLANS_URL
+          }));
+        } catch (error) {
+          figma.ui.postMessage({
+            type: "license-info",
+            configured: false,
+            status: "error",
+            plansUrl: LICENSE_PLANS_URL
+          });
+        }
+        break;
+      case "license-clear":
+        try {
+          await clearLicenseConfig();
+          figma.ui.postMessage({
+            type: "license-cleared",
+            success: true
+          });
+          figma.notify("\u{1F513} Licen\xE7a desconectada.", { timeout: 3e3 });
+        } catch (error) {
+          figma.ui.postMessage({
+            type: "license-cleared",
+            success: false,
+            error: safeGet(error, "message") || String(error)
+          });
+        }
+        break;
+      case "license-open-plans":
+        figma.ui.postMessage({
+          type: "open-external-url",
+          url: LICENSE_PLANS_URL
+        });
         break;
       case "resize-ui":
         const targetWidth = safeGetNumber(msg, "width", 0);
