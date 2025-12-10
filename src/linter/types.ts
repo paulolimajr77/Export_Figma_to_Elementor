@@ -34,7 +34,7 @@ export interface WidgetDetection {
     confidence: number; // 0-1
     justification: string;
     semanticRole?: string;
-    source?: 'explicit-name' | 'heuristic' | 'ai' | 'implicit-pattern';
+    source?: 'explicit-name' | 'heuristic' | 'ai' | 'composite';
     properties?: Record<string, any>;
     visualWrapperStyle?: Record<string, any>;
     // Composite/slots metadata (icon-box, icon-list, form, etc.)

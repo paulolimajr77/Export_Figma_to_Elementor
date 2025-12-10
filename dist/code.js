@@ -7536,7 +7536,9 @@ ${refText}` });
         const explicitWidget = rawName.split(/\s/)[0];
         const normalized = normalizeWidgetSlug(explicitWidget);
         if (!normalized) {
-          console.debug("[WIDGET DETECTOR] explicit-name fora da taxonomia, ignorando:", explicitWidget);
+          if (typeof console !== "undefined" && typeof console.log === "function") {
+            console.log("[WIDGET DETECTOR] explicit-name fora da taxonomia, ignorando:", explicitWidget);
+          }
           return null;
         }
         return {
@@ -7590,7 +7592,8 @@ ${refText}` });
       const isIconBox = iconBoxSlug && (name.startsWith("w:icon-box") || this.looksLikeIconBox(node));
       if (isIconBox) {
         const slots = this.extractIconBoxSlots(node, alreadyConsumed);
-        if (slots.icon || slots.title || slots.text) {
+        const hasBodyText = slots.text ? this.hasTextBody(node, slots.text) : false;
+        if (slots.icon && slots.title && slots.text && hasBodyText) {
           const consumedIds = Object.values(slots).filter(Boolean);
           return {
             detection: {
@@ -7598,8 +7601,8 @@ ${refText}` });
               node_name: node.name,
               widget: iconBoxSlug,
               confidence: 1,
-              justification: "Composite icon-box detectado (\xC3\xADcone + heading + texto)",
-              source: name.startsWith("w:") ? "explicit-name" : "heuristic",
+              justification: "Composite icon-box detectado (icone + heading + texto)",
+              source: "composite",
               semanticRole: "icon-box",
               compositeOf: consumedIds,
               slots: __spreadValues(__spreadValues(__spreadValues({}, slots.icon ? { icon: slots.icon } : {}), slots.title ? { title: slots.title } : {}), slots.text ? { text: slots.text } : {})
@@ -7620,8 +7623,8 @@ ${refText}` });
               node_name: node.name,
               widget: iconListSlug,
               confidence: name.startsWith("w:") ? 1 : score,
-              justification: `Composite icon-list detectado (itens com \xC3\xADcone + texto, score=${score.toFixed(2)})`,
-              source: name.startsWith("w:") ? "explicit-name" : "implicit-pattern",
+              justification: `Composite icon-list detectado (itens com icone + texto, score=${score.toFixed(2)})`,
+              source: "composite",
               semanticRole: "icon-list",
               repeaterItems: repeater,
               compositeOf: consumedIds
@@ -7648,7 +7651,7 @@ ${refText}` });
               widget: formSlug,
               confidence: name.startsWith("w:") ? 1 : score,
               justification: `Composite form detectado (campos + labels + auxiliares, score=${score.toFixed(2)})`,
-              source: name.startsWith("w:") ? "explicit-name" : "implicit-pattern",
+              source: "composite",
               semanticRole: "form",
               compositeOf: consumedIds,
               slots: __spreadValues(__spreadValues({}, slots.titleSlot ? { title: slots.titleSlot } : {}), slots.descriptionSlot ? { description: slots.descriptionSlot } : {}),
@@ -7736,6 +7739,15 @@ ${refText}` });
         }
       }
       return { icon: iconId, title: titleId, text: textId };
+    }
+    hasTextBody(root, textId) {
+      var _a;
+      const target = this.findNodeById(root, textId);
+      if (target && target.type === "TEXT" && "characters" in target) {
+        const len = ((_a = target.characters) == null ? void 0 : _a.length) || 0;
+        return len >= 15;
+      }
+      return false;
     }
     extractIconListItems(node, alreadyConsumed) {
       const children = "children" in node && node.children ? node.children : [];
@@ -7994,6 +8006,7 @@ ${refText}` });
       if (visual.aspectRatio > 1.5 && visual.aspectRatio < 6) visualMatch += 0.3;
       if (visual.hasBackground || visual.hasBorder) visualMatch += 0.4;
       if (visual.textCount === 1 && visual.avgTextLength < 30) visualMatch += 0.3;
+      if (visual.textCount === 0) return 0;
       if (visual.hasIcon) visualMatch += 0.2;
       let contentMatch = 0;
       if (visual.textCount >= 1 && visual.textCount <= 2) contentMatch = 1;
@@ -9098,8 +9111,50 @@ ${refText}` });
     if (normalized && VALID_WIDGET_SLUGS.has(normalized)) return true;
     return VALID_WIDGET_SLUGS.has(slug.trim());
   }
+  function getCanonicalName(slug) {
+    if (!slug) return null;
+    const normalized = normalizeWidgetSlug(slug);
+    if (normalized && VALID_WIDGET_SLUGS.has(normalized)) {
+      return normalized.startsWith("w:") || normalized.startsWith("woo:") || normalized.startsWith("loop:") ? normalized : normalized;
+    }
+    if (VALID_WIDGET_SLUGS.has(slug.trim())) return slug.trim();
+    return null;
+  }
   function isValidContainerName(name) {
     return isValidWidgetSlug(name);
+  }
+  function getAlternativesForSlug(slug, context) {
+    const canonical = getCanonicalName(slug);
+    if (!canonical) return [];
+    const suggestions = [canonical];
+    const add = (candidate) => {
+      const canon = getCanonicalName(candidate);
+      if (canon && canon !== canonical && !suggestions.includes(canon)) {
+        suggestions.push(canon);
+      }
+    };
+    const role = (context == null ? void 0 : context.semanticRole) || (context == null ? void 0 : context.containerRole);
+    if (canonical === "icon-box") {
+      add("image-box");
+      add("w:container");
+    } else if (canonical === "image-box" || canonical === "image") {
+      add("w:container");
+    } else if (canonical === "form") {
+      add("w:container");
+      add("w:inner-container");
+    } else if (canonical === "heading") {
+      add("text");
+      add("text-editor");
+    } else if (canonical === "text" || canonical === "text-editor") {
+      add("heading");
+    } else if (canonical === "w:container" || canonical === "w:inner-container") {
+      if (role === "hero") add("w:container");
+      add("w:inner-container");
+    } else if (canonical === "button") {
+      add("icon");
+      add("heading");
+    }
+    return suggestions.slice(0, 5).filter(isValidWidgetSlug);
   }
 
   // src/linter/rules/naming/WidgetNamingRule.ts
@@ -9133,7 +9188,7 @@ ${refText}` });
       const currentName = node.name || "";
       const isCorrectlyNamed = currentName.toLowerCase().includes(canonicalWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
       if (isCorrectlyNamed) return null;
-      const options = this.buildOptionsForNode(node, canonicalWidget);
+      const options = this.buildOptionsForNode(node, canonicalWidget, detection);
       if (!options.length) return null;
       const [recommendedName, ...alternatives] = options;
       const justification = this.buildJustification(detection, canonicalWidget);
@@ -9163,16 +9218,12 @@ ${refText}` });
       }
       return this.detector.detect(node);
     }
-    buildOptionsForNode(node, canonicalWidget) {
-      const pools = [];
-      if (node.type === "TEXT") {
-        pools.push(...getTextWidgetNames());
-      } else if (node.type === "RECTANGLE") {
-        pools.push(...getMediaWidgetNames());
-      } else if (node.type === "FRAME" || node.type === "GROUP") {
-        pools.push(...getContainerWidgetNames(), ...getMediaWidgetNames());
-      }
-      const ordered = [canonicalWidget, ...pools];
+    buildOptionsForNode(node, canonicalWidget, detection) {
+      const alternatives = getAlternativesForSlug(canonicalWidget, {
+        semanticRole: detection.semanticRole,
+        containerRole: void 0
+      });
+      const ordered = [canonicalWidget, ...alternatives];
       return filterValidWidgetNames(ordered).filter((name) => isValidWidgetSlug(name));
     }
     toTaxonomySlug(widget) {
@@ -9557,14 +9608,23 @@ ${justification}
       __publicField(this, "severity", "major");
       __publicField(this, "detector", new ContainerRoleDetector());
       __publicField(this, "detections", /* @__PURE__ */ new Map());
+      __publicField(this, "widgetDetections", /* @__PURE__ */ new Map());
     }
     setDetectionMap(map) {
       this.detections = map;
     }
+    setWidgetMap(map) {
+      this.widgetDetections = map;
+    }
     async validate(node) {
+      var _a;
       if (node.type !== "FRAME" && node.type !== "GROUP") return null;
       const detection = this.getDetectionForNode(node);
       if (!detection) return null;
+      const widgetDet = (_a = this.widgetDetections) == null ? void 0 : _a.get(node.id);
+      if (widgetDet && widgetDet.confidence >= 0.7) {
+        return null;
+      }
       const currentName = node.name || "";
       if (this.nameAlreadyContainsRole(currentName, detection.role)) {
         return null;
@@ -12151,9 +12211,10 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
           log("Relat\xF3rio gerado com sucesso", "info");
           log(`Total de issues: ${report.analysis.length}`, "info");
           log(`Total de widgets detectados: ${report.widgets.length}`, "info");
+          const safeReport = JSON.parse(JSON.stringify(report));
           figma.ui.postMessage({
             type: "linter-report",
-            payload: report
+            payload: safeReport
           });
           console.log("[LINTER] \u2705 Mensagem enviada para UI");
           log(`An\xE1lise conclu\xEDda: ${report.summary.total} problemas encontrados`, "success");

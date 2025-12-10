@@ -10,9 +10,14 @@ export class ContainerNamingRule implements Rule {
 
     private detector = new ContainerRoleDetector();
     private detections: Map<string, ContainerRoleDetection> = new Map();
+    private widgetDetections: Map<string, any> = new Map();
 
     setDetectionMap(map: Map<string, ContainerRoleDetection>) {
         this.detections = map;
+    }
+
+    setWidgetMap(map: Map<string, any>) {
+        this.widgetDetections = map;
     }
 
     async validate(node: SceneNode): Promise<LintResult | null> {
@@ -20,6 +25,12 @@ export class ContainerNamingRule implements Rule {
 
         const detection = this.getDetectionForNode(node);
         if (!detection) return null;
+
+        const widgetDet = this.widgetDetections?.get(node.id);
+        if (widgetDet && widgetDet.confidence >= 0.7) {
+            // Já tratado como widget com alta confiança; evita conflito de naming
+            return null;
+        }
 
         const currentName = node.name || '';
         if (this.nameAlreadyContainsRole(currentName, detection.role)) {

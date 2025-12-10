@@ -1092,9 +1092,10 @@ figma.ui.onmessage = async (msg) => {
                 log(`Total de issues: ${report.analysis.length}`, 'info');
                 log(`Total de widgets detectados: ${report.widgets.length}`, 'info');
 
+                const safeReport = JSON.parse(JSON.stringify(report));
                 figma.ui.postMessage({
                     type: 'linter-report',
-                    payload: report
+                    payload: safeReport
                 });
 
                 console.log('[LINTER] ✅ Mensagem enviada para UI');

@@ -529,7 +529,9 @@ export class WidgetDetector {
             const explicitWidget = rawName.split(/\s/)[0]; // preserva prefixo original
             const normalized = normalizeWidgetSlug(explicitWidget);
             if (!normalized) {
-                console.debug('[WIDGET DETECTOR] explicit-name fora da taxonomia, ignorando:', explicitWidget);
+                if (typeof console !== 'undefined' && typeof console.log === 'function') {
+                    console.log('[WIDGET DETECTOR] explicit-name fora da taxonomia, ignorando:', explicitWidget);
+                }
                 return null;
             }
             return {
@@ -593,7 +595,8 @@ export class WidgetDetector {
         const isIconBox = iconBoxSlug && (name.startsWith('w:icon-box') || this.looksLikeIconBox(node));
         if (isIconBox) {
             const slots = this.extractIconBoxSlots(node, alreadyConsumed);
-            if (slots.icon || slots.title || slots.text) {
+            const hasBodyText = slots.text ? this.hasTextBody(node, slots.text) : false;
+            if (slots.icon && slots.title && slots.text && hasBodyText) {
                 const consumedIds = Object.values(slots).filter(Boolean) as string[];
                 return {
                     detection: {
@@ -601,8 +604,8 @@ export class WidgetDetector {
                         node_name: node.name,
                         widget: iconBoxSlug,
                         confidence: 1.0,
-                        justification: 'Composite icon-box detectado (Ã­cone + heading + texto)',
-                        source: name.startsWith('w:') ? 'explicit-name' : 'heuristic',
+                        justification: 'Composite icon-box detectado (icone + heading + texto)',
+                        source: 'composite',
                         semanticRole: 'icon-box',
                         compositeOf: consumedIds,
                         slots: {
@@ -616,7 +619,7 @@ export class WidgetDetector {
             }
         }
 
-        // ICON-LIST (explÃ­cito ou padrÃ£o implÃ­cito)
+        // ICON-LIST (explicit or implicit pattern)
         const isIconList = iconListSlug && (name.startsWith('w:icon-list') || this.looksLikeIconList(node, alreadyConsumed));
         if (isIconList) {
             const repeater = this.extractIconListItems(node, alreadyConsumed);
@@ -629,8 +632,8 @@ export class WidgetDetector {
                         node_name: node.name,
                         widget: iconListSlug,
                         confidence: name.startsWith('w:') ? 1.0 : score,
-                        justification: `Composite icon-list detectado (itens com Ã­cone + texto, score=${score.toFixed(2)})`,
-                        source: name.startsWith('w:') ? 'explicit-name' : 'implicit-pattern',
+                        justification: `Composite icon-list detectado (itens com icone + texto, score=${score.toFixed(2)})`,
+                        source: 'composite',
                         semanticRole: 'icon-list',
                         repeaterItems: repeater,
                         compositeOf: consumedIds
@@ -640,7 +643,7 @@ export class WidgetDetector {
             }
         }
 
-        // FORM (explÃ­cito ou padrÃ£o implÃ­cito)
+        // FORM (explicit or implicit pattern)
         const isForm = formSlug && (name.startsWith('w:form') || this.looksLikeForm(node, alreadyConsumed));
         if (isForm) {
             const slots = this.extractFormSlots(node, alreadyConsumed);
@@ -659,7 +662,7 @@ export class WidgetDetector {
                         widget: formSlug,
                         confidence: name.startsWith('w:') ? 1.0 : score,
                         justification: `Composite form detectado (campos + labels + auxiliares, score=${score.toFixed(2)})`,
-                        source: name.startsWith('w:') ? 'explicit-name' : 'implicit-pattern',
+                        source: 'composite',
                         semanticRole: 'form',
                         compositeOf: consumedIds,
                         slots: {
@@ -760,6 +763,15 @@ export class WidgetDetector {
         }
 
         return { icon: iconId, title: titleId, text: textId };
+    }
+
+    private hasTextBody(root: SceneNode, textId: string): boolean {
+        const target = this.findNodeById(root, textId);
+        if (target && target.type === 'TEXT' && 'characters' in target) {
+            const len = (target as any).characters?.length || 0;
+            return len >= 15;
+        }
+        return false;
     }
 
     private extractIconListItems(node: SceneNode, alreadyConsumed: Set<string>): Array<{ itemId: string; iconId?: string; textId?: string }> {
@@ -1079,6 +1091,8 @@ export class WidgetDetector {
         if (visual.hasBackground || visual.hasBorder) visualMatch += 0.4;
         // Buttons usually have short text
         if (visual.textCount === 1 && visual.avgTextLength < 30) visualMatch += 0.3;
+        // Se não há texto, evite classificar como botão
+        if (visual.textCount === 0) return 0;
         // Buttons can have icons
         if (visual.hasIcon) visualMatch += 0.2;
 

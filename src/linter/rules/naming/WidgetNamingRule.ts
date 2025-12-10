@@ -8,7 +8,7 @@ import {
     normalizeWidgetSlug,
     isWidgetInTaxonomy
 } from '../../config/widget-taxonomy';
-import { getCanonicalName, isValidWidgetSlug } from '../../namingTaxonomy';
+import { getAlternativesForSlug, getCanonicalName, isValidWidgetSlug } from '../../namingTaxonomy';
 
 /**
  * Regra: Widget Detection & Naming
@@ -54,7 +54,7 @@ export class WidgetNamingRule implements Rule {
             currentName.startsWith('loop:');
         if (isCorrectlyNamed) return null;
 
-        const options = this.buildOptionsForNode(node, canonicalWidget);
+        const options = this.buildOptionsForNode(node, canonicalWidget, detection);
         if (!options.length) return null;
         const [recommendedName, ...alternatives] = options;
         const justification = this.buildJustification(detection, canonicalWidget);
@@ -87,16 +87,12 @@ export class WidgetNamingRule implements Rule {
         return this.detector.detect(node);
     }
 
-    private buildOptionsForNode(node: SceneNode, canonicalWidget: string): string[] {
-        const pools: string[] = [];
-        if (node.type === 'TEXT') {
-            pools.push(...getTextWidgetNames());
-        } else if (node.type === 'RECTANGLE') {
-            pools.push(...getMediaWidgetNames());
-        } else if (node.type === 'FRAME' || node.type === 'GROUP') {
-            pools.push(...getContainerWidgetNames(), ...getMediaWidgetNames());
-        }
-        const ordered = [canonicalWidget, ...pools];
+    private buildOptionsForNode(node: SceneNode, canonicalWidget: string, detection: WidgetDetection): string[] {
+        const alternatives = getAlternativesForSlug(canonicalWidget, {
+            semanticRole: detection.semanticRole,
+            containerRole: undefined
+        });
+        const ordered = [canonicalWidget, ...alternatives];
         return filterValidWidgetNames(ordered).filter(name => isValidWidgetSlug(name));
     }
 
