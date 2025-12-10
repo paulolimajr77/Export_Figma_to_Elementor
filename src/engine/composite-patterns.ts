@@ -107,8 +107,20 @@ const CardPattern: CompositePatternRule = {
         if (counts['button']) confidence += 0.10;
         if (node.children.length >= 3 && node.children.length <= 5) confidence += 0.10;
 
-        // Determine type: image-box if has image, icon-box if has icon without image
-        const targetType = (counts['image'] || 0) > 0 ? 'w:image-box' : 'w:icon-box';
+        // Determine type: image-box vs icon-box usando proporção do visual principal
+        const visualChild = (node.children || []).find(c =>
+            c.type === 'w:image' || c.type === 'image' || c.type === 'w:icon' || c.type === 'icon'
+        );
+        const visualW = visualChild?.features?.width || 0;
+        const visualH = visualChild?.features?.height || 0;
+        const parentW = node.features.width || 0;
+        const parentH = node.features.height || 0;
+        const widthRatio = parentW > 0 ? visualW / parentW : 0;
+        const heightRatio = parentH > 0 ? visualH / parentH : 0;
+
+        // Se o visual ocupa grande parte do card, trate como image-box; se for pequeno, icon-box.
+        const looksLikeImageBox = widthRatio >= 0.7 || heightRatio >= 0.5;
+        const targetType = looksLikeImageBox ? 'w:image-box' : 'w:icon-box';
 
         if (confidence >= 0.75) {
             logComposite(node.id, 'card', targetType, confidence);

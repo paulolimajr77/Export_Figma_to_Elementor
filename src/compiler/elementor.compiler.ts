@@ -140,7 +140,7 @@ export class ElementorCompiler {
 
         // Only set padding if at least one value is non-zero
         if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
-            settings.padding = {
+            const paddingValue = {
                 unit: 'px',
                 top: pTop,
                 right: pRight,
@@ -148,6 +148,9 @@ export class ElementorCompiler {
                 left: pLeft,
                 isLinked: pTop === pRight && pTop === pBottom && pTop === pLeft
             };
+            settings.padding = paddingValue;
+            // Mirror to _padding so Elementor UI exibe o padding correto no container raiz
+            (settings as any)._padding = paddingValue;
         }
 
         if (styles.background) {
@@ -370,6 +373,26 @@ export class ElementorCompiler {
         // Fallback simples
         let widgetType: string = widget.type;
         const settings: ElementorSettings = { ...baseSettings };
+
+        // Nunca usar HTML como fallback para cards reconhecidos (icon-box/image-box)
+        if (widget.type === 'icon-box' || widget.type === 'image-box') {
+            return {
+                id: widgetId,
+                elType: 'widget',
+                isInner: false,
+                isLocked: false,
+                widgetType: widget.type,
+                settings: {
+                    ...settings,
+                    title_text: widget.content || settings.title_text || '',
+                    description_text: settings.description_text || '',
+                    selected_icon: settings.selected_icon || { value: 'fas fa-star', library: 'fa-solid' },
+                    image: settings.image
+                },
+                defaultEditSettings: { defaultEditRoute: 'content' },
+                elements: []
+            };
+        }
 
         switch (widget.type) {
             case 'heading':

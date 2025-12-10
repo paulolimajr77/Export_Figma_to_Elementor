@@ -1775,7 +1775,7 @@ function extractTypographyFromTextNode(node: SerializedNode): TypographyStyles |
  * @param node - Figma frame node (serialized)
  * @returns CSS string with selector placeholder or null
  */
-function generateCardCustomCSSFromNode(node: SerializedNode): string | null {
+export function generateCardCustomCSSFromNode(node: SerializedNode): string | null {
     const nodeAny = node as any;
     const cssRules: string[] = [];
 
@@ -1797,17 +1797,27 @@ function generateCardCustomCSSFromNode(node: SerializedNode): string | null {
         return `${type}, ${stops})`;
     };
 
-    // Background (solid or gradient)
+    // Background: keep solid and gradient separate so gradient stays visible
+    let solidColor: string | undefined;
+    const gradients: string[] = [];
     if (nodeAny.fills && Array.isArray(nodeAny.fills)) {
-        const visibleFill = nodeAny.fills.find((f: any) => f.visible !== false);
-        if (visibleFill) {
-            if ((visibleFill.type === 'GRADIENT_LINEAR' || visibleFill.type === 'GRADIENT_RADIAL') && visibleFill.gradientStops) {
-                const grad = gradientToCss(visibleFill);
-                if (grad) cssRules.push(`background: ${grad}`);
-            } else if (visibleFill.type === 'SOLID' && visibleFill.color) {
-                cssRules.push(`background: ${toRgba(visibleFill.color, visibleFill.opacity)}`);
+        const visibleFills = nodeAny.fills.filter((f: any) => f.visible !== false);
+        for (const fill of visibleFills) {
+            if ((fill.type === 'GRADIENT_LINEAR' || fill.type === 'GRADIENT_RADIAL') && fill.gradientStops) {
+                const grad = gradientToCss(fill);
+                if (grad) gradients.push(grad);
+            } else if (fill.type === 'SOLID' && fill.color && solidColor === undefined) {
+                solidColor = toRgba(fill.color, fill.opacity);
             }
         }
+    }
+    if (solidColor && gradients.length > 0) {
+        cssRules.push(`background-color: ${solidColor}`);
+        cssRules.push(`background-image: ${gradients.join(', ')}`);
+    } else if (gradients.length > 0) {
+        cssRules.push(`background: ${gradients.join(', ')}`);
+    } else if (solidColor) {
+        cssRules.push(`background: ${solidColor}`);
     }
 
     // Border from strokes (uniform)
@@ -1826,21 +1836,22 @@ function generateCardCustomCSSFromNode(node: SerializedNode): string | null {
         cssRules.push(`overflow: hidden`);
     }
 
-    // Padding (maps to Advanced → padding in Elementor when using selector)
-    const paddings = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
-        .map(k => toNumber(nodeAny[k]) ?? 0);
-    if (paddings.some(v => v && v > 0)) {
-        const [pt, pr, pb, pl] = paddings;
-        cssRules.push(`padding: ${pt}px ${pr}px ${pb}px ${pl}px`);
-    }
-
-    // Gap (as row/column gap for flex containers)
-    const gap = toNumber(nodeAny.itemSpacing);
-    if (gap !== null && gap > 0) {
-        cssRules.push(`row-gap: ${gap}px`);
-        cssRules.push(`column-gap: ${gap}px`);
+    // Box shadow (visual only, never layout)
+    if (Array.isArray(nodeAny.effects)) {
+        const dropShadow = nodeAny.effects.find((e: any) => e.type === 'DROP_SHADOW' && e.visible !== false);
+        if (dropShadow && dropShadow.color) {
+            const { r = 0, g = 0, b = 0, a = 1 } = dropShadow.color;
+            const x = toNumber(dropShadow.offset?.x) ?? 0;
+            const y = toNumber(dropShadow.offset?.y) ?? 0;
+            const blur = toNumber(dropShadow.radius) ?? 0;
+            const spread = toNumber(dropShadow.spread) ?? 0;
+            cssRules.push(`box-shadow: ${x}px ${y}px ${blur}px ${spread}px rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`);
+        }
     }
 
     if (cssRules.length === 0) return null;
-    return `selector {\n  ${cssRules.join(';\n  ')};\n}`;
+    return `selector {
+  ${cssRules.join(';\n  ')};
+}`;
 }
+

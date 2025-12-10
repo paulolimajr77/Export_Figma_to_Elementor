@@ -71,4 +71,40 @@ describe('Compósitos absorvem background decorativo', () => {
         expect(det?.consumedBackgroundIds).toContain('bg');
         expect(map.has('bg')).toBe(false);
     });
+
+    it('absorve rectangle decorativo dentro de w:icon (FRAME) sem emitir widget', () => {
+        const detector = new WidgetDetector();
+        const bg = makeRect({ id: 'bg-inner', fills: [{ type: 'SOLID' }], children: [], parentId: 'icon-frame' });
+        const vectorIcon = { id: 'vec', name: 'shape', type: 'VECTOR', parentId: 'icon-frame', width: 24, height: 24, children: [] } as unknown as SceneNode;
+        const iconFrame = {
+            id: 'icon-frame',
+            name: 'w:icon',
+            type: 'FRAME',
+            children: [bg, vectorIcon],
+            width: 40,
+            height: 40,
+            parentId: 'f2',
+            fills: [],
+            strokes: []
+        } as unknown as SceneNode;
+        const title = makeText('t3', 'Heading');
+        const body = makeText('t4', 'Texto de descrição longo o bastante');
+        const frame = {
+            id: 'f2',
+            name: 'w:icon-box',
+            type: 'FRAME',
+            children: [iconFrame, title, body],
+            width: 200,
+            height: 120,
+            parentId: 'root',
+            fills: [],
+            strokes: []
+        } as unknown as SceneNode;
+
+        const map = detector.detectAll(frame);
+        const det = map.get('f2');
+        expect(det?.widget).toBe('w:icon-box');
+        expect(det?.consumedBackgroundIds).toContain('bg-inner');
+        expect(map.has('bg-inner')).toBe(false);
+    });
 });

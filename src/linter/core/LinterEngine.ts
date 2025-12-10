@@ -20,6 +20,7 @@ export class LinterEngine {
     private textBlockDetections: Map<string, TextBlockInfo> = new Map();
     private containerRoleDetector = new ContainerRoleDetector();
     private containerRoleDetections: Map<string, ContainerRoleDetection> = new Map();
+    private lockedImageNodes: Set<string> = new Set();
     private readonly debug = LINTER_DEBUG;
 
     /**
@@ -35,6 +36,7 @@ export class LinterEngine {
 
         // Pr?-processa detec??es para serem usadas pelo report e pelas regras de naming
         this.widgetDetections = this.widgetDetector.detectAll(node);
+        this.lockedImageNodes = this.widgetDetector.getLockedImageDescendants();
         this.textBlockDetections = this.textBlockDetector.detectAll(node);
         this.containerRoleDetections = this.containerRoleDetector.detectAll(node);
         this.shareDetectionsWithNamingRules(registry);
@@ -44,6 +46,10 @@ export class LinterEngine {
 
         // Analisa o node raiz
         for (const rule of rules) {
+            if (this.lockedImageNodes.has(node.id)) {
+                registry.markAsExecuted(rule.id);
+                continue;
+            }
             const result = await rule.validate(node);
             if (result) {
                 results.push(result);
@@ -69,6 +75,11 @@ export class LinterEngine {
     async analyzeNode(node: SceneNode, registry: RuleRegistry): Promise<LintResult[]> {
         if (this.debug) console.log(`[analyzeNode] ${node.name} (${node.type})`);
         const results: LintResult[] = [];
+
+        // Locked image groups (exportados como imagem única) são ignorados pelas regras
+        if (this.lockedImageNodes.has(node.id)) {
+            return results;
+        }
 
         // Skip widget naming validation if node already has a valid widget name
         const hasValidWidgetName = /^(w:|woo:|loop:)/.test(node.name);

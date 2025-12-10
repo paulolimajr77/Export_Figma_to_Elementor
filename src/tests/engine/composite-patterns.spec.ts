@@ -87,6 +87,40 @@ describe('Composite Patterns · CardPattern', () => {
         expect(result.compositeMeta?.hasButton).toBe(true);
     });
 
+    it('uses visual proportion to decide icon-box vs image-box (small visual → icon-box)', () => {
+        const cardNode: WidgetNode = {
+            id: 'card-small-visual',
+            type: 'w:container',
+            score: 0.50,
+            features: createFeatures({ layoutMode: 'VERTICAL', width: 320, height: 360, childCount: 3 }),
+            children: [
+                createWidgetNode('img-small', 'w:image', 0.80, createFeatures({ type: 'RECTANGLE', width: 60, height: 60 })),
+                createWidgetNode('h-x', 'w:heading', 0.90, createFeatures({ type: 'TEXT', fontSize: 20 })),
+                createWidgetNode('t-x', 'w:text-editor', 0.85, createFeatures({ type: 'TEXT', fontSize: 14 }))
+            ]
+        };
+
+        const result = applyCompositePatterns(cardNode);
+        expect(result.compositeType).toBe('w:icon-box');
+    });
+
+    it('uses visual proportion to decide icon-box vs image-box (large visual → image-box)', () => {
+        const cardNode: WidgetNode = {
+            id: 'card-large-visual',
+            type: 'w:container',
+            score: 0.50,
+            features: createFeatures({ layoutMode: 'VERTICAL', width: 320, height: 360, childCount: 3 }),
+            children: [
+                createWidgetNode('img-large', 'w:image', 0.80, createFeatures({ type: 'RECTANGLE', width: 260, height: 220 })),
+                createWidgetNode('h-y', 'w:heading', 0.90, createFeatures({ type: 'TEXT', fontSize: 20 })),
+                createWidgetNode('t-y', 'w:text-editor', 0.85, createFeatures({ type: 'TEXT', fontSize: 14 }))
+            ]
+        };
+
+        const result = applyCompositePatterns(cardNode);
+        expect(result.compositeType).toBe('w:image-box');
+    });
+
     it('does not detect card with insufficient children', () => {
         const notCard: WidgetNode = {
             id: 'not-card',

@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "fcdc3da",
+      "id": "d5743c2",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "fcdc3da",
+        "_element_id": "d5743c2",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -42,12 +42,12 @@
       },
       "elements": [
         {
-          "id": "eb02269",
+          "id": "744e641",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "eb02269",
+            "_element_id": "744e641",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -65,6 +65,14 @@
               "isLinked": true
             },
             "padding": {
+              "unit": "px",
+              "top": 145,
+              "right": 0,
+              "bottom": 60,
+              "left": 0,
+              "isLinked": false
+            },
+            "_padding": {
               "unit": "px",
               "top": 145,
               "right": 0,
@@ -107,13 +115,13 @@
           },
           "elements": [
             {
-              "id": "2c9a447",
+              "id": "72322d9",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "2c9a447",
+                "_element_id": "72322d9",
                 "minHeight": 690,
                 "justify_content": "flex-start",
                 "align_items": "flex-start",
@@ -134,13 +142,13 @@
               "elements": []
             },
             {
-              "id": "f391965",
+              "id": "7756a0d",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "text-editor",
               "settings": {
-                "_element_id": "f391965",
+                "_element_id": "7756a0d",
                 "align": "center",
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",

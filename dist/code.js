@@ -891,7 +891,7 @@ ${refText}` });
         const padBottom = typeof ((_g = w.styles) == null ? void 0 : _g.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
         const padLeft = typeof ((_h = w.styles) == null ? void 0 : _h.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
         if (padTop || padRight || padBottom || padLeft) {
-          settings.padding = {
+          const paddingValue = {
             unit: "px",
             top: padTop,
             right: padRight,
@@ -899,6 +899,9 @@ ${refText}` });
             left: padLeft,
             isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
           };
+          settings.box_padding = paddingValue;
+          settings._box_padding = paddingValue;
+          settings.padding = paddingValue;
         }
         const gap = typeof ((_i = w.styles) == null ? void 0 : _i.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
         if (gap !== void 0) {
@@ -907,12 +910,7 @@ ${refText}` });
         }
         if ((_j = w.styles) == null ? void 0 : _j.customCss) {
           let css = w.styles.customCss;
-          if (settings.padding) {
-            css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "");
-          }
-          if (gap !== void 0) {
-            css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
-          }
+          css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "").replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
           settings.custom_css = css.trim();
         }
         console.log("[IMAGE-BOX COMPILE] Typography applied:", {
@@ -964,8 +962,9 @@ ${refText}` });
         const padRight = typeof ((_g = w.styles) == null ? void 0 : _g.paddingRight) === "number" ? w.styles.paddingRight : 0;
         const padBottom = typeof ((_h = w.styles) == null ? void 0 : _h.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
         const padLeft = typeof ((_i = w.styles) == null ? void 0 : _i.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
-        if (padTop || padRight || padBottom || padLeft) {
-          settings.padding = {
+        const hasPadding = padTop || padRight || padBottom || padLeft;
+        if (hasPadding) {
+          const paddingValue = {
             unit: "px",
             top: padTop,
             right: padRight,
@@ -973,6 +972,9 @@ ${refText}` });
             left: padLeft,
             isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
           };
+          settings.box_padding = paddingValue;
+          settings._box_padding = paddingValue;
+          settings.padding = paddingValue;
         }
         const gap = typeof ((_j = w.styles) == null ? void 0 : _j.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
         if (gap !== void 0) {
@@ -981,12 +983,7 @@ ${refText}` });
         }
         if ((_k = w.styles) == null ? void 0 : _k.customCss) {
           let css = w.styles.customCss;
-          if (settings.padding) {
-            css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "");
-          }
-          if (gap !== void 0) {
-            css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
-          }
+          css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "").replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
           settings.custom_css = css.trim();
         }
         console.log("[ICON-BOX COMPILE] Typography applied:", {
@@ -2253,7 +2250,7 @@ ${refText}` });
       const pBottom = typeof styles.paddingBottom === "number" ? styles.paddingBottom : 0;
       const pLeft = typeof styles.paddingLeft === "number" ? styles.paddingLeft : 0;
       if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
-        settings.padding = {
+        const paddingValue = {
           unit: "px",
           top: pTop,
           right: pRight,
@@ -2261,6 +2258,8 @@ ${refText}` });
           left: pLeft,
           isLinked: pTop === pRight && pTop === pBottom && pTop === pLeft
         };
+        settings.padding = paddingValue;
+        settings._padding = paddingValue;
       }
       if (styles.background) {
         const bg = styles.background;
@@ -2464,6 +2463,23 @@ ${refText}` });
       }
       let widgetType = widget.type;
       const settings = __spreadValues({}, baseSettings);
+      if (widget.type === "icon-box" || widget.type === "image-box") {
+        return {
+          id: widgetId,
+          elType: "widget",
+          isInner: false,
+          isLocked: false,
+          widgetType: widget.type,
+          settings: __spreadProps(__spreadValues({}, settings), {
+            title_text: widget.content || settings.title_text || "",
+            description_text: settings.description_text || "",
+            selected_icon: settings.selected_icon || { value: "fas fa-star", library: "fa-solid" },
+            image: settings.image
+          }),
+          defaultEditSettings: { defaultEditRoute: "content" },
+          elements: []
+        };
+      }
       switch (widget.type) {
         case "heading":
           widgetType = "heading";
@@ -5349,7 +5365,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return hasStyles ? styles : void 0;
   }
   function generateCardCustomCSSFromNode(node) {
-    var _a;
+    var _a, _b, _c, _d, _e, _f, _g;
     const nodeAny = node;
     const cssRules = [];
     const toNumber = (value) => typeof value === "number" && isFinite(value) ? value : null;
@@ -5367,16 +5383,26 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       const type = fill.type === "GRADIENT_RADIAL" ? "radial-gradient(circle at center" : "linear-gradient(180deg";
       return `${type}, ${stops})`;
     };
+    let solidColor;
+    const gradients = [];
     if (nodeAny.fills && Array.isArray(nodeAny.fills)) {
-      const visibleFill = nodeAny.fills.find((f) => f.visible !== false);
-      if (visibleFill) {
-        if ((visibleFill.type === "GRADIENT_LINEAR" || visibleFill.type === "GRADIENT_RADIAL") && visibleFill.gradientStops) {
-          const grad = gradientToCss(visibleFill);
-          if (grad) cssRules.push(`background: ${grad}`);
-        } else if (visibleFill.type === "SOLID" && visibleFill.color) {
-          cssRules.push(`background: ${toRgba(visibleFill.color, visibleFill.opacity)}`);
+      const visibleFills = nodeAny.fills.filter((f) => f.visible !== false);
+      for (const fill of visibleFills) {
+        if ((fill.type === "GRADIENT_LINEAR" || fill.type === "GRADIENT_RADIAL") && fill.gradientStops) {
+          const grad = gradientToCss(fill);
+          if (grad) gradients.push(grad);
+        } else if (fill.type === "SOLID" && fill.color && solidColor === void 0) {
+          solidColor = toRgba(fill.color, fill.opacity);
         }
       }
+    }
+    if (solidColor && gradients.length > 0) {
+      cssRules.push(`background-color: ${solidColor}`);
+      cssRules.push(`background-image: ${gradients.join(", ")}`);
+    } else if (gradients.length > 0) {
+      cssRules.push(`background: ${gradients.join(", ")}`);
+    } else if (solidColor) {
+      cssRules.push(`background: ${solidColor}`);
     }
     if (nodeAny.strokes && Array.isArray(nodeAny.strokes) && nodeAny.strokes.length > 0) {
       const stroke = nodeAny.strokes[0];
@@ -5390,18 +5416,16 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       cssRules.push(`border-radius: ${radius}px`);
       cssRules.push(`overflow: hidden`);
     }
-    const paddings = ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"].map((k) => {
-      var _a2;
-      return (_a2 = toNumber(nodeAny[k])) != null ? _a2 : 0;
-    });
-    if (paddings.some((v) => v && v > 0)) {
-      const [pt, pr, pb, pl] = paddings;
-      cssRules.push(`padding: ${pt}px ${pr}px ${pb}px ${pl}px`);
-    }
-    const gap = toNumber(nodeAny.itemSpacing);
-    if (gap !== null && gap > 0) {
-      cssRules.push(`row-gap: ${gap}px`);
-      cssRules.push(`column-gap: ${gap}px`);
+    if (Array.isArray(nodeAny.effects)) {
+      const dropShadow = nodeAny.effects.find((e) => e.type === "DROP_SHADOW" && e.visible !== false);
+      if (dropShadow && dropShadow.color) {
+        const { r = 0, g = 0, b = 0, a = 1 } = dropShadow.color;
+        const x = (_c = toNumber((_b = dropShadow.offset) == null ? void 0 : _b.x)) != null ? _c : 0;
+        const y = (_e = toNumber((_d = dropShadow.offset) == null ? void 0 : _d.y)) != null ? _e : 0;
+        const blur = (_f = toNumber(dropShadow.radius)) != null ? _f : 0;
+        const spread = (_g = toNumber(dropShadow.spread)) != null ? _g : 0;
+        cssRules.push(`box-shadow: ${x}px ${y}px ${blur}px ${spread}px rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`);
+      }
     }
     if (cssRules.length === 0) return null;
     return `selector {
@@ -7158,6 +7182,8 @@ ${refText}` });
   var WidgetDetector = class {
     constructor() {
       __publicField(this, "rules", []);
+      __publicField(this, "lockedImageGroupIds", /* @__PURE__ */ new Set());
+      __publicField(this, "lockedImageDescendants", /* @__PURE__ */ new Set());
       this.initializeRules();
     }
     /**
@@ -7211,8 +7237,19 @@ ${refText}` });
     detectAll(root) {
       const results = /* @__PURE__ */ new Map();
       const consumed = /* @__PURE__ */ new Set();
+      this.lockedImageGroupIds = /* @__PURE__ */ new Set();
+      this.lockedImageDescendants = /* @__PURE__ */ new Set();
       const traverse = (node) => {
         if (consumed.has(node.id)) return;
+        if (this.isLockedImageGroup(node)) {
+          const idsToConsume = this.collectDescendantIds(node);
+          idsToConsume.forEach((id) => {
+            consumed.add(id);
+            this.lockedImageDescendants.add(id);
+          });
+          this.lockedImageGroupIds.add(node.id);
+          return;
+        }
         const singleChild = this.getSingleChild(node);
         if (singleChild && this.isVisualWrapper(node)) {
           traverse(singleChild);
@@ -7680,6 +7717,12 @@ ${refText}` });
       if (!normalized) return null;
       return normalized.startsWith("w:") ? normalized : `w:${normalized}`;
     }
+    getLockedImageGroupIds() {
+      return new Set(this.lockedImageGroupIds);
+    }
+    getLockedImageDescendants() {
+      return new Set(this.lockedImageDescendants);
+    }
     getSingleChild(node) {
       if (!("children" in node) || !node.children || node.children.length !== 1) return null;
       return node.children[0];
@@ -7741,6 +7784,10 @@ ${refText}` });
         }
         if (!iconId && (childName.startsWith("w:icon") || child.type === "VECTOR" || child.type === "ELLIPSE")) {
           iconId = child.id;
+          if (child.type === "FRAME" || child.type === "GROUP") {
+            const inner = this.collectIconBackgrounds(child, alreadyConsumed);
+            backgrounds.push(...inner.backgrounds);
+          }
           continue;
         }
         if (child.type === "TEXT") {
@@ -7772,6 +7819,24 @@ ${refText}` });
     isImageNode(node) {
       return "fills" in node && Array.isArray(node.fills) && node.fills.some((f) => f.type === "IMAGE");
     }
+    /**
+     * Coleta backgrounds decorativos dentro de um contĂ©iner de Ă­cone (ex.: w:icon com RECTANGLE + VECTOR)
+     */
+    collectIconBackgrounds(node, alreadyConsumed) {
+      if (!("children" in node) || !node.children) return { backgrounds: [] };
+      const children = node.children || [];
+      const hasIconContent = children.some((ch) => ch.type === "VECTOR" || ch.type === "ELLIPSE" || this.isImageNode(ch));
+      if (!hasIconContent) return { backgrounds: [] };
+      const backgrounds = [];
+      for (const ch of children) {
+        if (alreadyConsumed.has(ch.id)) continue;
+        const isDecorativeRect = ch.type === "RECTANGLE" && !this.rectangleHasTextOrImage(ch);
+        if (isDecorativeRect) {
+          backgrounds.push(ch.id);
+        }
+      }
+      return { backgrounds };
+    }
     extractIconListItems(node, alreadyConsumed) {
       const children = "children" in node && node.children ? node.children : [];
       const items = [];
@@ -7790,6 +7855,10 @@ ${refText}` });
           }
           if (!iconChild && ((c.name || "").toLowerCase().startsWith("w:icon") || c.type === "VECTOR" || c.type === "ELLIPSE" || this.isImageNode(c))) {
             iconChild = c;
+            if (c.type === "FRAME" || c.type === "GROUP") {
+              const inner = this.collectIconBackgrounds(c, alreadyConsumed);
+              backgrounds.push(...inner.backgrounds);
+            }
             continue;
           }
           if (!textChild && c.type === "TEXT") {
@@ -9136,6 +9205,24 @@ ${refText}` });
       }
       return Math.min(confidence, 1);
     }
+    isLockedImageGroup(node) {
+      if (node.type !== "FRAME" && node.type !== "GROUP") return false;
+      const locked = node.locked === true;
+      if (!locked) return false;
+      const hasImageFill = "fills" in node && Array.isArray(node.fills) && node.fills.some((f) => f.type === "IMAGE");
+      const children = ("children" in node && node.children ? node.children : []) || [];
+      const hasLockedImageChild = children.some((ch) => ch.type === "IMAGE" && ch.isLockedImage === true);
+      return locked && (hasImageFill || hasLockedImageChild);
+    }
+    collectDescendantIds(node) {
+      const ids = [node.id];
+      if ("children" in node && node.children) {
+        for (const child of node.children) {
+          ids.push(...this.collectDescendantIds(child));
+        }
+      }
+      return ids;
+    }
   };
 
   // src/linter/namingTaxonomy.ts
@@ -9782,6 +9869,7 @@ Dicas:
       __publicField(this, "textBlockDetections", /* @__PURE__ */ new Map());
       __publicField(this, "containerRoleDetector", new ContainerRoleDetector());
       __publicField(this, "containerRoleDetections", /* @__PURE__ */ new Map());
+      __publicField(this, "lockedImageNodes", /* @__PURE__ */ new Set());
       __publicField(this, "debug", LINTER_DEBUG);
     }
     /**
@@ -9791,12 +9879,17 @@ Dicas:
       this.startTime = Date.now();
       registry2.resetExecutedRules();
       this.widgetDetections = this.widgetDetector.detectAll(node);
+      this.lockedImageNodes = this.widgetDetector.getLockedImageDescendants();
       this.textBlockDetections = this.textBlockDetector.detectAll(node);
       this.containerRoleDetections = this.containerRoleDetector.detectAll(node);
       this.shareDetectionsWithNamingRules(registry2);
       const results = [];
       const rules = this.getApplicableRules(registry2, options);
       for (const rule of rules) {
+        if (this.lockedImageNodes.has(node.id)) {
+          registry2.markAsExecuted(rule.id);
+          continue;
+        }
         const result = await rule.validate(node);
         if (result) {
           results.push(result);
@@ -9818,6 +9911,9 @@ Dicas:
     async analyzeNode(node, registry2) {
       if (this.debug) console.log(`[analyzeNode] ${node.name} (${node.type})`);
       const results = [];
+      if (this.lockedImageNodes.has(node.id)) {
+        return results;
+      }
       const hasValidWidgetName = /^(w:|woo:|loop:)/.test(node.name);
       if (hasValidWidgetName) {
         if (this.debug) console.log(`[analyzeNode] skip ${node.name}: nome ja eh widget valido`);

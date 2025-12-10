@@ -39,6 +39,8 @@ const HIGH_RISK_WIDGETS = new Set([
 
 export class WidgetDetector {
     private rules: WidgetRule[] = [];
+    private lockedImageGroupIds: Set<string> = new Set();
+    private lockedImageDescendants: Set<string> = new Set();
 
     constructor() {
         this.initializeRules();
@@ -111,9 +113,22 @@ export class WidgetDetector {
     detectAll(root: SceneNode): Map<string, WidgetDetection> {
         const results: Map<string, WidgetDetection> = new Map();
         const consumed: Set<string> = new Set();
+        this.lockedImageGroupIds = new Set();
+        this.lockedImageDescendants = new Set();
 
         const traverse = (node: SceneNode) => {
             if (consumed.has(node.id)) return;
+
+            // Locked Image Group: trata como imagem ?nica e consome todos os descendentes
+            if (this.isLockedImageGroup(node)) {
+                const idsToConsume = this.collectDescendantIds(node);
+                idsToConsume.forEach(id => {
+                    consumed.add(id);
+                    this.lockedImageDescendants.add(id);
+                });
+                this.lockedImageGroupIds.add(node.id);
+                return;
+            }
 
             // Wrappers visuais: colapsa e anexa metadata ao filho Ãšnico
             const singleChild = this.getSingleChild(node);
@@ -699,6 +714,14 @@ export class WidgetDetector {
         return normalized.startsWith('w:') ? normalized : `w:${normalized}`;
     }
 
+    getLockedImageGroupIds(): Set<string> {
+        return new Set(this.lockedImageGroupIds);
+    }
+
+    getLockedImageDescendants(): Set<string> {
+        return new Set(this.lockedImageDescendants);
+    }
+
     private getSingleChild(node: SceneNode): SceneNode | null {
         if (!('children' in node) || !node.children || node.children.length !== 1) return null;
         return node.children[0] as SceneNode;
@@ -766,6 +789,11 @@ export class WidgetDetector {
             }
             if (!iconId && (childName.startsWith('w:icon') || child.type === 'VECTOR' || child.type === 'ELLIPSE')) {
                 iconId = child.id;
+                // Se o Ă­cone for um FRAME/GRUPO com camadas internas, absorve backgrounds decorativos
+                if (child.type === 'FRAME' || child.type === 'GROUP') {
+                    const inner = this.collectIconBackgrounds(child as any, alreadyConsumed);
+                    backgrounds.push(...inner.backgrounds);
+                }
                 continue;
             }
             if (child.type === 'TEXT') {
@@ -801,6 +829,25 @@ export class WidgetDetector {
         return 'fills' in node && Array.isArray((node as any).fills) && (node as any).fills.some((f: any) => f.type === 'IMAGE');
     }
 
+    /**
+     * Coleta backgrounds decorativos dentro de um contĂ©iner de Ă­cone (ex.: w:icon com RECTANGLE + VECTOR)
+     */
+    private collectIconBackgrounds(node: SceneNode, alreadyConsumed: Set<string>): { backgrounds: string[] } {
+        if (!('children' in node) || !(node as any).children) return { backgrounds: [] };
+        const children = ((node as any).children || []) as SceneNode[];
+        const hasIconContent = children.some(ch => ch.type === 'VECTOR' || ch.type === 'ELLIPSE' || this.isImageNode(ch as any));
+        if (!hasIconContent) return { backgrounds: [] };
+        const backgrounds: string[] = [];
+        for (const ch of children) {
+            if (alreadyConsumed.has(ch.id)) continue;
+            const isDecorativeRect = ch.type === 'RECTANGLE' && !this.rectangleHasTextOrImage(ch as any);
+            if (isDecorativeRect) {
+                backgrounds.push(ch.id);
+            }
+        }
+        return { backgrounds };
+    }
+
     private extractIconListItems(node: SceneNode, alreadyConsumed: Set<string>): Array<{ itemId: string; iconId?: string; textId?: string; backgrounds?: string[] }> {
         const children = ('children' in node && node.children) ? node.children : [];
         const items: Array<{ itemId: string; iconId?: string; textId?: string; backgrounds?: string[] }> = [];
@@ -819,6 +866,10 @@ export class WidgetDetector {
                 }
                 if (!iconChild && ((((c as any).name || '').toLowerCase().startsWith('w:icon')) || (c as any).type === 'VECTOR' || (c as any).type === 'ELLIPSE' || this.isImageNode(c as any))) {
                     iconChild = c;
+                    if ((c as any).type === 'FRAME' || (c as any).type === 'GROUP') {
+                        const inner = this.collectIconBackgrounds(c as any, alreadyConsumed);
+                        backgrounds.push(...inner.backgrounds);
+                    }
                     continue;
                 }
                 if (!textChild && (c as any).type === 'TEXT') {
@@ -2667,5 +2718,24 @@ export class WidgetDetector {
         return Math.min(confidence, 1.0);
     }
 
-}
+    private isLockedImageGroup(node: SceneNode): boolean {
+        if (node.type !== 'FRAME' && node.type !== 'GROUP') return false;
+        const locked = (node as any).locked === true;
+        if (!locked) return false;
+        const hasImageFill = 'fills' in node && Array.isArray((node as any).fills) && (node as any).fills.some((f: any) => f.type === 'IMAGE');
+        const children = ('children' in node && node.children ? (node.children as SceneNode[]) : []) || [];
+        const hasLockedImageChild = children.some(ch => (ch as any).type === 'IMAGE' && (ch as any).isLockedImage === true);
+        return locked && (hasImageFill || hasLockedImageChild);
+    }
 
+    private collectDescendantIds(node: SceneNode): string[] {
+        const ids: string[] = [node.id];
+        if ('children' in node && node.children) {
+            for (const child of node.children as SceneNode[]) {
+                ids.push(...this.collectDescendantIds(child));
+            }
+        }
+        return ids;
+    }
+
+}

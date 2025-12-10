@@ -346,7 +346,7 @@ const registry: WidgetDefinition[] = [
             const padBottom = typeof w.styles?.paddingBottom === 'number' ? w.styles.paddingBottom : 0;
             const padLeft = typeof w.styles?.paddingLeft === 'number' ? w.styles.paddingLeft : 0;
             if (padTop || padRight || padBottom || padLeft) {
-                settings.padding = {
+                const paddingValue = {
                     unit: 'px',
                     top: padTop,
                     right: padRight,
@@ -354,6 +354,11 @@ const registry: WidgetDefinition[] = [
                     left: padLeft,
                     isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
                 };
+                // Icon Box: prefer box padding controls (content box) instead of apenas padding avançado
+                settings.box_padding = paddingValue;
+                settings._box_padding = paddingValue;
+                // Keep legacy padding for backward compatibility
+                settings.padding = paddingValue;
             }
             const gap = typeof w.styles?.itemSpacing === 'number' ? w.styles.itemSpacing : undefined;
             if (gap !== undefined) {
@@ -363,15 +368,11 @@ const registry: WidgetDefinition[] = [
 
             // ===== CUSTOM CSS (background, border, radius from frame) =====
             if (w.styles?.customCss) {
-                // If we mapped padding/gap nativamente, remove essas linhas do CSS para evitar duplicação
                 let css = w.styles.customCss;
-                if (settings.padding) {
-                    css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '');
-                }
-                if (gap !== undefined) {
-                    css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
-                             .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
-                }
+                // Remover qualquer traço de layout (padding/gap) do CSS customizado
+                css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '')
+                         .replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
+                         .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
                 settings.custom_css = css.trim();
             }
 
@@ -431,8 +432,9 @@ const registry: WidgetDefinition[] = [
             const padRight = typeof w.styles?.paddingRight === 'number' ? w.styles.paddingRight : 0;
             const padBottom = typeof w.styles?.paddingBottom === 'number' ? w.styles.paddingBottom : 0;
             const padLeft = typeof w.styles?.paddingLeft === 'number' ? w.styles.paddingLeft : 0;
-            if (padTop || padRight || padBottom || padLeft) {
-                settings.padding = {
+            const hasPadding = padTop || padRight || padBottom || padLeft;
+            if (hasPadding) {
+                const paddingValue = {
                     unit: 'px',
                     top: padTop,
                     right: padRight,
@@ -440,6 +442,10 @@ const registry: WidgetDefinition[] = [
                     left: padLeft,
                     isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
                 };
+                // Aplicar padding nativo do widget (box/content) em vez de custom_css
+                (settings as any).box_padding = paddingValue;
+                (settings as any)._box_padding = paddingValue;
+                settings.padding = paddingValue;
             }
             const gap = typeof w.styles?.itemSpacing === 'number' ? w.styles.itemSpacing : undefined;
             if (gap !== undefined) {
@@ -451,13 +457,9 @@ const registry: WidgetDefinition[] = [
             // ===== CUSTOM CSS (background, border, radius from frame) =====
             if (w.styles?.customCss) {
                 let css = w.styles.customCss;
-                if (settings.padding) {
-                    css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '');
-                }
-                if (gap !== undefined) {
-                    css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
-                             .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
-                }
+                css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '')
+                         .replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
+                         .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
                 settings.custom_css = css.trim();
             }
 
