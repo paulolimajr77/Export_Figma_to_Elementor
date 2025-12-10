@@ -325,6 +325,7 @@ const registry: WidgetDefinition[] = [
                 if (titleStyles.letterSpacing) settings.title_typography_letter_spacing = { unit: 'px', size: titleStyles.letterSpacing, sizes: [] };
                 if (titleStyles.textTransform) settings.title_typography_text_transform = titleStyles.textTransform;
                 if (titleStyles.color) settings.title_color = titleStyles.color;
+                if (titleStyles.textAlign) settings.align = titleStyles.textAlign;
             }
 
             // ===== DESCRIPTION TYPOGRAPHY (from w.styles.descriptionStyles) =====
@@ -338,6 +339,7 @@ const registry: WidgetDefinition[] = [
                 if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: 'px', size: descStyles.letterSpacing, sizes: [] };
                 if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
                 if (descStyles.color) settings.description_color = descStyles.color;
+                if (descStyles.textAlign && !settings.align) settings.align = descStyles.textAlign;
             }
 
             // Map native spacing/padding when available
@@ -446,6 +448,7 @@ const registry: WidgetDefinition[] = [
                 (settings as any).box_padding = paddingValue;
                 (settings as any)._box_padding = paddingValue;
                 settings.padding = paddingValue;
+                (settings as any)._padding = paddingValue;
             }
             const gap = typeof w.styles?.itemSpacing === 'number' ? w.styles.itemSpacing : undefined;
             if (gap !== undefined) {

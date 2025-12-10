@@ -874,6 +874,7 @@ ${refText}` });
           if (titleStyles.letterSpacing) settings.title_typography_letter_spacing = { unit: "px", size: titleStyles.letterSpacing, sizes: [] };
           if (titleStyles.textTransform) settings.title_typography_text_transform = titleStyles.textTransform;
           if (titleStyles.color) settings.title_color = titleStyles.color;
+          if (titleStyles.textAlign) settings.align = titleStyles.textAlign;
         }
         const descStyles = (_d = w.styles) == null ? void 0 : _d.descriptionStyles;
         if (descStyles) {
@@ -885,6 +886,7 @@ ${refText}` });
           if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: "px", size: descStyles.letterSpacing, sizes: [] };
           if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
           if (descStyles.color) settings.description_color = descStyles.color;
+          if (descStyles.textAlign && !settings.align) settings.align = descStyles.textAlign;
         }
         const padTop = typeof ((_e = w.styles) == null ? void 0 : _e.paddingTop) === "number" ? w.styles.paddingTop : 0;
         const padRight = typeof ((_f = w.styles) == null ? void 0 : _f.paddingRight) === "number" ? w.styles.paddingRight : 0;
@@ -975,6 +977,7 @@ ${refText}` });
           settings.box_padding = paddingValue;
           settings._box_padding = paddingValue;
           settings.padding = paddingValue;
+          settings._padding = paddingValue;
         }
         const gap = typeof ((_j = w.styles) == null ? void 0 : _j.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
         if (gap !== void 0) {
