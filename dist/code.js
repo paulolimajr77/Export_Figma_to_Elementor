@@ -6824,6 +6824,322 @@ ${refText}` });
     }
   };
 
+  // src/linter/config/widget-taxonomy.ts
+  var WIDGET_TAXONOMY = [
+    {
+      id: "basics",
+      label: "Basicos",
+      items: [
+        "heading",
+        "text",
+        "button",
+        "image",
+        "icon",
+        "video",
+        "divider",
+        "spacer",
+        "image-box",
+        "icon-box",
+        "star-rating",
+        "counter",
+        "progress",
+        "tabs",
+        "accordion",
+        "toggle",
+        "alert",
+        "social-icons",
+        "soundcloud",
+        "shortcode",
+        "html",
+        "menu-anchor",
+        "sidebar",
+        "read-more",
+        "image-carousel",
+        "basic-gallery",
+        "gallery",
+        "icon-list",
+        "nav-menu",
+        "search-form",
+        "google-maps",
+        "testimonial",
+        "embed",
+        "lottie",
+        "loop:grid",
+        "w:container",
+        "w:inner-container"
+      ]
+    },
+    {
+      id: "pro",
+      label: "Pro",
+      items: [
+        "form",
+        "login",
+        "subscription",
+        "call-to-action",
+        "media:carousel",
+        "portfolio",
+        "gallery-pro",
+        "slider:slides",
+        "slideshow",
+        "flip-box",
+        "animated-headline",
+        "post-navigation",
+        "share-buttons",
+        "table-of-contents",
+        "countdown",
+        "blockquote",
+        "testimonial-carousel",
+        "review-box",
+        "reviews",
+        "hotspots",
+        "sitemap",
+        "author-box",
+        "price-table",
+        "price-list",
+        "progress-tracker",
+        "animated-text",
+        "nav-menu-pro",
+        "breadcrumb",
+        "facebook-button",
+        "facebook-comments",
+        "facebook-embed",
+        "facebook-page",
+        "loop:builder",
+        "loop:grid-advanced",
+        "loop-carousel",
+        "post-excerpt",
+        "post-content",
+        "post-title",
+        "post-info",
+        "post-featured-image",
+        "post-author",
+        "post-date",
+        "post-terms",
+        "archive-title",
+        "archive-description",
+        "site-logo",
+        "site-title",
+        "site-tagline",
+        "search-results",
+        "global-widget",
+        "video-playlist",
+        "video-gallery"
+      ]
+    },
+    {
+      id: "woo",
+      label: "WooCommerce",
+      items: [
+        "woo:product-title",
+        "woo:product-image",
+        "woo:product-price",
+        "woo:product-add-to-cart",
+        "woo:product-data-tabs",
+        "woo:product-excerpt",
+        "woo:product-rating",
+        "woo:product-stock",
+        "woo:product-meta",
+        "woo:product-additional-information",
+        "woo:product-short-description",
+        "woo:product-related",
+        "woo:product-upsells",
+        "woo:product-tabs",
+        "woo:product-breadcrumb",
+        "woo:product-gallery",
+        "woo:products",
+        "woo:product-grid",
+        "woo:product-carousel",
+        "woo:product-loop-item",
+        "woo:loop-product-title",
+        "woo:loop-product-price",
+        "woo:loop-product-rating",
+        "woo:loop-product-image",
+        "woo:loop-product-button",
+        "woo:loop-product-meta",
+        "woo:cart",
+        "woo:checkout",
+        "woo:my-account",
+        "woo:purchase-summary",
+        "woo:order-tracking"
+      ]
+    },
+    {
+      id: "loop-builder",
+      label: "Loop Builder",
+      items: [
+        "loop:item",
+        "loop:image",
+        "loop:title",
+        "loop:meta",
+        "loop:terms",
+        "loop:rating",
+        "loop:price",
+        "loop:add-to-cart",
+        "loop:read-more",
+        "loop:featured-image",
+        "loop:pagination"
+      ]
+    },
+    {
+      id: "experimental",
+      label: "Experimentais",
+      items: [
+        "w:nested-tabs",
+        "w:mega-menu",
+        "w:scroll-snap",
+        "w:motion-effects",
+        "w:background-slideshow",
+        "w:css-transform",
+        "w:custom-position",
+        "w:dynamic-tags",
+        "w:ajax-pagination"
+      ]
+    },
+    {
+      id: "wordpress",
+      label: "WordPress",
+      items: [
+        "w:wp-search",
+        "w:wp-recent-posts",
+        "w:wp-recent-comments",
+        "w:wp-archives",
+        "w:wp-categories",
+        "w:wp-calendar",
+        "w:wp-tag-cloud",
+        "w:wp-custom-menu"
+      ]
+    },
+    {
+      id: "hierarchy",
+      label: "Nomenclatura Hierarquica",
+      items: [
+        "accordion:item",
+        "accordion:title",
+        "accordion:content",
+        "accordion:icon",
+        "tabs:item",
+        "tabs:title",
+        "tabs:content",
+        "list:item",
+        "list:icon",
+        "list:text",
+        "slide:1",
+        "slide:2",
+        "carousel:slide",
+        "countdown:days",
+        "countdown:hours",
+        "countdown:minutes",
+        "countdown:seconds",
+        "toggle:item",
+        "toggle:title",
+        "toggle:content"
+      ]
+    }
+  ];
+  var ALL_WIDGET_SLUGS = new Set(WIDGET_TAXONOMY.flatMap((cat) => cat.items));
+  function getAllWidgetSlugs() {
+    return Array.from(ALL_WIDGET_SLUGS);
+  }
+  function isWidgetInTaxonomy(slug) {
+    if (!slug) return false;
+    return ALL_WIDGET_SLUGS.has(slug.trim());
+  }
+  function normalizeWidgetSlug(slug) {
+    if (!slug) return null;
+    const trimmed = slug.trim();
+    if (ALL_WIDGET_SLUGS.has(trimmed)) return trimmed;
+    if (trimmed.startsWith("w:")) {
+      const withoutPrefix = trimmed.slice(2);
+      if (ALL_WIDGET_SLUGS.has(withoutPrefix)) {
+        return withoutPrefix;
+      }
+    }
+    return null;
+  }
+  function filterValidWidgetNames(names) {
+    const unique = [];
+    names.forEach((name) => {
+      const normalized = normalizeWidgetSlug(name);
+      if (normalized && !unique.includes(normalized)) {
+        unique.push(normalized);
+      }
+    });
+    return unique;
+  }
+  var TEXT_WIDGETS = [
+    "heading",
+    "text",
+    "animated-headline",
+    "post-title",
+    "post-excerpt",
+    "post-content",
+    "post-info",
+    "post-terms",
+    "archive-title",
+    "archive-description",
+    "site-title",
+    "site-tagline",
+    "countdown",
+    "blockquote"
+  ].filter(isWidgetInTaxonomy);
+  var MEDIA_WIDGETS = [
+    "image",
+    "image-box",
+    "image-carousel",
+    "basic-gallery",
+    "gallery",
+    "media:carousel",
+    "slideshow",
+    "slider:slides",
+    "video",
+    "video-gallery",
+    "video-playlist",
+    "loop:image",
+    "post-featured-image",
+    "site-logo",
+    "woo:product-image",
+    "woo:product-gallery",
+    "woo:product-carousel"
+  ].filter(isWidgetInTaxonomy);
+  var CONTAINER_WIDGETS = [
+    "w:container",
+    "w:inner-container",
+    "menu-anchor",
+    "sidebar",
+    "nav-menu",
+    "nav-menu-pro",
+    "accordion",
+    "tabs",
+    "toggle",
+    "accordion:item",
+    "accordion:title",
+    "accordion:content",
+    "accordion:icon",
+    "tabs:item",
+    "tabs:title",
+    "tabs:content",
+    "toggle:item",
+    "toggle:title",
+    "toggle:content",
+    "carousel:slide",
+    "slide:1",
+    "slide:2"
+  ].filter(isWidgetInTaxonomy);
+  var FORM_WIDGETS = [
+    "form",
+    "login",
+    "subscription",
+    "search-form",
+    "woo:checkout",
+    "woo:cart",
+    "woo:order-tracking",
+    "woo:my-account"
+  ].filter(isWidgetInTaxonomy);
+  var getTextWidgetNames = () => [...TEXT_WIDGETS];
+  var getMediaWidgetNames = () => [...MEDIA_WIDGETS];
+  var getContainerWidgetNames = () => [...CONTAINER_WIDGETS];
+
   // src/linter/detectors/WidgetDetector.ts
   var WIDGETS_BY_NODE_TYPE = {
     TEXT: ["w:heading", "w:post-title", "w:call-to-action", "w:text-editor", "w:paragraph", "w:rich-text"],
@@ -6890,13 +7206,41 @@ ${refText}` });
       };
     }
     /**
-     * Detecta múltiplos widgets em uma árvore
+     * Detecta mÃºltiplos widgets em uma Ã¡rvore
      */
     detectAll(root) {
       const results = /* @__PURE__ */ new Map();
+      const consumed = /* @__PURE__ */ new Set();
       const traverse = (node) => {
+        if (consumed.has(node.id)) return;
+        const singleChild = this.getSingleChild(node);
+        if (singleChild && this.isVisualWrapper(node)) {
+          traverse(singleChild);
+          const childDetection = results.get(singleChild.id);
+          if (childDetection) {
+            childDetection.wrapperCollapsed = true;
+            childDetection.wrapperNodeId = node.id;
+            childDetection.visualWrapperStyle = this.extractWrapperStyle(node);
+            results.set(childDetection.node_id, childDetection);
+          }
+          consumed.add(node.id);
+          return;
+        }
+        const composite = this.detectComposite(node, consumed);
+        if (composite) {
+          this.attachMicrotexts(node, composite.detection, consumed);
+          results.set(node.id, composite.detection);
+          composite.consumedIds.forEach((id) => consumed.add(id));
+          if ("children" in node && node.children) {
+            for (const child of node.children) {
+              if (!consumed.has(child.id)) traverse(child);
+            }
+          }
+          return;
+        }
         const detection = this.detect(node);
         if (detection) {
+          this.attachMicrotexts(node, detection, consumed);
           results.set(node.id, detection);
         }
         if ("children" in node && node.children) {
@@ -6909,7 +7253,7 @@ ${refText}` });
       return results;
     }
     /**
-     * Inicializa todas as regras de detecção
+     * Inicializa todas as regras de detecÃ§Ã£o
      */
     initializeRules() {
       this.addRule("w:heading", "basic", this.matchHeading.bind(this));
@@ -7040,13 +7384,13 @@ ${refText}` });
       this.addRule("w:parallax", "experimental", this.matchParallax.bind(this));
     }
     /**
-     * Adiciona uma regra de detecção
+     * Adiciona uma regra de detecÃ§Ã£o
      */
     addRule(widget, category, matcher) {
       this.rules.push({ widget, category, matcher });
     }
     /**
-     * Gera justificativa para a detecção
+     * Gera justificativa para a detecÃ§Ã£o
      */
     generateJustification(node, widget, confidence) {
       const reasons = [];
@@ -7054,14 +7398,14 @@ ${refText}` });
         reasons.push("Nome do layer corresponde ao widget");
       }
       if (node.type === "TEXT") {
-        reasons.push("\xC9 um elemento de texto");
+        reasons.push("\xC3\u2030 um elemento de texto");
       } else if (node.type === "RECTANGLE" || node.type === "FRAME") {
-        reasons.push("Estrutura compat\xEDvel com o widget");
+        reasons.push("Estrutura compat\xC3\xADvel com o widget");
       }
       if (confidence >= 0.8) {
-        reasons.push("Alta confian\xE7a na detec\xE7\xE3o");
+        reasons.push("Alta confian\xC3\xA7a na detec\xC3\xA7\xC3\xA3o");
       } else if (confidence >= 0.5) {
-        reasons.push("Confian\xE7a moderada");
+        reasons.push("Confian\xC3\xA7a moderada");
       }
       return reasons.join("; ");
     }
@@ -7109,7 +7453,7 @@ ${refText}` });
       };
     }
     /**
-     * Helper: Analisa conteúdo de texto
+     * Helper: Analisa conteÃºdo de texto
      */
     analyzeTextContent(node) {
       let hasQuote = false;
@@ -7119,7 +7463,7 @@ ${refText}` });
       let hasDescription = false;
       if ("children" in node && node.children) {
         const texts = node.children.filter((child) => child.type === "TEXT");
-        hasQuote = texts.some((t) => t.characters.includes('"') || t.characters.includes("\u201C") || t.characters.includes("\u201D") || t.name.toLowerCase().includes("quote"));
+        hasQuote = texts.some((t) => t.characters.includes('"') || t.characters.includes("\xE2\u20AC\u0153") || t.characters.includes("\xE2\u20AC\x9D") || t.name.toLowerCase().includes("quote"));
         hasAuthor = texts.some((t) => t.name.toLowerCase().includes("author") || t.name.toLowerCase().includes("autor") || t.name.toLowerCase().includes("role") || t.name.toLowerCase().includes("cargo"));
         isLongText = texts.some((t) => t.characters.length > 100);
         hasTitle = texts.some((t) => typeof t.fontSize === "number" && t.fontSize > 16 || t.fontWeight === 700 || t.name.toLowerCase().includes("title") || t.name.toLowerCase().includes("heading"));
@@ -7128,7 +7472,7 @@ ${refText}` });
       return { hasQuote, hasAuthor, isLongText, hasTitle, hasDescription };
     }
     /**
-     * Helper: Calcula confiança final
+     * Helper: Calcula confianÃ§a final
      */
     calculateConfidence(baseScore, visualMatch, contentMatch, nameMatch) {
       const weights = {
@@ -7142,7 +7486,7 @@ ${refText}` });
         1
       );
     }
-    // ==================== MATCHERS - BÁSICOS ====================
+    // ==================== MATCHERS - BÃSICOS ====================
     /**
      * Verifica se o node pode ser considerado candidato a widget
      */
@@ -7181,7 +7525,7 @@ ${refText}` });
       return false;
     }
     /**
-     * Respeita nomes com prefixo técnico explícito (alta confiança)
+     * Respeita nomes com prefixo tÃ©cnico explÃ­cito (alta confianÃ§a)
      */
     detectByExplicitName(node) {
       const rawName = node.name || "";
@@ -7190,12 +7534,17 @@ ${refText}` });
       const hasExplicitPrefix = explicitPrefixes.some((prefix) => name.startsWith(prefix));
       if (hasExplicitPrefix) {
         const explicitWidget = rawName.split(/\s/)[0];
+        const normalized = normalizeWidgetSlug(explicitWidget);
+        if (!normalized) {
+          console.debug("[WIDGET DETECTOR] explicit-name fora da taxonomia, ignorando:", explicitWidget);
+          return null;
+        }
         return {
           node_id: node.id,
           node_name: node.name,
           widget: explicitWidget,
           confidence: 1,
-          justification: "Nome possui prefixo t\xE9cnico expl\xEDcito",
+          justification: "Nome possui prefixo t\xC3\xA9cnico expl\xC3\xADcito",
           source: "explicit-name"
         };
       }
@@ -7212,7 +7561,7 @@ ${refText}` });
       return null;
     }
     /**
-     * Retorna lista de widgets compatíveis com o tipo de node
+     * Retorna lista de widgets compatÃ­veis com o tipo de node
      */
     getAllowedWidgetsForNodeType(nodeType) {
       return WIDGETS_BY_NODE_TYPE[nodeType] || [];
@@ -7230,12 +7579,386 @@ ${refText}` });
       }
       return confidence >= 0.6;
     }
+    // =====================
+    // Composite detection
+    // =====================
+    detectComposite(node, alreadyConsumed) {
+      const name = (node.name || "").toLowerCase();
+      const iconBoxSlug = this.normalizeWidgetSlugWithPrefix("w:icon-box");
+      const iconListSlug = this.normalizeWidgetSlugWithPrefix("w:icon-list");
+      const formSlug = this.normalizeWidgetSlugWithPrefix("w:form");
+      const isIconBox = iconBoxSlug && (name.startsWith("w:icon-box") || this.looksLikeIconBox(node));
+      if (isIconBox) {
+        const slots = this.extractIconBoxSlots(node, alreadyConsumed);
+        if (slots.icon || slots.title || slots.text) {
+          const consumedIds = Object.values(slots).filter(Boolean);
+          return {
+            detection: {
+              node_id: node.id,
+              node_name: node.name,
+              widget: iconBoxSlug,
+              confidence: 1,
+              justification: "Composite icon-box detectado (\xC3\xADcone + heading + texto)",
+              source: name.startsWith("w:") ? "explicit-name" : "heuristic",
+              semanticRole: "icon-box",
+              compositeOf: consumedIds,
+              slots: __spreadValues(__spreadValues(__spreadValues({}, slots.icon ? { icon: slots.icon } : {}), slots.title ? { title: slots.title } : {}), slots.text ? { text: slots.text } : {})
+            },
+            consumedIds
+          };
+        }
+      }
+      const isIconList = iconListSlug && (name.startsWith("w:icon-list") || this.looksLikeIconList(node, alreadyConsumed));
+      if (isIconList) {
+        const repeater = this.extractIconListItems(node, alreadyConsumed);
+        const score = this.scoreIconList(node, repeater);
+        if (repeater.length > 0 && score >= 0.7) {
+          const consumedIds = repeater.flatMap((item) => [item.itemId, item.iconId, item.textId].filter(Boolean));
+          return {
+            detection: {
+              node_id: node.id,
+              node_name: node.name,
+              widget: iconListSlug,
+              confidence: name.startsWith("w:") ? 1 : score,
+              justification: `Composite icon-list detectado (itens com \xC3\xADcone + texto, score=${score.toFixed(2)})`,
+              source: name.startsWith("w:") ? "explicit-name" : "implicit-pattern",
+              semanticRole: "icon-list",
+              repeaterItems: repeater,
+              compositeOf: consumedIds
+            },
+            consumedIds
+          };
+        }
+      }
+      const isForm = formSlug && (name.startsWith("w:form") || this.looksLikeForm(node, alreadyConsumed));
+      if (isForm) {
+        const slots = this.extractFormSlots(node, alreadyConsumed);
+        const score = slots ? this.scoreForm(node, slots) : 0;
+        if (slots && score >= 0.7) {
+          const consumedIds = [
+            ...slots.titleSlot ? [slots.titleSlot] : [],
+            ...slots.descriptionSlot ? [slots.descriptionSlot] : [],
+            ...slots.fields.flatMap((f) => [f.fieldId, f.labelId, ...f.helperTextIds || []]).filter(Boolean),
+            ...slots.buttons || []
+          ];
+          return {
+            detection: {
+              node_id: node.id,
+              node_name: node.name,
+              widget: formSlug,
+              confidence: name.startsWith("w:") ? 1 : score,
+              justification: `Composite form detectado (campos + labels + auxiliares, score=${score.toFixed(2)})`,
+              source: name.startsWith("w:") ? "explicit-name" : "implicit-pattern",
+              semanticRole: "form",
+              compositeOf: consumedIds,
+              slots: __spreadValues(__spreadValues({}, slots.titleSlot ? { title: slots.titleSlot } : {}), slots.descriptionSlot ? { description: slots.descriptionSlot } : {}),
+              properties: {
+                fields: slots.fields,
+                buttons: slots.buttons || []
+              }
+            },
+            consumedIds
+          };
+        }
+      }
+      return null;
+    }
+    normalizeWidgetSlugWithPrefix(slug) {
+      const normalized = normalizeWidgetSlug(slug);
+      if (!normalized) return null;
+      return normalized.startsWith("w:") ? normalized : `w:${normalized}`;
+    }
+    getSingleChild(node) {
+      if (!("children" in node) || !node.children || node.children.length !== 1) return null;
+      return node.children[0];
+    }
+    isVisualWrapper(node) {
+      if (node.type !== "FRAME" && node.type !== "GROUP") return false;
+      const child = this.getSingleChild(node);
+      if (!child) return false;
+      const hasBackground = Array.isArray(node.fills) && node.fills.length > 0;
+      const hasStroke = Array.isArray(node.strokes) && node.strokes.length > 0;
+      const hasRadius = typeof node.cornerRadius === "number" && node.cornerRadius > 0;
+      return hasBackground || hasStroke || hasRadius;
+    }
+    extractWrapperStyle(node) {
+      const style = {};
+      if (Array.isArray(node.fills) && node.fills.length > 0) {
+        style.fills = node.fills.filter((f) => f.visible !== false);
+      }
+      if (Array.isArray(node.strokes) && node.strokes.length > 0) {
+        style.strokes = node.strokes.filter((s) => s.visible !== false);
+        style.strokeWeight = node.strokeWeight;
+      }
+      if (typeof node.cornerRadius === "number") {
+        style.cornerRadius = node.cornerRadius;
+      }
+      if (Array.isArray(node.effects) && node.effects.length > 0) {
+        style.effects = node.effects.filter((e) => e.visible !== false);
+      }
+      return style;
+    }
+    looksLikeIconBox(node) {
+      if (node.type !== "FRAME" && node.type !== "GROUP") return false;
+      const children = "children" in node && node.children ? node.children : [];
+      if (!children || children.length < 2) return false;
+      const hasIcon = children.some((ch) => ch.type === "VECTOR" || ch.type === "ELLIPSE" || (ch.name || "").toLowerCase().startsWith("w:icon"));
+      const textNodes = children.filter((ch) => ch.type === "TEXT");
+      return hasIcon && textNodes.length >= 1;
+    }
+    looksLikeIconList(node, alreadyConsumed) {
+      if (node.type !== "FRAME" && node.type !== "GROUP") return false;
+      const children = "children" in node && node.children ? node.children : [];
+      if (!children || children.length < 2) return false;
+      const items = this.extractIconListItems(node, alreadyConsumed);
+      return items.length >= 2;
+    }
+    extractIconBoxSlots(node, alreadyConsumed) {
+      const children = "children" in node && node.children ? node.children : [];
+      let iconId;
+      let titleId;
+      let textId;
+      for (const child of children) {
+        if (alreadyConsumed.has(child.id)) continue;
+        const childName = (child.name || "").toLowerCase();
+        if (!iconId && (childName.startsWith("w:icon") || child.type === "VECTOR" || child.type === "ELLIPSE")) {
+          iconId = child.id;
+          continue;
+        }
+        if (child.type === "TEXT") {
+          if (!titleId) {
+            titleId = child.id;
+            continue;
+          }
+          if (!textId) {
+            textId = child.id;
+          }
+        }
+      }
+      return { icon: iconId, title: titleId, text: textId };
+    }
+    extractIconListItems(node, alreadyConsumed) {
+      const children = "children" in node && node.children ? node.children : [];
+      const items = [];
+      for (const item of children) {
+        if (alreadyConsumed.has(item.id)) continue;
+        if (!("children" in item) || !item.children) continue;
+        const iconChild = item.children.find(
+          (c) => !alreadyConsumed.has(c.id) && ((c.name || "").toLowerCase().startsWith("w:icon") || c.type === "VECTOR" || c.type === "ELLIPSE")
+        );
+        const textChild = item.children.find(
+          (c) => !alreadyConsumed.has(c.id) && c.type === "TEXT"
+        );
+        if (iconChild || textChild) {
+          items.push({ itemId: item.id, iconId: iconChild == null ? void 0 : iconChild.id, textId: textChild == null ? void 0 : textChild.id });
+        }
+      }
+      return items;
+    }
+    scoreIconList(node, items) {
+      if (items.length === 0) return 0;
+      let score = 0;
+      if (items.length >= 3) score += 0.4;
+      else if (items.length === 2) score += 0.2;
+      const allHaveIconAndText = items.every((it) => !!it.iconId && !!it.textId);
+      if (allHaveIconAndText) score += 0.3;
+      const positions = items.map((it) => {
+        var _a;
+        const nodeChild = (_a = node.children) == null ? void 0 : _a.find((c) => c.id === it.itemId);
+        return nodeChild ? { y: nodeChild.y, height: nodeChild.height } : null;
+      }).filter(Boolean);
+      if (positions.length >= 2) {
+        const gaps = [];
+        const sorted = positions.sort((a, b) => a.y - b.y);
+        for (let i = 1; i < sorted.length; i++) {
+          gaps.push(sorted[i].y - (sorted[i - 1].y + sorted[i - 1].height));
+        }
+        if (gaps.length) {
+          const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+          const maxDiff = Math.max(...gaps.map((g) => Math.abs(g - avg)));
+          if (maxDiff <= 4) score += 0.2;
+        }
+      }
+      const widths = items.map((it) => {
+        var _a;
+        const nodeChild = (_a = node.children) == null ? void 0 : _a.find((c) => c.id === it.itemId);
+        return nodeChild ? nodeChild.width : null;
+      }).filter((v) => typeof v === "number");
+      if (widths.length >= 2) {
+        const minW = Math.min(...widths);
+        const maxW = Math.max(...widths);
+        if (minW > 0 && maxW / minW <= 1.2) {
+          score += 0.1;
+        }
+      }
+      return Math.min(score, 1);
+    }
+    extractFormSlots(node, alreadyConsumed) {
+      const children = "children" in node && node.children ? node.children : [];
+      if (!children || children.length === 0) return null;
+      let titleSlot;
+      let descriptionSlot;
+      const fields = [];
+      const buttons = [];
+      for (const child of children) {
+        if (alreadyConsumed.has(child.id)) continue;
+        const childName = (child.name || "").toLowerCase();
+        if (childName.startsWith("w:button") || child.type === "COMPONENT" || childName.includes("button")) {
+          buttons.push(child.id);
+          continue;
+        }
+        if (child.type === "TEXT") {
+          if (!titleSlot) {
+            titleSlot = child.id;
+            continue;
+          }
+          if (!descriptionSlot) {
+            descriptionSlot = child.id;
+            continue;
+          }
+        }
+        if (child.type === "FRAME" || child.type === "GROUP" || child.type === "RECTANGLE") {
+          const grandChildren = "children" in child && child.children ? child.children : [];
+          let labelId;
+          let fieldId;
+          const helpers = [];
+          for (const gc of grandChildren) {
+            if (alreadyConsumed.has(gc.id)) continue;
+            if (!labelId && gc.type === "TEXT") {
+              labelId = gc.id;
+              continue;
+            }
+            if (!fieldId && (gc.type === "RECTANGLE" || gc.type === "FRAME" || gc.type === "GROUP")) {
+              fieldId = gc.id;
+              continue;
+            }
+            if (gc.type === "TEXT") {
+              helpers.push(gc.id);
+            }
+          }
+          if (fieldId || labelId) {
+            fields.push({ fieldId: fieldId || labelId, labelId, helperTextIds: helpers.length ? helpers : void 0 });
+          }
+        }
+      }
+      if (!titleSlot && !descriptionSlot && fields.length === 0 && buttons.length === 0) {
+        return null;
+      }
+      return { titleSlot, descriptionSlot, fields, buttons };
+    }
+    looksLikeForm(node, alreadyConsumed) {
+      if (node.type !== "FRAME" && node.type !== "GROUP") return false;
+      const slots = this.extractFormSlots(node, alreadyConsumed);
+      if (!slots) return false;
+      const hasFields = slots.fields && slots.fields.length >= 2;
+      const hasButton = slots.buttons && slots.buttons.length > 0;
+      return !!(hasFields && hasButton);
+    }
+    scoreForm(node, slots) {
+      let score = 0;
+      const fieldCount = slots.fields.length;
+      if (fieldCount >= 3) score += 0.4;
+      else if (fieldCount >= 2) score += 0.3;
+      if (slots.buttons && slots.buttons.length > 0) score += 0.2;
+      if (slots.titleSlot || slots.descriptionSlot) score += 0.1;
+      const fieldsNodes = slots.fields.map((f) => {
+        const n = this.findNodeById(node, f.fieldId);
+        return n ? { y: n.y, height: n.height } : null;
+      }).filter(Boolean);
+      if (fieldsNodes.length >= 2) {
+        const gaps = [];
+        const sorted = fieldsNodes.sort((a, b) => a.y - b.y);
+        for (let i = 1; i < sorted.length; i++) {
+          gaps.push(sorted[i].y - (sorted[i - 1].y + sorted[i - 1].height));
+        }
+        if (gaps.length) {
+          const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+          const maxDiff = Math.max(...gaps.map((g) => Math.abs(g - avg)));
+          if (maxDiff <= 8) score += 0.2;
+        }
+      }
+      return Math.min(score, 1);
+    }
+    /**
+     * Microtext/description attachment
+     */
+    attachMicrotexts(node, detection, consumed) {
+      if (!("children" in node) || !node.children || node.children.length === 0) return;
+      const attached = detection.attachedTextIds ? [...detection.attachedTextIds] : [];
+      const childTexts = node.children.filter((ch) => ch.type === "TEXT" && !consumed.has(ch.id) && !(ch.name || "").toLowerCase().startsWith("w:"));
+      const fontSizes = childTexts.map((t) => t.fontSize).filter((v) => typeof v === "number");
+      const maxFont = fontSizes.length ? Math.max(...fontSizes) : 0;
+      const thresholdSmall = maxFont > 0 ? Math.min(maxFont * 0.8, maxFont - 2) : 18;
+      const headingCandidate = childTexts.reduce((acc, t) => {
+        const f = t.fontSize;
+        if (typeof f === "number" && f >= (acc.font || 0)) {
+          return { node: t, font: f, bbox: this.getBBox(t) };
+        }
+        return acc;
+      }, { node: null, font: 0 });
+      for (const child of childTexts) {
+        const fontSize = child.fontSize;
+        const fontWeight = child.fontWeight;
+        const fills = child.fills;
+        const bboxChild = this.getBBox(child);
+        const bboxParent = this.getBBox(node);
+        const topGap = bboxChild.y - bboxParent.y;
+        const bottomGap = bboxParent.y + bboxParent.height - (bboxChild.y + bboxChild.height);
+        const minGap = Math.min(topGap, bottomGap);
+        const withinDistance = minGap >= 4 && minGap <= 32;
+        const overlap = Math.max(0, Math.min(bboxParent.x + bboxParent.width, bboxChild.x + bboxChild.width) - Math.max(bboxParent.x, bboxChild.x));
+        const overlapRatio = bboxChild.width > 0 ? overlap / bboxChild.width : 0;
+        const aligns = overlapRatio >= 0.6;
+        const headingOverlap = headingCandidate.bbox ? this.computeOverlapRatio(bboxChild, headingCandidate.bbox) : 1;
+        const smallFont = typeof fontSize === "number" ? fontSize <= thresholdSmall : true;
+        const lightWeight = typeof fontWeight === "number" ? fontWeight <= 500 : false;
+        let lowOpacity = false;
+        if (Array.isArray(fills)) {
+          const solid = fills.find((f) => f.type === "SOLID" && f.visible !== false);
+          if (solid && solid.opacity !== void 0 && solid.opacity < 0.8) {
+            lowOpacity = true;
+          }
+        }
+        const looksLikeHeading = typeof fontWeight === "number" && fontWeight >= 600 || typeof fontSize === "number" && fontSize >= maxFont;
+        const tooCloseToHeading = headingCandidate.font && typeof fontSize === "number" && fontSize >= headingCandidate.font * 0.8;
+        const wrongColumn = headingCandidate.bbox && headingOverlap < 0.6;
+        if (!looksLikeHeading && !tooCloseToHeading && !wrongColumn && aligns && withinDistance && (smallFont || lightWeight || lowOpacity)) {
+          attached.push(child.id);
+          consumed.add(child.id);
+        }
+      }
+      if (attached.length) {
+        detection.attachedTextIds = attached;
+      }
+    }
+    computeOverlapRatio(a, b) {
+      const overlap = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+      return a.width > 0 ? overlap / a.width : 0;
+    }
+    getBBox(node) {
+      var _a, _b;
+      const x = (_a = node.x) != null ? _a : 0;
+      const y = (_b = node.y) != null ? _b : 0;
+      const width = "width" in node ? node.width || 0 : 0;
+      const height = "height" in node ? node.height || 0 : 0;
+      return { x, y, width, height };
+    }
+    findNodeById(root, id) {
+      if (root.id === id) return root;
+      if ("children" in root && root.children) {
+        for (const ch of root.children) {
+          const found = this.findNodeById(ch, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
     matchHeading(node) {
       if (node.type !== "TEXT") return 0;
       const text = node;
       let confidence = 0.4;
       const name = node.name.toLowerCase();
-      if (name.includes("heading") || name.includes("t\xEDtulo") || /^h[1-6]$/i.test(name)) {
+      if (name.includes("heading") || name.includes("t\xC3\xADtulo") || /^h[1-6]$/i.test(name)) {
         confidence += 0.3;
       }
       if (text.fontSize && typeof text.fontSize === "number" && text.fontSize > 24) {
@@ -7718,7 +8441,7 @@ ${refText}` });
       }
       if (node.type === "TEXT") {
         const text = node;
-        if (text.characters && (/\$|R\$|€/.test(text.characters) || /\d+[.,]\d+/.test(text.characters))) {
+        if (text.characters && (/\$|R\$|â‚¬/.test(text.characters) || /\d+[.,]\d+/.test(text.characters))) {
           confidence += 0.3;
         }
       }
@@ -7751,9 +8474,9 @@ ${refText}` });
       }
       return Math.min(confidence, 1);
     }
-    // ==================== MATCHERS - GENÉRICOS ====================
+    // ==================== MATCHERS - GENÃ‰RICOS ====================
     /**
-     * Matcher genérico para texto (usado para widgets simples de texto)
+     * Matcher genÃ©rico para texto (usado para widgets simples de texto)
      */
     matchGenericText(node) {
       let confidence = 0;
@@ -7769,7 +8492,7 @@ ${refText}` });
       return Math.min(confidence, 1);
     }
     /**
-     * Matcher genérico para containers (usado para widgets que são apenas wrappers)
+     * Matcher genÃ©rico para containers (usado para widgets que sÃ£o apenas wrappers)
      */
     matchGenericContainer(node) {
       let confidence = 0;
@@ -8052,13 +8775,13 @@ ${refText}` });
         const hasAttributeTerms = node.children.some((child) => {
           if (child.type === "TEXT") {
             const text = child.characters.toLowerCase();
-            return text.includes("weight") || text.includes("dimensions") || text.includes("peso") || text.includes("dimens\xF5es") || text.includes("attributes") || text.includes("atributos");
+            return text.includes("weight") || text.includes("dimensions") || text.includes("peso") || text.includes("dimens\xC3\xB5es") || text.includes("attributes") || text.includes("atributos");
           }
           if ("children" in child) {
             return child.children.some((grandChild) => {
               if (grandChild.type === "TEXT") {
                 const text = grandChild.characters.toLowerCase();
-                return text.includes("weight") || text.includes("dimensions") || text.includes("peso") || text.includes("dimens\xF5es");
+                return text.includes("weight") || text.includes("dimensions") || text.includes("peso") || text.includes("dimens\xC3\xB5es");
               }
               return false;
             });
@@ -8071,7 +8794,7 @@ ${refText}` });
       }
       return Math.min(confidence, 1);
     }
-    // ==================== MATCHERS - PRO AVANÇADO ====================
+    // ==================== MATCHERS - PRO AVANÃ‡ADO ====================
     matchSubscription(node) {
       var _a;
       let confidence = 0;
@@ -8367,318 +9090,17 @@ ${refText}` });
     }
   };
 
-  // src/linter/config/widget-taxonomy.ts
-  var WIDGET_TAXONOMY = [
-    {
-      id: "basics",
-      label: "Basicos",
-      items: [
-        "heading",
-        "text",
-        "button",
-        "image",
-        "icon",
-        "video",
-        "divider",
-        "spacer",
-        "image-box",
-        "icon-box",
-        "star-rating",
-        "counter",
-        "progress",
-        "tabs",
-        "accordion",
-        "toggle",
-        "alert",
-        "social-icons",
-        "soundcloud",
-        "shortcode",
-        "html",
-        "menu-anchor",
-        "sidebar",
-        "read-more",
-        "image-carousel",
-        "basic-gallery",
-        "gallery",
-        "icon-list",
-        "nav-menu",
-        "search-form",
-        "google-maps",
-        "testimonial",
-        "embed",
-        "lottie",
-        "loop:grid",
-        "w:container",
-        "w:inner-container"
-      ]
-    },
-    {
-      id: "pro",
-      label: "Pro",
-      items: [
-        "form",
-        "login",
-        "subscription",
-        "call-to-action",
-        "media:carousel",
-        "portfolio",
-        "gallery-pro",
-        "slider:slides",
-        "slideshow",
-        "flip-box",
-        "animated-headline",
-        "post-navigation",
-        "share-buttons",
-        "table-of-contents",
-        "countdown",
-        "blockquote",
-        "testimonial-carousel",
-        "review-box",
-        "reviews",
-        "hotspots",
-        "sitemap",
-        "author-box",
-        "price-table",
-        "price-list",
-        "progress-tracker",
-        "animated-text",
-        "nav-menu-pro",
-        "breadcrumb",
-        "facebook-button",
-        "facebook-comments",
-        "facebook-embed",
-        "facebook-page",
-        "loop:builder",
-        "loop:grid-advanced",
-        "loop-carousel",
-        "post-excerpt",
-        "post-content",
-        "post-title",
-        "post-info",
-        "post-featured-image",
-        "post-author",
-        "post-date",
-        "post-terms",
-        "archive-title",
-        "archive-description",
-        "site-logo",
-        "site-title",
-        "site-tagline",
-        "search-results",
-        "global-widget",
-        "video-playlist",
-        "video-gallery"
-      ]
-    },
-    {
-      id: "woo",
-      label: "WooCommerce",
-      items: [
-        "woo:product-title",
-        "woo:product-image",
-        "woo:product-price",
-        "woo:product-add-to-cart",
-        "woo:product-data-tabs",
-        "woo:product-excerpt",
-        "woo:product-rating",
-        "woo:product-stock",
-        "woo:product-meta",
-        "woo:product-additional-information",
-        "woo:product-short-description",
-        "woo:product-related",
-        "woo:product-upsells",
-        "woo:product-tabs",
-        "woo:product-breadcrumb",
-        "woo:product-gallery",
-        "woo:products",
-        "woo:product-grid",
-        "woo:product-carousel",
-        "woo:product-loop-item",
-        "woo:loop-product-title",
-        "woo:loop-product-price",
-        "woo:loop-product-rating",
-        "woo:loop-product-image",
-        "woo:loop-product-button",
-        "woo:loop-product-meta",
-        "woo:cart",
-        "woo:checkout",
-        "woo:my-account",
-        "woo:purchase-summary",
-        "woo:order-tracking"
-      ]
-    },
-    {
-      id: "loop-builder",
-      label: "Loop Builder",
-      items: [
-        "loop:item",
-        "loop:image",
-        "loop:title",
-        "loop:meta",
-        "loop:terms",
-        "loop:rating",
-        "loop:price",
-        "loop:add-to-cart",
-        "loop:read-more",
-        "loop:featured-image",
-        "loop:pagination"
-      ]
-    },
-    {
-      id: "experimental",
-      label: "Experimentais",
-      items: [
-        "w:nested-tabs",
-        "w:mega-menu",
-        "w:scroll-snap",
-        "w:motion-effects",
-        "w:background-slideshow",
-        "w:css-transform",
-        "w:custom-position",
-        "w:dynamic-tags",
-        "w:ajax-pagination"
-      ]
-    },
-    {
-      id: "wordpress",
-      label: "WordPress",
-      items: [
-        "w:wp-search",
-        "w:wp-recent-posts",
-        "w:wp-recent-comments",
-        "w:wp-archives",
-        "w:wp-categories",
-        "w:wp-calendar",
-        "w:wp-tag-cloud",
-        "w:wp-custom-menu"
-      ]
-    },
-    {
-      id: "hierarchy",
-      label: "Nomenclatura Hierarquica",
-      items: [
-        "accordion:item",
-        "accordion:title",
-        "accordion:content",
-        "accordion:icon",
-        "tabs:item",
-        "tabs:title",
-        "tabs:content",
-        "list:item",
-        "list:icon",
-        "list:text",
-        "slide:1",
-        "slide:2",
-        "carousel:slide",
-        "countdown:days",
-        "countdown:hours",
-        "countdown:minutes",
-        "countdown:seconds",
-        "toggle:item",
-        "toggle:title",
-        "toggle:content"
-      ]
-    }
-  ];
-  var ALL_WIDGET_SLUGS = new Set(WIDGET_TAXONOMY.flatMap((cat) => cat.items));
-  function isWidgetInTaxonomy(slug) {
+  // src/linter/namingTaxonomy.ts
+  var VALID_WIDGET_SLUGS = new Set(getAllWidgetSlugs());
+  function isValidWidgetSlug(slug) {
     if (!slug) return false;
-    return ALL_WIDGET_SLUGS.has(slug.trim());
+    const normalized = normalizeWidgetSlug(slug);
+    if (normalized && VALID_WIDGET_SLUGS.has(normalized)) return true;
+    return VALID_WIDGET_SLUGS.has(slug.trim());
   }
-  function normalizeWidgetSlug(slug) {
-    if (!slug) return null;
-    const trimmed = slug.trim();
-    if (ALL_WIDGET_SLUGS.has(trimmed)) return trimmed;
-    if (trimmed.startsWith("w:")) {
-      const withoutPrefix = trimmed.slice(2);
-      if (ALL_WIDGET_SLUGS.has(withoutPrefix)) {
-        return withoutPrefix;
-      }
-    }
-    return null;
+  function isValidContainerName(name) {
+    return isValidWidgetSlug(name);
   }
-  function filterValidWidgetNames(names) {
-    const unique = [];
-    names.forEach((name) => {
-      const normalized = normalizeWidgetSlug(name);
-      if (normalized && !unique.includes(normalized)) {
-        unique.push(normalized);
-      }
-    });
-    return unique;
-  }
-  var TEXT_WIDGETS = [
-    "heading",
-    "text",
-    "animated-headline",
-    "post-title",
-    "post-excerpt",
-    "post-content",
-    "post-info",
-    "post-terms",
-    "archive-title",
-    "archive-description",
-    "site-title",
-    "site-tagline",
-    "countdown",
-    "blockquote"
-  ].filter(isWidgetInTaxonomy);
-  var MEDIA_WIDGETS = [
-    "image",
-    "image-box",
-    "image-carousel",
-    "basic-gallery",
-    "gallery",
-    "media:carousel",
-    "slideshow",
-    "slider:slides",
-    "video",
-    "video-gallery",
-    "video-playlist",
-    "loop:image",
-    "post-featured-image",
-    "site-logo",
-    "woo:product-image",
-    "woo:product-gallery",
-    "woo:product-carousel"
-  ].filter(isWidgetInTaxonomy);
-  var CONTAINER_WIDGETS = [
-    "w:container",
-    "w:inner-container",
-    "menu-anchor",
-    "sidebar",
-    "nav-menu",
-    "nav-menu-pro",
-    "accordion",
-    "tabs",
-    "toggle",
-    "accordion:item",
-    "accordion:title",
-    "accordion:content",
-    "accordion:icon",
-    "tabs:item",
-    "tabs:title",
-    "tabs:content",
-    "toggle:item",
-    "toggle:title",
-    "toggle:content",
-    "carousel:slide",
-    "slide:1",
-    "slide:2"
-  ].filter(isWidgetInTaxonomy);
-  var FORM_WIDGETS = [
-    "form",
-    "login",
-    "subscription",
-    "search-form",
-    "woo:checkout",
-    "woo:cart",
-    "woo:order-tracking",
-    "woo:my-account"
-  ].filter(isWidgetInTaxonomy);
-  var getTextWidgetNames = () => [...TEXT_WIDGETS];
-  var getMediaWidgetNames = () => [...MEDIA_WIDGETS];
-  var getContainerWidgetNames = () => [...CONTAINER_WIDGETS];
 
   // src/linter/rules/naming/WidgetNamingRule.ts
   var WidgetNamingRule = class {
@@ -8714,6 +9136,7 @@ ${refText}` });
       const options = this.buildOptionsForNode(node, canonicalWidget);
       if (!options.length) return null;
       const [recommendedName, ...alternatives] = options;
+      const justification = this.buildJustification(detection, canonicalWidget);
       return {
         node_id: node.id,
         node_name: node.name,
@@ -8721,14 +9144,14 @@ ${refText}` });
         severity: this.severity,
         category: this.category,
         rule: this.id,
-        message: `Widget detectado como "${canonicalWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
+        message: `Widget detectado como "${canonicalWidget}" (${Math.round(confidence * 100)}% confian\xE7a, fonte ${detection.source || "heuristic"}), mas nome atual \xE9 "${currentName}"`,
         widgetType: canonicalWidget,
         confidence,
         naming: {
           recommendedName,
           alternatives
         },
-        educational_tip: this.buildEducationalTip(canonicalWidget, recommendedName, currentName, detection.justification),
+        educational_tip: this.buildEducationalTip(canonicalWidget, recommendedName, currentName, justification),
         fixAvailable: true
       };
     }
@@ -8750,7 +9173,7 @@ ${refText}` });
         pools.push(...getContainerWidgetNames(), ...getMediaWidgetNames());
       }
       const ordered = [canonicalWidget, ...pools];
-      return filterValidWidgetNames(ordered);
+      return filterValidWidgetNames(ordered).filter((name) => isValidWidgetSlug(name));
     }
     toTaxonomySlug(widget) {
       const normalized = normalizeWidgetSlug(widget);
@@ -8786,6 +9209,28 @@ ${this.getSuggestions(recommendedName, currentName).join("\n")}
 \u2705 Justificativa da detec\xE7\xE3o:
 ${justification}
         `.trim();
+    }
+    buildJustification(det, canonicalWidget) {
+      const parts = [];
+      parts.push(`Fonte: ${det.source || "heuristic"} (${Math.round((det.confidence || 0) * 100)}% confian\xE7a)`);
+      if (det.semanticRole) parts.push(`Papel sem\xE2ntico: ${det.semanticRole}`);
+      if (det.compositeOf && det.compositeOf.length) {
+        const slotsCount = det.slots ? Object.keys(det.slots).length : 0;
+        parts.push(`Comp\xF3sito ${canonicalWidget} com ${slotsCount || det.compositeOf.length} slots/itens`);
+      }
+      if (det.repeaterItems && det.repeaterItems.length) {
+        parts.push(`Lista com ${det.repeaterItems.length} itens (\xEDcone+texto)`);
+      }
+      if (det.wrapperCollapsed) {
+        parts.push("Estilo visual herdado de wrapper colapsado");
+      }
+      if (det.attachedTextIds && det.attachedTextIds.length) {
+        parts.push(`Textos anexados (descri\xE7\xF5es/microtextos): ${det.attachedTextIds.length}`);
+      }
+      if (det.justification) {
+        parts.push(det.justification);
+      }
+      return parts.join(" | ");
     }
     generateGuide(node) {
       const detection = this.getDetectionForNode(node);
@@ -9176,7 +9621,7 @@ ${justification}
     }
     buildNameSuggestions(role) {
       const base = getContainerWidgetNames();
-      const pick = (...names) => filterValidWidgetNames(names.length ? names : base);
+      const pick = (...names) => filterValidWidgetNames(names.length ? names : base).filter((n) => isValidContainerName(n));
       switch (role) {
         case "hero":
           return pick("w:container", "w:inner-container");
@@ -9215,6 +9660,22 @@ Dicas:
     }
   };
 
+  // src/linter/utils/debugFlag.ts
+  var detectDebugFlag = () => {
+    try {
+      const globalDebug = globalThis == null ? void 0 : globalThis.LINTER_DEBUG;
+      if (globalDebug !== void 0) {
+        return Boolean(globalDebug);
+      }
+      if (typeof process !== "undefined" && process.env && process.env.LINTER_DEBUG) {
+        return process.env.LINTER_DEBUG === "1" || process.env.LINTER_DEBUG === "true";
+      }
+    } catch (e) {
+    }
+    return false;
+  };
+  var LINTER_DEBUG = detectDebugFlag();
+
   // src/linter/core/LinterEngine.ts
   var LinterEngine = class {
     constructor() {
@@ -9226,6 +9687,7 @@ Dicas:
       __publicField(this, "textBlockDetections", /* @__PURE__ */ new Map());
       __publicField(this, "containerRoleDetector", new ContainerRoleDetector());
       __publicField(this, "containerRoleDetections", /* @__PURE__ */ new Map());
+      __publicField(this, "debug", LINTER_DEBUG);
     }
     /**
      * Analisa um node do Figma
@@ -9259,13 +9721,13 @@ Dicas:
      * Analisa um único node (sem recursão)
      */
     async analyzeNode(node, registry2) {
-      console.log(`\u{1F50D} [analyzeNode] Analisando: ${node.name} (${node.type})`);
+      if (this.debug) console.log(`[analyzeNode] ${node.name} (${node.type})`);
       const results = [];
       const hasValidWidgetName = /^(w:|woo:|loop:)/.test(node.name);
       if (hasValidWidgetName) {
-        console.log(`  \u23ED\uFE0F Pulando ${node.name}: j\xE1 tem nome de widget v\xE1lido`);
+        if (this.debug) console.log(`[analyzeNode] skip ${node.name}: nome ja eh widget valido`);
         if ("children" in node && node.children) {
-          console.log(`\u{1F50D} [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
+          if (this.debug) console.log(`[analyzeNode] ${node.name} tem ${node.children.length} filhos`);
           for (const child of node.children) {
             const childResults = await this.analyzeNode(child, registry2);
             results.push(...childResults);
@@ -9274,23 +9736,23 @@ Dicas:
         return results;
       }
       const rules = registry2.getAll();
-      console.log(`\u{1F50D} [analyzeNode] ${rules.length} regras para executar`);
+      if (this.debug) console.log(`[analyzeNode] ${rules.length} regras para executar`);
       for (const rule of rules) {
-        console.log(`  \u2699\uFE0F Executando regra: ${rule.id}`);
+        if (this.debug) console.log(`[analyzeNode] executando regra: ${rule.id}`);
         try {
           const result = await rule.validate(node);
           if (result) {
             results.push(result);
-            console.log(`    \u2705 Regra ${rule.id}: Issue encontrado`);
+            if (this.debug) console.log(`[analyzeNode] regra ${rule.id}: issue encontrado`);
           } else {
-            console.log(`    \u2705 Regra ${rule.id}: OK`);
+            if (this.debug) console.log(`[analyzeNode] regra ${rule.id}: OK`);
           }
         } catch (error) {
-          console.error(`    \u274C ERRO na regra ${rule.id}:`, error);
+          console.error(`    ? ERRO na regra ${rule.id}:`, error);
         }
       }
       if ("children" in node && node.children) {
-        console.log(`\u{1F50D} [analyzeNode] ${node.name} tem ${node.children.length} filhos`);
+        if (this.debug) console.log(`[analyzeNode] ${node.name} tem ${node.children.length} filhos`);
         for (const child of node.children) {
           const childResults = await this.analyzeNode(child, registry2);
           results.push(...childResults);
@@ -9302,15 +9764,15 @@ Dicas:
      * Gera relatório completo
      */
     generateReport(results, registry2, options = {}, rootNode) {
-      var _a, _b;
+      var _a, _b, _c, _d;
       const summary = this.generateSummary(results);
-      console.log("[generateReport] Summary gerado");
+      if (this.debug) console.log("[generateReport] Summary gerado");
       const guides = this.generateGuides(results, registry2);
-      console.log("[generateReport] Guides gerados");
+      if (this.debug) console.log("[generateReport] Guides gerados");
       let widgets = [];
       let detectionMap = this.widgetDetections;
       if ((!detectionMap || detectionMap.size === 0) && rootNode) {
-        console.log("[generateReport] Iniciando deteccao de widgets (fallback)...");
+        if (this.debug) console.log("[generateReport] Iniciando deteccao de widgets (fallback)...");
         try {
           detectionMap = this.widgetDetector.detectAll(rootNode);
         } catch (error) {
@@ -9320,9 +9782,19 @@ Dicas:
       }
       if (detectionMap) {
         widgets = Array.from(detectionMap.values());
-        console.log(`[generateReport] ${widgets.length} widgets detectados`);
+        if (this.debug) console.log(`[generateReport] ${widgets.length} widgets detectados`);
       }
-      return {
+      const compositeWidgetsCount = widgets.filter((w) => w.compositeOf && w.compositeOf.length > 0).length;
+      const collapsedWrappersCount = widgets.filter((w) => w.wrapperCollapsed).length;
+      const attachedTextCount = widgets.reduce((acc, w) => acc + (w.attachedTextIds && w.attachedTextIds.length || 0), 0);
+      const compositeBreakdown = {};
+      widgets.forEach((w) => {
+        if (w.compositeOf && w.compositeOf.length && w.widget) {
+          const key = w.widget;
+          compositeBreakdown[key] = (compositeBreakdown[key] || 0) + 1;
+        }
+      });
+      const report = {
         summary,
         analysis: results,
         widgets,
@@ -9334,9 +9806,34 @@ Dicas:
           ai_used: options.aiAssisted || false,
           rules_executed: registry2.getExecutedRules(),
           text_blocks_detected: ((_a = this.textBlockDetections) == null ? void 0 : _a.size) || 0,
-          container_roles_detected: ((_b = this.containerRoleDetections) == null ? void 0 : _b.size) || 0
+          container_roles_detected: ((_b = this.containerRoleDetections) == null ? void 0 : _b.size) || 0,
+          composite_widgets_detected: compositeWidgetsCount,
+          collapsed_wrappers: collapsedWrappersCount,
+          attached_texts: attachedTextCount,
+          composite_breakdown: compositeBreakdown
         }
       };
+      const rolesDistribution = {};
+      (_c = this.containerRoleDetections) == null ? void 0 : _c.forEach((det) => {
+        rolesDistribution[det.role] = (rolesDistribution[det.role] || 0) + 1;
+      });
+      report.metadata.naming_context = {
+        total_widgets_detected: widgets.length,
+        total_containers_with_roles: ((_d = this.containerRoleDetections) == null ? void 0 : _d.size) || 0,
+        roles_distribution: rolesDistribution,
+        widgets_with_microtext: widgets.filter((w) => w.attachedTextIds && w.attachedTextIds.length).length,
+        widgets_with_wrappers: widgets.filter((w) => w.wrapperCollapsed).length,
+        composite_breakdown: compositeBreakdown
+      };
+      if (this.debug) {
+        report.metadata.internal_debug = {
+          composite_breakdown: compositeBreakdown,
+          widgets_detected: widgets.length,
+          attached_texts: attachedTextCount,
+          collapsed_wrappers: collapsedWrappersCount
+        };
+      }
+      return report;
     }
     /**
      * Gera sumário de problemas
@@ -9384,6 +9881,9 @@ Dicas:
         }
         if (rule instanceof ContainerNamingRule && typeof rule.setDetectionMap === "function") {
           rule.setDetectionMap(this.containerRoleDetections);
+          if (typeof rule.setWidgetMap === "function") {
+            rule.setWidgetMap(this.widgetDetections);
+          }
         }
       }
     }

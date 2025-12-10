@@ -1,11 +1,12 @@
-import { WidgetDetection } from '../types';
+﻿import { WidgetDetection } from '../types';
+import { normalizeWidgetSlug } from '../config/widget-taxonomy';
 
 /**
- * WidgetDetector - Detecção inteligente de widgets Elementor
+ * WidgetDetector - DetecÃ§Ã£o inteligente de widgets Elementor
  * 
  * Analisa nodes do Figma e identifica qual widget Elementor melhor representa cada elemento.
  * Suporta 148 widgets divididos em 6 categorias:
- * - Básicos (36)
+ * - BÃ¡sicos (36)
  * - Pro (53)
  * - WooCommerce (31)
  * - Loop Builder (11)
@@ -19,7 +20,7 @@ interface WidgetRule {
     category: 'basic' | 'pro' | 'woo' | 'loop' | 'experimental' | 'wordpress';
 }
 
-// Compatibilidade de widgets por tipo de node para evitar sugestões absurdas
+// Compatibilidade de widgets por tipo de node para evitar sugestÃµes absurdas
 const WIDGETS_BY_NODE_TYPE: Partial<Record<SceneNode['type'], string[]>> = {
     TEXT: ['w:heading', 'w:post-title', 'w:call-to-action', 'w:text-editor', 'w:paragraph', 'w:rich-text'],
     RECTANGLE: ['w:image', 'w:button', 'w:icon'],
@@ -51,7 +52,7 @@ export class WidgetDetector {
             return null;
         }
 
-        // Respeita prefixos tÃ©cnicos explícitos (ex.: w:image, woo:product-image)
+        // Respeita prefixos tÃƒÂ©cnicos explÃ­citos (ex.: w:image, woo:product-image)
         const explicitDetection = this.detectByExplicitName(node);
         if (explicitDetection) {
             return explicitDetection;
@@ -105,14 +106,47 @@ export class WidgetDetector {
     }
 
     /**
-     * Detecta múltiplos widgets em uma árvore
+     * Detecta mÃºltiplos widgets em uma Ã¡rvore
      */
     detectAll(root: SceneNode): Map<string, WidgetDetection> {
         const results: Map<string, WidgetDetection> = new Map();
+        const consumed: Set<string> = new Set();
 
         const traverse = (node: SceneNode) => {
+            if (consumed.has(node.id)) return;
+
+            // Wrappers visuais: colapsa e anexa metadata ao filho Ãšnico
+            const singleChild = this.getSingleChild(node);
+            if (singleChild && this.isVisualWrapper(node)) {
+                traverse(singleChild);
+                const childDetection = results.get(singleChild.id);
+                if (childDetection) {
+                    childDetection.wrapperCollapsed = true;
+                    childDetection.wrapperNodeId = node.id;
+                    childDetection.visualWrapperStyle = this.extractWrapperStyle(node);
+                    results.set(childDetection.node_id, childDetection);
+                }
+                consumed.add(node.id);
+                return;
+            }
+
+            // Composite detection primeiro (icon-box, icon-list, form)
+            const composite = this.detectComposite(node, consumed);
+            if (composite) {
+                this.attachMicrotexts(node, composite.detection, consumed);
+                results.set(node.id, composite.detection);
+                composite.consumedIds.forEach(id => consumed.add(id));
+                if ('children' in node && node.children) {
+                    for (const child of node.children) {
+                        if (!consumed.has(child.id)) traverse(child as SceneNode);
+                    }
+                }
+                return;
+            }
+
             const detection = this.detect(node);
             if (detection) {
+                this.attachMicrotexts(node, detection, consumed);
                 results.set(node.id, detection);
             }
 
@@ -128,10 +162,10 @@ export class WidgetDetector {
     }
 
     /**
-     * Inicializa todas as regras de detecção
+     * Inicializa todas as regras de detecÃ§Ã£o
      */
     private initializeRules(): void {
-        // === BÁSICOS ===
+        // === BÃSICOS ===
         this.addRule('w:heading', 'basic', this.matchHeading.bind(this));
         this.addRule('w:text-editor', 'basic', this.matchTextEditor.bind(this));
         this.addRule('w:button', 'basic', this.matchButton.bind(this));
@@ -206,7 +240,7 @@ export class WidgetDetector {
         // this.addRule('w:wp-recent-comments', 'wordpress', this.matchGenericContainer.bind(this)); // DISABLED: too generic
         this.addRule('w:wp-custom-menu', 'wordpress', this.matchNavMenu.bind(this));
 
-        // === BÁSICOS ADICIONAIS (Fase 1) ===
+        // === BÃSICOS ADICIONAIS (Fase 1) ===
         this.addRule('w:gallery', 'basic', this.matchGallery.bind(this));
         this.addRule('w:image-carousel', 'basic', this.matchImageCarousel.bind(this));
         this.addRule('w:basic-gallery', 'basic', this.matchGallery.bind(this));
@@ -236,7 +270,7 @@ export class WidgetDetector {
         this.addRule('woo:product-stock', 'woo', this.matchWooProductStock.bind(this));
         this.addRule('woo:product-meta', 'woo', this.matchWooProductMeta.bind(this));
 
-        // === PRO AVANÇADO (Fase 3) ===
+        // === PRO AVANÃ‡ADO (Fase 3) ===
         this.addRule('w:subscription', 'pro', this.matchSubscription.bind(this));
         this.addRule('w:media-carousel', 'pro', this.matchMediaCarousel.bind(this));
         this.addRule('w:slider-slides', 'pro', this.matchSliderSlides.bind(this));
@@ -288,35 +322,35 @@ export class WidgetDetector {
     }
 
     /**
-     * Adiciona uma regra de detecção
+     * Adiciona uma regra de detecÃ§Ã£o
      */
     private addRule(widget: string, category: WidgetRule['category'], matcher: (node: SceneNode) => number): void {
         this.rules.push({ widget, category, matcher });
     }
 
     /**
-     * Gera justificativa para a detecção
+     * Gera justificativa para a detecÃ§Ã£o
      */
     private generateJustification(node: SceneNode, widget: string, confidence: number): string {
         const reasons: string[] = [];
 
-        // Análise baseada no nome
+        // AnÃ¡lise baseada no nome
         if (node.name.toLowerCase().includes(widget.replace(/^w:|^woo:|^loop:/, ''))) {
             reasons.push('Nome do layer corresponde ao widget');
         }
 
-        // Análise baseada no tipo
+        // AnÃ¡lise baseada no tipo
         if (node.type === 'TEXT') {
-            reasons.push('É um elemento de texto');
+            reasons.push('Ã‰ um elemento de texto');
         } else if (node.type === 'RECTANGLE' || node.type === 'FRAME') {
-            reasons.push('Estrutura compatível com o widget');
+            reasons.push('Estrutura compatÃ­vel com o widget');
         }
 
         // Confidence
         if (confidence >= 0.8) {
-            reasons.push('Alta confiança na detecção');
+            reasons.push('Alta confianÃ§a na detecÃ§Ã£o');
         } else if (confidence >= 0.5) {
-            reasons.push('Confiança moderada');
+            reasons.push('ConfianÃ§a moderada');
         }
 
         return reasons.join('; ');
@@ -381,7 +415,7 @@ export class WidgetDetector {
     }
 
     /**
-     * Helper: Analisa conteúdo de texto
+     * Helper: Analisa conteÃºdo de texto
      */
     private analyzeTextContent(node: SceneNode): {
         hasQuote: boolean;
@@ -399,7 +433,7 @@ export class WidgetDetector {
         if ('children' in node && node.children) {
             const texts = node.children.filter(child => child.type === 'TEXT') as TextNode[];
 
-            hasQuote = texts.some(t => t.characters.includes('"') || t.characters.includes('“') || t.characters.includes('”') || t.name.toLowerCase().includes('quote'));
+            hasQuote = texts.some(t => t.characters.includes('"') || t.characters.includes('â€œ') || t.characters.includes('â€') || t.name.toLowerCase().includes('quote'));
             hasAuthor = texts.some(t => t.name.toLowerCase().includes('author') || t.name.toLowerCase().includes('autor') || t.name.toLowerCase().includes('role') || t.name.toLowerCase().includes('cargo'));
             isLongText = texts.some(t => t.characters.length > 100);
 
@@ -411,7 +445,7 @@ export class WidgetDetector {
     }
 
     /**
-     * Helper: Calcula confiança final
+     * Helper: Calcula confianÃ§a final
      */
     private calculateConfidence(
         baseScore: number,
@@ -435,7 +469,7 @@ export class WidgetDetector {
         );
     }
 
-    // ==================== MATCHERS - BÁSICOS ====================
+    // ==================== MATCHERS - BÃSICOS ====================
 
     /**
      * Verifica se o node pode ser considerado candidato a widget
@@ -447,7 +481,7 @@ export class WidgetDetector {
             return false;
         }
         if ((node as any).parent === null || (node as any).parentId === null) {
-            // Diferencia raiz gigante (pÇ¸gina) de exports pequenos isolados
+            // Diferencia raiz gigante (pÃ‡Â¸gina) de exports pequenos isolados
             if (this.looksLikePageRoot(node)) {
                 return false;
             }
@@ -483,7 +517,7 @@ export class WidgetDetector {
     }
 
     /**
-     * Respeita nomes com prefixo técnico explícito (alta confiança)
+     * Respeita nomes com prefixo tÃ©cnico explÃ­cito (alta confianÃ§a)
      */
     private detectByExplicitName(node: SceneNode): WidgetDetection | null {
         const rawName = node.name || '';
@@ -493,17 +527,22 @@ export class WidgetDetector {
         const hasExplicitPrefix = explicitPrefixes.some(prefix => name.startsWith(prefix));
         if (hasExplicitPrefix) {
             const explicitWidget = rawName.split(/\s/)[0]; // preserva prefixo original
+            const normalized = normalizeWidgetSlug(explicitWidget);
+            if (!normalized) {
+                console.debug('[WIDGET DETECTOR] explicit-name fora da taxonomia, ignorando:', explicitWidget);
+                return null;
+            }
             return {
                 node_id: node.id,
                 node_name: node.name,
                 widget: explicitWidget,
                 confidence: 1.0,
-                justification: 'Nome possui prefixo técnico explícito',
+                justification: 'Nome possui prefixo tÃ©cnico explÃ­cito',
                 source: 'explicit-name'
             };
         }
 
-        // Casos específicos aceitos com confiança máxima
+        // Casos especÃ­ficos aceitos com confianÃ§a mÃ¡xima
         if (name === 'image') {
             return {
                 node_id: node.id,
@@ -519,7 +558,7 @@ export class WidgetDetector {
     }
 
     /**
-     * Retorna lista de widgets compatíveis com o tipo de node
+     * Retorna lista de widgets compatÃ­veis com o tipo de node
      */
     private getAllowedWidgetsForNodeType(nodeType: SceneNode['type']): string[] {
         return WIDGETS_BY_NODE_TYPE[nodeType] || [];
@@ -531,7 +570,7 @@ export class WidgetDetector {
     private shouldAcceptWidgetDetection(widget: string, confidence: number, nodeName: string): boolean {
         const normalizedName = (nodeName || '').toLowerCase();
         if (normalizedName.startsWith('w:') || normalizedName.startsWith('woo:') || normalizedName.startsWith('loop:')) {
-            return true; // Nome já tem prefixo técnico
+            return true; // Nome jÃ¡ tem prefixo tÃ©cnico
         }
 
         if (HIGH_RISK_WIDGETS.has(widget)) {
@@ -541,15 +580,451 @@ export class WidgetDetector {
         return confidence >= 0.6;
     }
 
+    // =====================
+    // Composite detection
+    // =====================
+    private detectComposite(node: SceneNode, alreadyConsumed: Set<string>): { detection: WidgetDetection; consumedIds: string[] } | null {
+        const name = (node.name || '').toLowerCase();
+        const iconBoxSlug = this.normalizeWidgetSlugWithPrefix('w:icon-box');
+        const iconListSlug = this.normalizeWidgetSlugWithPrefix('w:icon-list');
+        const formSlug = this.normalizeWidgetSlugWithPrefix('w:form');
+
+        // ICON-BOX
+        const isIconBox = iconBoxSlug && (name.startsWith('w:icon-box') || this.looksLikeIconBox(node));
+        if (isIconBox) {
+            const slots = this.extractIconBoxSlots(node, alreadyConsumed);
+            if (slots.icon || slots.title || slots.text) {
+                const consumedIds = Object.values(slots).filter(Boolean) as string[];
+                return {
+                    detection: {
+                        node_id: node.id,
+                        node_name: node.name,
+                        widget: iconBoxSlug,
+                        confidence: 1.0,
+                        justification: 'Composite icon-box detectado (Ã­cone + heading + texto)',
+                        source: name.startsWith('w:') ? 'explicit-name' : 'heuristic',
+                        semanticRole: 'icon-box',
+                        compositeOf: consumedIds,
+                        slots: {
+                            ...(slots.icon ? { icon: slots.icon } : {}),
+                            ...(slots.title ? { title: slots.title } : {}),
+                            ...(slots.text ? { text: slots.text } : {})
+                        }
+                    },
+                    consumedIds
+                };
+            }
+        }
+
+        // ICON-LIST (explÃ­cito ou padrÃ£o implÃ­cito)
+        const isIconList = iconListSlug && (name.startsWith('w:icon-list') || this.looksLikeIconList(node, alreadyConsumed));
+        if (isIconList) {
+            const repeater = this.extractIconListItems(node, alreadyConsumed);
+            const score = this.scoreIconList(node, repeater);
+            if (repeater.length > 0 && score >= 0.7) {
+                const consumedIds = repeater.flatMap(item => [item.itemId, item.iconId, item.textId].filter(Boolean) as string[]);
+                return {
+                    detection: {
+                        node_id: node.id,
+                        node_name: node.name,
+                        widget: iconListSlug,
+                        confidence: name.startsWith('w:') ? 1.0 : score,
+                        justification: `Composite icon-list detectado (itens com Ã­cone + texto, score=${score.toFixed(2)})`,
+                        source: name.startsWith('w:') ? 'explicit-name' : 'implicit-pattern',
+                        semanticRole: 'icon-list',
+                        repeaterItems: repeater,
+                        compositeOf: consumedIds
+                    },
+                    consumedIds
+                };
+            }
+        }
+
+        // FORM (explÃ­cito ou padrÃ£o implÃ­cito)
+        const isForm = formSlug && (name.startsWith('w:form') || this.looksLikeForm(node, alreadyConsumed));
+        if (isForm) {
+            const slots = this.extractFormSlots(node, alreadyConsumed);
+            const score = slots ? this.scoreForm(node, slots) : 0;
+            if (slots && score >= 0.7) {
+                const consumedIds = [
+                    ...(slots.titleSlot ? [slots.titleSlot] : []),
+                    ...(slots.descriptionSlot ? [slots.descriptionSlot] : []),
+                    ...slots.fields.flatMap(f => [f.fieldId, f.labelId, ...(f.helperTextIds || [])]).filter(Boolean) as string[],
+                    ...(slots.buttons || [])
+                ];
+                return {
+                    detection: {
+                        node_id: node.id,
+                        node_name: node.name,
+                        widget: formSlug,
+                        confidence: name.startsWith('w:') ? 1.0 : score,
+                        justification: `Composite form detectado (campos + labels + auxiliares, score=${score.toFixed(2)})`,
+                        source: name.startsWith('w:') ? 'explicit-name' : 'implicit-pattern',
+                        semanticRole: 'form',
+                        compositeOf: consumedIds,
+                        slots: {
+                            ...(slots.titleSlot ? { title: slots.titleSlot } : {}),
+                            ...(slots.descriptionSlot ? { description: slots.descriptionSlot } : {})
+                        },
+                        properties: {
+                            fields: slots.fields,
+                            buttons: slots.buttons || []
+                        }
+                    },
+                    consumedIds
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private normalizeWidgetSlugWithPrefix(slug: string): string | null {
+        const normalized = normalizeWidgetSlug(slug);
+        if (!normalized) return null;
+        return normalized.startsWith('w:') ? normalized : `w:${normalized}`;
+    }
+
+    private getSingleChild(node: SceneNode): SceneNode | null {
+        if (!('children' in node) || !node.children || node.children.length !== 1) return null;
+        return node.children[0] as SceneNode;
+    }
+
+    private isVisualWrapper(node: SceneNode): boolean {
+        if (node.type !== 'FRAME' && node.type !== 'GROUP') return false;
+        const child = this.getSingleChild(node);
+        if (!child) return false;
+        const hasBackground = Array.isArray((node as any).fills) && (node as any).fills.length > 0;
+        const hasStroke = Array.isArray((node as any).strokes) && (node as any).strokes.length > 0;
+        const hasRadius = typeof (node as any).cornerRadius === 'number' && (node as any).cornerRadius > 0;
+        return hasBackground || hasStroke || hasRadius;
+    }
+
+    private extractWrapperStyle(node: SceneNode): Record<string, any> {
+        const style: Record<string, any> = {};
+        if (Array.isArray((node as any).fills) && (node as any).fills.length > 0) {
+            style.fills = (node as any).fills.filter((f: any) => f.visible !== false);
+        }
+        if (Array.isArray((node as any).strokes) && (node as any).strokes.length > 0) {
+            style.strokes = (node as any).strokes.filter((s: any) => s.visible !== false);
+            style.strokeWeight = (node as any).strokeWeight;
+        }
+        if (typeof (node as any).cornerRadius === 'number') {
+            style.cornerRadius = (node as any).cornerRadius;
+        }
+        if (Array.isArray((node as any).effects) && (node as any).effects.length > 0) {
+            style.effects = (node as any).effects.filter((e: any) => e.visible !== false);
+        }
+        return style;
+    }
+
+    private looksLikeIconBox(node: SceneNode): boolean {
+        if (node.type !== 'FRAME' && node.type !== 'GROUP') return false;
+        const children = ('children' in node && node.children) ? node.children : [];
+        if (!children || children.length < 2) return false;
+        const hasIcon = children.some(ch => (ch as any).type === 'VECTOR' || (ch as any).type === 'ELLIPSE' || ((ch as any).name || '').toLowerCase().startsWith('w:icon'));
+        const textNodes = children.filter(ch => (ch as any).type === 'TEXT');
+        return hasIcon && textNodes.length >= 1;
+    }
+
+    private looksLikeIconList(node: SceneNode, alreadyConsumed: Set<string>): boolean {
+        if (node.type !== 'FRAME' && node.type !== 'GROUP') return false;
+        const children = ('children' in node && node.children) ? node.children : [];
+        if (!children || children.length < 2) return false;
+        const items = this.extractIconListItems(node, alreadyConsumed);
+        return items.length >= 2;
+    }
+
+    private extractIconBoxSlots(node: SceneNode, alreadyConsumed: Set<string>): { icon?: string; title?: string; text?: string } {
+        const children = ('children' in node && node.children) ? node.children : [];
+        let iconId: string | undefined;
+        let titleId: string | undefined;
+        let textId: string | undefined;
+
+        for (const child of children) {
+            if (alreadyConsumed.has(child.id)) continue;
+            const childName = (child.name || '').toLowerCase();
+            if (!iconId && (childName.startsWith('w:icon') || child.type === 'VECTOR' || child.type === 'ELLIPSE')) {
+                iconId = child.id;
+                continue;
+            }
+            if (child.type === 'TEXT') {
+                if (!titleId) {
+                    titleId = child.id;
+                    continue;
+                }
+                if (!textId) {
+                    textId = child.id;
+                }
+            }
+        }
+
+        return { icon: iconId, title: titleId, text: textId };
+    }
+
+    private extractIconListItems(node: SceneNode, alreadyConsumed: Set<string>): Array<{ itemId: string; iconId?: string; textId?: string }> {
+        const children = ('children' in node && node.children) ? node.children : [];
+        const items: Array<{ itemId: string; iconId?: string; textId?: string }> = [];
+        for (const item of children) {
+            if (alreadyConsumed.has(item.id)) continue;
+            if (!('children' in item) || !(item as any).children) continue;
+            const iconChild = (item as any).children.find((c: any) =>
+                !alreadyConsumed.has(c.id) &&
+                (((c.name || '').toLowerCase().startsWith('w:icon')) || c.type === 'VECTOR' || c.type === 'ELLIPSE')
+            );
+            const textChild = (item as any).children.find((c: any) =>
+                !alreadyConsumed.has(c.id) &&
+                c.type === 'TEXT'
+            );
+            if (iconChild || textChild) {
+                items.push({ itemId: item.id, iconId: iconChild?.id, textId: textChild?.id });
+            }
+        }
+        return items;
+    }
+
+    private scoreIconList(node: SceneNode, items: Array<{ itemId: string; iconId?: string; textId?: string }>): number {
+        if (items.length === 0) return 0;
+        let score = 0;
+        if (items.length >= 3) score += 0.4;
+        else if (items.length === 2) score += 0.2;
+
+        const allHaveIconAndText = items.every(it => !!it.iconId && !!it.textId);
+        if (allHaveIconAndText) score += 0.3;
+
+        // Gap consistency
+        const positions = items.map(it => {
+            const nodeChild = (node as any).children?.find((c: any) => c.id === it.itemId);
+            return nodeChild ? { y: nodeChild.y as number, height: (nodeChild as any).height as number } : null;
+        }).filter(Boolean) as { y: number; height: number }[];
+        if (positions.length >= 2) {
+            const gaps: number[] = [];
+            const sorted = positions.sort((a, b) => a.y - b.y);
+            for (let i = 1; i < sorted.length; i++) {
+                gaps.push(sorted[i].y - (sorted[i - 1].y + sorted[i - 1].height));
+            }
+            if (gaps.length) {
+                const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+                const maxDiff = Math.max(...gaps.map(g => Math.abs(g - avg)));
+                if (maxDiff <= 4) score += 0.2;
+            }
+        }
+
+        // Width similarity
+        const widths = items.map(it => {
+            const nodeChild = (node as any).children?.find((c: any) => c.id === it.itemId);
+            return nodeChild ? (nodeChild as any).width as number : null;
+        }).filter((v): v is number => typeof v === 'number');
+        if (widths.length >= 2) {
+            const minW = Math.min(...widths);
+            const maxW = Math.max(...widths);
+            if (minW > 0 && maxW / minW <= 1.2) {
+                score += 0.1;
+            }
+        }
+
+        return Math.min(score, 1);
+    }
+
+    private extractFormSlots(node: SceneNode, alreadyConsumed: Set<string>): { titleSlot?: string; descriptionSlot?: string; fields: Array<{ fieldId: string; labelId?: string; helperTextIds?: string[] }>; buttons?: string[] } | null {
+        const children = ('children' in node && node.children) ? node.children : [];
+        if (!children || children.length === 0) return null;
+
+        let titleSlot: string | undefined;
+        let descriptionSlot: string | undefined;
+        const fields: Array<{ fieldId: string; labelId?: string; helperTextIds?: string[] }> = [];
+        const buttons: string[] = [];
+
+        for (const child of children) {
+            if (alreadyConsumed.has(child.id)) continue;
+            const childName = (child.name || '').toLowerCase();
+
+            if (childName.startsWith('w:button') || child.type === 'COMPONENT' || childName.includes('button')) {
+                buttons.push(child.id);
+                continue;
+            }
+
+            if (child.type === 'TEXT') {
+                if (!titleSlot) {
+                    titleSlot = child.id;
+                    continue;
+                }
+                if (!descriptionSlot) {
+                    descriptionSlot = child.id;
+                    continue;
+                }
+            }
+
+            if (child.type === 'FRAME' || child.type === 'GROUP' || child.type === 'RECTANGLE') {
+                const grandChildren = ('children' in child && (child as any).children) ? (child as any).children : [];
+                let labelId: string | undefined;
+                let fieldId: string | undefined;
+                const helpers: string[] = [];
+                for (const gc of grandChildren) {
+                    if (alreadyConsumed.has(gc.id)) continue;
+                    if (!labelId && gc.type === 'TEXT') {
+                        labelId = gc.id;
+                        continue;
+                    }
+                    if (!fieldId && (gc.type === 'RECTANGLE' || gc.type === 'FRAME' || gc.type === 'GROUP')) {
+                        fieldId = gc.id;
+                        continue;
+                    }
+                    if (gc.type === 'TEXT') {
+                        helpers.push(gc.id);
+                    }
+                }
+                if (fieldId || labelId) {
+                    fields.push({ fieldId: fieldId || labelId!, labelId, helperTextIds: helpers.length ? helpers : undefined });
+                }
+            }
+        }
+
+        if (!titleSlot && !descriptionSlot && fields.length === 0 && buttons.length === 0) {
+            return null;
+        }
+
+        return { titleSlot, descriptionSlot, fields, buttons };
+    }
+
+    private looksLikeForm(node: SceneNode, alreadyConsumed: Set<string>): boolean {
+        if (node.type !== 'FRAME' && node.type !== 'GROUP') return false;
+        const slots = this.extractFormSlots(node, alreadyConsumed);
+        if (!slots) return false;
+        const hasFields = slots.fields && slots.fields.length >= 2;
+        const hasButton = slots.buttons && slots.buttons.length > 0;
+        return !!(hasFields && hasButton);
+    }
+
+    private scoreForm(node: SceneNode, slots: { fields: Array<{ fieldId: string; labelId?: string; helperTextIds?: string[] }>; buttons?: string[]; titleSlot?: string; descriptionSlot?: string }): number {
+        let score = 0;
+        const fieldCount = slots.fields.length;
+        if (fieldCount >= 3) score += 0.4;
+        else if (fieldCount >= 2) score += 0.3;
+
+        if (slots.buttons && slots.buttons.length > 0) score += 0.2;
+        if (slots.titleSlot || slots.descriptionSlot) score += 0.1;
+
+        // ConsistÃªncia de alinhamento vertical dos campos
+        const fieldsNodes = slots.fields.map(f => {
+            const n = this.findNodeById(node, f.fieldId);
+            return n ? { y: (n as any).y as number, height: (n as any).height as number } : null;
+        }).filter(Boolean) as { y: number; height: number }[];
+        if (fieldsNodes.length >= 2) {
+            const gaps: number[] = [];
+            const sorted = fieldsNodes.sort((a, b) => a.y - b.y);
+            for (let i = 1; i < sorted.length; i++) {
+                gaps.push(sorted[i].y - (sorted[i - 1].y + sorted[i - 1].height));
+            }
+            if (gaps.length) {
+                const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+                const maxDiff = Math.max(...gaps.map(g => Math.abs(g - avg)));
+                if (maxDiff <= 8) score += 0.2;
+            }
+        }
+
+        return Math.min(score, 1);
+    }
+
+    /**
+     * Microtext/description attachment
+     */
+    private attachMicrotexts(node: SceneNode, detection: WidgetDetection, consumed: Set<string>) {
+        if (!('children' in node) || !node.children || node.children.length === 0) return;
+
+        const attached: string[] = detection.attachedTextIds ? [...detection.attachedTextIds] : [];
+        const childTexts = (node.children as SceneNode[]).filter(ch => ch.type === 'TEXT' && !consumed.has(ch.id) && !((ch.name || '').toLowerCase().startsWith('w:')));
+
+        // Referência de fonte principal (maior fontSize entre textos não consumidos)
+        const fontSizes = childTexts.map(t => (t as any).fontSize).filter((v: any) => typeof v === 'number') as number[];
+        const maxFont = fontSizes.length ? Math.max(...fontSizes) : 0;
+        const thresholdSmall = maxFont > 0 ? Math.min(maxFont * 0.8, maxFont - 2) : 18;
+        const headingCandidate = childTexts.reduce<{ node: SceneNode | null; font: number; bbox?: { x: number; y: number; width: number; height: number } }>((acc, t) => {
+            const f = (t as any).fontSize;
+            if (typeof f === 'number' && f >= (acc.font || 0)) {
+                return { node: t, font: f, bbox: this.getBBox(t) };
+            }
+            return acc;
+        }, { node: null, font: 0 });
+
+        for (const child of childTexts) {
+            const fontSize = (child as any).fontSize;
+            const fontWeight = (child as any).fontWeight;
+            const fills = (child as any).fills;
+            const bboxChild = this.getBBox(child);
+            const bboxParent = this.getBBox(node);
+
+            // Distância vertical para edges do pai
+            const topGap = bboxChild.y - bboxParent.y;
+            const bottomGap = (bboxParent.y + bboxParent.height) - (bboxChild.y + bboxChild.height);
+            const minGap = Math.min(topGap, bottomGap);
+            const withinDistance = minGap >= 4 && minGap <= 32;
+
+            // Sobreposição horizontal mínima 60%
+            const overlap = Math.max(0, Math.min(bboxParent.x + bboxParent.width, bboxChild.x + bboxChild.width) - Math.max(bboxParent.x, bboxChild.x));
+            const overlapRatio = bboxChild.width > 0 ? (overlap / bboxChild.width) : 0;
+            const aligns = overlapRatio >= 0.6;
+            const headingOverlap = headingCandidate.bbox ? this.computeOverlapRatio(bboxChild, headingCandidate.bbox) : 1;
+
+            const smallFont = typeof fontSize === 'number' ? fontSize <= thresholdSmall : true;
+            const lightWeight = typeof fontWeight === 'number' ? fontWeight <= 500 : false;
+            let lowOpacity = false;
+            if (Array.isArray(fills)) {
+                const solid = fills.find((f: any) => f.type === 'SOLID' && f.visible !== false);
+                if (solid && solid.opacity !== undefined && solid.opacity < 0.8) {
+                    lowOpacity = true;
+                }
+            }
+
+            // Conflito: se parece heading (peso alto ou fonte >= maxFont), não anexar
+            const looksLikeHeading = (typeof fontWeight === 'number' && fontWeight >= 600) || (typeof fontSize === 'number' && fontSize >= maxFont);
+            const tooCloseToHeading = headingCandidate.font && typeof fontSize === 'number' && fontSize >= headingCandidate.font * 0.8;
+            const wrongColumn = headingCandidate.bbox && headingOverlap < 0.6;
+
+            if (!looksLikeHeading && !tooCloseToHeading && !wrongColumn && aligns && withinDistance && (smallFont || lightWeight || lowOpacity)) {
+                attached.push(child.id);
+                consumed.add(child.id);
+            }
+        }
+
+        if (attached.length) {
+            detection.attachedTextIds = attached;
+        }
+    }
+
+    private computeOverlapRatio(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): number {
+        const overlap = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+        return a.width > 0 ? overlap / a.width : 0;
+    }
+
+    private getBBox(node: SceneNode): { x: number; y: number; width: number; height: number } {
+        const x = (node as any).x ?? 0;
+        const y = (node as any).y ?? 0;
+        const width = 'width' in node ? (node as any).width || 0 : 0;
+        const height = 'height' in node ? (node as any).height || 0 : 0;
+        return { x, y, width, height };
+    }
+
+    private findNodeById(root: SceneNode, id: string): SceneNode | null {
+        if (root.id === id) return root;
+        if ('children' in root && root.children) {
+            for (const ch of root.children) {
+                const found = this.findNodeById(ch as SceneNode, id);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
     private matchHeading(node: SceneNode): number {
         if (node.type !== 'TEXT') return 0;
         const text = node as TextNode;
 
         let confidence = 0.4; // Base
 
-        // Nome contém "heading", "h1", "h2", "título"
+        // Nome contÃ©m "heading", "h1", "h2", "tÃ­tulo"
         const name = node.name.toLowerCase();
-        if (name.includes('heading') || name.includes('título') || /^h[1-6]$/i.test(name)) {
+        if (name.includes('heading') || name.includes('tÃ­tulo') || /^h[1-6]$/i.test(name)) {
             confidence += 0.3;
         }
 
@@ -648,7 +1123,7 @@ export class WidgetDetector {
             }
         }
 
-        // É um vetor
+        // Ã‰ um vetor
         if (node.type === 'VECTOR' || node.type === 'BOOLEAN_OPERATION') {
             confidence += 0.2;
         }
@@ -769,7 +1244,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Múltiplos icons em linha
+        // MÃºltiplos icons em linha
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const starCount = node.children.filter(child =>
                 child.name.toLowerCase().includes('star') ||
@@ -792,7 +1267,7 @@ export class WidgetDetector {
             confidence += 0.6;
         }
 
-        // Texto com números
+        // Texto com nÃºmeros
         if (node.type === 'TEXT') {
             const text = node as TextNode;
             if (text.characters && /^\d+/.test(text.characters)) {
@@ -830,7 +1305,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Múltiplos frames horizontais
+        // MÃºltiplos frames horizontais
         if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
             const hasMultipleSections = node.children.filter(child => child.type === 'FRAME').length >= 2;
             if (hasMultipleSections) {
@@ -849,7 +1324,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Múltiplos frames verticais
+        // MÃºltiplos frames verticais
         if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
             confidence += 0.3;
         }
@@ -904,7 +1379,7 @@ export class WidgetDetector {
             confidence += 0.6;
         }
 
-        // Múltiplos icons pequenos em linha
+        // MÃºltiplos icons pequenos em linha
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const iconCount = node.children.filter(child =>
                 child.type === 'VECTOR' ||
@@ -927,7 +1402,7 @@ export class WidgetDetector {
             confidence += 0.6;
         }
 
-        // Múltiplos pares de icon + texto
+        // MÃºltiplos pares de icon + texto
         if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
             confidence += 0.4;
         }
@@ -943,7 +1418,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Múltiplos links/botões horizontais
+        // MÃºltiplos links/botÃµes horizontais
         if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 3) {
             confidence += 0.3;
         }
@@ -959,7 +1434,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Input + botão
+        // Input + botÃ£o
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const hasInput = node.children.some(child =>
                 child.name.toLowerCase().includes('input') ||
@@ -1005,7 +1480,7 @@ export class WidgetDetector {
             confidence += 0.5;
         }
 
-        // Frame com múltiplos filhos
+        // Frame com mÃºltiplos filhos
         if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length > 0) {
             confidence += 0.3;
         }
@@ -1028,7 +1503,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Múltiplos inputs
+        // MÃºltiplos inputs
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const inputCount = node.children.filter(child =>
                 child.name.toLowerCase().includes('input') ||
@@ -1075,7 +1550,7 @@ export class WidgetDetector {
             confidence += 0.8;
         }
 
-        // Frame com titulo + descrição + botão
+        // Frame com titulo + descriÃ§Ã£o + botÃ£o
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const hasText = node.children.filter(child => child.type === 'TEXT').length >= 2;
             const hasButton = node.children.some(child =>
@@ -1153,7 +1628,7 @@ export class WidgetDetector {
             confidence += 0.8;
         }
 
-        // Múltiplos números (dias, horas, min, seg)
+        // MÃºltiplos nÃºmeros (dias, horas, min, seg)
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const numberCount = node.children.filter(child =>
                 child.type === 'TEXT' && /\d/.test(child.name)
@@ -1175,7 +1650,7 @@ export class WidgetDetector {
             confidence += 0.6;
         }
 
-        // Frame com título + preço + features + button
+        // Frame com tÃ­tulo + preÃ§o + features + button
         if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 3) {
             confidence += 0.4;
         }
@@ -1191,7 +1666,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Lista de items com preços
+        // Lista de items com preÃ§os
         if (node.type === 'FRAME' && 'children' in node && node.children && node.children.length >= 2) {
             confidence += 0.3;
         }
@@ -1240,10 +1715,10 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Texto com cifrão ou número
+        // Texto com cifrÃ£o ou nÃºmero
         if (node.type === 'TEXT') {
             const text = node as TextNode;
-            if (text.characters && (/\$|R\$|€/.test(text.characters) || /\d+[.,]\d+/.test(text.characters))) {
+            if (text.characters && (/\$|R\$|â‚¬/.test(text.characters) || /\d+[.,]\d+/.test(text.characters))) {
                 confidence += 0.3;
             }
         }
@@ -1289,10 +1764,10 @@ export class WidgetDetector {
         return Math.min(confidence, 1.0);
     }
 
-    // ==================== MATCHERS - GENÉRICOS ====================
+    // ==================== MATCHERS - GENÃ‰RICOS ====================
 
     /**
-     * Matcher genérico para texto (usado para widgets simples de texto)
+     * Matcher genÃ©rico para texto (usado para widgets simples de texto)
      */
     private matchGenericText(node: SceneNode): number {
         let confidence = 0;
@@ -1313,7 +1788,7 @@ export class WidgetDetector {
     }
 
     /**
-     * Matcher genérico para containers (usado para widgets que são apenas wrappers)
+     * Matcher genÃ©rico para containers (usado para widgets que sÃ£o apenas wrappers)
      */
     private matchGenericContainer(node: SceneNode): number {
         let confidence = 0;
@@ -1341,7 +1816,7 @@ export class WidgetDetector {
             confidence += 0.6;
         }
 
-        // Container com múltiplas imagens
+        // Container com mÃºltiplas imagens
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const imageCount = node.children.filter(child => {
                 const childName = child.name.toLowerCase();
@@ -1370,7 +1845,7 @@ export class WidgetDetector {
             confidence += 0.3;
         }
 
-        // Container horizontal com múltiplas imagens
+        // Container horizontal com mÃºltiplas imagens
         if (node.type === 'FRAME' && 'children' in node && 'layoutMode' in node) {
             if (node.layoutMode === 'HORIZONTAL') {
                 confidence += 0.2;
@@ -1388,7 +1863,7 @@ export class WidgetDetector {
             confidence += 0.7;
         }
 
-        // Frame com aspect ratio próximo de mapa
+        // Frame com aspect ratio prÃ³ximo de mapa
         if ('width' in node && 'height' in node) {
             const ratio = (node.width as number) / (node.height as number);
             if (ratio >= 1.3 && ratio <= 2.0) {
@@ -1532,7 +2007,7 @@ export class WidgetDetector {
             confidence += 0.5;
         }
 
-        // Container com layout grid ou múltiplos filhos repetidos
+        // Container com layout grid ou mÃºltiplos filhos repetidos
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             if (node.children.length >= 4) {
                 confidence += 0.3;
@@ -1548,7 +2023,7 @@ export class WidgetDetector {
         let confidence = 0;
         const name = node.name.toLowerCase();
 
-        // Loop Builder geralmente é um container wrapper de um template
+        // Loop Builder geralmente Ã© um container wrapper de um template
         if (name.includes('loop') && (name.includes('builder') || name.includes('grid') || name.includes('carousel'))) {
             confidence += 0.8;
         }
@@ -1586,7 +2061,7 @@ export class WidgetDetector {
         let confidence = 0;
         const name = node.name.toLowerCase();
 
-        // Global widget só deve ser detectado se explicitamente nomeado
+        // Global widget sÃ³ deve ser detectado se explicitamente nomeado
         if (name.includes('global') && (name.includes('widget') || name.includes('template'))) {
             confidence += 0.9;
         }
@@ -1617,7 +2092,7 @@ export class WidgetDetector {
             confidence += 0.6;
         }
 
-        // Container com múltiplos itens
+        // Container com mÃºltiplos itens
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             if (node.children.length >= 3) {
                 confidence += 0.4;
@@ -1708,13 +2183,13 @@ export class WidgetDetector {
             confidence += 0.8;
         }
 
-        // Deve conter termos específicos de atributos de produto
+        // Deve conter termos especÃ­ficos de atributos de produto
         if (node.type === 'FRAME' && 'children' in node && node.children) {
             const hasAttributeTerms = node.children.some(child => {
                 if (child.type === 'TEXT') {
                     const text = (child as TextNode).characters.toLowerCase();
                     return text.includes('weight') || text.includes('dimensions') ||
-                        text.includes('peso') || text.includes('dimensões') ||
+                        text.includes('peso') || text.includes('dimensÃµes') ||
                         text.includes('attributes') || text.includes('atributos');
                 }
                 // Recursivo para estruturas mais complexas (tabelas)
@@ -1723,7 +2198,7 @@ export class WidgetDetector {
                         if (grandChild.type === 'TEXT') {
                             const text = grandChild.characters.toLowerCase();
                             return text.includes('weight') || text.includes('dimensions') ||
-                                text.includes('peso') || text.includes('dimensões');
+                                text.includes('peso') || text.includes('dimensÃµes');
                         }
                         return false;
                     });
@@ -1739,7 +2214,7 @@ export class WidgetDetector {
         return Math.min(confidence, 1.0);
     }
 
-    // ==================== MATCHERS - PRO AVANÇADO ====================
+    // ==================== MATCHERS - PRO AVANÃ‡ADO ====================
 
     private matchSubscription(node: SceneNode): number {
         let confidence = 0;
@@ -2142,3 +2617,4 @@ export class WidgetDetector {
     }
 
 }
+

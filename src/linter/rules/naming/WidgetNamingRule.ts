@@ -8,6 +8,7 @@ import {
     normalizeWidgetSlug,
     isWidgetInTaxonomy
 } from '../../config/widget-taxonomy';
+import { getCanonicalName, isValidWidgetSlug } from '../../namingTaxonomy';
 
 /**
  * Regra: Widget Detection & Naming
@@ -56,6 +57,7 @@ export class WidgetNamingRule implements Rule {
         const options = this.buildOptionsForNode(node, canonicalWidget);
         if (!options.length) return null;
         const [recommendedName, ...alternatives] = options;
+        const justification = this.buildJustification(detection, canonicalWidget);
 
         return {
             node_id: node.id,
@@ -64,14 +66,14 @@ export class WidgetNamingRule implements Rule {
             severity: this.severity,
             category: this.category,
             rule: this.id,
-            message: `Widget detectado como "${canonicalWidget}" (${Math.round(confidence * 100)}% confiança), mas nome atual é "${currentName}"`,
+            message: `Widget detectado como "${canonicalWidget}" (${Math.round(confidence * 100)}% confiança, fonte ${detection.source || 'heuristic'}), mas nome atual é "${currentName}"`,
             widgetType: canonicalWidget,
             confidence,
             naming: {
                 recommendedName,
                 alternatives
             },
-            educational_tip: this.buildEducationalTip(canonicalWidget, recommendedName, currentName, detection.justification),
+            educational_tip: this.buildEducationalTip(canonicalWidget, recommendedName, currentName, justification),
             fixAvailable: true
         };
     }
@@ -95,7 +97,7 @@ export class WidgetNamingRule implements Rule {
             pools.push(...getContainerWidgetNames(), ...getMediaWidgetNames());
         }
         const ordered = [canonicalWidget, ...pools];
-        return filterValidWidgetNames(ordered);
+        return filterValidWidgetNames(ordered).filter(name => isValidWidgetSlug(name));
     }
 
     private toTaxonomySlug(widget: string): string | null {
@@ -136,6 +138,29 @@ ${this.getSuggestions(recommendedName, currentName).join('\n')}
 ✅ Justificativa da detecção:
 ${justification}
         `.trim();
+    }
+
+    private buildJustification(det: WidgetDetection, canonicalWidget: string): string {
+        const parts: string[] = [];
+        parts.push(`Fonte: ${det.source || 'heuristic'} (${Math.round((det.confidence || 0) * 100)}% confiança)`);
+        if (det.semanticRole) parts.push(`Papel semântico: ${det.semanticRole}`);
+        if (det.compositeOf && det.compositeOf.length) {
+            const slotsCount = det.slots ? Object.keys(det.slots).length : 0;
+            parts.push(`Compósito ${canonicalWidget} com ${slotsCount || det.compositeOf.length} slots/itens`);
+        }
+        if (det.repeaterItems && det.repeaterItems.length) {
+            parts.push(`Lista com ${det.repeaterItems.length} itens (ícone+texto)`);
+        }
+        if (det.wrapperCollapsed) {
+            parts.push('Estilo visual herdado de wrapper colapsado');
+        }
+        if (det.attachedTextIds && det.attachedTextIds.length) {
+            parts.push(`Textos anexados (descrições/microtextos): ${det.attachedTextIds.length}`);
+        }
+        if (det.justification) {
+            parts.push(det.justification);
+        }
+        return parts.join(' | ');
     }
 
     generateGuide(node: SceneNode): ManualFixGuide {

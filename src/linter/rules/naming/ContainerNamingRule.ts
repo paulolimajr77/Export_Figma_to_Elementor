@@ -1,6 +1,7 @@
 import { Rule, LintResult, ManualFixGuide, ContainerRoleDetection } from '../../types';
 import { ContainerRoleDetector } from '../../detectors/ContainerRoleDetector';
 import { filterValidWidgetNames, getContainerWidgetNames } from '../../config/widget-taxonomy';
+import { isValidContainerName } from '../../namingTaxonomy';
 
 export class ContainerNamingRule implements Rule {
     id = 'container-naming';
@@ -83,7 +84,7 @@ export class ContainerNamingRule implements Rule {
 
     private buildNameSuggestions(role: ContainerRoleDetection['role']): string[] {
         const base = getContainerWidgetNames();
-        const pick = (...names: string[]) => filterValidWidgetNames(names.length ? names : base);
+        const pick = (...names: string[]) => filterValidWidgetNames(names.length ? names : base).filter(n => isValidContainerName(n));
 
         switch (role) {
             case 'hero':

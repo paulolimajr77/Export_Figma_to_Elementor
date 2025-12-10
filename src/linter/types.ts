@@ -34,8 +34,17 @@ export interface WidgetDetection {
     confidence: number; // 0-1
     justification: string;
     semanticRole?: string;
-    source?: 'explicit-name' | 'heuristic' | 'ai';
+    source?: 'explicit-name' | 'heuristic' | 'ai' | 'implicit-pattern';
     properties?: Record<string, any>;
+    visualWrapperStyle?: Record<string, any>;
+    // Composite/slots metadata (icon-box, icon-list, form, etc.)
+    compositeOf?: string[]; // child node ids consumed to build this widget
+    slots?: Record<string, string>; // slotName -> nodeId (e.g., icon/title/text)
+    repeaterItems?: Array<{ itemId: string; iconId?: string; textId?: string }>;
+    consumedBy?: string; // if this detection/node was consumed by a composite parent
+    attachedTextIds?: string[]; // helper/description texts attached to this widget
+    wrapperCollapsed?: boolean;
+    wrapperNodeId?: string;
 }
 
 export interface TextBlockInfo {
@@ -97,6 +106,21 @@ export interface LinterReport {
         device_target: 'desktop';
         ai_used: boolean;
         rules_executed: string[];
+        text_blocks_detected?: number;
+        container_roles_detected?: number;
+        composite_widgets_detected?: number;
+        collapsed_wrappers?: number;
+        attached_texts?: number;
+        composite_breakdown?: Record<string, number>;
+        internal_debug?: Record<string, any>;
+        naming_context?: {
+            total_widgets_detected: number;
+            total_containers_with_roles: number;
+            roles_distribution: Record<string, number>;
+            widgets_with_microtext: number;
+            widgets_with_wrappers: number;
+            composite_breakdown: Record<string, number>;
+        };
     };
 }
 
