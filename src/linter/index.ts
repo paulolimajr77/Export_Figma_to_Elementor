@@ -12,6 +12,7 @@ export { AutoLayoutRule } from './rules/structure/AutoLayoutRule';
 export { SpacerDetectionRule } from './rules/structure/SpacerDetectionRule';
 export { GenericNameRule } from './rules/naming/GenericNameRule';
 export { WidgetNamingRule } from './rules/naming/WidgetNamingRule';
+export { ContainerNamingRule } from './rules/naming/ContainerNamingRule';
 
 import { LinterEngine } from './core/LinterEngine';
 import { RuleRegistry } from './core/RuleRegistry';
@@ -19,6 +20,7 @@ import { AutoLayoutRule } from './rules/structure/AutoLayoutRule';
 import { SpacerDetectionRule } from './rules/structure/SpacerDetectionRule';
 import { GenericNameRule } from './rules/naming/GenericNameRule';
 import { WidgetNamingRule } from './rules/naming/WidgetNamingRule';
+import { ContainerNamingRule } from './rules/naming/ContainerNamingRule';
 import { LinterOptions, LinterReport } from './types';
 
 /**
@@ -50,7 +52,8 @@ export async function analyzeFigmaLayout(
         new AutoLayoutRule(),
         new SpacerDetectionRule(),
         new GenericNameRule(),
-        new WidgetNamingRule()
+        new WidgetNamingRule(),
+        new ContainerNamingRule()
     ]);
     console.log('📍 [analyzeFigmaLayout] Regras registradas');
 

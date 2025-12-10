@@ -1,6 +1,10 @@
-import { Rule, LintResult, LinterOptions, LinterReport, ManualFixGuide } from '../types';
+﻿import { Rule, LintResult, LinterOptions, LinterReport, ManualFixGuide, WidgetDetection, TextBlockInfo, ContainerRoleDetection } from '../types';
 import { RuleRegistry } from './RuleRegistry';
 import { WidgetDetector } from '../detectors/WidgetDetector';
+import { WidgetNamingRule } from '../rules/naming/WidgetNamingRule';
+import { TextBlockDetector } from '../detectors/TextBlockDetector';
+import { ContainerRoleDetector } from '../detectors/ContainerRoleDetector';
+import { ContainerNamingRule } from '../rules/naming/ContainerNamingRule';
 
 /**
  * Motor principal do Linter
@@ -9,6 +13,12 @@ import { WidgetDetector } from '../detectors/WidgetDetector';
 export class LinterEngine {
     private startTime: number = 0;
     private endTime: number = 0;
+    private widgetDetector = new WidgetDetector();
+    private widgetDetections: Map<string, WidgetDetection> = new Map();
+    private textBlockDetector = new TextBlockDetector();
+    private textBlockDetections: Map<string, TextBlockInfo> = new Map();
+    private containerRoleDetector = new ContainerRoleDetector();
+    private containerRoleDetections: Map<string, ContainerRoleDetection> = new Map();
 
     /**
      * Analisa um node do Figma
@@ -20,6 +30,12 @@ export class LinterEngine {
     ): Promise<LintResult[]> {
         this.startTime = Date.now();
         registry.resetExecutedRules();
+
+        // Pr�-processa detec��es para serem usadas pelo report e pelas regras de naming
+        this.widgetDetections = this.widgetDetector.detectAll(node);
+        this.textBlockDetections = this.textBlockDetector.detectAll(node);
+        this.containerRoleDetections = this.containerRoleDetector.detectAll(node);
+        this.shareDetectionsWithNamingRules(registry);
 
         const results: LintResult[] = [];
         const rules = this.getApplicableRules(registry, options);
@@ -108,24 +124,26 @@ export class LinterEngine {
         rootNode?: SceneNode
     ): LinterReport {
         const summary = this.generateSummary(results);
-        console.log('📊 [generateReport] Summary gerado');
+        console.log('[generateReport] Summary gerado');
 
         const guides = this.generateGuides(results, registry);
-        console.log('📊 [generateReport] Guides gerados');
+        console.log('[generateReport] Guides gerados');
 
-        // Detecção de widgets (Fase 2)
-        let widgets: any[] = [];
-        if (rootNode) {
-            console.log('📊 [generateReport] Iniciando detecção de widgets...');
+        // Deteccao de widgets (Fase 2)
+        let widgets: WidgetDetection[] = [];
+        let detectionMap = this.widgetDetections;
+        if ((!detectionMap || detectionMap.size === 0) && rootNode) {
+            console.log('[generateReport] Iniciando deteccao de widgets (fallback)...');
             try {
-                const detector = new WidgetDetector();
-                console.log('📊 [generateReport] WidgetDetector criado');
-                widgets = detector.detectAll(rootNode);
-                console.log(`📊 [generateReport] ${widgets.length} widgets detectados`);
+                detectionMap = this.widgetDetector.detectAll(rootNode);
             } catch (error) {
-                console.error('❌ ERRO ao detectar widgets:', error);
-                widgets = [];
+                console.error('Erro ao detectar widgets:', error);
+                detectionMap = new Map();
             }
+        }
+        if (detectionMap) {
+            widgets = Array.from(detectionMap.values());
+            console.log(`[generateReport] ${widgets.length} widgets detectados`);
         }
 
         return {
@@ -138,10 +156,13 @@ export class LinterEngine {
                 timestamp: new Date().toISOString(),
                 device_target: 'desktop',
                 ai_used: options.aiAssisted || false,
-                rules_executed: registry.getExecutedRules()
+                rules_executed: registry.getExecutedRules(),
+                text_blocks_detected: this.textBlockDetections?.size || 0,
+                container_roles_detected: this.containerRoleDetections?.size || 0
             }
         };
     }
+
 
     /**
      * Gera sumário de problemas
@@ -181,6 +202,23 @@ export class LinterEngine {
 
         return guides;
     }
+    /**
+     * Compartilha detecções aprovadas com regras que dependem delas
+     */
+    private shareDetectionsWithNamingRules(registry: RuleRegistry): void {
+        for (const rule of registry.getAll()) {
+            if (rule instanceof WidgetNamingRule && typeof (rule as WidgetNamingRule).setDetectionMap === 'function') {
+                (rule as WidgetNamingRule).setDetectionMap(this.widgetDetections);
+                if (typeof (rule as any).setTextBlocks === 'function') {
+                    (rule as any).setTextBlocks(this.textBlockDetections);
+                }
+            }
+            if (rule instanceof ContainerNamingRule && typeof (rule as ContainerNamingRule).setDetectionMap === 'function') {
+                (rule as ContainerNamingRule).setDetectionMap(this.containerRoleDetections);
+            }
+        }
+    }
+
 
     /**
      * Obtém passos genéricos baseados na regra
@@ -258,3 +296,5 @@ export class LinterEngine {
         return this.endTime - this.startTime;
     }
 }
+
+

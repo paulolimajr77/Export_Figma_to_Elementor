@@ -19,6 +19,23 @@ interface WidgetRule {
     category: 'basic' | 'pro' | 'woo' | 'loop' | 'experimental' | 'wordpress';
 }
 
+// Compatibilidade de widgets por tipo de node para evitar sugestões absurdas
+const WIDGETS_BY_NODE_TYPE: Partial<Record<SceneNode['type'], string[]>> = {
+    TEXT: ['w:heading', 'w:post-title', 'w:call-to-action', 'w:text-editor', 'w:paragraph', 'w:rich-text'],
+    RECTANGLE: ['w:image', 'w:button', 'w:icon'],
+    FRAME: ['w:container', 'w:icon-box', 'w:image-box', 'w:card'],
+    GROUP: ['w:card', 'w:icon-box']
+};
+
+const HIGH_RISK_WIDGETS = new Set([
+    'w:google-maps',
+    'w:gallery',
+    'w:basic-gallery',
+    'w:image-carousel',
+    'w:gallery-pro',
+    'w:icon-box'
+]);
+
 export class WidgetDetector {
     private rules: WidgetRule[] = [];
 
@@ -30,15 +47,37 @@ export class WidgetDetector {
      * Detecta qual widget Elementor melhor representa o node
      */
     detect(node: SceneNode): WidgetDetection | null {
-        const detections: Array<{ widget: string; confidence: number; justification: string }> = [];
+        if (!this.isWidgetCandidate(node)) {
+            return null;
+        }
 
-        for (const rule of this.rules) {
+        // Respeita prefixos tÃ©cnicos explícitos (ex.: w:image, woo:product-image)
+        const explicitDetection = this.detectByExplicitName(node);
+        if (explicitDetection) {
+            return explicitDetection;
+        }
+
+        const allowedWidgets = this.getAllowedWidgetsForNodeType(node.type);
+        if (!allowedWidgets.length) {
+            return null;
+        }
+
+        const candidateRules = this.rules.filter(rule => allowedWidgets.includes(rule.widget));
+        const detections: Array<{
+            widget: string;
+            confidence: number;
+            justification: string;
+            source?: WidgetDetection['source'];
+        }> = [];
+
+        for (const rule of candidateRules) {
             const confidence = rule.matcher(node);
             if (confidence > 0) {
                 detections.push({
                     widget: rule.widget,
                     confidence,
-                    justification: this.generateJustification(node, rule.widget, confidence)
+                    justification: this.generateJustification(node, rule.widget, confidence),
+                    source: 'heuristic'
                 });
             }
         }
@@ -47,8 +86,12 @@ export class WidgetDetector {
         detections.sort((a, b) => b.confidence - a.confidence);
         const best = detections[0];
 
-        if (!best || best.confidence < 0.3) {
-            return null; // Confidence muito baixa
+        if (!best) {
+            return null;
+        }
+
+        if (!this.shouldAcceptWidgetDetection(best.widget, best.confidence, node.name)) {
+            return null; // Confidence insuficiente para o widget considerado
         }
 
         return {
@@ -56,20 +99,21 @@ export class WidgetDetector {
             node_name: node.name,
             widget: best.widget,
             confidence: best.confidence,
-            justification: best.justification
+            justification: best.justification,
+            source: best.source || 'heuristic'
         };
     }
 
     /**
      * Detecta múltiplos widgets em uma árvore
      */
-    detectAll(root: SceneNode): WidgetDetection[] {
-        const results: WidgetDetection[] = [];
+    detectAll(root: SceneNode): Map<string, WidgetDetection> {
+        const results: Map<string, WidgetDetection> = new Map();
 
         const traverse = (node: SceneNode) => {
             const detection = this.detect(node);
             if (detection) {
-                results.push(detection);
+                results.set(node.id, detection);
             }
 
             if ('children' in node && node.children) {
@@ -392,6 +436,110 @@ export class WidgetDetector {
     }
 
     // ==================== MATCHERS - BÁSICOS ====================
+
+    /**
+     * Verifica se o node pode ser considerado candidato a widget
+     */
+    private isWidgetCandidate(node: SceneNode): boolean {
+        // Nunca classificar frame raiz
+        const hasParentInfo = (node as any).parent !== undefined || (node as any).parentId !== undefined;
+        if (!hasParentInfo) {
+            return false;
+        }
+        if ((node as any).parent === null || (node as any).parentId === null) {
+            // Diferencia raiz gigante (pÇ¸gina) de exports pequenos isolados
+            if (this.looksLikePageRoot(node)) {
+                return false;
+            }
+        } else if ((node as any).parent && (node as any).parent.type === 'PAGE') {
+            return false;
+        }
+
+        const allowedTypes: SceneNode['type'][] = ['FRAME', 'GROUP', 'RECTANGLE', 'TEXT'];
+        if (!allowedTypes.includes(node.type)) {
+            return false;
+        }
+
+        const width = 'width' in node ? (node.width as number) : 0;
+        const height = 'height' in node ? (node.height as number) : 0;
+        if (width < 32 || height < 16) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private looksLikePageRoot(node: SceneNode): boolean {
+        const name = (node.name || '').toLowerCase();
+        const isPageName = ['page', 'desktop', 'mobile', 'artboard'].some(token => name.includes(token));
+        const area = ('width' in node ? (node.width as number) : 0) * ('height' in node ? (node.height as number) : 0);
+        const isHuge = area > 1200 * 1200;
+        // Se o node for pequeno (ex.: card exportado isolado), permita como candidato
+        const isSmallIsolated = ('width' in node ? (node.width as number) : 0) < 1000 && ('height' in node ? (node.height as number) : 0) < 1000;
+        if (!isSmallIsolated && (isPageName || isHuge)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Respeita nomes com prefixo técnico explícito (alta confiança)
+     */
+    private detectByExplicitName(node: SceneNode): WidgetDetection | null {
+        const rawName = node.name || '';
+        const name = rawName.toLowerCase();
+
+        const explicitPrefixes = ['w:', 'woo:', 'loop:'];
+        const hasExplicitPrefix = explicitPrefixes.some(prefix => name.startsWith(prefix));
+        if (hasExplicitPrefix) {
+            const explicitWidget = rawName.split(/\s/)[0]; // preserva prefixo original
+            return {
+                node_id: node.id,
+                node_name: node.name,
+                widget: explicitWidget,
+                confidence: 1.0,
+                justification: 'Nome possui prefixo técnico explícito',
+                source: 'explicit-name'
+            };
+        }
+
+        // Casos específicos aceitos com confiança máxima
+        if (name === 'image') {
+            return {
+                node_id: node.id,
+                node_name: node.name,
+                widget: 'w:image',
+                confidence: 1.0,
+                justification: 'Layer nomeado como image',
+                source: 'explicit-name'
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Retorna lista de widgets compatíveis com o tipo de node
+     */
+    private getAllowedWidgetsForNodeType(nodeType: SceneNode['type']): string[] {
+        return WIDGETS_BY_NODE_TYPE[nodeType] || [];
+    }
+
+    /**
+     * Aplica thresholds diferentes para widgets de alto risco
+     */
+    private shouldAcceptWidgetDetection(widget: string, confidence: number, nodeName: string): boolean {
+        const normalizedName = (nodeName || '').toLowerCase();
+        if (normalizedName.startsWith('w:') || normalizedName.startsWith('woo:') || normalizedName.startsWith('loop:')) {
+            return true; // Nome já tem prefixo técnico
+        }
+
+        if (HIGH_RISK_WIDGETS.has(widget)) {
+            return confidence >= 0.8;
+        }
+
+        return confidence >= 0.6;
+    }
 
     private matchHeading(node: SceneNode): number {
         if (node.type !== 'TEXT') return 0;

@@ -1,11 +1,17 @@
-import { Rule, LintResult, ManualFixGuide } from '../../types';
+import { Rule, LintResult, ManualFixGuide, WidgetDetection, TextBlockInfo } from '../../types';
 import { WidgetDetector } from '../../detectors/WidgetDetector';
+import {
+    filterValidWidgetNames,
+    getContainerWidgetNames,
+    getMediaWidgetNames,
+    getTextWidgetNames,
+    normalizeWidgetSlug,
+    isWidgetInTaxonomy
+} from '../../config/widget-taxonomy';
 
 /**
  * Regra: Widget Detection & Naming
- * Detecta qual widget Elementor o node representa e valida se o nome está correto
- * Severidade: Warning (não crítico, mas importante para qualidade)
- * Categoria: Naming
+ * Usa a taxonomia oficial para sugerir apenas nomes válidos (sem strings soltas).
  */
 export class WidgetNamingRule implements Rule {
     id = 'widget-naming';
@@ -13,37 +19,43 @@ export class WidgetNamingRule implements Rule {
     severity = 'major' as const;
 
     private detector = new WidgetDetector();
+    private detections: Map<string, WidgetDetection> = new Map();
+    private textBlocks: Map<string, TextBlockInfo> = new Map();
+    private readonly TEXT_WIDGETS = new Set(getTextWidgetNames());
+
+    setDetectionMap(detections: Map<string, WidgetDetection>) {
+        this.detections = detections;
+    }
+
+    setTextBlocks(textBlocks: Map<string, TextBlockInfo>) {
+        this.textBlocks = textBlocks;
+    }
 
     async validate(node: SceneNode): Promise<LintResult | null> {
-        // Detecta widget
-        const detection = this.detector.detect(node);
+        const detection = this.getDetectionForNode(node);
+        if (!detection) return null;
 
-        if (!detection) {
-            return null; // Não conseguiu detectar widget
-        }
-
-        // Verifica se o nome atual corresponde ao widget detectado
-        const currentName = node.name;
         const suggestedWidget = detection.widget;
         const confidence = detection.confidence;
+        if (confidence < 0.6) return null;
 
-        // Se confidence é baixa (< 0.6), não reportar
-        if (confidence < 0.6) {
+        const canonicalWidget = this.toTaxonomySlug(suggestedWidget);
+        if (!canonicalWidget) return null;
+
+        if (node.type === 'TEXT' && !this.TEXT_WIDGETS.has(canonicalWidget)) {
             return null;
         }
 
-        // Verifica se o nome já está correto
-        const isCorrectlyNamed = currentName.toLowerCase().includes(suggestedWidget.toLowerCase()) ||
+        const currentName = node.name || '';
+        const isCorrectlyNamed = currentName.toLowerCase().includes(canonicalWidget.toLowerCase()) ||
             currentName.startsWith('w:') ||
             currentName.startsWith('woo:') ||
             currentName.startsWith('loop:');
+        if (isCorrectlyNamed) return null;
 
-        if (isCorrectlyNamed) {
-            return null; // Nome já está bom
-        }
-
-        // Generate alternative naming suggestions
-        const alternatives = this.getAlternativeNames(suggestedWidget, currentName);
+        const options = this.buildOptionsForNode(node, canonicalWidget);
+        if (!options.length) return null;
+        const [recommendedName, ...alternatives] = options;
 
         return {
             node_id: node.id,
@@ -52,106 +64,101 @@ export class WidgetNamingRule implements Rule {
             severity: this.severity,
             category: this.category,
             rule: this.id,
-            message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confiança), mas nome atual é "${currentName}"`,
-
-            // ===== NAMING OBJECT FOR UI ACTION PANEL =====
-            widgetType: suggestedWidget,
-            confidence: confidence,
+            message: `Widget detectado como "${canonicalWidget}" (${Math.round(confidence * 100)}% confiança), mas nome atual é "${currentName}"`,
+            widgetType: canonicalWidget,
+            confidence,
             naming: {
-                recommendedName: suggestedWidget,
-                alternatives: alternatives
+                recommendedName,
+                alternatives
             },
-
-            educational_tip: `
-💡 Widget Detection
-
-O Linter detectou que este elemento corresponde ao widget "${suggestedWidget}" do Elementor.
-
-📋 Por que nomenclatura correta importa:
-• Facilita identificação visual no Figma
-• Melhora conversão automática para Elementor
-• Reduz erros na exportação
-• Torna o design system mais consistente
-
-✅ Nomenclatura recomendada:
-${this.getSuggestions(suggestedWidget, currentName).join('\n')}
-
-🎯 Justificativa da detecção:
-${detection.justification}
-            `.trim(),
-            fixAvailable: true // Naming now has one-click fix via UI
+            educational_tip: this.buildEducationalTip(canonicalWidget, recommendedName, currentName, detection.justification),
+            fixAvailable: true
         };
     }
 
-    /**
-     * Generate cleaner alternative names for the dropdown
-     */
-    private getAlternativeNames(widget: string, currentName: string): string[] {
-        const alternatives: string[] = [];
-
-        // Contextual name
-        const context = currentName.replace(/frame|rectangle|group|circle|ellipse|polygon|\d+/gi, '').trim();
-        if (context && context.length > 1) {
-            const contextName = `${context} ${widget}`.replace(/\s+/g, ' ').trim();
-            if (contextName !== widget) {
-                alternatives.push(contextName);
-            }
+    private getDetectionForNode(node: SceneNode): WidgetDetection | null {
+        if (this.detections && this.detections.size > 0) {
+            const cached = this.detections.get(node.id);
+            if (cached) return cached;
+            return null;
         }
-
-        // Widget type variations
-        const widgetBase = widget.toLowerCase();
-        if (widgetBase.includes('button')) {
-            if (!widget.includes('primary')) alternatives.push(`${widget}-primary`);
-            if (!widget.includes('secondary')) alternatives.push(`${widget}-secondary`);
-        } else if (widgetBase.includes('heading')) {
-            alternatives.push(`${widget}-hero`);
-        } else if (widgetBase.includes('container')) {
-            alternatives.push(`c:section`);
-            alternatives.push(`c:wrapper`);
-        }
-
-        return alternatives.slice(0, 3); // Limit to 3 alternatives
+        return this.detector.detect(node);
     }
 
-    generateGuide(node: SceneNode): ManualFixGuide {
-        const detection = this.detector.detect(node);
-        const suggestedWidget = detection?.widget || 'w:unknown';
+    private buildOptionsForNode(node: SceneNode, canonicalWidget: string): string[] {
+        const pools: string[] = [];
+        if (node.type === 'TEXT') {
+            pools.push(...getTextWidgetNames());
+        } else if (node.type === 'RECTANGLE') {
+            pools.push(...getMediaWidgetNames());
+        } else if (node.type === 'FRAME' || node.type === 'GROUP') {
+            pools.push(...getContainerWidgetNames(), ...getMediaWidgetNames());
+        }
+        const ordered = [canonicalWidget, ...pools];
+        return filterValidWidgetNames(ordered);
+    }
 
-        return {
-            node_id: node.id,
-            problem: `Nome não reflete o widget detectado (${suggestedWidget})`,
-            severity: this.severity,
-            step_by_step: [
-                { step: 1, action: 'Selecione o layer no Figma' },
-                { step: 2, action: `Renomeie para "${suggestedWidget}"` },
-                { step: 3, action: 'Ou use um nome descritivo que inclua o tipo de widget' },
-                { step: 4, action: 'Exemplo: "Hero CTA Button" ou "w:button"' }
-            ],
-            before_after_example: {
-                before: `Nome genérico: "${node.name}"`,
-                after: `Nome correto: "${suggestedWidget}" ou "Hero ${suggestedWidget}"`
-            },
-            estimated_time: '30 segundos',
-            difficulty: 'easy'
-        };
+    private toTaxonomySlug(widget: string): string | null {
+        const normalized = normalizeWidgetSlug(widget);
+        if (normalized) return normalized;
+        if (isWidgetInTaxonomy(widget)) return widget;
+        return null;
     }
 
     private getSuggestions(widget: string, currentName: string): string[] {
         const suggestions: string[] = [];
+        suggestions.push(`• "${widget}" (padrão técnico da taxonomia)`);
 
-        // Opção 1: Nome técnico puro
-        suggestions.push(`• "${widget}" (padrão técnico)`);
-
-        // Opção 2: Nome contextual
         const context = currentName.replace(/frame|rectangle|group|\d+/gi, '').trim();
         if (context) {
             suggestions.push(`• "${context} ${widget}" (nome descritivo)`);
         }
 
-        // Opção 3: Nome funcional
-        const widgetType = widget.split(':')[1] || widget;
-        suggestions.push(`• "Hero ${widgetType}" ou "Footer ${widgetType}" (nome funcional)`);
-
+        suggestions.push(`• "Hero ${widget}" ou "Footer ${widget}" (nome funcional dentro da taxonomia)`);
         return suggestions;
+    }
+
+    private buildEducationalTip(canonicalWidget: string, recommendedName: string, currentName: string, justification: string): string {
+        return `
+🔎 Widget Detection
+
+O Linter detectou que este elemento corresponde ao widget "${canonicalWidget}" do Elementor.
+
+🧭 Por que nomenclatura correta importa:
+• Facilita identificação visual no Figma
+• Melhora conversão automática para Elementor
+• Reduz erros na exportação
+• Torna o design system mais consistente
+
+💡 Nomenclatura recomendada:
+${this.getSuggestions(recommendedName, currentName).join('\n')}
+
+✅ Justificativa da detecção:
+${justification}
+        `.trim();
+    }
+
+    generateGuide(node: SceneNode): ManualFixGuide {
+        const detection = this.getDetectionForNode(node);
+        const suggestedWidget = detection?.widget || 'unknown';
+        const canonicalWidget = this.toTaxonomySlug(suggestedWidget) || suggestedWidget;
+
+        return {
+            node_id: node.id,
+            problem: `Nome não reflete o widget detectado (${canonicalWidget})`,
+            severity: this.severity,
+            step_by_step: [
+                { step: 1, action: 'Selecione o layer no Figma' },
+                { step: 2, action: `Renomeie para "${canonicalWidget}"` },
+                { step: 3, action: 'Use apenas nomes da taxonomia oficial (dropdown do Linter)' },
+                { step: 4, action: 'Confirme no painel se o nome foi aplicado' }
+            ],
+            before_after_example: {
+                before: `Nome genérico: "${node.name}"`,
+                after: `Nome correto: "${canonicalWidget}"`
+            },
+            estimated_time: '30 segundos',
+            difficulty: 'easy'
+        };
     }
 }

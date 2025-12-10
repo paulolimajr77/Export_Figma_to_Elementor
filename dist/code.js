@@ -6735,6 +6735,20 @@ ${refText}` });
   };
 
   // src/linter/detectors/WidgetDetector.ts
+  var WIDGETS_BY_NODE_TYPE = {
+    TEXT: ["w:heading", "w:post-title", "w:call-to-action", "w:text-editor", "w:paragraph", "w:rich-text"],
+    RECTANGLE: ["w:image", "w:button", "w:icon"],
+    FRAME: ["w:container", "w:icon-box", "w:image-box", "w:card"],
+    GROUP: ["w:card", "w:icon-box"]
+  };
+  var HIGH_RISK_WIDGETS = /* @__PURE__ */ new Set([
+    "w:google-maps",
+    "w:gallery",
+    "w:basic-gallery",
+    "w:image-carousel",
+    "w:gallery-pro",
+    "w:icon-box"
+  ]);
   var WidgetDetector = class {
     constructor() {
       __publicField(this, "rules", []);
@@ -6744,20 +6758,36 @@ ${refText}` });
      * Detecta qual widget Elementor melhor representa o node
      */
     detect(node) {
+      if (!this.isWidgetCandidate(node)) {
+        return null;
+      }
+      const explicitDetection = this.detectByExplicitName(node);
+      if (explicitDetection) {
+        return explicitDetection;
+      }
+      const allowedWidgets = this.getAllowedWidgetsForNodeType(node.type);
+      if (!allowedWidgets.length) {
+        return null;
+      }
+      const candidateRules = this.rules.filter((rule) => allowedWidgets.includes(rule.widget));
       const detections = [];
-      for (const rule of this.rules) {
+      for (const rule of candidateRules) {
         const confidence = rule.matcher(node);
         if (confidence > 0) {
           detections.push({
             widget: rule.widget,
             confidence,
-            justification: this.generateJustification(node, rule.widget, confidence)
+            justification: this.generateJustification(node, rule.widget, confidence),
+            source: "heuristic"
           });
         }
       }
       detections.sort((a, b) => b.confidence - a.confidence);
       const best = detections[0];
-      if (!best || best.confidence < 0.3) {
+      if (!best) {
+        return null;
+      }
+      if (!this.shouldAcceptWidgetDetection(best.widget, best.confidence, node.name)) {
         return null;
       }
       return {
@@ -6765,18 +6795,19 @@ ${refText}` });
         node_name: node.name,
         widget: best.widget,
         confidence: best.confidence,
-        justification: best.justification
+        justification: best.justification,
+        source: best.source || "heuristic"
       };
     }
     /**
      * Detecta múltiplos widgets em uma árvore
      */
     detectAll(root) {
-      const results = [];
+      const results = /* @__PURE__ */ new Map();
       const traverse = (node) => {
         const detection = this.detect(node);
         if (detection) {
-          results.push(detection);
+          results.set(node.id, detection);
         }
         if ("children" in node && node.children) {
           for (const child of node.children) {
@@ -7022,6 +7053,93 @@ ${refText}` });
       );
     }
     // ==================== MATCHERS - BÁSICOS ====================
+    /**
+     * Verifica se o node pode ser considerado candidato a widget
+     */
+    isWidgetCandidate(node) {
+      const hasParentInfo = node.parent !== void 0 || node.parentId !== void 0;
+      if (!hasParentInfo) {
+        return false;
+      }
+      if (node.parent === null || node.parentId === null) {
+        if (this.looksLikePageRoot(node)) {
+          return false;
+        }
+      } else if (node.parent && node.parent.type === "PAGE") {
+        return false;
+      }
+      const allowedTypes = ["FRAME", "GROUP", "RECTANGLE", "TEXT"];
+      if (!allowedTypes.includes(node.type)) {
+        return false;
+      }
+      const width = "width" in node ? node.width : 0;
+      const height = "height" in node ? node.height : 0;
+      if (width < 32 || height < 16) {
+        return false;
+      }
+      return true;
+    }
+    looksLikePageRoot(node) {
+      const name = (node.name || "").toLowerCase();
+      const isPageName = ["page", "desktop", "mobile", "artboard"].some((token) => name.includes(token));
+      const area = ("width" in node ? node.width : 0) * ("height" in node ? node.height : 0);
+      const isHuge = area > 1200 * 1200;
+      const isSmallIsolated = ("width" in node ? node.width : 0) < 1e3 && ("height" in node ? node.height : 0) < 1e3;
+      if (!isSmallIsolated && (isPageName || isHuge)) {
+        return true;
+      }
+      return false;
+    }
+    /**
+     * Respeita nomes com prefixo técnico explícito (alta confiança)
+     */
+    detectByExplicitName(node) {
+      const rawName = node.name || "";
+      const name = rawName.toLowerCase();
+      const explicitPrefixes = ["w:", "woo:", "loop:"];
+      const hasExplicitPrefix = explicitPrefixes.some((prefix) => name.startsWith(prefix));
+      if (hasExplicitPrefix) {
+        const explicitWidget = rawName.split(/\s/)[0];
+        return {
+          node_id: node.id,
+          node_name: node.name,
+          widget: explicitWidget,
+          confidence: 1,
+          justification: "Nome possui prefixo t\xE9cnico expl\xEDcito",
+          source: "explicit-name"
+        };
+      }
+      if (name === "image") {
+        return {
+          node_id: node.id,
+          node_name: node.name,
+          widget: "w:image",
+          confidence: 1,
+          justification: "Layer nomeado como image",
+          source: "explicit-name"
+        };
+      }
+      return null;
+    }
+    /**
+     * Retorna lista de widgets compatíveis com o tipo de node
+     */
+    getAllowedWidgetsForNodeType(nodeType) {
+      return WIDGETS_BY_NODE_TYPE[nodeType] || [];
+    }
+    /**
+     * Aplica thresholds diferentes para widgets de alto risco
+     */
+    shouldAcceptWidgetDetection(widget, confidence, nodeName) {
+      const normalizedName = (nodeName || "").toLowerCase();
+      if (normalizedName.startsWith("w:") || normalizedName.startsWith("woo:") || normalizedName.startsWith("loop:")) {
+        return true;
+      }
+      if (HIGH_RISK_WIDGETS.has(widget)) {
+        return confidence >= 0.8;
+      }
+      return confidence >= 0.6;
+    }
     matchHeading(node) {
       if (node.type !== "TEXT") return 0;
       const text = node;
@@ -8159,11 +8277,565 @@ ${refText}` });
     }
   };
 
+  // src/linter/rules/naming/WidgetNamingRule.ts
+  var WidgetNamingRule = class {
+    constructor() {
+      __publicField(this, "id", "widget-naming");
+      __publicField(this, "category", "naming");
+      __publicField(this, "severity", "major");
+      __publicField(this, "detector", new WidgetDetector());
+      __publicField(this, "detections", /* @__PURE__ */ new Map());
+      __publicField(this, "textBlocks", /* @__PURE__ */ new Map());
+      __publicField(this, "TEXT_WIDGETS", /* @__PURE__ */ new Set([
+        "w:heading",
+        "w:post-title",
+        "w:call-to-action",
+        "w:text-editor",
+        "w:paragraph",
+        "w:rich-text"
+      ]));
+    }
+    setDetectionMap(detections) {
+      this.detections = detections;
+    }
+    setTextBlocks(textBlocks) {
+      this.textBlocks = textBlocks;
+    }
+    async validate(node) {
+      const detection = this.getDetectionForNode(node);
+      if (!detection) {
+        return null;
+      }
+      const currentName = node.name;
+      const suggestedWidget = detection.widget;
+      const confidence = detection.confidence;
+      if (confidence < 0.6) {
+        return null;
+      }
+      if (node.type === "TEXT" && !this.TEXT_WIDGETS.has(suggestedWidget)) {
+        return null;
+      }
+      const isCorrectlyNamed = currentName.toLowerCase().includes(suggestedWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
+      if (isCorrectlyNamed) {
+        return null;
+      }
+      const alternatives = this.getAlternativeNames(suggestedWidget, currentName);
+      return {
+        node_id: node.id,
+        node_name: node.name,
+        node_type: node.type,
+        severity: this.severity,
+        category: this.category,
+        rule: this.id,
+        message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
+        // ===== NAMING OBJECT FOR UI ACTION PANEL =====
+        widgetType: suggestedWidget,
+        confidence,
+        naming: {
+          recommendedName: suggestedWidget,
+          alternatives
+        },
+        educational_tip: `
+\u{1F4A1} Widget Detection
+
+O Linter detectou que este elemento corresponde ao widget "${suggestedWidget}" do Elementor.
+
+\u{1F4CB} Por que nomenclatura correta importa:
+\u2022 Facilita identifica\xE7\xE3o visual no Figma
+\u2022 Melhora convers\xE3o autom\xE1tica para Elementor
+\u2022 Reduz erros na exporta\xE7\xE3o
+\u2022 Torna o design system mais consistente
+
+\u2705 Nomenclatura recomendada:
+${this.getSuggestions(suggestedWidget, currentName).join("\n")}
+
+\u{1F3AF} Justificativa da detec\xE7\xE3o:
+${detection.justification}
+            `.trim(),
+        fixAvailable: true
+        // Naming now has one-click fix via UI
+      };
+    }
+    /**
+     * Generate cleaner alternative names for the dropdown
+     */
+    getDetectionForNode(node) {
+      if (this.detections && this.detections.size > 0) {
+        const cached = this.detections.get(node.id);
+        if (cached) {
+          return cached;
+        }
+        return null;
+      }
+      return this.detector.detect(node);
+    }
+    getAlternativeNames(widget, currentName) {
+      const alternatives = [];
+      const context = currentName.replace(/frame|rectangle|group|circle|ellipse|polygon|\d+/gi, "").trim();
+      if (context && context.length > 1) {
+        const contextName = `${context} ${widget}`.replace(/\s+/g, " ").trim();
+        if (contextName !== widget) {
+          alternatives.push(contextName);
+        }
+      }
+      const widgetBase = widget.toLowerCase();
+      if (widgetBase.includes("button")) {
+        if (!widget.includes("primary")) alternatives.push(`${widget}-primary`);
+        if (!widget.includes("secondary")) alternatives.push(`${widget}-secondary`);
+      } else if (widgetBase.includes("heading")) {
+        alternatives.push(`${widget}-hero`);
+      } else if (widgetBase.includes("container")) {
+        alternatives.push(`c:section`);
+        alternatives.push(`c:wrapper`);
+      }
+      return alternatives.slice(0, 3);
+    }
+    generateGuide(node) {
+      const detection = this.getDetectionForNode(node);
+      const suggestedWidget = (detection == null ? void 0 : detection.widget) || "w:unknown";
+      return {
+        node_id: node.id,
+        problem: `Nome n\xE3o reflete o widget detectado (${suggestedWidget})`,
+        severity: this.severity,
+        step_by_step: [
+          { step: 1, action: "Selecione o layer no Figma" },
+          { step: 2, action: `Renomeie para "${suggestedWidget}"` },
+          { step: 3, action: "Ou use um nome descritivo que inclua o tipo de widget" },
+          { step: 4, action: 'Exemplo: "Hero CTA Button" ou "w:button"' }
+        ],
+        before_after_example: {
+          before: `Nome gen\xE9rico: "${node.name}"`,
+          after: `Nome correto: "${suggestedWidget}" ou "Hero ${suggestedWidget}"`
+        },
+        estimated_time: "30 segundos",
+        difficulty: "easy"
+      };
+    }
+    getSuggestions(widget, currentName) {
+      const suggestions = [];
+      suggestions.push(`\u2022 "${widget}" (padr\xE3o t\xE9cnico)`);
+      const context = currentName.replace(/frame|rectangle|group|\d+/gi, "").trim();
+      if (context) {
+        suggestions.push(`\u2022 "${context} ${widget}" (nome descritivo)`);
+      }
+      const widgetType = widget.split(":")[1] || widget;
+      suggestions.push(`\u2022 "Hero ${widgetType}" ou "Footer ${widgetType}" (nome funcional)`);
+      return suggestions;
+    }
+  };
+
+  // src/linter/detectors/TextBlockDetector.ts
+  var TextBlockDetector = class {
+    detect(node) {
+      if (!("children" in node) || !node.children || node.children.length < 2) return null;
+      const layoutMode = node.layoutMode;
+      if (layoutMode !== "VERTICAL" && layoutMode !== "HORIZONTAL") return null;
+      const textChildren = node.children.filter((child) => child.type === "TEXT");
+      if (textChildren.length < 2) return null;
+      const features = textChildren.map((t) => this.extractTextFeatures(t));
+      const maxFont = Math.max(...features.map((f) => f.fontSize));
+      const maxWeight = Math.max(...features.map((f) => f.fontWeight));
+      const rolesByChildId = {};
+      let headlineCount = 0;
+      let bodyCount = 0;
+      features.forEach((f, idx) => {
+        const isBiggest = f.fontSize >= maxFont - 1 || f.fontWeight >= maxWeight;
+        const isCaps = f.isAllCaps && f.lines <= 2;
+        const looksBody = f.lines >= 3 || f.length > 80;
+        const sizeRatio = maxFont > 0 ? f.fontSize / maxFont : 1;
+        let role = "body";
+        if (isBiggest || isCaps || f.fontSize >= maxFont * 0.9) {
+          role = headlineCount === 0 ? "headline" : "subheadline";
+        } else if (sizeRatio >= 0.75 && f.fontWeight >= Math.max(500, maxWeight * 0.85)) {
+          role = headlineCount === 0 ? "headline" : "subheadline";
+        } else if (looksBody) {
+          role = "body";
+        } else if (f.length < 25 && f.lines <= 2) {
+          role = "small-label";
+        } else {
+          role = "body";
+        }
+        rolesByChildId[textChildren[idx].id] = role;
+        if (role === "headline" || role === "subheadline") headlineCount++;
+        if (role === "body") bodyCount++;
+      });
+      if (headlineCount === 0) return null;
+      const type = bodyCount > 0 && headlineCount >= 1 ? "headline+body" : headlineCount >= 2 ? "headline+subheadline" : "headline-stack";
+      const contrast = maxFont > 0 ? maxFont / Math.max(1, Math.min(...features.map((f) => f.fontSize))) : 1;
+      const confidence = Math.min(1, 0.5 + 0.2 * headlineCount + 0.1 * bodyCount + Math.min(0.2, (contrast - 1) * 0.2));
+      return {
+        nodeId: node.id,
+        type,
+        rolesByChildId,
+        confidence,
+        justification: `Layout ${layoutMode.toLowerCase()} com ${textChildren.length} textos; contraste de fonte ${contrast.toFixed(2)}`
+      };
+    }
+    detectAll(root) {
+      const result = /* @__PURE__ */ new Map();
+      const traverse = (node) => {
+        const detection = this.detect(node);
+        if (detection) {
+          result.set(node.id, detection);
+        }
+        if ("children" in node && node.children) {
+          for (const child of node.children) {
+            traverse(child);
+          }
+        }
+      };
+      traverse(root);
+      return result;
+    }
+    extractTextFeatures(node) {
+      const fontSize = typeof node.fontSize === "number" ? node.fontSize : 16;
+      const fontWeight = typeof node.fontWeight === "number" ? node.fontWeight : this.mapFontNameToWeight(node.fontName);
+      const text = (node.characters || "").toString();
+      const lines = text.split(/\n/).length;
+      const isAllCaps = text && text === text.toUpperCase();
+      return {
+        fontSize,
+        fontWeight,
+        lines,
+        length: text.length,
+        isAllCaps
+      };
+    }
+    mapFontNameToWeight(fontName) {
+      if (!fontName || !fontName.style) return 400;
+      const style = fontName.style.toLowerCase();
+      if (style.includes("bold")) return 700;
+      if (style.includes("semibold") || style.includes("semi")) return 600;
+      if (style.includes("medium")) return 500;
+      return 400;
+    }
+  };
+
+  // src/linter/detectors/ContainerRoleDetector.ts
+  var ContainerRoleDetector = class {
+    detect(node) {
+      if (!this.isContainerCandidate(node)) return null;
+      const summary = this.summarize(node);
+      const scores = [];
+      scores.push(this.scoreHero(node, summary));
+      scores.push(this.scoreFooter(node, summary));
+      scores.push(this.scoreImageBox(node, summary));
+      scores.push(this.scoreCard(node, summary));
+      scores.push(this.scoreInner(node, summary));
+      scores.push(this.scoreSection(node, summary));
+      scores.push(this.scoreGrid(node, summary));
+      const best = scores.sort((a, b) => b.score - a.score)[0];
+      if (!best || best.score < 0.5) return null;
+      return {
+        nodeId: node.id,
+        role: best.role,
+        confidence: Math.min(1, best.score),
+        hints: best.hints
+      };
+    }
+    detectAll(root) {
+      const result = /* @__PURE__ */ new Map();
+      const traverse = (node) => {
+        const detection = this.detect(node);
+        if (detection) {
+          result.set(node.id, detection);
+        }
+        if ("children" in node && node.children) {
+          for (const child of node.children) traverse(child);
+        }
+      };
+      traverse(root);
+      return result;
+    }
+    isContainerCandidate(node) {
+      if (node.type !== "FRAME" && node.type !== "GROUP") return false;
+      const width = "width" in node ? node.width : 0;
+      const height = "height" in node ? node.height : 0;
+      if (width < 80 || height < 40) return false;
+      const hasParentInfo = node.parent !== void 0 || node.parentId !== void 0;
+      if (hasParentInfo && (node.parent === null || node.parentId === null)) {
+        const name = (node.name || "").toLowerCase();
+        const isPageName = ["page", "desktop", "mobile", "artboard"].some((token) => name.includes(token));
+        const area = width * height;
+        const isHuge = area > 1200 * 1200;
+        if (isPageName && isHuge) return false;
+      }
+      return true;
+    }
+    summarize(node) {
+      const children = ("children" in node && node.children ? node.children : []) || [];
+      const layoutMode = node.layoutMode || "NONE";
+      let textCount = 0;
+      let imageCount = 0;
+      let buttonHint = false;
+      let hasBackground = false;
+      for (const child of children) {
+        if (child.type === "TEXT") textCount++;
+        if (this.isImageNode(child)) imageCount++;
+        if (this.looksLikeButton(child)) buttonHint = true;
+        if ("fills" in child && Array.isArray(child.fills)) {
+          hasBackground = hasBackground || child.fills.some((f) => f.visible !== false && f.type === "SOLID");
+        }
+      }
+      if ("fills" in node && Array.isArray(node.fills)) {
+        hasBackground = hasBackground || node.fills.some((f) => f.visible !== false && f.type === "SOLID");
+      }
+      return {
+        type: node.type,
+        width: "width" in node ? node.width : 0,
+        height: "height" in node ? node.height : 0,
+        layoutMode,
+        childCount: children.length,
+        textCount,
+        imageCount,
+        buttonHint,
+        hasBackground
+      };
+    }
+    scoreHero(node, s) {
+      let score = 0;
+      const hints = [];
+      if (s.height >= 300 && s.width >= 600) {
+        score += 0.4;
+        hints.push("dimens\xF5es de hero");
+      }
+      if (s.textCount >= 2) {
+        score += 0.2;
+        hints.push("m\xFAltiplos textos");
+      }
+      if (s.buttonHint) {
+        score += 0.2;
+        hints.push("possui CTA");
+      }
+      if (s.imageCount > 0) {
+        score += 0.2;
+        hints.push("imagem presente");
+      }
+      return { role: "hero", score, hints };
+    }
+    scoreFooter(node, s) {
+      let score = 0;
+      const hints = [];
+      const name = (node.name || "").toLowerCase();
+      if (name.includes("footer")) {
+        score += 0.5;
+        hints.push("nome indica footer");
+      }
+      if (s.textCount >= 4 && s.childCount >= 3) {
+        score += 0.3;
+        hints.push("m\xFAltiplas colunas de texto");
+      }
+      if (s.height > 200) score += 0.1;
+      return { role: "footer", score, hints };
+    }
+    scoreImageBox(node, s) {
+      let score = 0;
+      const hints = [];
+      if (s.imageCount >= 1) {
+        score += 0.4;
+        hints.push("imagem presente");
+      }
+      if (s.textCount >= 1) {
+        score += 0.3;
+        hints.push("texto acompanhando imagem");
+      }
+      if (s.childCount <= 4) score += 0.1;
+      return { role: "image-box-container", score, hints };
+    }
+    scoreCard(node, s) {
+      let score = 0;
+      const hints = [];
+      if (s.imageCount >= 1) {
+        score += 0.3;
+        hints.push("imagem presente");
+      }
+      if (s.textCount >= 1) {
+        score += 0.3;
+        hints.push("texto presente");
+      }
+      if (s.textCount >= 2 || s.childCount >= 3) {
+        score += 0.2;
+        hints.push("estrutura de card (v\xE1rios elementos)");
+      }
+      if (s.width <= 600 && s.height <= 800) score += 0.1;
+      if (s.layoutMode !== "NONE") score += 0.1;
+      return { role: "card", score, hints };
+    }
+    scoreInner(node, s) {
+      let score = 0;
+      const hints = [];
+      if (s.width >= 400 && s.width <= 1e3 && s.childCount >= 1) {
+        score += 0.4;
+        hints.push("largura encaixotada");
+      }
+      if (s.layoutMode !== "NONE") score += 0.1;
+      if (s.textCount > 0 || s.childCount === 1) score += 0.1;
+      return { role: "inner", score, hints };
+    }
+    scoreSection(node, s) {
+      let score = 0;
+      const hints = [];
+      if (s.width >= 800 && s.childCount >= 2) {
+        score += 0.4;
+        hints.push("largura de se\xE7\xE3o");
+      }
+      if (node.parent === null || node.parentId === null) {
+        score += 0.2;
+        hints.push("raiz de layout");
+      }
+      if (s.layoutMode !== "NONE") score += 0.1;
+      return { role: "section", score, hints };
+    }
+    scoreGrid(node, s) {
+      let score = 0;
+      const hints = [];
+      if (s.childCount >= 4) {
+        score += 0.3;
+        hints.push("muitos filhos");
+      }
+      if (s.layoutMode === "HORIZONTAL" || s.layoutMode === "VERTICAL") {
+        score += 0.1;
+        hints.push("auto layout para grid");
+      }
+      return { role: "grid", score, hints };
+    }
+    isImageNode(node) {
+      if ("fills" in node && Array.isArray(node.fills)) {
+        const hasImageFill = node.fills.some((f) => f.type === "IMAGE");
+        if (hasImageFill) return true;
+      }
+      const name = (node.name || "").toLowerCase();
+      return name.includes("image") || name.includes("img") || name.startsWith("w:image");
+    }
+    looksLikeButton(node) {
+      const name = (node.name || "").toLowerCase();
+      if (name.includes("button") || name.includes("btn") || name.includes("cta")) return true;
+      if ("children" in node && node.children) {
+        return node.children.some((ch) => ch.characters && ch.characters.length < 30);
+      }
+      return false;
+    }
+  };
+
+  // src/linter/rules/naming/ContainerNamingRule.ts
+  var ContainerNamingRule = class {
+    constructor() {
+      __publicField(this, "id", "container-naming");
+      __publicField(this, "category", "naming");
+      __publicField(this, "severity", "major");
+      __publicField(this, "detector", new ContainerRoleDetector());
+      __publicField(this, "detections", /* @__PURE__ */ new Map());
+    }
+    setDetectionMap(map) {
+      this.detections = map;
+    }
+    async validate(node) {
+      if (node.type !== "FRAME" && node.type !== "GROUP") return null;
+      const detection = this.getDetectionForNode(node);
+      if (!detection) return null;
+      const currentName = node.name || "";
+      if (this.nameAlreadyContainsRole(currentName, detection.role)) {
+        return null;
+      }
+      const suggestions = this.buildNameSuggestions(detection.role, currentName);
+      const message = `Container detectado como "${detection.role}" (${Math.round(detection.confidence * 100)}% conf.) \u2013 considere renomear para algo como "${suggestions[0]}"`;
+      return {
+        node_id: node.id,
+        node_name: node.name,
+        node_type: node.type,
+        severity: this.severity,
+        category: this.category,
+        rule: this.id,
+        message,
+        naming: {
+          recommendedName: suggestions[0],
+          alternatives: suggestions.slice(0, 3)
+        },
+        educational_tip: this.buildEducationalTip(detection, suggestions),
+        fixAvailable: false
+      };
+    }
+    generateGuide(node) {
+      const detection = this.getDetectionForNode(node);
+      const role = (detection == null ? void 0 : detection.role) || "section";
+      const suggestions = this.buildNameSuggestions(role, node.name);
+      return {
+        node_id: node.id,
+        problem: `Container sem nome sem\xE2ntico (parece um ${role})`,
+        severity: this.severity,
+        step_by_step: [
+          { step: 1, action: "Selecione o frame no Figma" },
+          { step: 2, action: `Renomeie para algo como "${suggestions[0]}"` },
+          { step: 3, action: "Mantenha um padr\xE3o consistente (Section/*, Card/*, ImgBox/*, Footer/*)" }
+        ],
+        before_after_example: {
+          before: node.name,
+          after: suggestions[0]
+        },
+        estimated_time: "15 segundos",
+        difficulty: "easy"
+      };
+    }
+    getDetectionForNode(node) {
+      if (this.detections && this.detections.size > 0) {
+        return this.detections.get(node.id) || null;
+      }
+      return this.detector.detect(node);
+    }
+    nameAlreadyContainsRole(name, role) {
+      const lower = name.toLowerCase();
+      return lower.includes(role.replace(/-/g, "")) || lower.startsWith("c:");
+    }
+    buildNameSuggestions(role, currentName) {
+      switch (role) {
+        case "hero":
+          return ["Section/Hero", "Hero/Main", "Hero/Primary"];
+        case "footer":
+          return ["Section/Footer", "Footer/Main", "Footer/Links"];
+        case "card":
+          return ["Card/Feature", "Card/Product", "Card/Service"];
+        case "image-box-container":
+          return ["ImgBox/Feature", "Card/Image", "ImgBox/Hero"];
+        case "inner":
+          return ["Container/Content", "c:inner", "Section/Inner"];
+        case "grid":
+          return ["Grid/Cards", "Grid/Features", "Grid/List"];
+        case "section-root":
+        case "section":
+        default:
+          return ["Section/Content", "c:section", `Section/${currentName || "Area"}`];
+      }
+    }
+    buildEducationalTip(detection, suggestions) {
+      return `
+Papel detectado: ${detection.role}
+
+Por que importa:
+- Facilita mapear para Section/Container do Elementor
+- Reduz alertas repetidos de estrutura e deixa o relat\xF3rio mais acion\xE1vel
+
+Sugest\xF5es de nome:
+- ${suggestions.join("\n- ")}
+
+Dicas:
+- Use Section/* para blocos principais
+- Use c:inner ou Container/* para wrappers internos
+- Cards e caixas de imagem mapeiam bem para widgets de cart\xE3o ou image-box no Elementor
+        `.trim();
+    }
+  };
+
   // src/linter/core/LinterEngine.ts
   var LinterEngine = class {
     constructor() {
       __publicField(this, "startTime", 0);
       __publicField(this, "endTime", 0);
+      __publicField(this, "widgetDetector", new WidgetDetector());
+      __publicField(this, "widgetDetections", /* @__PURE__ */ new Map());
+      __publicField(this, "textBlockDetector", new TextBlockDetector());
+      __publicField(this, "textBlockDetections", /* @__PURE__ */ new Map());
+      __publicField(this, "containerRoleDetector", new ContainerRoleDetector());
+      __publicField(this, "containerRoleDetections", /* @__PURE__ */ new Map());
     }
     /**
      * Analisa um node do Figma
@@ -8171,6 +8843,10 @@ ${refText}` });
     async analyze(node, registry2, options = {}) {
       this.startTime = Date.now();
       registry2.resetExecutedRules();
+      this.widgetDetections = this.widgetDetector.detectAll(node);
+      this.textBlockDetections = this.textBlockDetector.detectAll(node);
+      this.containerRoleDetections = this.containerRoleDetector.detectAll(node);
+      this.shareDetectionsWithNamingRules(registry2);
       const results = [];
       const rules = this.getApplicableRules(registry2, options);
       for (const rule of rules) {
@@ -8236,22 +8912,25 @@ ${refText}` });
      * Gera relatório completo
      */
     generateReport(results, registry2, options = {}, rootNode) {
+      var _a, _b;
       const summary = this.generateSummary(results);
-      console.log("\u{1F4CA} [generateReport] Summary gerado");
+      console.log("[generateReport] Summary gerado");
       const guides = this.generateGuides(results, registry2);
-      console.log("\u{1F4CA} [generateReport] Guides gerados");
+      console.log("[generateReport] Guides gerados");
       let widgets = [];
-      if (rootNode) {
-        console.log("\u{1F4CA} [generateReport] Iniciando detec\xE7\xE3o de widgets...");
+      let detectionMap = this.widgetDetections;
+      if ((!detectionMap || detectionMap.size === 0) && rootNode) {
+        console.log("[generateReport] Iniciando deteccao de widgets (fallback)...");
         try {
-          const detector = new WidgetDetector();
-          console.log("\u{1F4CA} [generateReport] WidgetDetector criado");
-          widgets = detector.detectAll(rootNode);
-          console.log(`\u{1F4CA} [generateReport] ${widgets.length} widgets detectados`);
+          detectionMap = this.widgetDetector.detectAll(rootNode);
         } catch (error) {
-          console.error("\u274C ERRO ao detectar widgets:", error);
-          widgets = [];
+          console.error("Erro ao detectar widgets:", error);
+          detectionMap = /* @__PURE__ */ new Map();
         }
+      }
+      if (detectionMap) {
+        widgets = Array.from(detectionMap.values());
+        console.log(`[generateReport] ${widgets.length} widgets detectados`);
       }
       return {
         summary,
@@ -8263,7 +8942,9 @@ ${refText}` });
           timestamp: (/* @__PURE__ */ new Date()).toISOString(),
           device_target: "desktop",
           ai_used: options.aiAssisted || false,
-          rules_executed: registry2.getExecutedRules()
+          rules_executed: registry2.getExecutedRules(),
+          text_blocks_detected: ((_a = this.textBlockDetections) == null ? void 0 : _a.size) || 0,
+          container_roles_detected: ((_b = this.containerRoleDetections) == null ? void 0 : _b.size) || 0
         }
       };
     }
@@ -8299,6 +8980,22 @@ ${refText}` });
         }
       }
       return guides;
+    }
+    /**
+     * Compartilha detecções aprovadas com regras que dependem delas
+     */
+    shareDetectionsWithNamingRules(registry2) {
+      for (const rule of registry2.getAll()) {
+        if (rule instanceof WidgetNamingRule && typeof rule.setDetectionMap === "function") {
+          rule.setDetectionMap(this.widgetDetections);
+          if (typeof rule.setTextBlocks === "function") {
+            rule.setTextBlocks(this.textBlockDetections);
+          }
+        }
+        if (rule instanceof ContainerNamingRule && typeof rule.setDetectionMap === "function") {
+          rule.setDetectionMap(this.containerRoleDetections);
+        }
+      }
     }
     /**
      * Obtém passos genéricos baseados na regra
@@ -8735,124 +9432,6 @@ Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, C
     }
   };
 
-  // src/linter/rules/naming/WidgetNamingRule.ts
-  var WidgetNamingRule = class {
-    constructor() {
-      __publicField(this, "id", "widget-naming");
-      __publicField(this, "category", "naming");
-      __publicField(this, "severity", "major");
-      __publicField(this, "detector", new WidgetDetector());
-    }
-    async validate(node) {
-      const detection = this.detector.detect(node);
-      if (!detection) {
-        return null;
-      }
-      const currentName = node.name;
-      const suggestedWidget = detection.widget;
-      const confidence = detection.confidence;
-      if (confidence < 0.6) {
-        return null;
-      }
-      const isCorrectlyNamed = currentName.toLowerCase().includes(suggestedWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
-      if (isCorrectlyNamed) {
-        return null;
-      }
-      const alternatives = this.getAlternativeNames(suggestedWidget, currentName);
-      return {
-        node_id: node.id,
-        node_name: node.name,
-        node_type: node.type,
-        severity: this.severity,
-        category: this.category,
-        rule: this.id,
-        message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
-        // ===== NAMING OBJECT FOR UI ACTION PANEL =====
-        widgetType: suggestedWidget,
-        confidence,
-        naming: {
-          recommendedName: suggestedWidget,
-          alternatives
-        },
-        educational_tip: `
-\u{1F4A1} Widget Detection
-
-O Linter detectou que este elemento corresponde ao widget "${suggestedWidget}" do Elementor.
-
-\u{1F4CB} Por que nomenclatura correta importa:
-\u2022 Facilita identifica\xE7\xE3o visual no Figma
-\u2022 Melhora convers\xE3o autom\xE1tica para Elementor
-\u2022 Reduz erros na exporta\xE7\xE3o
-\u2022 Torna o design system mais consistente
-
-\u2705 Nomenclatura recomendada:
-${this.getSuggestions(suggestedWidget, currentName).join("\n")}
-
-\u{1F3AF} Justificativa da detec\xE7\xE3o:
-${detection.justification}
-            `.trim(),
-        fixAvailable: true
-        // Naming now has one-click fix via UI
-      };
-    }
-    /**
-     * Generate cleaner alternative names for the dropdown
-     */
-    getAlternativeNames(widget, currentName) {
-      const alternatives = [];
-      const context = currentName.replace(/frame|rectangle|group|circle|ellipse|polygon|\d+/gi, "").trim();
-      if (context && context.length > 1) {
-        const contextName = `${context} ${widget}`.replace(/\s+/g, " ").trim();
-        if (contextName !== widget) {
-          alternatives.push(contextName);
-        }
-      }
-      const widgetBase = widget.toLowerCase();
-      if (widgetBase.includes("button")) {
-        if (!widget.includes("primary")) alternatives.push(`${widget}-primary`);
-        if (!widget.includes("secondary")) alternatives.push(`${widget}-secondary`);
-      } else if (widgetBase.includes("heading")) {
-        alternatives.push(`${widget}-hero`);
-      } else if (widgetBase.includes("container")) {
-        alternatives.push(`c:section`);
-        alternatives.push(`c:wrapper`);
-      }
-      return alternatives.slice(0, 3);
-    }
-    generateGuide(node) {
-      const detection = this.detector.detect(node);
-      const suggestedWidget = (detection == null ? void 0 : detection.widget) || "w:unknown";
-      return {
-        node_id: node.id,
-        problem: `Nome n\xE3o reflete o widget detectado (${suggestedWidget})`,
-        severity: this.severity,
-        step_by_step: [
-          { step: 1, action: "Selecione o layer no Figma" },
-          { step: 2, action: `Renomeie para "${suggestedWidget}"` },
-          { step: 3, action: "Ou use um nome descritivo que inclua o tipo de widget" },
-          { step: 4, action: 'Exemplo: "Hero CTA Button" ou "w:button"' }
-        ],
-        before_after_example: {
-          before: `Nome gen\xE9rico: "${node.name}"`,
-          after: `Nome correto: "${suggestedWidget}" ou "Hero ${suggestedWidget}"`
-        },
-        estimated_time: "30 segundos",
-        difficulty: "easy"
-      };
-    }
-    getSuggestions(widget, currentName) {
-      const suggestions = [];
-      suggestions.push(`\u2022 "${widget}" (padr\xE3o t\xE9cnico)`);
-      const context = currentName.replace(/frame|rectangle|group|\d+/gi, "").trim();
-      if (context) {
-        suggestions.push(`\u2022 "${context} ${widget}" (nome descritivo)`);
-      }
-      const widgetType = widget.split(":")[1] || widget;
-      suggestions.push(`\u2022 "Hero ${widgetType}" ou "Footer ${widgetType}" (nome funcional)`);
-      return suggestions;
-    }
-  };
-
   // src/linter/index.ts
   async function analyzeFigmaLayout(node, options = {
     aiAssisted: false,
@@ -8869,7 +9448,8 @@ ${detection.justification}
       new AutoLayoutRule(),
       new SpacerDetectionRule(),
       new GenericNameRule(),
-      new WidgetNamingRule()
+      new WidgetNamingRule(),
+      new ContainerNamingRule()
     ]);
     console.log("\u{1F4CD} [analyzeFigmaLayout] Regras registradas");
     console.log("\u{1F4CD} [analyzeFigmaLayout] Iniciando engine.analyze...");

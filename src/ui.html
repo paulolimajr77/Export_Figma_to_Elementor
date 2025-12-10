@@ -4322,6 +4322,19 @@
         ]
       };
 
+      const WIDGET_SET = new Set(Object.values(WIDGET_DATA).flat());
+      const filterValidWidgetNames = (names = []) => {
+        const unique = [];
+        names.forEach((n) => {
+          const trimmed = (n || '').trim();
+          if (!trimmed) return;
+          if (WIDGET_SET.has(trimmed) && !unique.includes(trimmed)) {
+            unique.push(trimmed);
+          }
+        });
+        return unique;
+      };
+
       function renderWidgetList(filterText = '') {
         const container = document.getElementById('widget-list-container');
         if (!container) return;
@@ -5045,14 +5058,14 @@
           const naming = issue.naming || {};
           const recommendedName = naming.recommendedName || issue.widgetType || '';
           const alternatives = naming.alternatives || [];
-          const hasNamingSuggestion = !!recommendedName;
+          let renameOptions = filterValidWidgetNames([recommendedName, ...alternatives]);
+          const hasNamingSuggestion = renameOptions.length > 0;
+          const alternativeCount = Math.max(renameOptions.length - 1, 0);
 
           // Build rename options for dropdown
-          const renameOptions = [];
-          if (recommendedName) renameOptions.push(recommendedName);
-          alternatives.forEach(alt => {
-            if (alt && !renameOptions.includes(alt)) renameOptions.push(alt);
-          });
+          if (!hasNamingSuggestion && recommendedName) {
+            renameOptions = filterValidWidgetNames([recommendedName]);
+          }
 
           // Build inline rename controls for naming issues
           let inlineRenameHtml = '';
@@ -5067,7 +5080,7 @@
                     Renomear
                   </button>
                 </div>
-                ${alternatives.length > 0 ? `<div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 4px;">${alternatives.length} alternativa(s) disponível(is)</div>` : ''}
+                ${alternativeCount > 0 ? `<div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 4px;">${alternativeCount} alternativa(s) dispon?vel(is)</div>` : ''}
               </div>
             `;
           } else if (issue.rule === 'widget-naming' || (issue.category || '').includes('naming')) {
@@ -5220,14 +5233,14 @@
         const naming = issue.naming || {};
         const recommendedName = naming.recommendedName || issue.widgetType || '';
         const alternatives = naming.alternatives || [];
-        const hasNamingSuggestion = !!recommendedName;
+        let renameOptions = filterValidWidgetNames([recommendedName, ...alternatives]);
+        const hasNamingSuggestion = renameOptions.length > 0;
+        const alternativeCount = Math.max(renameOptions.length - 1, 0);
 
         // Build rename options for dropdown
-        const renameOptions = [];
-        if (recommendedName) renameOptions.push(recommendedName);
-        alternatives.forEach(alt => {
-          if (alt && !renameOptions.includes(alt)) renameOptions.push(alt);
-        });
+        if (!hasNamingSuggestion && recommendedName) {
+          renameOptions = filterValidWidgetNames([recommendedName]);
+        }
 
         // Update panel HTML with action-focused layout
         panel.innerHTML = `
@@ -5252,7 +5265,7 @@
                   ✏️ Renomear
                 </button>
               </div>
-              ${alternatives.length > 0 ? `<div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 4px;">${alternatives.length} alternativa(s) disponível(is)</div>` : ''}
+              ${alternativeCount > 0 ? `<div style="font-size: 10px; color: var(--color-text-secondary); margin-top: 4px;">${alternativeCount} alternativa(s) dispon?vel(is)</div>` : ''}
             </div>
           ` : ''}
           

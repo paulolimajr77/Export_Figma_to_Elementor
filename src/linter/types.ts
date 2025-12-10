@@ -33,7 +33,24 @@ export interface WidgetDetection {
     widget: string; // w:button, w:heading, etc.
     confidence: number; // 0-1
     justification: string;
+    semanticRole?: string;
+    source?: 'explicit-name' | 'heuristic' | 'ai';
     properties?: Record<string, any>;
+}
+
+export interface TextBlockInfo {
+    nodeId: string;
+    type: 'headline-stack' | 'headline+body' | 'headline+subheadline' | 'headline-subheadline-body';
+    rolesByChildId: Record<string, 'headline' | 'subheadline' | 'body' | 'small-label'>;
+    confidence: number;
+    justification?: string;
+}
+
+export interface ContainerRoleDetection {
+    nodeId: string;
+    role: 'section' | 'inner' | 'card' | 'hero' | 'footer' | 'image-box-container' | 'grid' | 'section-root';
+    confidence: number;
+    hints?: string[];
 }
 
 export interface ManualFixGuide {
