@@ -2,7 +2,7 @@
 import { ElementorJSON, ElementorElement, ElementorSettings, WPConfig } from '../types/elementor.types';
 import { generateGUID } from '../utils/guid';
 import { compileWithRegistry } from '../config/widget.registry';
-import { normalizeColor, normalizeElementorSettings } from '../utils/style_normalizer';
+import { normalizeColor, normalizeElementorSettings, normalizePadding, normalizeFlexGap } from '../utils/style_normalizer';
 
 /**
  * Compilador Elementor para Flexbox Containers (Elementor 3.19+)
@@ -124,12 +124,10 @@ export class ElementorCompiler {
 
         // Only set gap if it's a valid number > 0 (ignore auto/undefined)
         if (typeof styles.gap === 'number' && styles.gap > 0) {
-            settings.flex_gap = {
-                unit: 'px',
-                column: String(styles.gap),
-                row: String(styles.gap),
-                isLinked: true
-            };
+            const gapValue = normalizeFlexGap(styles.gap);
+            if (gapValue) {
+                settings.flex_gap = gapValue;
+            }
         }
 
         // Only set padding if at least one value is non-zero
@@ -140,17 +138,14 @@ export class ElementorCompiler {
 
         // Only set padding if at least one value is non-zero
         if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
-            const paddingValue = {
-                unit: 'px',
-                top: pTop,
-                right: pRight,
-                bottom: pBottom,
-                left: pLeft,
-                isLinked: pTop === pRight && pTop === pBottom && pTop === pLeft
-            };
-            settings.padding = paddingValue;
-            // Mirror to _padding so Elementor UI exibe o padding correto no container raiz
-            (settings as any)._padding = paddingValue;
+            // Usar normalizePadding para garantir valores STRING
+            const paddingValue = normalizePadding(pTop, pRight, pBottom, pLeft);
+            if (paddingValue) {
+                settings.padding = paddingValue;
+                // Mirror to _padding so Elementor UI exibe o padding correto no container raiz
+                (settings as any)._padding = paddingValue;
+                console.log('[figtoel-boxmodel] container padding applied:', paddingValue);
+            }
         }
 
         if (styles.background) {

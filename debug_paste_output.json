@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "d0e3805",
+      "id": "75676dc",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "d0e3805",
+        "_element_id": "75676dc",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -42,12 +42,12 @@
       },
       "elements": [
         {
-          "id": "505390d",
+          "id": "7e4c418",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "505390d",
+            "_element_id": "7e4c418",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -66,18 +66,18 @@
             },
             "padding": {
               "unit": "px",
-              "top": 145,
-              "right": 0,
-              "bottom": 60,
-              "left": 0,
+              "top": "145",
+              "right": "0",
+              "bottom": "60",
+              "left": "0",
               "isLinked": false
             },
             "_padding": {
               "unit": "px",
-              "top": 145,
-              "right": 0,
-              "bottom": 60,
-              "left": 0,
+              "top": "145",
+              "right": "0",
+              "bottom": "60",
+              "left": "0",
               "isLinked": false
             },
             "background_background": "gradient",
@@ -115,13 +115,13 @@
           },
           "elements": [
             {
-              "id": "1333792",
+              "id": "b762cb6",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "1333792",
+                "_element_id": "b762cb6",
                 "minHeight": 690,
                 "justify_content": "flex-start",
                 "align_items": "flex-start",
@@ -142,13 +142,13 @@
               "elements": []
             },
             {
-              "id": "5c50983",
+              "id": "21c203c",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "text-editor",
               "settings": {
-                "_element_id": "5c50983",
+                "_element_id": "21c203c",
                 "align": "center",
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",
@@ -178,12 +178,12 @@
           ]
         },
         {
-          "id": "b7b283e",
+          "id": "eb6230e",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "b7b283e",
+            "_element_id": "eb6230e",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -202,18 +202,18 @@
             },
             "padding": {
               "unit": "px",
-              "top": 130,
-              "right": 40,
-              "bottom": 130,
-              "left": 40,
+              "top": "130",
+              "right": "40",
+              "bottom": "130",
+              "left": "40",
               "isLinked": false
             },
             "_padding": {
               "unit": "px",
-              "top": 130,
-              "right": 40,
-              "bottom": 130,
-              "left": 40,
+              "top": "130",
+              "right": "40",
+              "bottom": "130",
+              "left": "40",
               "isLinked": false
             },
             "background_background": "classic",
@@ -234,12 +234,12 @@
           },
           "elements": [
             {
-              "id": "21342f9",
+              "id": "b9309ed",
               "elType": "container",
               "isInner": true,
               "isLocked": false,
               "settings": {
-                "_element_id": "21342f9",
+                "_element_id": "b9309ed",
                 "container_type": "flex",
                 "content_width": "full",
                 "flex_direction": "column",
@@ -272,12 +272,12 @@
               },
               "elements": [
                 {
-                  "id": "7a15edd",
+                  "id": "9226e97",
                   "elType": "container",
                   "isInner": true,
                   "isLocked": false,
                   "settings": {
-                    "_element_id": "7a15edd",
+                    "_element_id": "9226e97",
                     "container_type": "flex",
                     "content_width": "full",
                     "flex_direction": "column",
@@ -310,12 +310,12 @@
                   },
                   "elements": [
                     {
-                      "id": "809fe9a",
+                      "id": "c774ebc",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "809fe9a",
+                        "_element_id": "c774ebc",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "column",
@@ -348,13 +348,13 @@
                       },
                       "elements": [
                         {
-                          "id": "cdb88a6",
+                          "id": "51c5220",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "heading",
                           "settings": {
-                            "_element_id": "cdb88a6",
+                            "_element_id": "51c5220",
                             "minHeight": 106,
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
@@ -384,13 +384,13 @@
                           "elements": []
                         },
                         {
-                          "id": "e5d57f4",
+                          "id": "bf51c24",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "text-editor",
                           "settings": {
-                            "_element_id": "e5d57f4",
+                            "_element_id": "bf51c24",
                             "minHeight": 45,
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
@@ -418,12 +418,12 @@
                       ]
                     },
                     {
-                      "id": "e371cb8",
+                      "id": "b997eaa",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "e371cb8",
+                        "_element_id": "b997eaa",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "row",
@@ -436,18 +436,18 @@
                         "flex_align_items": "flex-start",
                         "padding": {
                           "unit": "px",
-                          "top": 0,
-                          "right": 420,
-                          "bottom": 0,
-                          "left": 420,
+                          "top": "0",
+                          "right": "420",
+                          "bottom": "0",
+                          "left": "420",
                           "isLinked": false
                         },
                         "_padding": {
                           "unit": "px",
-                          "top": 0,
-                          "right": 420,
-                          "bottom": 0,
-                          "left": 420,
+                          "top": "0",
+                          "right": "420",
+                          "bottom": "0",
+                          "left": "420",
                           "isLinked": false
                         },
                         "width": {
@@ -472,13 +472,13 @@
                       },
                       "elements": [
                         {
-                          "id": "851cf4f",
+                          "id": "cd40478",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "button",
                           "settings": {
-                            "_element_id": "851cf4f",
+                            "_element_id": "cd40478",
                             "minHeight": 47,
                             "justify_content": "center",
                             "align_items": "center",

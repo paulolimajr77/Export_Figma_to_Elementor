@@ -267,6 +267,56 @@
     }
     return void 0;
   }
+  function normalizeSize(value, unit = "px") {
+    if (value === void 0 || value === null) return void 0;
+    return {
+      unit,
+      size: typeof value === "number" ? value : "",
+      sizes: []
+    };
+  }
+  function normalizeBoxModelValue(value) {
+    if (value === void 0 || value === null) return "";
+    if (typeof value === "string") return value;
+    return String(value);
+  }
+  function normalizePadding(top, right, bottom, left, unit = "px") {
+    if (top === void 0 && right === void 0 && bottom === void 0 && left === void 0) {
+      return void 0;
+    }
+    if (top === null && right === null && bottom === null && left === null) {
+      return void 0;
+    }
+    const t = normalizeBoxModelValue(top);
+    const r = normalizeBoxModelValue(right);
+    const b = normalizeBoxModelValue(bottom);
+    const l = normalizeBoxModelValue(left);
+    const allEqual = t === r && r === b && b === l;
+    const hasValue = t !== "" || r !== "" || b !== "" || l !== "";
+    console.log("[figtoel-boxmodel] normalizePadding:", { top: t, right: r, bottom: b, left: l, isLinked: allEqual && hasValue });
+    return {
+      unit,
+      top: t,
+      right: r,
+      bottom: b,
+      left: l,
+      isLinked: allEqual && hasValue
+    };
+  }
+  function normalizeGap(gap, unit = "px") {
+    if (gap === void 0 || gap === null) return void 0;
+    const gapStr = gap > 0 ? String(gap) : "";
+    console.log("[figtoel-boxmodel] normalizeGap:", { gap, gapStr });
+    return {
+      unit,
+      column: gapStr,
+      row: gapStr,
+      isLinked: true
+    };
+  }
+  function normalizeFlexGap(gap, unit = "px") {
+    return normalizeGap(gap, unit);
+  }
 
   // src/utils/style_utils.ts
   function buildHtmlFromSegments(node) {
@@ -893,22 +943,16 @@ ${refText}` });
         const padBottom = typeof ((_g = w.styles) == null ? void 0 : _g.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
         const padLeft = typeof ((_h = w.styles) == null ? void 0 : _h.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
         if (padTop || padRight || padBottom || padLeft) {
-          const paddingValue = {
-            unit: "px",
-            top: padTop,
-            right: padRight,
-            bottom: padBottom,
-            left: padLeft,
-            isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
-          };
-          settings.box_padding = paddingValue;
-          settings._box_padding = paddingValue;
-          settings.padding = paddingValue;
+          const paddingValue = normalizePadding(padTop, padRight, padBottom, padLeft);
+          if (paddingValue) {
+            settings._padding = paddingValue;
+            console.log("[figtoel-boxmodel] image-box _padding applied:", paddingValue);
+          }
         }
         const gap = typeof ((_i = w.styles) == null ? void 0 : _i.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
         if (gap !== void 0) {
-          settings.icon_spacing = gap;
-          settings.title_spacing = gap;
+          settings.image_spacing = normalizeSize(gap);
+          settings.title_bottom_space = normalizeSize(gap);
         }
         if ((_j = w.styles) == null ? void 0 : _j.customCss) {
           let css = w.styles.customCss;
@@ -966,23 +1010,16 @@ ${refText}` });
         const padLeft = typeof ((_i = w.styles) == null ? void 0 : _i.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
         const hasPadding = padTop || padRight || padBottom || padLeft;
         if (hasPadding) {
-          const paddingValue = {
-            unit: "px",
-            top: padTop,
-            right: padRight,
-            bottom: padBottom,
-            left: padLeft,
-            isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
-          };
-          settings.box_padding = paddingValue;
-          settings._box_padding = paddingValue;
-          settings.padding = paddingValue;
-          settings._padding = paddingValue;
+          const paddingValue = normalizePadding(padTop, padRight, padBottom, padLeft);
+          if (paddingValue) {
+            settings._padding = paddingValue;
+            console.log("[figtoel-boxmodel] icon-box _padding applied:", paddingValue);
+          }
         }
         const gap = typeof ((_j = w.styles) == null ? void 0 : _j.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
         if (gap !== void 0) {
-          settings.icon_spacing = gap;
-          settings.title_spacing = gap;
+          settings.icon_space = normalizeSize(gap);
+          settings.title_bottom_space = normalizeSize(gap);
         }
         if ((_k = w.styles) == null ? void 0 : _k.customCss) {
           let css = w.styles.customCss;
@@ -2241,28 +2278,22 @@ ${refText}` });
         settings.flex_align_items = settings.align_items;
       }
       if (typeof styles.gap === "number" && styles.gap > 0) {
-        settings.flex_gap = {
-          unit: "px",
-          column: String(styles.gap),
-          row: String(styles.gap),
-          isLinked: true
-        };
+        const gapValue = normalizeFlexGap(styles.gap);
+        if (gapValue) {
+          settings.flex_gap = gapValue;
+        }
       }
       const pTop = typeof styles.paddingTop === "number" ? styles.paddingTop : 0;
       const pRight = typeof styles.paddingRight === "number" ? styles.paddingRight : 0;
       const pBottom = typeof styles.paddingBottom === "number" ? styles.paddingBottom : 0;
       const pLeft = typeof styles.paddingLeft === "number" ? styles.paddingLeft : 0;
       if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
-        const paddingValue = {
-          unit: "px",
-          top: pTop,
-          right: pRight,
-          bottom: pBottom,
-          left: pLeft,
-          isLinked: pTop === pRight && pTop === pBottom && pTop === pLeft
-        };
-        settings.padding = paddingValue;
-        settings._padding = paddingValue;
+        const paddingValue = normalizePadding(pTop, pRight, pBottom, pLeft);
+        if (paddingValue) {
+          settings.padding = paddingValue;
+          settings._padding = paddingValue;
+          console.log("[figtoel-boxmodel] container padding applied:", paddingValue);
+        }
       }
       if (styles.background) {
         const bg = styles.background;

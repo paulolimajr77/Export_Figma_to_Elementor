@@ -92,33 +92,86 @@ export function normalizeTypography(styles: Record<string, any>): Record<string,
 }
 
 /**
- * Normaliza padding para estrutura Elementor
+ * Normaliza um valor numérico para string (formato Elementor Dimensions)
+ * IMPORTANTE: Controles Dimensions esperam STRINGS, não números!
+ * @param value - Valor numérico ou string
+ * @returns String do valor ou string vazia
+ */
+export function normalizeBoxModelValue(value: number | string | undefined | null): string {
+    if (value === undefined || value === null) return '';
+    if (typeof value === 'string') return value;
+    return String(value);
+}
+
+/**
+ * Tipo de retorno para funções de Dimensions (padding, margin)
+ */
+export interface ElementorDimensions {
+    unit: string;
+    top: string;
+    right: string;
+    bottom: string;
+    left: string;
+    isLinked: boolean;
+}
+
+/**
+ * Normaliza padding para estrutura Elementor com valores STRING
  * @param top - Padding top
  * @param right - Padding right  
  * @param bottom - Padding bottom
  * @param left - Padding left
  * @param unit - Unidade
- * @returns Objeto no formato Elementor
+ * @returns Objeto no formato Elementor com valores STRING
  */
 export function normalizePadding(
-    top?: number,
-    right?: number,
-    bottom?: number,
-    left?: number,
+    top?: number | string,
+    right?: number | string,
+    bottom?: number | string,
+    left?: number | string,
     unit: string = 'px'
-): { unit: string; top: string | number; right: string | number; bottom: string | number; left: string | number; isLinked: boolean } | undefined {
+): ElementorDimensions | undefined {
+    // Se tudo undefined/null, retorna undefined
     if (top === undefined && right === undefined && bottom === undefined && left === undefined) {
         return undefined;
     }
+    if (top === null && right === null && bottom === null && left === null) {
+        return undefined;
+    }
+
+    const t = normalizeBoxModelValue(top);
+    const r = normalizeBoxModelValue(right);
+    const b = normalizeBoxModelValue(bottom);
+    const l = normalizeBoxModelValue(left);
+
+    // isLinked só é true se todos iguais E pelo menos um tem valor
+    const allEqual = t === r && r === b && b === l;
+    const hasValue = t !== '' || r !== '' || b !== '' || l !== '';
+
+    console.log('[figtoel-boxmodel] normalizePadding:', { top: t, right: r, bottom: b, left: l, isLinked: allEqual && hasValue });
 
     return {
         unit,
-        top: top ?? '',
-        right: right ?? '',
-        bottom: bottom ?? '',
-        left: left ?? '',
-        isLinked: top === right && right === bottom && bottom === left
+        top: t,
+        right: r,
+        bottom: b,
+        left: l,
+        isLinked: allEqual && hasValue
     };
+}
+
+/**
+ * Normaliza margin para estrutura Elementor com valores STRING
+ * Usa mesma lógica de normalizePadding
+ */
+export function normalizeMargin(
+    top?: number | string,
+    right?: number | string,
+    bottom?: number | string,
+    left?: number | string,
+    unit: string = 'px'
+): ElementorDimensions | undefined {
+    return normalizePadding(top, right, bottom, left, unit);
 }
 
 /**
@@ -177,23 +230,47 @@ export function normalizeBorderWidth(
 }
 
 /**
- * Normaliza gap/spacing para estrutura Elementor
- * @param gap - Valor do gap
+ * Tipo de retorno para flex_gap
+ */
+export interface ElementorFlexGap {
+    unit: string;
+    column: string;
+    row: string;
+    isLinked: boolean;
+}
+
+/**
+ * Normaliza gap/spacing para estrutura Elementor flex_gap
+ * @param gap - Valor do gap (número)
  * @param unit - Unidade
- * @returns Objeto no formato Elementor
+ * @returns Objeto no formato Elementor flex_gap
  */
 export function normalizeGap(
     gap: number | undefined,
     unit: string = 'px'
-): { unit: string; column: string | number; row: string | number; isLinked: boolean } | undefined {
+): ElementorFlexGap | undefined {
     if (gap === undefined || gap === null) return undefined;
+
+    const gapStr = gap > 0 ? String(gap) : '';
+
+    console.log('[figtoel-boxmodel] normalizeGap:', { gap, gapStr });
 
     return {
         unit,
-        column: gap > 0 ? String(gap) : '',
-        row: gap > 0 ? String(gap) : '',
+        column: gapStr,
+        row: gapStr,
         isLinked: true
     };
+}
+
+/**
+ * Alias para normalizeGap - usado para flex containers
+ */
+export function normalizeFlexGap(
+    gap: number | undefined,
+    unit: string = 'px'
+): ElementorFlexGap | undefined {
+    return normalizeGap(gap, unit);
 }
 
 /**

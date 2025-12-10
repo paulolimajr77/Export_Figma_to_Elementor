@@ -1,6 +1,6 @@
 ﻿import type { PipelineWidget } from '../types/pipeline.schema';
 import type { ElementorSettings } from '../types/elementor.types';
-import { normalizeColor, normalizeElementorSettings } from '../utils/style_normalizer';
+import { normalizeColor, normalizeElementorSettings, normalizePadding, normalizeSize } from '../utils/style_normalizer';
 import { generateGUID } from '../utils/guid';
 
 export interface WidgetDefinition {
@@ -348,24 +348,20 @@ const registry: WidgetDefinition[] = [
             const padBottom = typeof w.styles?.paddingBottom === 'number' ? w.styles.paddingBottom : 0;
             const padLeft = typeof w.styles?.paddingLeft === 'number' ? w.styles.paddingLeft : 0;
             if (padTop || padRight || padBottom || padLeft) {
-                const paddingValue = {
-                    unit: 'px',
-                    top: padTop,
-                    right: padRight,
-                    bottom: padBottom,
-                    left: padLeft,
-                    isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
-                };
-                // Icon Box: prefer box padding controls (content box) instead of apenas padding avançado
-                settings.box_padding = paddingValue;
-                settings._box_padding = paddingValue;
-                // Keep legacy padding for backward compatibility
-                settings.padding = paddingValue;
+                // Usar normalizePadding para garantir valores STRING
+                // Widget padding vai em _padding (aba Avançado do Elementor)
+                // NÃO usar box_padding/_box_padding - não existem no image-box
+                const paddingValue = normalizePadding(padTop, padRight, padBottom, padLeft);
+                if (paddingValue) {
+                    (settings as any)._padding = paddingValue;
+                    console.log('[figtoel-boxmodel] image-box _padding applied:', paddingValue);
+                }
             }
             const gap = typeof w.styles?.itemSpacing === 'number' ? w.styles.itemSpacing : undefined;
             if (gap !== undefined) {
-                settings.icon_spacing = gap;
-                settings.title_spacing = gap;
+                // image-box: image_spacing e title_bottom_space são Sliders (números, não strings)
+                settings.image_spacing = normalizeSize(gap);
+                settings.title_bottom_space = normalizeSize(gap);
             }
 
             // ===== CUSTOM CSS (background, border, radius from frame) =====
@@ -373,8 +369,8 @@ const registry: WidgetDefinition[] = [
                 let css = w.styles.customCss;
                 // Remover qualquer traço de layout (padding/gap) do CSS customizado
                 css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '')
-                         .replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
-                         .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
+                    .replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
+                    .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
                 settings.custom_css = css.trim();
             }
 
@@ -436,33 +432,28 @@ const registry: WidgetDefinition[] = [
             const padLeft = typeof w.styles?.paddingLeft === 'number' ? w.styles.paddingLeft : 0;
             const hasPadding = padTop || padRight || padBottom || padLeft;
             if (hasPadding) {
-                const paddingValue = {
-                    unit: 'px',
-                    top: padTop,
-                    right: padRight,
-                    bottom: padBottom,
-                    left: padLeft,
-                    isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
-                };
-                // Aplicar padding nativo do widget (box/content) em vez de custom_css
-                (settings as any).box_padding = paddingValue;
-                (settings as any)._box_padding = paddingValue;
-                settings.padding = paddingValue;
-                (settings as any)._padding = paddingValue;
+                // Usar normalizePadding para garantir valores STRING
+                // Widget padding vai em _padding (aba Avançado do Elementor)
+                // NÃO usar box_padding/_box_padding - não existem no icon-box
+                const paddingValue = normalizePadding(padTop, padRight, padBottom, padLeft);
+                if (paddingValue) {
+                    (settings as any)._padding = paddingValue;
+                    console.log('[figtoel-boxmodel] icon-box _padding applied:', paddingValue);
+                }
             }
             const gap = typeof w.styles?.itemSpacing === 'number' ? w.styles.itemSpacing : undefined;
             if (gap !== undefined) {
-                // Icon-box tem controles nativos de espaçamento; mapeamos ambos
-                settings.icon_spacing = gap;
-                settings.title_spacing = gap;
+                // icon-box: icon_space e title_bottom_space são Sliders (números, não strings)
+                settings.icon_space = normalizeSize(gap);
+                settings.title_bottom_space = normalizeSize(gap);
             }
 
             // ===== CUSTOM CSS (background, border, radius from frame) =====
             if (w.styles?.customCss) {
                 let css = w.styles.customCss;
                 css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '')
-                         .replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
-                         .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
+                    .replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
+                    .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
                 settings.custom_css = css.trim();
             }
 
