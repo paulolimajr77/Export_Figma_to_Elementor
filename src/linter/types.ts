@@ -45,6 +45,8 @@ export interface WidgetDetection {
     attachedTextIds?: string[]; // helper/description texts attached to this widget
     wrapperCollapsed?: boolean;
     wrapperNodeId?: string;
+    consumedBackgroundIds?: string[];
+    backgroundOf?: string;
 }
 
 export interface TextBlockInfo {

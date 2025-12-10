@@ -7164,12 +7164,12 @@ ${refText}` });
      * Detecta qual widget Elementor melhor representa o node
      */
     detect(node) {
-      if (!this.isWidgetCandidate(node)) {
-        return null;
-      }
       const explicitDetection = this.detectByExplicitName(node);
       if (explicitDetection) {
         return explicitDetection;
+      }
+      if (!this.isWidgetCandidate(node)) {
+        return null;
       }
       const allowedWidgets = this.getAllowedWidgetsForNodeType(node.type);
       if (!allowedWidgets.length) {
@@ -7506,6 +7506,13 @@ ${refText}` });
       if (!allowedTypes.includes(node.type)) {
         return false;
       }
+      if (node.type === "RECTANGLE") {
+        const hasTextChild = "children" in node && Array.isArray(node.children) && node.children.some((ch) => ch.type === "TEXT");
+        const hasImageFill = "fills" in node && Array.isArray(node.fills) && node.fills.some((f) => f.type === "IMAGE");
+        if (!hasTextChild && !hasImageFill) {
+          return false;
+        }
+      }
       const width = "width" in node ? node.width : 0;
       const height = "height" in node ? node.height : 0;
       if (width < 32 || height < 16) {
@@ -7595,6 +7602,7 @@ ${refText}` });
         const hasBodyText = slots.text ? this.hasTextBody(node, slots.text) : false;
         if (slots.icon && slots.title && slots.text && hasBodyText) {
           const consumedIds = Object.values(slots).filter(Boolean);
+          const backgrounds = slots.backgrounds || [];
           return {
             detection: {
               node_id: node.id,
@@ -7605,9 +7613,10 @@ ${refText}` });
               source: "composite",
               semanticRole: "icon-box",
               compositeOf: consumedIds,
+              consumedBackgroundIds: backgrounds,
               slots: __spreadValues(__spreadValues(__spreadValues({}, slots.icon ? { icon: slots.icon } : {}), slots.title ? { title: slots.title } : {}), slots.text ? { text: slots.text } : {})
             },
-            consumedIds
+            consumedIds: [...consumedIds, ...backgrounds]
           };
         }
       }
@@ -7616,7 +7625,7 @@ ${refText}` });
         const repeater = this.extractIconListItems(node, alreadyConsumed);
         const score = this.scoreIconList(node, repeater);
         if (repeater.length > 0 && score >= 0.7) {
-          const consumedIds = repeater.flatMap((item) => [item.itemId, item.iconId, item.textId].filter(Boolean));
+          const consumedIds = repeater.flatMap((item) => [item.itemId, item.iconId, item.textId, ...item.backgrounds || []].filter(Boolean));
           return {
             detection: {
               node_id: node.id,
@@ -7721,9 +7730,15 @@ ${refText}` });
       let iconId;
       let titleId;
       let textId;
+      const backgrounds = [];
       for (const child of children) {
         if (alreadyConsumed.has(child.id)) continue;
         const childName = (child.name || "").toLowerCase();
+        const isDecorativeRect = child.type === "RECTANGLE" && !this.rectangleHasTextOrImage(child);
+        if (isDecorativeRect) {
+          backgrounds.push(child.id);
+          continue;
+        }
         if (!iconId && (childName.startsWith("w:icon") || child.type === "VECTOR" || child.type === "ELLIPSE")) {
           iconId = child.id;
           continue;
@@ -7738,7 +7753,7 @@ ${refText}` });
           }
         }
       }
-      return { icon: iconId, title: titleId, text: textId };
+      return { icon: iconId, title: titleId, text: textId, backgrounds };
     }
     hasTextBody(root, textId) {
       var _a;
@@ -7749,20 +7764,40 @@ ${refText}` });
       }
       return false;
     }
+    rectangleHasTextOrImage(node) {
+      const hasImage = node.fills && typeof node.fills !== "symbol" && node.fills.some((f) => f.type === "IMAGE");
+      const hasTextChild = "children" in node && Array.isArray(node.children) && node.children.some((ch) => ch.type === "TEXT");
+      return hasImage || hasTextChild;
+    }
+    isImageNode(node) {
+      return "fills" in node && Array.isArray(node.fills) && node.fills.some((f) => f.type === "IMAGE");
+    }
     extractIconListItems(node, alreadyConsumed) {
       const children = "children" in node && node.children ? node.children : [];
       const items = [];
       for (const item of children) {
         if (alreadyConsumed.has(item.id)) continue;
         if (!("children" in item) || !item.children) continue;
-        const iconChild = item.children.find(
-          (c) => !alreadyConsumed.has(c.id) && ((c.name || "").toLowerCase().startsWith("w:icon") || c.type === "VECTOR" || c.type === "ELLIPSE")
-        );
-        const textChild = item.children.find(
-          (c) => !alreadyConsumed.has(c.id) && c.type === "TEXT"
-        );
+        const backgrounds = [];
+        let iconChild;
+        let textChild;
+        for (const c of item.children) {
+          if (alreadyConsumed.has(c.id)) continue;
+          const isDecorativeRect = c.type === "RECTANGLE" && !this.rectangleHasTextOrImage(c);
+          if (isDecorativeRect) {
+            backgrounds.push(c.id);
+            continue;
+          }
+          if (!iconChild && ((c.name || "").toLowerCase().startsWith("w:icon") || c.type === "VECTOR" || c.type === "ELLIPSE" || this.isImageNode(c))) {
+            iconChild = c;
+            continue;
+          }
+          if (!textChild && c.type === "TEXT") {
+            textChild = c;
+          }
+        }
         if (iconChild || textChild) {
-          items.push({ itemId: item.id, iconId: iconChild == null ? void 0 : iconChild.id, textId: textChild == null ? void 0 : textChild.id });
+          items.push({ itemId: item.id, iconId: iconChild == null ? void 0 : iconChild.id, textId: textChild == null ? void 0 : textChild.id, backgrounds });
         }
       }
       return items;
@@ -10238,6 +10273,7 @@ Use a propriedade "Gap" do Auto Layout no frame pai ao inv\xE9s de elementos inv
     async validate(node) {
       if (!this.GENERIC_PATTERNS.test(node.name)) return null;
       const namingOptions = this.buildNamingOptions(node);
+      if (!namingOptions.length) return null;
       const recommended = namingOptions[0];
       return __spreadValues({
         node_id: node.id,
@@ -10281,8 +10317,12 @@ Use a propriedade "Gap" do Auto Layout no frame pai ao inv\xE9s de elementos inv
       }
       if (node.type === "RECTANGLE") {
         const rect = node;
+        const hasTextChild = "children" in rect && Array.isArray(rect.children) && rect.children.some((ch) => ch.type === "TEXT");
         if (this.hasImageFill(rect)) {
           return filterValidWidgetNames(["image", "image-box"]);
+        }
+        if (!hasTextChild) {
+          return [];
         }
         if (this.isButtonLike(rect)) {
           return filterValidWidgetNames(["button"]);

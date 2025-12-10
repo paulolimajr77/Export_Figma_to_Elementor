@@ -15,6 +15,7 @@ export class GenericNameRule implements Rule {
         if (!this.GENERIC_PATTERNS.test(node.name)) return null;
 
         const namingOptions = this.buildNamingOptions(node);
+        if (!namingOptions.length) return null;
         const recommended = namingOptions[0];
 
         return {
@@ -66,8 +67,13 @@ export class GenericNameRule implements Rule {
 
         if (node.type === 'RECTANGLE') {
             const rect = node as RectangleNode;
+            const hasTextChild = 'children' in rect && Array.isArray(rect.children) && rect.children.some(ch => (ch as any).type === 'TEXT');
             if (this.hasImageFill(rect)) {
                 return filterValidWidgetNames(['image', 'image-box']);
+            }
+            if (!hasTextChild) {
+                // Decorativo: não sugerir
+                return [];
             }
             if (this.isButtonLike(rect)) {
                 return filterValidWidgetNames(['button']);

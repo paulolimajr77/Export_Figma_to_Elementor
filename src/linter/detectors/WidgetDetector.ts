@@ -48,14 +48,14 @@ export class WidgetDetector {
      * Detecta qual widget Elementor melhor representa o node
      */
     detect(node: SceneNode): WidgetDetection | null {
-        if (!this.isWidgetCandidate(node)) {
-            return null;
-        }
-
-        // Respeita prefixos tÃƒÂ©cnicos explÃ­citos (ex.: w:image, woo:product-image)
+        // Respeita prefixos t????cnicos expl????citos (ex.: w:image, woo:product-image)
         const explicitDetection = this.detectByExplicitName(node);
         if (explicitDetection) {
             return explicitDetection;
+        }
+
+        if (!this.isWidgetCandidate(node)) {
+            return null;
         }
 
         const allowedWidgets = this.getAllowedWidgetsForNodeType(node.type);
@@ -494,6 +494,15 @@ export class WidgetDetector {
             return false;
         }
 
+        if (node.type === 'RECTANGLE') {
+            const hasTextChild = 'children' in node && Array.isArray(node.children) && (node.children as SceneNode[]).some(ch => ch.type === 'TEXT');
+            const hasImageFill = 'fills' in node && Array.isArray((node as any).fills) && (node as any).fills.some((f: any) => f.type === 'IMAGE');
+            if (!hasTextChild && !hasImageFill) {
+                // Retângulos decorativos não são candidatos
+                return false;
+            }
+        }
+
         const width = 'width' in node ? (node.width as number) : 0;
         const height = 'height' in node ? (node.height as number) : 0;
         if (width < 32 || height < 16) {
@@ -598,6 +607,7 @@ export class WidgetDetector {
             const hasBodyText = slots.text ? this.hasTextBody(node, slots.text) : false;
             if (slots.icon && slots.title && slots.text && hasBodyText) {
                 const consumedIds = Object.values(slots).filter(Boolean) as string[];
+                const backgrounds = slots.backgrounds || [];
                 return {
                     detection: {
                         node_id: node.id,
@@ -608,13 +618,14 @@ export class WidgetDetector {
                         source: 'composite',
                         semanticRole: 'icon-box',
                         compositeOf: consumedIds,
+                        consumedBackgroundIds: backgrounds,
                         slots: {
                             ...(slots.icon ? { icon: slots.icon } : {}),
                             ...(slots.title ? { title: slots.title } : {}),
                             ...(slots.text ? { text: slots.text } : {})
                         }
                     },
-                    consumedIds
+                    consumedIds: [...consumedIds, ...backgrounds]
                 };
             }
         }
@@ -625,7 +636,7 @@ export class WidgetDetector {
             const repeater = this.extractIconListItems(node, alreadyConsumed);
             const score = this.scoreIconList(node, repeater);
             if (repeater.length > 0 && score >= 0.7) {
-                const consumedIds = repeater.flatMap(item => [item.itemId, item.iconId, item.textId].filter(Boolean) as string[]);
+                const consumedIds = repeater.flatMap(item => [item.itemId, item.iconId, item.textId, ...(item.backgrounds || [])].filter(Boolean) as string[]);
                 return {
                     detection: {
                         node_id: node.id,
@@ -738,15 +749,21 @@ export class WidgetDetector {
         return items.length >= 2;
     }
 
-    private extractIconBoxSlots(node: SceneNode, alreadyConsumed: Set<string>): { icon?: string; title?: string; text?: string } {
+    private extractIconBoxSlots(node: SceneNode, alreadyConsumed: Set<string>): { icon?: string; title?: string; text?: string; backgrounds?: string[] } {
         const children = ('children' in node && node.children) ? node.children : [];
         let iconId: string | undefined;
         let titleId: string | undefined;
         let textId: string | undefined;
+        const backgrounds: string[] = [];
 
         for (const child of children) {
             if (alreadyConsumed.has(child.id)) continue;
             const childName = (child.name || '').toLowerCase();
+            const isDecorativeRect = child.type === 'RECTANGLE' && !this.rectangleHasTextOrImage(child as any);
+            if (isDecorativeRect) {
+                backgrounds.push(child.id);
+                continue;
+            }
             if (!iconId && (childName.startsWith('w:icon') || child.type === 'VECTOR' || child.type === 'ELLIPSE')) {
                 iconId = child.id;
                 continue;
@@ -762,7 +779,7 @@ export class WidgetDetector {
             }
         }
 
-        return { icon: iconId, title: titleId, text: textId };
+        return { icon: iconId, title: titleId, text: textId, backgrounds };
     }
 
     private hasTextBody(root: SceneNode, textId: string): boolean {
@@ -774,22 +791,42 @@ export class WidgetDetector {
         return false;
     }
 
-    private extractIconListItems(node: SceneNode, alreadyConsumed: Set<string>): Array<{ itemId: string; iconId?: string; textId?: string }> {
+    private rectangleHasTextOrImage(node: RectangleNode): boolean {
+        const hasImage = node.fills && typeof node.fills !== 'symbol' && (node.fills as any[]).some(f => f.type === 'IMAGE');
+        const hasTextChild = 'children' in node && Array.isArray((node as any).children) && ((node as any).children as SceneNode[]).some(ch => ch.type === 'TEXT');
+        return hasImage || hasTextChild;
+    }
+
+    private isImageNode(node: SceneNode): boolean {
+        return 'fills' in node && Array.isArray((node as any).fills) && (node as any).fills.some((f: any) => f.type === 'IMAGE');
+    }
+
+    private extractIconListItems(node: SceneNode, alreadyConsumed: Set<string>): Array<{ itemId: string; iconId?: string; textId?: string; backgrounds?: string[] }> {
         const children = ('children' in node && node.children) ? node.children : [];
-        const items: Array<{ itemId: string; iconId?: string; textId?: string }> = [];
+        const items: Array<{ itemId: string; iconId?: string; textId?: string; backgrounds?: string[] }> = [];
         for (const item of children) {
             if (alreadyConsumed.has(item.id)) continue;
             if (!('children' in item) || !(item as any).children) continue;
-            const iconChild = (item as any).children.find((c: any) =>
-                !alreadyConsumed.has(c.id) &&
-                (((c.name || '').toLowerCase().startsWith('w:icon')) || c.type === 'VECTOR' || c.type === 'ELLIPSE')
-            );
-            const textChild = (item as any).children.find((c: any) =>
-                !alreadyConsumed.has(c.id) &&
-                c.type === 'TEXT'
-            );
+            const backgrounds: string[] = [];
+            let iconChild: any;
+            let textChild: any;
+            for (const c of (item as any).children as SceneNode[]) {
+                if (alreadyConsumed.has((c as any).id)) continue;
+                const isDecorativeRect = (c as any).type === 'RECTANGLE' && !this.rectangleHasTextOrImage(c as any);
+                if (isDecorativeRect) {
+                    backgrounds.push((c as any).id);
+                    continue;
+                }
+                if (!iconChild && ((((c as any).name || '').toLowerCase().startsWith('w:icon')) || (c as any).type === 'VECTOR' || (c as any).type === 'ELLIPSE' || this.isImageNode(c as any))) {
+                    iconChild = c;
+                    continue;
+                }
+                if (!textChild && (c as any).type === 'TEXT') {
+                    textChild = c;
+                }
+            }
             if (iconChild || textChild) {
-                items.push({ itemId: item.id, iconId: iconChild?.id, textId: textChild?.id });
+                items.push({ itemId: (item as any).id, iconId: iconChild?.id, textId: textChild?.id, backgrounds });
             }
         }
         return items;
