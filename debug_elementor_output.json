@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "1753cd2",
+      "id": "42714d3",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "1753cd2",
+        "_element_id": "42714d3",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -42,12 +42,12 @@
       },
       "elements": [
         {
-          "id": "889ac74",
+          "id": "dbe368c",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "889ac74",
+            "_element_id": "dbe368c",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -107,13 +107,16 @@
           },
           "elements": [
             {
-              "id": "d573a68",
+              "id": "28f7b36",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "d573a68",
+                "_element_id": "28f7b36",
+                "minHeight": 690,
+                "justify_content": "flex-start",
+                "align_items": "flex-start",
                 "image": {
                   "url": "",
                   "id": 6011
@@ -131,15 +134,14 @@
               "elements": []
             },
             {
-              "id": "ce01bd1",
+              "id": "07adc1e",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "text-editor",
               "settings": {
-                "_element_id": "ce01bd1",
+                "_element_id": "07adc1e",
                 "align": "center",
-                "customCss": ".color-949494 { color: rgba(148, 148, 148, 1); }\n.color-fafafa { color: rgba(250, 250, 250, 1); }",
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",
                 "typography_font_weight": 500,

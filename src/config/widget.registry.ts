@@ -340,9 +340,39 @@ const registry: WidgetDefinition[] = [
                 if (descStyles.color) settings.description_color = descStyles.color;
             }
 
+            // Map native spacing/padding when available
+            const padTop = typeof w.styles?.paddingTop === 'number' ? w.styles.paddingTop : 0;
+            const padRight = typeof w.styles?.paddingRight === 'number' ? w.styles.paddingRight : 0;
+            const padBottom = typeof w.styles?.paddingBottom === 'number' ? w.styles.paddingBottom : 0;
+            const padLeft = typeof w.styles?.paddingLeft === 'number' ? w.styles.paddingLeft : 0;
+            if (padTop || padRight || padBottom || padLeft) {
+                settings.padding = {
+                    unit: 'px',
+                    top: padTop,
+                    right: padRight,
+                    bottom: padBottom,
+                    left: padLeft,
+                    isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
+                };
+            }
+            const gap = typeof w.styles?.itemSpacing === 'number' ? w.styles.itemSpacing : undefined;
+            if (gap !== undefined) {
+                settings.icon_spacing = gap;
+                settings.title_spacing = gap;
+            }
+
             // ===== CUSTOM CSS (background, border, radius from frame) =====
             if (w.styles?.customCss) {
-                settings.custom_css = w.styles.customCss;
+                // If we mapped padding/gap nativamente, remove essas linhas do CSS para evitar duplicação
+                let css = w.styles.customCss;
+                if (settings.padding) {
+                    css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '');
+                }
+                if (gap !== undefined) {
+                    css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
+                             .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
+                }
+                settings.custom_css = css.trim();
             }
 
             console.log('[IMAGE-BOX COMPILE] Typography applied:', {
@@ -396,9 +426,39 @@ const registry: WidgetDefinition[] = [
                 if (descStyles.color) settings.description_color = descStyles.color;
             }
 
+            // Map native spacing/padding when available
+            const padTop = typeof w.styles?.paddingTop === 'number' ? w.styles.paddingTop : 0;
+            const padRight = typeof w.styles?.paddingRight === 'number' ? w.styles.paddingRight : 0;
+            const padBottom = typeof w.styles?.paddingBottom === 'number' ? w.styles.paddingBottom : 0;
+            const padLeft = typeof w.styles?.paddingLeft === 'number' ? w.styles.paddingLeft : 0;
+            if (padTop || padRight || padBottom || padLeft) {
+                settings.padding = {
+                    unit: 'px',
+                    top: padTop,
+                    right: padRight,
+                    bottom: padBottom,
+                    left: padLeft,
+                    isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
+                };
+            }
+            const gap = typeof w.styles?.itemSpacing === 'number' ? w.styles.itemSpacing : undefined;
+            if (gap !== undefined) {
+                // Icon-box tem controles nativos de espaçamento; mapeamos ambos
+                settings.icon_spacing = gap;
+                settings.title_spacing = gap;
+            }
+
             // ===== CUSTOM CSS (background, border, radius from frame) =====
             if (w.styles?.customCss) {
-                settings.custom_css = w.styles.customCss;
+                let css = w.styles.customCss;
+                if (settings.padding) {
+                    css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, '');
+                }
+                if (gap !== undefined) {
+                    css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, '')
+                             .replace(/^\s*column-gap:[^;]+;?\s*$/gm, '');
+                }
+                settings.custom_css = css.trim();
             }
 
             console.log('[ICON-BOX COMPILE] Typography applied:', {

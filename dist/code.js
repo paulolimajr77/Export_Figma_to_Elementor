@@ -857,7 +857,7 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("image-box", ["caixa de imagem", "box imagem", "card com imagem"], ["image box", "box image", "card image", "feature box", "service box"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
         const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
         const settings = __spreadProps(__spreadValues({}, base), {
           image: { url: base.image_url || "", id: isNaN(imgId) ? "" : imgId },
@@ -886,8 +886,34 @@ ${refText}` });
           if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
           if (descStyles.color) settings.description_color = descStyles.color;
         }
-        if ((_e = w.styles) == null ? void 0 : _e.customCss) {
-          settings.custom_css = w.styles.customCss;
+        const padTop = typeof ((_e = w.styles) == null ? void 0 : _e.paddingTop) === "number" ? w.styles.paddingTop : 0;
+        const padRight = typeof ((_f = w.styles) == null ? void 0 : _f.paddingRight) === "number" ? w.styles.paddingRight : 0;
+        const padBottom = typeof ((_g = w.styles) == null ? void 0 : _g.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
+        const padLeft = typeof ((_h = w.styles) == null ? void 0 : _h.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
+        if (padTop || padRight || padBottom || padLeft) {
+          settings.padding = {
+            unit: "px",
+            top: padTop,
+            right: padRight,
+            bottom: padBottom,
+            left: padLeft,
+            isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
+          };
+        }
+        const gap = typeof ((_i = w.styles) == null ? void 0 : _i.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
+        if (gap !== void 0) {
+          settings.icon_spacing = gap;
+          settings.title_spacing = gap;
+        }
+        if ((_j = w.styles) == null ? void 0 : _j.customCss) {
+          let css = w.styles.customCss;
+          if (settings.padding) {
+            css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "");
+          }
+          if (gap !== void 0) {
+            css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
+          }
+          settings.custom_css = css.trim();
         }
         console.log("[IMAGE-BOX COMPILE] Typography applied:", {
           titleFamily: titleStyles == null ? void 0 : titleStyles.fontFamily,
@@ -905,7 +931,7 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("icon-box", ["caixa de \xEDcone", "box \xEDcone", "card com \xEDcone"], ["icon box", "box icon", "card icon", "feature icon"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
         const settings = __spreadProps(__spreadValues({}, base), {
           // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
           selected_icon: ((_a = w.styles) == null ? void 0 : _a.selected_icon) || base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
@@ -934,8 +960,34 @@ ${refText}` });
           if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
           if (descStyles.color) settings.description_color = descStyles.color;
         }
-        if ((_f = w.styles) == null ? void 0 : _f.customCss) {
-          settings.custom_css = w.styles.customCss;
+        const padTop = typeof ((_f = w.styles) == null ? void 0 : _f.paddingTop) === "number" ? w.styles.paddingTop : 0;
+        const padRight = typeof ((_g = w.styles) == null ? void 0 : _g.paddingRight) === "number" ? w.styles.paddingRight : 0;
+        const padBottom = typeof ((_h = w.styles) == null ? void 0 : _h.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
+        const padLeft = typeof ((_i = w.styles) == null ? void 0 : _i.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
+        if (padTop || padRight || padBottom || padLeft) {
+          settings.padding = {
+            unit: "px",
+            top: padTop,
+            right: padRight,
+            bottom: padBottom,
+            left: padLeft,
+            isLinked: padTop === padRight && padTop === padBottom && padTop === padLeft
+          };
+        }
+        const gap = typeof ((_j = w.styles) == null ? void 0 : _j.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
+        if (gap !== void 0) {
+          settings.icon_spacing = gap;
+          settings.title_spacing = gap;
+        }
+        if ((_k = w.styles) == null ? void 0 : _k.customCss) {
+          let css = w.styles.customCss;
+          if (settings.padding) {
+            css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "");
+          }
+          if (gap !== void 0) {
+            css = css.replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
+          }
+          settings.custom_css = css.trim();
         }
         console.log("[ICON-BOX COMPILE] Typography applied:", {
           titleFamily: titleStyles == null ? void 0 : titleStyles.fontFamily,
@@ -2116,6 +2168,16 @@ ${refText}` });
       return template;
     }
     compileContainer(container, isInner) {
+      var _a, _b, _c;
+      if (((_a = container.children) == null ? void 0 : _a.length) === 0 && Array.isArray(container.widgets) && container.widgets.length === 1) {
+        const soleWidget = container.widgets[0];
+        const sourceName = String(
+          ((_b = soleWidget.styles) == null ? void 0 : _b.sourceName) || ((_c = container.styles) == null ? void 0 : _c.sourceName) || soleWidget.type || ""
+        ).toLowerCase();
+        if (sourceName.startsWith("w:icon-box") || sourceName.startsWith("w:image-box")) {
+          return this.compileWidget(soleWidget);
+        }
+      }
       const id = generateGUID();
       const flexDirection = container.direction === "row" ? "row" : "column";
       const settings = __spreadValues({
@@ -2134,12 +2196,12 @@ ${refText}` });
       settings.flex_justify_content = settings.justify_content;
       settings.flex_align_items = settings.align_items;
       const widgetElements = container.widgets.map((w) => {
-        var _a, _b;
-        return { order: (_b = (_a = w.styles) == null ? void 0 : _a._order) != null ? _b : 0, el: this.compileWidget(w) };
+        var _a2, _b2;
+        return { order: (_b2 = (_a2 = w.styles) == null ? void 0 : _a2._order) != null ? _b2 : 0, el: this.compileWidget(w) };
       });
       const childContainers = container.children.map((child) => {
-        var _a, _b;
-        return { order: (_b = (_a = child.styles) == null ? void 0 : _a._order) != null ? _b : 0, el: this.compileContainer(child, true) };
+        var _a2, _b2;
+        return { order: (_b2 = (_a2 = child.styles) == null ? void 0 : _a2._order) != null ? _b2 : 0, el: this.compileContainer(child, true) };
       });
       const merged = [...widgetElements, ...childContainers].sort((a, b) => a.order - b.order).map((i) => i.el);
       return {
@@ -2381,6 +2443,7 @@ ${refText}` });
       Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
       if ((_a = widget.styles) == null ? void 0 : _a.customCss) {
         baseSettings.custom_css = widget.styles.customCss;
+        if (baseSettings.customCss) delete baseSettings.customCss;
       }
       if ((_b = widget.styles) == null ? void 0 : _b.align) {
         baseSettings.align = widget.styles.align;
@@ -4186,6 +4249,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
   function calculateWidgetScore(node) {
     const scores = [];
     const name = (node.name || "").toLowerCase();
+    let explicitContainerStyles = null;
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const children = hasChildren ? node.children : [];
     const widgetPrefixes = ["w:", "woo:", "e:", "wp:", "loop:", "c:"];
@@ -4317,6 +4381,7 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
   function detectWidget(node) {
     var _a, _b;
     const name = (node.name || "").toLowerCase();
+    let explicitContainerStyles = null;
     console.log("[DETECT WIDGET] Processing node:", node.name, "Type:", node.type, "Name (lowercase):", name);
     if (/^(w:|woo:|loop:)/.test(name)) {
       const widgetType = name.replace(/^(w:|woo:|loop:)/, "");
@@ -4328,12 +4393,13 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       const registryDef2 = findWidgetDefinition(name, node.type);
       if (registryDef2) {
         console.log("[DETECT WIDGET] Found in registry, delegating to registry handler");
+        explicitContainerStyles = extractContainerStyles(node);
       } else {
         console.log("[DETECT WIDGET] Not in registry, creating basic widget");
-        const styles2 = {
+        const styles2 = __spreadValues({
           sourceId: node.id,
           sourceName: node.name
-        };
+        }, extractContainerStyles(node));
         let content = node.name || "";
         let imageId = null;
         if (widgetType === "heading" || widgetType === "text-editor" || widgetType === "text") {
@@ -4363,10 +4429,10 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       console.log("[DETECT WIDGET] Ignoring container:", node.name);
       return null;
     }
-    const styles = {
+    const styles = __spreadValues({
       sourceId: node.id,
       sourceName: node.name
-    };
+    }, explicitContainerStyles || {});
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const children = hasChildren ? node.children : [];
     const firstImageDeep = findFirstImageId(node);
@@ -5206,19 +5272,22 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     console.log("[EXTRACT BOX] customCss:", customCss ? "generated" : "none");
     return { imageId, title, description, titleStyles, descriptionStyles, customCss };
   }
+  var isNumber = (v) => typeof v === "number" && isFinite(v);
+  var isString = (v) => typeof v === "string";
+  var isSymbolValue = (v) => typeof v === "symbol";
   function extractTypographyFromTextNode(node) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     if (node.type !== "TEXT") return void 0;
     const styles = {};
     const nodeAny = node;
-    if ((_a = nodeAny.fontName) == null ? void 0 : _a.family) {
+    if (!isSymbolValue(nodeAny.fontName) && ((_a = nodeAny.fontName) == null ? void 0 : _a.family)) {
       styles.fontFamily = nodeAny.fontName.family;
     } else if ((_d = (_c = (_b = nodeAny.styledTextSegments) == null ? void 0 : _b[0]) == null ? void 0 : _c.fontName) == null ? void 0 : _d.family) {
       styles.fontFamily = nodeAny.styledTextSegments[0].fontName.family;
     }
-    if (nodeAny.fontWeight) {
+    if (isNumber(nodeAny.fontWeight) || isString(nodeAny.fontWeight)) {
       styles.fontWeight = nodeAny.fontWeight;
-    } else if ((_e = nodeAny.fontName) == null ? void 0 : _e.style) {
+    } else if (!isSymbolValue(nodeAny.fontName) && ((_e = nodeAny.fontName) == null ? void 0 : _e.style) && isString(nodeAny.fontName.style)) {
       const styleWeightMap = {
         "Thin": 100,
         "ExtraLight": 200,
@@ -5238,20 +5307,20 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         }
       }
     }
-    if (nodeAny.fontSize) {
+    if (isNumber(nodeAny.fontSize)) {
       styles.fontSize = nodeAny.fontSize;
     }
     if (nodeAny.lineHeight) {
-      if (typeof nodeAny.lineHeight === "number") {
+      if (isNumber(nodeAny.lineHeight)) {
         styles.lineHeight = nodeAny.lineHeight;
-      } else if (nodeAny.lineHeight.value && nodeAny.lineHeight.unit !== "AUTO") {
+      } else if (!isSymbolValue((_f = nodeAny.lineHeight) == null ? void 0 : _f.value) && nodeAny.lineHeight.value && nodeAny.lineHeight.unit !== "AUTO") {
         styles.lineHeight = nodeAny.lineHeight.value;
       }
     }
     if (nodeAny.letterSpacing) {
-      if (typeof nodeAny.letterSpacing === "number") {
+      if (isNumber(nodeAny.letterSpacing)) {
         styles.letterSpacing = nodeAny.letterSpacing;
-      } else if (nodeAny.letterSpacing.value) {
+      } else if (!isSymbolValue((_g = nodeAny.letterSpacing) == null ? void 0 : _g.value) && nodeAny.letterSpacing.value) {
         if (nodeAny.letterSpacing.unit === "PERCENT" && styles.fontSize) {
           styles.letterSpacing = nodeAny.letterSpacing.value / 100 * styles.fontSize;
         } else {
@@ -5259,12 +5328,12 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         }
       }
     }
-    const fills = nodeAny.fills || ((_g = (_f = nodeAny.styledTextSegments) == null ? void 0 : _f[0]) == null ? void 0 : _g.fills);
+    const fills = nodeAny.fills || ((_i = (_h = nodeAny.styledTextSegments) == null ? void 0 : _h[0]) == null ? void 0 : _i.fills);
     if (fills && Array.isArray(fills) && fills.length > 0) {
       const solidFill = fills.find((f) => f.type === "SOLID" && f.visible !== false);
       if (solidFill == null ? void 0 : solidFill.color) {
         const { r, g, b } = solidFill.color;
-        const a = (_h = solidFill.opacity) != null ? _h : 1;
+        const a = (_j = solidFill.opacity) != null ? _j : 1;
         styles.color = a >= 1 ? `#${Math.round(r * 255).toString(16).padStart(2, "0")}${Math.round(g * 255).toString(16).padStart(2, "0")}${Math.round(b * 255).toString(16).padStart(2, "0")}`.toUpperCase() : `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
       }
     }
@@ -5280,40 +5349,61 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
     return hasStyles ? styles : void 0;
   }
   function generateCardCustomCSSFromNode(node) {
-    var _a, _b;
+    var _a;
     const nodeAny = node;
     const cssRules = [];
+    const toNumber = (value) => typeof value === "number" && isFinite(value) ? value : null;
+    const toRgba = (color, opacity) => {
+      const a = opacity != null ? opacity : 1;
+      return `rgba(${Math.round((color.r || 0) * 255)}, ${Math.round((color.g || 0) * 255)}, ${Math.round((color.b || 0) * 255)}, ${a})`;
+    };
+    const gradientToCss = (fill) => {
+      if (!(fill == null ? void 0 : fill.gradientStops) || !Array.isArray(fill.gradientStops) || fill.gradientStops.length < 2) return null;
+      const stops = fill.gradientStops.map((stop) => {
+        var _a2;
+        const pos = Math.round((stop.position || 0) * 100);
+        return `${toRgba(stop.color || {}, (_a2 = stop.color) == null ? void 0 : _a2.a)} ${pos}%`;
+      }).join(", ");
+      const type = fill.type === "GRADIENT_RADIAL" ? "radial-gradient(circle at center" : "linear-gradient(180deg";
+      return `${type}, ${stops})`;
+    };
     if (nodeAny.fills && Array.isArray(nodeAny.fills)) {
-      const solidFill = nodeAny.fills.find(
-        (f) => f.type === "SOLID" && f.visible !== false && f.color
-      );
-      if (solidFill == null ? void 0 : solidFill.color) {
-        const { r, g, b } = solidFill.color;
-        const opacity = (_a = solidFill.opacity) != null ? _a : 1;
-        if (opacity >= 1) {
-          const hex = `#${Math.round(r * 255).toString(16).padStart(2, "0")}${Math.round(g * 255).toString(16).padStart(2, "0")}${Math.round(b * 255).toString(16).padStart(2, "0")}`.toUpperCase();
-          cssRules.push(`background-color: ${hex}`);
-        } else {
-          cssRules.push(`background-color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+      const visibleFill = nodeAny.fills.find((f) => f.visible !== false);
+      if (visibleFill) {
+        if ((visibleFill.type === "GRADIENT_LINEAR" || visibleFill.type === "GRADIENT_RADIAL") && visibleFill.gradientStops) {
+          const grad = gradientToCss(visibleFill);
+          if (grad) cssRules.push(`background: ${grad}`);
+        } else if (visibleFill.type === "SOLID" && visibleFill.color) {
+          cssRules.push(`background: ${toRgba(visibleFill.color, visibleFill.opacity)}`);
         }
       }
     }
     if (nodeAny.strokes && Array.isArray(nodeAny.strokes) && nodeAny.strokes.length > 0) {
       const stroke = nodeAny.strokes[0];
-      if (stroke.type === "SOLID" && stroke.color) {
-        const { r, g, b } = stroke.color;
-        const strokeWeight = nodeAny.strokeWeight || 1;
-        const opacity = (_b = stroke.opacity) != null ? _b : 1;
-        cssRules.push(`border: ${strokeWeight}px solid rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+      if (stroke.visible !== false && stroke.color) {
+        const strokeWeight = (_a = toNumber(nodeAny.strokeWeight)) != null ? _a : 1;
+        cssRules.push(`border: ${strokeWeight}px solid ${toRgba(stroke.color, stroke.opacity)}`);
       }
     }
-    if (nodeAny.cornerRadius !== void 0 && nodeAny.cornerRadius > 0) {
-      cssRules.push(`border-radius: ${nodeAny.cornerRadius}px`);
+    const radius = toNumber(nodeAny.cornerRadius);
+    if (radius !== null && radius > 0) {
+      cssRules.push(`border-radius: ${radius}px`);
       cssRules.push(`overflow: hidden`);
     }
-    if (cssRules.length === 0) {
-      return null;
+    const paddings = ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"].map((k) => {
+      var _a2;
+      return (_a2 = toNumber(nodeAny[k])) != null ? _a2 : 0;
+    });
+    if (paddings.some((v) => v && v > 0)) {
+      const [pt, pr, pb, pl] = paddings;
+      cssRules.push(`padding: ${pt}px ${pr}px ${pb}px ${pl}px`);
     }
+    const gap = toNumber(nodeAny.itemSpacing);
+    if (gap !== null && gap > 0) {
+      cssRules.push(`row-gap: ${gap}px`);
+      cssRules.push(`column-gap: ${gap}px`);
+    }
+    if (cssRules.length === 0) return null;
     return `selector {
   ${cssRules.join(";\n  ")};
 }`;
@@ -8277,6 +8367,319 @@ ${refText}` });
     }
   };
 
+  // src/linter/config/widget-taxonomy.ts
+  var WIDGET_TAXONOMY = [
+    {
+      id: "basics",
+      label: "Basicos",
+      items: [
+        "heading",
+        "text",
+        "button",
+        "image",
+        "icon",
+        "video",
+        "divider",
+        "spacer",
+        "image-box",
+        "icon-box",
+        "star-rating",
+        "counter",
+        "progress",
+        "tabs",
+        "accordion",
+        "toggle",
+        "alert",
+        "social-icons",
+        "soundcloud",
+        "shortcode",
+        "html",
+        "menu-anchor",
+        "sidebar",
+        "read-more",
+        "image-carousel",
+        "basic-gallery",
+        "gallery",
+        "icon-list",
+        "nav-menu",
+        "search-form",
+        "google-maps",
+        "testimonial",
+        "embed",
+        "lottie",
+        "loop:grid",
+        "w:container",
+        "w:inner-container"
+      ]
+    },
+    {
+      id: "pro",
+      label: "Pro",
+      items: [
+        "form",
+        "login",
+        "subscription",
+        "call-to-action",
+        "media:carousel",
+        "portfolio",
+        "gallery-pro",
+        "slider:slides",
+        "slideshow",
+        "flip-box",
+        "animated-headline",
+        "post-navigation",
+        "share-buttons",
+        "table-of-contents",
+        "countdown",
+        "blockquote",
+        "testimonial-carousel",
+        "review-box",
+        "reviews",
+        "hotspots",
+        "sitemap",
+        "author-box",
+        "price-table",
+        "price-list",
+        "progress-tracker",
+        "animated-text",
+        "nav-menu-pro",
+        "breadcrumb",
+        "facebook-button",
+        "facebook-comments",
+        "facebook-embed",
+        "facebook-page",
+        "loop:builder",
+        "loop:grid-advanced",
+        "loop-carousel",
+        "post-excerpt",
+        "post-content",
+        "post-title",
+        "post-info",
+        "post-featured-image",
+        "post-author",
+        "post-date",
+        "post-terms",
+        "archive-title",
+        "archive-description",
+        "site-logo",
+        "site-title",
+        "site-tagline",
+        "search-results",
+        "global-widget",
+        "video-playlist",
+        "video-gallery"
+      ]
+    },
+    {
+      id: "woo",
+      label: "WooCommerce",
+      items: [
+        "woo:product-title",
+        "woo:product-image",
+        "woo:product-price",
+        "woo:product-add-to-cart",
+        "woo:product-data-tabs",
+        "woo:product-excerpt",
+        "woo:product-rating",
+        "woo:product-stock",
+        "woo:product-meta",
+        "woo:product-additional-information",
+        "woo:product-short-description",
+        "woo:product-related",
+        "woo:product-upsells",
+        "woo:product-tabs",
+        "woo:product-breadcrumb",
+        "woo:product-gallery",
+        "woo:products",
+        "woo:product-grid",
+        "woo:product-carousel",
+        "woo:product-loop-item",
+        "woo:loop-product-title",
+        "woo:loop-product-price",
+        "woo:loop-product-rating",
+        "woo:loop-product-image",
+        "woo:loop-product-button",
+        "woo:loop-product-meta",
+        "woo:cart",
+        "woo:checkout",
+        "woo:my-account",
+        "woo:purchase-summary",
+        "woo:order-tracking"
+      ]
+    },
+    {
+      id: "loop-builder",
+      label: "Loop Builder",
+      items: [
+        "loop:item",
+        "loop:image",
+        "loop:title",
+        "loop:meta",
+        "loop:terms",
+        "loop:rating",
+        "loop:price",
+        "loop:add-to-cart",
+        "loop:read-more",
+        "loop:featured-image",
+        "loop:pagination"
+      ]
+    },
+    {
+      id: "experimental",
+      label: "Experimentais",
+      items: [
+        "w:nested-tabs",
+        "w:mega-menu",
+        "w:scroll-snap",
+        "w:motion-effects",
+        "w:background-slideshow",
+        "w:css-transform",
+        "w:custom-position",
+        "w:dynamic-tags",
+        "w:ajax-pagination"
+      ]
+    },
+    {
+      id: "wordpress",
+      label: "WordPress",
+      items: [
+        "w:wp-search",
+        "w:wp-recent-posts",
+        "w:wp-recent-comments",
+        "w:wp-archives",
+        "w:wp-categories",
+        "w:wp-calendar",
+        "w:wp-tag-cloud",
+        "w:wp-custom-menu"
+      ]
+    },
+    {
+      id: "hierarchy",
+      label: "Nomenclatura Hierarquica",
+      items: [
+        "accordion:item",
+        "accordion:title",
+        "accordion:content",
+        "accordion:icon",
+        "tabs:item",
+        "tabs:title",
+        "tabs:content",
+        "list:item",
+        "list:icon",
+        "list:text",
+        "slide:1",
+        "slide:2",
+        "carousel:slide",
+        "countdown:days",
+        "countdown:hours",
+        "countdown:minutes",
+        "countdown:seconds",
+        "toggle:item",
+        "toggle:title",
+        "toggle:content"
+      ]
+    }
+  ];
+  var ALL_WIDGET_SLUGS = new Set(WIDGET_TAXONOMY.flatMap((cat) => cat.items));
+  function isWidgetInTaxonomy(slug) {
+    if (!slug) return false;
+    return ALL_WIDGET_SLUGS.has(slug.trim());
+  }
+  function normalizeWidgetSlug(slug) {
+    if (!slug) return null;
+    const trimmed = slug.trim();
+    if (ALL_WIDGET_SLUGS.has(trimmed)) return trimmed;
+    if (trimmed.startsWith("w:")) {
+      const withoutPrefix = trimmed.slice(2);
+      if (ALL_WIDGET_SLUGS.has(withoutPrefix)) {
+        return withoutPrefix;
+      }
+    }
+    return null;
+  }
+  function filterValidWidgetNames(names) {
+    const unique = [];
+    names.forEach((name) => {
+      const normalized = normalizeWidgetSlug(name);
+      if (normalized && !unique.includes(normalized)) {
+        unique.push(normalized);
+      }
+    });
+    return unique;
+  }
+  var TEXT_WIDGETS = [
+    "heading",
+    "text",
+    "animated-headline",
+    "post-title",
+    "post-excerpt",
+    "post-content",
+    "post-info",
+    "post-terms",
+    "archive-title",
+    "archive-description",
+    "site-title",
+    "site-tagline",
+    "countdown",
+    "blockquote"
+  ].filter(isWidgetInTaxonomy);
+  var MEDIA_WIDGETS = [
+    "image",
+    "image-box",
+    "image-carousel",
+    "basic-gallery",
+    "gallery",
+    "media:carousel",
+    "slideshow",
+    "slider:slides",
+    "video",
+    "video-gallery",
+    "video-playlist",
+    "loop:image",
+    "post-featured-image",
+    "site-logo",
+    "woo:product-image",
+    "woo:product-gallery",
+    "woo:product-carousel"
+  ].filter(isWidgetInTaxonomy);
+  var CONTAINER_WIDGETS = [
+    "w:container",
+    "w:inner-container",
+    "menu-anchor",
+    "sidebar",
+    "nav-menu",
+    "nav-menu-pro",
+    "accordion",
+    "tabs",
+    "toggle",
+    "accordion:item",
+    "accordion:title",
+    "accordion:content",
+    "accordion:icon",
+    "tabs:item",
+    "tabs:title",
+    "tabs:content",
+    "toggle:item",
+    "toggle:title",
+    "toggle:content",
+    "carousel:slide",
+    "slide:1",
+    "slide:2"
+  ].filter(isWidgetInTaxonomy);
+  var FORM_WIDGETS = [
+    "form",
+    "login",
+    "subscription",
+    "search-form",
+    "woo:checkout",
+    "woo:cart",
+    "woo:order-tracking",
+    "woo:my-account"
+  ].filter(isWidgetInTaxonomy);
+  var getTextWidgetNames = () => [...TEXT_WIDGETS];
+  var getMediaWidgetNames = () => [...MEDIA_WIDGETS];
+  var getContainerWidgetNames = () => [...CONTAINER_WIDGETS];
+
   // src/linter/rules/naming/WidgetNamingRule.ts
   var WidgetNamingRule = class {
     constructor() {
@@ -8286,14 +8689,7 @@ ${refText}` });
       __publicField(this, "detector", new WidgetDetector());
       __publicField(this, "detections", /* @__PURE__ */ new Map());
       __publicField(this, "textBlocks", /* @__PURE__ */ new Map());
-      __publicField(this, "TEXT_WIDGETS", /* @__PURE__ */ new Set([
-        "w:heading",
-        "w:post-title",
-        "w:call-to-action",
-        "w:text-editor",
-        "w:paragraph",
-        "w:rich-text"
-      ]));
+      __publicField(this, "TEXT_WIDGETS", new Set(getTextWidgetNames()));
     }
     setDetectionMap(detections) {
       this.detections = detections;
@@ -8303,23 +8699,21 @@ ${refText}` });
     }
     async validate(node) {
       const detection = this.getDetectionForNode(node);
-      if (!detection) {
-        return null;
-      }
-      const currentName = node.name;
+      if (!detection) return null;
       const suggestedWidget = detection.widget;
       const confidence = detection.confidence;
-      if (confidence < 0.6) {
+      if (confidence < 0.6) return null;
+      const canonicalWidget = this.toTaxonomySlug(suggestedWidget);
+      if (!canonicalWidget) return null;
+      if (node.type === "TEXT" && !this.TEXT_WIDGETS.has(canonicalWidget)) {
         return null;
       }
-      if (node.type === "TEXT" && !this.TEXT_WIDGETS.has(suggestedWidget)) {
-        return null;
-      }
-      const isCorrectlyNamed = currentName.toLowerCase().includes(suggestedWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
-      if (isCorrectlyNamed) {
-        return null;
-      }
-      const alternatives = this.getAlternativeNames(suggestedWidget, currentName);
+      const currentName = node.name || "";
+      const isCorrectlyNamed = currentName.toLowerCase().includes(canonicalWidget.toLowerCase()) || currentName.startsWith("w:") || currentName.startsWith("woo:") || currentName.startsWith("loop:");
+      if (isCorrectlyNamed) return null;
+      const options = this.buildOptionsForNode(node, canonicalWidget);
+      if (!options.length) return null;
+      const [recommendedName, ...alternatives] = options;
       return {
         node_id: node.id,
         node_name: node.name,
@@ -8327,100 +8721,93 @@ ${refText}` });
         severity: this.severity,
         category: this.category,
         rule: this.id,
-        message: `Widget detectado como "${suggestedWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
-        // ===== NAMING OBJECT FOR UI ACTION PANEL =====
-        widgetType: suggestedWidget,
+        message: `Widget detectado como "${canonicalWidget}" (${Math.round(confidence * 100)}% confian\xE7a), mas nome atual \xE9 "${currentName}"`,
+        widgetType: canonicalWidget,
         confidence,
         naming: {
-          recommendedName: suggestedWidget,
+          recommendedName,
           alternatives
         },
-        educational_tip: `
-\u{1F4A1} Widget Detection
+        educational_tip: this.buildEducationalTip(canonicalWidget, recommendedName, currentName, detection.justification),
+        fixAvailable: true
+      };
+    }
+    getDetectionForNode(node) {
+      if (this.detections && this.detections.size > 0) {
+        const cached = this.detections.get(node.id);
+        if (cached) return cached;
+        return null;
+      }
+      return this.detector.detect(node);
+    }
+    buildOptionsForNode(node, canonicalWidget) {
+      const pools = [];
+      if (node.type === "TEXT") {
+        pools.push(...getTextWidgetNames());
+      } else if (node.type === "RECTANGLE") {
+        pools.push(...getMediaWidgetNames());
+      } else if (node.type === "FRAME" || node.type === "GROUP") {
+        pools.push(...getContainerWidgetNames(), ...getMediaWidgetNames());
+      }
+      const ordered = [canonicalWidget, ...pools];
+      return filterValidWidgetNames(ordered);
+    }
+    toTaxonomySlug(widget) {
+      const normalized = normalizeWidgetSlug(widget);
+      if (normalized) return normalized;
+      if (isWidgetInTaxonomy(widget)) return widget;
+      return null;
+    }
+    getSuggestions(widget, currentName) {
+      const suggestions = [];
+      suggestions.push(`\u2022 "${widget}" (padr\xE3o t\xE9cnico da taxonomia)`);
+      const context = currentName.replace(/frame|rectangle|group|\d+/gi, "").trim();
+      if (context) {
+        suggestions.push(`\u2022 "${context} ${widget}" (nome descritivo)`);
+      }
+      suggestions.push(`\u2022 "Hero ${widget}" ou "Footer ${widget}" (nome funcional dentro da taxonomia)`);
+      return suggestions;
+    }
+    buildEducationalTip(canonicalWidget, recommendedName, currentName, justification) {
+      return `
+\u{1F50E} Widget Detection
 
-O Linter detectou que este elemento corresponde ao widget "${suggestedWidget}" do Elementor.
+O Linter detectou que este elemento corresponde ao widget "${canonicalWidget}" do Elementor.
 
-\u{1F4CB} Por que nomenclatura correta importa:
+\u{1F9ED} Por que nomenclatura correta importa:
 \u2022 Facilita identifica\xE7\xE3o visual no Figma
 \u2022 Melhora convers\xE3o autom\xE1tica para Elementor
 \u2022 Reduz erros na exporta\xE7\xE3o
 \u2022 Torna o design system mais consistente
 
-\u2705 Nomenclatura recomendada:
-${this.getSuggestions(suggestedWidget, currentName).join("\n")}
+\u{1F4A1} Nomenclatura recomendada:
+${this.getSuggestions(recommendedName, currentName).join("\n")}
 
-\u{1F3AF} Justificativa da detec\xE7\xE3o:
-${detection.justification}
-            `.trim(),
-        fixAvailable: true
-        // Naming now has one-click fix via UI
-      };
-    }
-    /**
-     * Generate cleaner alternative names for the dropdown
-     */
-    getDetectionForNode(node) {
-      if (this.detections && this.detections.size > 0) {
-        const cached = this.detections.get(node.id);
-        if (cached) {
-          return cached;
-        }
-        return null;
-      }
-      return this.detector.detect(node);
-    }
-    getAlternativeNames(widget, currentName) {
-      const alternatives = [];
-      const context = currentName.replace(/frame|rectangle|group|circle|ellipse|polygon|\d+/gi, "").trim();
-      if (context && context.length > 1) {
-        const contextName = `${context} ${widget}`.replace(/\s+/g, " ").trim();
-        if (contextName !== widget) {
-          alternatives.push(contextName);
-        }
-      }
-      const widgetBase = widget.toLowerCase();
-      if (widgetBase.includes("button")) {
-        if (!widget.includes("primary")) alternatives.push(`${widget}-primary`);
-        if (!widget.includes("secondary")) alternatives.push(`${widget}-secondary`);
-      } else if (widgetBase.includes("heading")) {
-        alternatives.push(`${widget}-hero`);
-      } else if (widgetBase.includes("container")) {
-        alternatives.push(`c:section`);
-        alternatives.push(`c:wrapper`);
-      }
-      return alternatives.slice(0, 3);
+\u2705 Justificativa da detec\xE7\xE3o:
+${justification}
+        `.trim();
     }
     generateGuide(node) {
       const detection = this.getDetectionForNode(node);
-      const suggestedWidget = (detection == null ? void 0 : detection.widget) || "w:unknown";
+      const suggestedWidget = (detection == null ? void 0 : detection.widget) || "unknown";
+      const canonicalWidget = this.toTaxonomySlug(suggestedWidget) || suggestedWidget;
       return {
         node_id: node.id,
-        problem: `Nome n\xE3o reflete o widget detectado (${suggestedWidget})`,
+        problem: `Nome n\xE3o reflete o widget detectado (${canonicalWidget})`,
         severity: this.severity,
         step_by_step: [
           { step: 1, action: "Selecione o layer no Figma" },
-          { step: 2, action: `Renomeie para "${suggestedWidget}"` },
-          { step: 3, action: "Ou use um nome descritivo que inclua o tipo de widget" },
-          { step: 4, action: 'Exemplo: "Hero CTA Button" ou "w:button"' }
+          { step: 2, action: `Renomeie para "${canonicalWidget}"` },
+          { step: 3, action: "Use apenas nomes da taxonomia oficial (dropdown do Linter)" },
+          { step: 4, action: "Confirme no painel se o nome foi aplicado" }
         ],
         before_after_example: {
           before: `Nome gen\xE9rico: "${node.name}"`,
-          after: `Nome correto: "${suggestedWidget}" ou "Hero ${suggestedWidget}"`
+          after: `Nome correto: "${canonicalWidget}"`
         },
         estimated_time: "30 segundos",
         difficulty: "easy"
       };
-    }
-    getSuggestions(widget, currentName) {
-      const suggestions = [];
-      suggestions.push(`\u2022 "${widget}" (padr\xE3o t\xE9cnico)`);
-      const context = currentName.replace(/frame|rectangle|group|\d+/gi, "").trim();
-      if (context) {
-        suggestions.push(`\u2022 "${context} ${widget}" (nome descritivo)`);
-      }
-      const widgetType = widget.split(":")[1] || widget;
-      suggestions.push(`\u2022 "Hero ${widgetType}" ou "Footer ${widgetType}" (nome funcional)`);
-      return suggestions;
     }
   };
 
@@ -8737,8 +9124,9 @@ ${detection.justification}
       if (this.nameAlreadyContainsRole(currentName, detection.role)) {
         return null;
       }
-      const suggestions = this.buildNameSuggestions(detection.role, currentName);
-      const message = `Container detectado como "${detection.role}" (${Math.round(detection.confidence * 100)}% conf.) \u2013 considere renomear para algo como "${suggestions[0]}"`;
+      const suggestions = this.buildNameSuggestions(detection.role);
+      if (!suggestions.length) return null;
+      const message = `Container detectado como "${detection.role}" (${Math.round(detection.confidence * 100)}% conf.) \u2192 renomeie para "${suggestions[0]}"`;
       return {
         node_id: node.id,
         node_name: node.name,
@@ -8749,28 +9137,28 @@ ${detection.justification}
         message,
         naming: {
           recommendedName: suggestions[0],
-          alternatives: suggestions.slice(0, 3)
+          alternatives: suggestions.slice(1, 4)
         },
         educational_tip: this.buildEducationalTip(detection, suggestions),
-        fixAvailable: false
+        fixAvailable: true
       };
     }
     generateGuide(node) {
       const detection = this.getDetectionForNode(node);
       const role = (detection == null ? void 0 : detection.role) || "section";
-      const suggestions = this.buildNameSuggestions(role, node.name);
+      const suggestions = this.buildNameSuggestions(role);
       return {
         node_id: node.id,
         problem: `Container sem nome sem\xE2ntico (parece um ${role})`,
         severity: this.severity,
         step_by_step: [
           { step: 1, action: "Selecione o frame no Figma" },
-          { step: 2, action: `Renomeie para algo como "${suggestions[0]}"` },
-          { step: 3, action: "Mantenha um padr\xE3o consistente (Section/*, Card/*, ImgBox/*, Footer/*)" }
+          { step: 2, action: `Renomeie para "${suggestions[0] || "w:container"}"` },
+          { step: 3, action: "Use apenas slugs oficiais listados na aba Ajuda/Taxonomia" }
         ],
         before_after_example: {
           before: node.name,
-          after: suggestions[0]
+          after: suggestions[0] || "w:container"
         },
         estimated_time: "15 segundos",
         difficulty: "easy"
@@ -8784,26 +9172,28 @@ ${detection.justification}
     }
     nameAlreadyContainsRole(name, role) {
       const lower = name.toLowerCase();
-      return lower.includes(role.replace(/-/g, "")) || lower.startsWith("c:");
+      return lower.includes(role.replace(/-/g, "")) || lower.startsWith("c:") || lower.includes("container");
     }
-    buildNameSuggestions(role, currentName) {
+    buildNameSuggestions(role) {
+      const base = getContainerWidgetNames();
+      const pick = (...names) => filterValidWidgetNames(names.length ? names : base);
       switch (role) {
         case "hero":
-          return ["Section/Hero", "Hero/Main", "Hero/Primary"];
+          return pick("w:container", "w:inner-container");
         case "footer":
-          return ["Section/Footer", "Footer/Main", "Footer/Links"];
+          return pick("w:container");
         case "card":
-          return ["Card/Feature", "Card/Product", "Card/Service"];
+          return pick("w:container", "w:inner-container", "image-box");
         case "image-box-container":
-          return ["ImgBox/Feature", "Card/Image", "ImgBox/Hero"];
+          return pick("image-box", "image");
         case "inner":
-          return ["Container/Content", "c:inner", "Section/Inner"];
+          return pick("w:inner-container", "w:container");
         case "grid":
-          return ["Grid/Cards", "Grid/Features", "Grid/List"];
+          return pick("w:container");
         case "section-root":
         case "section":
         default:
-          return ["Section/Content", "c:section", `Section/${currentName || "Area"}`];
+          return pick("w:container");
       }
     }
     buildEducationalTip(detection, suggestions) {
@@ -8812,15 +9202,15 @@ Papel detectado: ${detection.role}
 
 Por que importa:
 - Facilita mapear para Section/Container do Elementor
-- Reduz alertas repetidos de estrutura e deixa o relat\xF3rio mais acion\xE1vel
+- Reduz alertas repetidos e deixa o relat\xF3rio mais acion\xE1vel
 
-Sugest\xF5es de nome:
+Sugest\xF5es (taxonomia oficial):
 - ${suggestions.join("\n- ")}
 
 Dicas:
-- Use Section/* para blocos principais
-- Use c:inner ou Container/* para wrappers internos
-- Cards e caixas de imagem mapeiam bem para widgets de cart\xE3o ou image-box no Elementor
+- Use w:container para se\xE7\xF5es principais
+- Use w:inner-container para wrappers internos
+- Para cards/caixas de imagem, utilize slugs oficiais como image-box
         `.trim();
     }
   };
@@ -9286,144 +9676,88 @@ Use a propriedade "Gap" do Auto Layout no frame pai ao inv\xE9s de elementos inv
       __publicField(this, "GENERIC_PATTERNS", /^(Frame|Rectangle|Group|Vector|Ellipse|Line|Component|Instance)\s+\d+$/);
     }
     async validate(node) {
-      if (this.GENERIC_PATTERNS.test(node.name)) {
-        const suggestedPattern = this.detectSuggestedPattern(node);
-        const examples = this.getExamplesForNodeType(node);
-        return {
-          node_id: node.id,
-          node_name: node.name,
-          severity: this.severity,
-          category: this.category,
-          rule: this.id,
-          message: `Nome gen\xE9rico detectado: "${node.name}"`,
-          educational_tip: `
-\u26A0\uFE0F Por que nomenclatura importa?
-
-\u2022 Facilita manuten\xE7\xE3o do design no Figma
-\u2022 Melhora a detec\xE7\xE3o autom\xE1tica de widgets
-\u2022 Gera c\xF3digo Elementor mais leg\xEDvel
-\u2022 Facilita colabora\xE7\xE3o em equipe
-
-\u{1F4A1} Padr\xE3o sugerido: ${suggestedPattern}
-
-\u{1F4D6} Exemplos:
-${examples.map((ex) => `  \u2022 ${ex}`).join("\n")}
-
-\u2705 Solu\xE7\xE3o:
-Renomeie a camada seguindo a taxonomia Elementor (Btn/*, Img/*, Icon/*, H1-H6, Card/*, etc.)
-        `.trim()
-        };
-      }
-      return null;
+      if (!this.GENERIC_PATTERNS.test(node.name)) return null;
+      const namingOptions = this.buildNamingOptions(node);
+      const recommended = namingOptions[0];
+      return __spreadValues({
+        node_id: node.id,
+        node_name: node.name,
+        severity: this.severity,
+        category: this.category,
+        rule: this.id,
+        message: `Nome gen\xE9rico detectado: "${node.name}"${recommended ? ` \u2192 use "${recommended}"` : ""}`,
+        educational_tip: this.buildEducationalTip(namingOptions)
+      }, recommended ? {
+        naming: {
+          recommendedName: recommended,
+          alternatives: namingOptions.slice(1)
+        }
+      } : {});
     }
     generateGuide(node) {
-      const suggestedPattern = this.detectSuggestedPattern(node);
-      const examples = this.getExamplesForNodeType(node);
+      const namingOptions = this.buildNamingOptions(node);
+      const recommended = namingOptions[0] || "w:container";
       return {
         node_id: node.id,
         problem: `Nome gen\xE9rico: "${node.name}"`,
         severity: this.severity,
         step_by_step: [
           { step: 1, action: "Clique duas vezes no nome da camada no Figma" },
-          { step: 2, action: `Renomeie seguindo o padr\xE3o: ${suggestedPattern}` },
+          { step: 2, action: `Renomeie seguindo o padr\xE3o da taxonomia: ${recommended}` },
           { step: 3, action: "Use nomes descritivos que indiquem a fun\xE7\xE3o do elemento" }
         ],
         before_after_example: {
           before: `"${node.name}" (gen\xE9rico)`,
-          after: `"${examples[0]}" (descritivo)`
+          after: `"${recommended}" (taxonomia oficial)`
         },
         estimated_time: "10 segundos",
         difficulty: "easy"
       };
     }
-    /**
-     * Detecta padrão sugerido baseado no tipo de node
-     */
-    detectSuggestedPattern(node) {
+    buildNamingOptions(node) {
       if (node.type === "TEXT") {
-        const textNode = node;
-        const fontSize = typeof textNode.fontSize === "number" ? textNode.fontSize : 16;
-        if (fontSize >= 32) return "H1, H2, H3";
-        if (fontSize >= 24) return "H4, H5";
-        return "Text/Paragraph, Text/Description, Text/Label";
+        const options = getTextWidgetNames();
+        return filterValidWidgetNames(options);
       }
       if (node.type === "RECTANGLE") {
         const rect = node;
         if (this.hasImageFill(rect)) {
-          return "Img/Hero, Img/Product, Img/Background";
+          return filterValidWidgetNames(["image", "image-box"]);
         }
         if (this.isButtonLike(rect)) {
-          return "Btn/Primary, Btn/Secondary, Btn/Outline";
+          return filterValidWidgetNames(["button"]);
         }
-        return "Container/*, Section/*";
+        return filterValidWidgetNames(["w:container", "w:inner-container", ...getMediaWidgetNames()]);
       }
       if (node.type === "VECTOR" || node.type === "BOOLEAN_OPERATION") {
-        return "Icon/Menu, Icon/Close, Icon/Arrow";
+        return filterValidWidgetNames(["icon"]);
       }
-      if (node.type === "FRAME") {
-        const frame = node;
-        if (frame.layoutMode !== "NONE") {
-          return "Card/*, Grid/*, Section/*, Container/*";
-        }
+      if (node.type === "FRAME" || node.type === "GROUP") {
+        return filterValidWidgetNames(["w:container", "w:inner-container", ...getContainerWidgetNames()]);
       }
-      return "Descreva a fun\xE7\xE3o do elemento";
+      return [];
     }
-    /**
-     * Obtém exemplos de nomenclatura para o tipo de node
-     */
-    getExamplesForNodeType(node) {
-      if (node.type === "TEXT") {
-        return [
-          "H1 - T\xEDtulo principal",
-          "H2/Features - Subt\xEDtulo da se\xE7\xE3o",
-          "Text/Description - Texto descritivo",
-          "Label/Price - R\xF3tulo de pre\xE7o"
-        ];
+    buildEducationalTip(options) {
+      if (!options.length) {
+        return `
+Use a taxonomia oficial do Elementor (aba Ajuda) para renomear.
+Evite padr\xF5es inventados como Card/Feature ou Grid/* fora da lista oficial.
+            `.trim();
       }
-      if (node.type === "RECTANGLE") {
-        const rect = node;
-        if (this.hasImageFill(rect)) {
-          return [
-            "Img/Hero - Imagem principal",
-            "Img/Product - Imagem de produto",
-            "Img/Avatar - Foto de perfil"
-          ];
-        }
-        if (this.isButtonLike(rect)) {
-          return [
-            "Btn/Primary - Bot\xE3o principal",
-            "Btn/CTA - Call to action",
-            "Btn/Submit - Bot\xE3o de envio"
-          ];
-        }
-      }
-      if (node.type === "VECTOR" || node.type === "BOOLEAN_OPERATION") {
-        return [
-          "Icon/Menu - \xCDcone de menu",
-          "Icon/Close - \xCDcone de fechar",
-          "Icon/Arrow - \xCDcone de seta"
-        ];
-      }
-      if (node.type === "FRAME") {
-        return [
-          "Card/Product - Card de produto",
-          "Grid/Features - Grid de funcionalidades",
-          "Section/Hero - Se\xE7\xE3o hero",
-          "Container/Content - Container de conte\xFAdo"
-        ];
-      }
-      return ["Use nomes descritivos"];
+      return `
+Por que nomenclatura importa?
+- Facilita manuten\xE7\xE3o e leitura no Figma
+- Melhora a detec\xE7\xE3o autom\xE1tica de widgets
+- Gera c\xF3digo Elementor mais leg\xEDvel
+
+Sugest\xF5es v\xE1lidas (taxonomia oficial):
+- ${options.join("\n- ")}
+        `.trim();
     }
-    /**
-     * Verifica se node tem fill de imagem
-     */
     hasImageFill(node) {
       if (!node.fills || typeof node.fills === "symbol") return false;
       return node.fills.some((fill) => fill.type === "IMAGE");
     }
-    /**
-     * Verifica se node parece um botão
-     */
     isButtonLike(node) {
       const hasFill = node.fills && typeof node.fills !== "symbol" && node.fills.length > 0;
       const hasStroke = node.strokes && typeof node.strokes !== "symbol" && node.strokes.length > 0;

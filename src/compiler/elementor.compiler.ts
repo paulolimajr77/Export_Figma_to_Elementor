@@ -36,6 +36,25 @@ export class ElementorCompiler {
     }
 
     private compileContainer(container: PipelineContainer, isInner: boolean): ElementorElement {
+        // Fast-path: if this "container" is naively wrapping a single widget with explicit widget name (w:icon-box, w:image-box),
+        // return the widget directly to avoid extra wrapper.
+        if (
+            container.children?.length === 0 &&
+            Array.isArray(container.widgets) &&
+            container.widgets.length === 1
+        ) {
+            const soleWidget = container.widgets[0];
+            const sourceName = String(
+                soleWidget.styles?.sourceName ||
+                container.styles?.sourceName ||
+                soleWidget.type ||
+                ''
+            ).toLowerCase();
+            if (sourceName.startsWith('w:icon-box') || sourceName.startsWith('w:image-box')) {
+                return this.compileWidget(soleWidget);
+            }
+        }
+
         const id = generateGUID();
         const flexDirection = container.direction === 'row' ? 'row' : 'column';
         const settings: ElementorSettings = {
@@ -324,6 +343,8 @@ export class ElementorCompiler {
 
         if (widget.styles?.customCss) {
             baseSettings.custom_css = widget.styles.customCss;
+            // Remove non-standard camelCase key to avoid duplicated entries
+            if ((baseSettings as any).customCss) delete (baseSettings as any).customCss;
         }
 
         if (widget.styles?.align) {

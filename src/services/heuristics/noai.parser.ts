@@ -292,6 +292,7 @@ interface WidgetScore {
 function calculateWidgetScore(node: SerializedNode): WidgetScore[] {
     const scores: WidgetScore[] = [];
     const name = (node.name || '').toLowerCase();
+    let explicitContainerStyles: Record<string, any> | null = null;
     const hasChildren = Array.isArray((node as any).children) && (node as any).children.length > 0;
     const children = hasChildren ? ((node as any).children as SerializedNode[]) : [];
 
@@ -494,6 +495,9 @@ function calculateWidgetScore(node: SerializedNode): WidgetScore[] {
 
 function detectWidget(node: SerializedNode): MaybeWidget {
     const name = (node.name || '').toLowerCase();
+    // When the user names a node explicitly (w:icon-box, w:image-box), we keep the container-level
+    // styles here so they can be reused by the registry and mapped to native Elementor controls.
+    let explicitContainerStyles: Record<string, any> | null = null;
 
     console.log('[DETECT WIDGET] Processing node:', node.name, 'Type:', node.type, 'Name (lowercase):', name);
 
@@ -514,12 +518,15 @@ function detectWidget(node: SerializedNode): MaybeWidget {
         if (registryDef) {
             console.log('[DETECT WIDGET] Found in registry, delegating to registry handler');
             // Fall through to registry processing below (line ~464)
+            explicitContainerStyles = extractContainerStyles(node);
         } else {
             // Widget name is valid but not in registry - create basic widget
             console.log('[DETECT WIDGET] Not in registry, creating basic widget');
             const styles: Record<string, any> = {
                 sourceId: node.id,
-                sourceName: node.name
+                sourceName: node.name,
+                // Carry layout/background so icon-box/image-box can map padding/gap/border to native Elementor controls
+                ...extractContainerStyles(node)
             };
 
             // Extract content based on widget type
@@ -559,7 +566,8 @@ function detectWidget(node: SerializedNode): MaybeWidget {
 
     const styles: Record<string, any> = {
         sourceId: node.id,
-        sourceName: node.name
+        sourceName: node.name,
+        ...(explicitContainerStyles || {})
     };
 
     const hasChildren = Array.isArray((node as any).children) && (node as any).children.length > 0;
@@ -1664,6 +1672,10 @@ interface TypographyStyles {
     textTransform?: string;
 }
 
+const isNumber = (v: any): v is number => typeof v === 'number' && isFinite(v);
+const isString = (v: any): v is string => typeof v === 'string';
+const isSymbolValue = (v: any): boolean => typeof v === 'symbol';
+
 /**
  * Extracts typography properties from a TEXT node
  * @param node - Figma TEXT node (serialized)
@@ -1676,16 +1688,16 @@ function extractTypographyFromTextNode(node: SerializedNode): TypographyStyles |
     const nodeAny = node as any;
 
     // Font family - from fontName or styledTextSegments
-    if (nodeAny.fontName?.family) {
+    if (!isSymbolValue(nodeAny.fontName) && nodeAny.fontName?.family) {
         styles.fontFamily = nodeAny.fontName.family;
     } else if (nodeAny.styledTextSegments?.[0]?.fontName?.family) {
         styles.fontFamily = nodeAny.styledTextSegments[0].fontName.family;
     }
 
     // Font weight - from fontWeight or fontName.style
-    if (nodeAny.fontWeight) {
+    if (isNumber(nodeAny.fontWeight) || isString(nodeAny.fontWeight)) {
         styles.fontWeight = nodeAny.fontWeight;
-    } else if (nodeAny.fontName?.style) {
+    } else if (!isSymbolValue(nodeAny.fontName) && nodeAny.fontName?.style && isString(nodeAny.fontName.style)) {
         // Map style names to numeric weights
         const styleWeightMap: Record<string, number> = {
             'Thin': 100, 'ExtraLight': 200, 'Light': 300, 'Regular': 400,
@@ -1701,24 +1713,24 @@ function extractTypographyFromTextNode(node: SerializedNode): TypographyStyles |
     }
 
     // Font size
-    if (nodeAny.fontSize) {
+    if (isNumber(nodeAny.fontSize)) {
         styles.fontSize = nodeAny.fontSize;
     }
 
     // Line height - convert to px
     if (nodeAny.lineHeight) {
-        if (typeof nodeAny.lineHeight === 'number') {
+        if (isNumber(nodeAny.lineHeight)) {
             styles.lineHeight = nodeAny.lineHeight;
-        } else if (nodeAny.lineHeight.value && nodeAny.lineHeight.unit !== 'AUTO') {
-            styles.lineHeight = nodeAny.lineHeight.value;
+        } else if (!isSymbolValue(nodeAny.lineHeight?.value) && nodeAny.lineHeight.value && nodeAny.lineHeight.unit !== 'AUTO') {
+            styles.lineHeight = nodeAny.lineHeight.value as number;
         }
     }
 
     // Letter spacing
     if (nodeAny.letterSpacing) {
-        if (typeof nodeAny.letterSpacing === 'number') {
+        if (isNumber(nodeAny.letterSpacing)) {
             styles.letterSpacing = nodeAny.letterSpacing;
-        } else if (nodeAny.letterSpacing.value) {
+        } else if (!isSymbolValue(nodeAny.letterSpacing?.value) && nodeAny.letterSpacing.value) {
             // Convert PERCENT to px if needed (using fontSize as base)
             if (nodeAny.letterSpacing.unit === 'PERCENT' && styles.fontSize) {
                 styles.letterSpacing = (nodeAny.letterSpacing.value / 100) * styles.fontSize;
@@ -1767,48 +1779,68 @@ function generateCardCustomCSSFromNode(node: SerializedNode): string | null {
     const nodeAny = node as any;
     const cssRules: string[] = [];
 
-    // 1. Background from fills (SOLID only)
-    if (nodeAny.fills && Array.isArray(nodeAny.fills)) {
-        const solidFill = nodeAny.fills.find((f: any) =>
-            f.type === 'SOLID' &&
-            f.visible !== false &&
-            f.color
-        );
+    const toNumber = (value: any): number | null =>
+        typeof value === 'number' && isFinite(value) ? value : null;
 
-        if (solidFill?.color) {
-            const { r, g, b } = solidFill.color;
-            const opacity = solidFill.opacity ?? 1;
-            if (opacity >= 1) {
-                const hex = `#${Math.round(r * 255).toString(16).padStart(2, '0')}${Math.round(g * 255).toString(16).padStart(2, '0')}${Math.round(b * 255).toString(16).padStart(2, '0')}`.toUpperCase();
-                cssRules.push(`background-color: ${hex}`);
-            } else {
-                cssRules.push(`background-color: rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+    const toRgba = (color: any, opacity: number | undefined) => {
+        const a = opacity ?? 1;
+        return `rgba(${Math.round((color.r || 0) * 255)}, ${Math.round((color.g || 0) * 255)}, ${Math.round((color.b || 0) * 255)}, ${a})`;
+    };
+
+    const gradientToCss = (fill: any): string | null => {
+        if (!fill?.gradientStops || !Array.isArray(fill.gradientStops) || fill.gradientStops.length < 2) return null;
+        const stops = fill.gradientStops.map((stop: any) => {
+            const pos = Math.round((stop.position || 0) * 100);
+            return `${toRgba(stop.color || {}, stop.color?.a)} ${pos}%`;
+        }).join(', ');
+        const type = fill.type === 'GRADIENT_RADIAL' ? 'radial-gradient(circle at center' : 'linear-gradient(180deg';
+        return `${type}, ${stops})`;
+    };
+
+    // Background (solid or gradient)
+    if (nodeAny.fills && Array.isArray(nodeAny.fills)) {
+        const visibleFill = nodeAny.fills.find((f: any) => f.visible !== false);
+        if (visibleFill) {
+            if ((visibleFill.type === 'GRADIENT_LINEAR' || visibleFill.type === 'GRADIENT_RADIAL') && visibleFill.gradientStops) {
+                const grad = gradientToCss(visibleFill);
+                if (grad) cssRules.push(`background: ${grad}`);
+            } else if (visibleFill.type === 'SOLID' && visibleFill.color) {
+                cssRules.push(`background: ${toRgba(visibleFill.color, visibleFill.opacity)}`);
             }
         }
     }
 
-    // 2. Border from strokes
+    // Border from strokes (uniform)
     if (nodeAny.strokes && Array.isArray(nodeAny.strokes) && nodeAny.strokes.length > 0) {
         const stroke = nodeAny.strokes[0];
-        if (stroke.type === 'SOLID' && stroke.color) {
-            const { r, g, b } = stroke.color;
-            const strokeWeight = nodeAny.strokeWeight || 1;
-            const opacity = stroke.opacity ?? 1;
-            cssRules.push(`border: ${strokeWeight}px solid rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${opacity})`);
+        if (stroke.visible !== false && stroke.color) {
+            const strokeWeight = toNumber(nodeAny.strokeWeight) ?? 1;
+            cssRules.push(`border: ${strokeWeight}px solid ${toRgba(stroke.color, stroke.opacity)}`);
         }
     }
 
-    // 3. Border radius
-    if (nodeAny.cornerRadius !== undefined && nodeAny.cornerRadius > 0) {
-        cssRules.push(`border-radius: ${nodeAny.cornerRadius}px`);
+    // Border radius
+    const radius = toNumber(nodeAny.cornerRadius);
+    if (radius !== null && radius > 0) {
+        cssRules.push(`border-radius: ${radius}px`);
         cssRules.push(`overflow: hidden`);
     }
 
-    // If no rules, return null
-    if (cssRules.length === 0) {
-        return null;
+    // Padding (maps to Advanced → padding in Elementor when using selector)
+    const paddings = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
+        .map(k => toNumber(nodeAny[k]) ?? 0);
+    if (paddings.some(v => v && v > 0)) {
+        const [pt, pr, pb, pl] = paddings;
+        cssRules.push(`padding: ${pt}px ${pr}px ${pb}px ${pl}px`);
     }
 
+    // Gap (as row/column gap for flex containers)
+    const gap = toNumber(nodeAny.itemSpacing);
+    if (gap !== null && gap > 0) {
+        cssRules.push(`row-gap: ${gap}px`);
+        cssRules.push(`column-gap: ${gap}px`);
+    }
+
+    if (cssRules.length === 0) return null;
     return `selector {\n  ${cssRules.join(';\n  ')};\n}`;
 }
-
