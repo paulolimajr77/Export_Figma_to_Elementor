@@ -72,10 +72,10 @@ export function extractPadding(node: SceneNode): ElementorSettings {
     return {
         padding: {
             unit: 'px',
-            top,
-            right,
-            bottom,
-            left,
+            top: String(top),
+            right: String(right),
+            bottom: String(bottom),
+            left: String(left),
             isLinked
         }
     };

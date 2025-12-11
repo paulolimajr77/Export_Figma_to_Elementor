@@ -137,20 +137,17 @@ export class ElementorCompiler {
         }
 
         // Only set padding if at least one value is non-zero
-        const pTop = typeof styles.paddingTop === 'number' ? styles.paddingTop : 0;
-        const pRight = typeof styles.paddingRight === 'number' ? styles.paddingRight : 0;
-        const pBottom = typeof styles.paddingBottom === 'number' ? styles.paddingBottom : 0;
-        const pLeft = typeof styles.paddingLeft === 'number' ? styles.paddingLeft : 0;
+        // Padding Logic: Check explicit undefined rather than 0 to allow forcing 0px
+        if (styles.paddingTop !== undefined || styles.paddingRight !== undefined || styles.paddingBottom !== undefined || styles.paddingLeft !== undefined) {
+            const pTop = styles.paddingTop || 0;
+            const pRight = styles.paddingRight || 0;
+            const pBottom = styles.paddingBottom || 0;
+            const pLeft = styles.paddingLeft || 0;
 
-        // Only set padding if at least one value is non-zero
-        if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
-            // Usar normalizePadding para garantir valores STRING
             const paddingValue = normalizePadding(pTop, pRight, pBottom, pLeft);
             if (paddingValue) {
                 settings.padding = paddingValue;
-                // Mirror to _padding so Elementor UI exibe o padding correto no container raiz
                 (settings as any)._padding = paddingValue;
-                console.log('[figtoel-boxmodel] container padding applied:', paddingValue);
             }
         }
 
@@ -179,8 +176,9 @@ export class ElementorCompiler {
                     settings.background_color_b_stop = { unit: '%', size: bg.stops[bg.stops.length - 1].position, sizes: [] };
                 }
 
-                // Set gradient angle (default 180deg for top-to-bottom)
-                settings.background_gradient_angle = { unit: 'deg', size: 180, sizes: [] };
+                // Set gradient angle use provided angle or default 180
+                const angle = bg.angle !== undefined ? bg.angle : 180;
+                settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
             } else if (bg.type === 'image' && bg.imageHash) {
                 settings.background_background = 'classic';
                 // Image URL will be resolved by uploader
@@ -433,10 +431,31 @@ export class ElementorCompiler {
                 // Typography
                 Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
 
-                // Background color
+                // Background (Solid, Gradient, Image)
                 if (widget.styles?.background) {
-                    settings.background_color = this.sanitizeColor(widget.styles.background);
+                    const bg = widget.styles.background;
+                    if (bg.type === 'solid') {
+                        settings.background_background = 'classic';
+                        settings.background_color = this.sanitizeColor(bg.color);
+                    } else if (bg.type === 'gradient') {
+                        settings.background_background = 'gradient';
+                        settings.background_gradient_type = bg.gradientType || 'linear';
+                        if (bg.stops && bg.stops.length > 0) {
+                            settings.background_color = bg.stops[0].color;
+                            settings.background_color_stop = { unit: '%', size: bg.stops[0].position, sizes: [] };
+                            if (bg.stops.length > 1) {
+                                settings.background_color_b = bg.stops[bg.stops.length - 1].color;
+                                settings.background_color_b_stop = { unit: '%', size: bg.stops[bg.stops.length - 1].position, sizes: [] };
+                            }
+                        }
+                        const angle = bg.angle !== undefined ? bg.angle : 180;
+                        settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
+                    } else if (bg.type === 'image') {
+                        settings.background_background = 'classic';
+                        settings.background_image = { url: '', id: 0, imageHash: bg.imageHash };
+                    }
                 } else if (widget.styles?.fills && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
+                    // Fallback for direct fills if background object missing
                     const solidFill = widget.styles.fills.find((f: any) => f.type === 'SOLID');
                     if (solidFill) {
                         settings.background_color = this.sanitizeColor(solidFill.color);
@@ -449,27 +468,37 @@ export class ElementorCompiler {
                 }
 
                 // Padding
+                // Standard Elementor Button uses 'button_padding' not 'padding'
                 if (widget.styles?.paddingTop !== undefined || widget.styles?.paddingRight !== undefined ||
                     widget.styles?.paddingBottom !== undefined || widget.styles?.paddingLeft !== undefined) {
                     settings.button_padding = {
                         unit: 'px',
-                        top: widget.styles.paddingTop || 0,
-                        right: widget.styles.paddingRight || 0,
-                        bottom: widget.styles.paddingBottom || 0,
-                        left: widget.styles.paddingLeft || 0,
+                        top: String(widget.styles.paddingTop || 0),
+                        right: String(widget.styles.paddingRight || 0),
+                        bottom: String(widget.styles.paddingBottom || 0),
+                        left: String(widget.styles.paddingLeft || 0),
                         isLinked: false
                     };
                 }
 
-                // Border radius
-                if (widget.styles?.cornerRadius !== undefined) {
+                // Border Style & Radius
+                if (widget.styles?.border) {
+                    const b = widget.styles.border;
+                    if (b.type) settings.border_border = b.type;
+                    if (b.width !== undefined) {
+                        const w = String(b.width);
+                        settings.border_width = { unit: 'px', top: w, right: w, bottom: w, left: w, isLinked: true };
+                    }
+                    if (b.color) settings.border_color = b.color;
+                    if (b.radius) {
+                        const r = String(b.radius);
+                        settings.border_radius = { unit: 'px', top: r, right: r, bottom: r, left: r, isLinked: true };
+                    }
+                } else if (widget.styles?.cornerRadius !== undefined) {
+                    const r = String(widget.styles.cornerRadius);
                     settings.border_radius = {
                         unit: 'px',
-                        top: widget.styles.cornerRadius,
-                        right: widget.styles.cornerRadius,
-                        bottom: widget.styles.cornerRadius,
-                        left: widget.styles.cornerRadius,
-                        isLinked: true
+                        top: r, bottom: r, left: r, right: r, isLinked: true
                     };
                 }
 
@@ -507,6 +536,15 @@ export class ElementorCompiler {
         }
 
         const finalSettings = this.normalizeIconSettings(widgetType, settings, widget);
+
+        // SAFEGUARD: Ensure background_color is a string (Elementor crash prevention)
+        if (finalSettings.background_color && typeof finalSettings.background_color === 'object') {
+            console.warn('[ElementorCompiler] ⚠️ Sanitizing invalid background_color object for', widgetType);
+            // If it's a gradient object that slipped through, we might want to kill it to avoid crash
+            // The correct gradient settings should have been set by the button/container logic.
+            // If we are here, it means the specific logic failed or wasn't triggered.
+            delete finalSettings.background_color;
+        }
 
         return {
             id: widgetId,

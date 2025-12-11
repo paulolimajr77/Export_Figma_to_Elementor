@@ -13,6 +13,7 @@ import { FileLogger } from './utils/logger';
 import { analyzeFigmaLayout, validateSingleNode, RuleRegistry, AutoLayoutRule } from './linter';
 import { enforceWidgetTypes } from './services/heuristics';
 import { initializeCompatLayer, safeGet, safeGetArray, safeGetNumber, safeGetString, safeGetBoolean, safeInvoke } from './compat';
+import { getCompatibilityWarning } from './linter/rules/widget-compatibility';
 
 // Licensing Module
 import {
@@ -48,13 +49,31 @@ const runtimeHealth = initializeCompatLayer({
 
 // Logger dedicado para capturar eventos sem alterar console global
 export const logger = new FileLogger(console.log.bind(console));
+
+// Initialize plugin UI
 figma.notify("Plugin carregou!");
-figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
+figma.showUI(__html__, { width: 380, height: 640, themeColors: true });
 safeInvoke(() => figma.ui.postMessage({
     type: 'runtime-health',
     status: runtimeHealth.runtime,
     warnings: runtimeHealth.warnings || []
 }));
+
+// Listen for selection changes to update IntelliSense modal
+figma.on('selectionchange', () => {
+    const selection = figma.currentPage.selection;
+    const nodes = selection.map(node => ({
+        id: node.id,
+        name: node.name,
+        type: node.type
+    }));
+
+    // Send updated selection to UI
+    figma.ui.postMessage({
+        type: 'UPDATE_SELECTION',
+        nodes: nodes
+    });
+});
 
 const pipeline = new ConversionPipeline();
 let lastJSON: string | null = null;
@@ -63,6 +82,165 @@ let noaiUploader: ImageUploader | null = null;
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_PROVIDER = 'gemini';
 const DEFAULT_GPT_MODEL = 'gpt-4.1-mini';
+
+// ============================================================
+// IntelliSense Widget Vocabulary (inline to avoid import issues)
+// ============================================================
+const INTELLISENSE_WIDGETS = [
+    // Containers (Priority)
+    'container', 'inner-container', 'section', 'inner-section',
+    // Basic
+    'heading', 'text-editor', 'button', 'image', 'icon', 'video', 'divider', 'spacer',
+    'image-box', 'icon-box', 'star-rating', 'counter', 'progress', 'tabs', 'accordion',
+    'toggle', 'alert', 'social-icons', 'soundcloud', 'shortcode', 'html', 'menu-anchor',
+    'sidebar', 'read-more', 'image-carousel', 'image-gallery', 'icon-list', 'testimonial',
+    'google-maps', 'audio', 'rating', 'inner-section',
+    // Pro
+    'form', 'login', 'call-to-action', 'media-carousel', 'portfolio', 'slides', 'flip-box',
+    'animated-headline', 'post-navigation', 'share-buttons', 'table-of-contents', 'countdown',
+    'blockquote', 'testimonial-carousel', 'reviews', 'hotspots', 'sitemap', 'author-box',
+    'price-table', 'price-list', 'progress-tracker', 'nav-menu', 'breadcrumb', 'lottie',
+    'video-playlist', 'search-form', 'global-widget',
+    // Theme Builder
+    'post-title', 'post-excerpt', 'post-content', 'post-featured-image', 'post-info',
+    'post-author', 'post-date', 'post-terms', 'archive-title', 'archive-description',
+    'site-logo', 'site-title', 'site-tagline', 'search-results',
+    // Loop Builder
+    'loop-grid', 'loop-carousel', 'loop-item', 'loop-image', 'loop-title', 'loop-meta',
+    'loop-terms', 'loop-rating', 'loop-price', 'loop-add-to-cart', 'loop-read-more', 'loop-pagination',
+    // Containers (Moved to top)
+    // 'container', 'inner-container',
+    // Hierarchical
+    'accordion:item', 'accordion:title', 'accordion:content', 'tabs:item', 'tabs:title',
+    'tabs:content', 'list:item', 'list:icon', 'list:text', 'toggle:item', 'toggle:title',
+    'toggle:content', 'countdown:days', 'countdown:hours', 'countdown:minutes', 'countdown:seconds',
+    'slide:1', 'slide:2', 'carousel:slide'
+];
+
+// Prefixed aliases for widget names
+const WIDGET_ALIASES: Record<string, string[]> = {
+    'heading': ['w:heading', 'title', 'h1', 'h2', 'h3', 'titulo'],
+    'text-editor': ['w:text-editor', 'text', 'paragraph', 'texto'],
+    'button': ['w:button', 'btn', 'cta', 'botao'],
+    'image': ['w:image', 'img', 'photo', 'imagem', 'foto'],
+    'icon': ['w:icon', 'icone'],
+    'video': ['w:video', 'player'],
+    'divider': ['w:divider', 'separator', 'line', 'hr'],
+    'spacer': ['w:spacer', 'gap', 'spacing'],
+    'image-box': ['w:image-box', 'imgbox'],
+    'icon-box': ['w:icon-box', 'iconbox'],
+    'container': ['w:container', 'c:container', 'section', 'wrapper', 'box'],
+    'inner-container': ['w:inner-container', 'c:inner', 'inner'],
+    'tabs': ['w:tabs', 'tabpanel'],
+    'accordion': ['w:accordion', 'faq', 'collapse'],
+    'form': ['w:form', 'formulario', 'contact-form'],
+    'nav-menu': ['w:nav-menu', 'menu', 'navigation'],
+    'image-gallery': ['w:image-gallery', 'gallery', 'galeria'],
+    'image-carousel': ['w:image-carousel', 'carousel', 'slider'],
+    'icon-list': ['w:icon-list', 'list', 'lista'],
+    'testimonial': ['w:testimonial', 'depoimento', 'review'],
+    'google-maps': ['w:google-maps', 'maps', 'mapa'],
+    'countdown': ['w:countdown', 'timer'],
+    'site-logo': ['w:site-logo', 'logo'],
+    'search-form': ['w:search-form', 'search', 'busca'],
+    'progress': ['w:progress', 'progressbar'],
+    'counter': ['w:counter', 'number'],
+    'star-rating': ['w:star-rating', 'rating', 'stars'],
+    'social-icons': ['w:social-icons', 'social', 'redes-sociais'],
+    'slides': ['w:slides', 'slider:slides', 'slideshow'],
+    'price-table': ['w:price-table', 'pricing'],
+    'blockquote': ['w:blockquote', 'quote', 'citacao'],
+    'author-box': ['w:author-box', 'author'],
+    'post-title': ['w:post-title', 'loop:title'],
+    'post-featured-image': ['w:post-featured-image', 'loop:featured-image', 'loop:image'],
+    'loop-grid': ['w:loop-grid', 'loop:grid', 'posts-grid'],
+    'loop-carousel': ['w:loop-carousel', 'loop:carousel', 'posts-carousel']
+};
+
+
+/**
+ * Levenshtein distance for fuzzy matching
+ */
+function levenshtein(a: string, b: string): number {
+    const matrix: number[][] = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+/**
+ * Get IntelliSense suggestions for a query
+ * ONLY returns widgets from the vocabulary - nothing invented
+ */
+function getIntelliSenseSuggestions(query: string, limit: number = 15): Array<{ name: string; score: number; alias?: string }> {
+    const q = (query || '').toLowerCase().trim();
+    if (!q) {
+        // Return first N widgets alphabetically
+        return INTELLISENSE_WIDGETS.slice(0, limit).map(name => ({ name, score: 1 }));
+    }
+
+    const results: Array<{ name: string; score: number; alias?: string }> = [];
+    const seen = new Set<string>();
+
+    for (const widget of INTELLISENSE_WIDGETS) {
+        // Exact match
+        if (widget === q) {
+            results.push({ name: widget, score: 1 });
+            seen.add(widget);
+            continue;
+        }
+
+        // Prefix match
+        if (widget.startsWith(q)) {
+            results.push({ name: widget, score: 0.9 });
+            seen.add(widget);
+            continue;
+        }
+
+        // Contains match
+        if (widget.includes(q)) {
+            results.push({ name: widget, score: 0.7 });
+            seen.add(widget);
+            continue;
+        }
+
+        // Fuzzy match
+        const distance = levenshtein(q, widget);
+        const similarity = 1 - (distance / Math.max(q.length, widget.length));
+        if (similarity > 0.4) {
+            results.push({ name: widget, score: similarity });
+            seen.add(widget);
+        }
+    }
+
+    // Check aliases
+    for (const [widget, aliases] of Object.entries(WIDGET_ALIASES)) {
+        if (seen.has(widget)) continue;
+        for (const alias of aliases) {
+            const aliasLower = alias.toLowerCase();
+            if (aliasLower === q || aliasLower.startsWith(q) || aliasLower.includes(q)) {
+                results.push({ name: widget, score: 0.85, alias });
+                seen.add(widget);
+                break;
+            }
+        }
+    }
+
+    // Sort by score
+    results.sort((a, b) => b.score - a.score);
+
+    return results.slice(0, limit);
+}
+
 
 function getActiveProvider(providerId?: string): SchemaProvider {
     return providerId === 'gpt' ? openaiProvider : geminiProvider;
@@ -443,6 +621,22 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                         return false;
                     };
 
+                    // Helper to find actual icon node inside a composite widget
+                    const findIconChild = (n: SceneNode): SceneNode | null => {
+                        // Priority 1: Explicit name match
+                        if (n.name.toLowerCase().includes('icon') || n.name.toLowerCase().includes('vector')) return n;
+                        // Priority 2: Vector type
+                        if (isVectorNode(n)) return n;
+                        // Recursion
+                        if ('children' in n) {
+                            for (const c of n.children) {
+                                const found = findIconChild(c);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    };
+
                     if (('locked' in node && node.locked)) {
                         if (hasImageChildren(node as SceneNode)) {
                             format = 'WEBP';
@@ -456,11 +650,28 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
                     }
 
                     // Force SVG for Icon nodes inside buttons or explicit icon widgets
-                    if (node.name === 'Icon' || widget.type === 'icon' || widget.type === 'list-item' || widget.type === 'accordion' || widget.type === 'toggle') {
+                    const explicitIconTypes = ['icon', 'list-item', 'accordion', 'toggle', 'button', 'icon-box'];
+                    if (node.name === 'Icon' || explicitIconTypes.includes(widget.type)) {
                         format = 'SVG';
                     }
 
-                    const result = await uploader.uploadToWordPress(node as SceneNode, format as any);
+                    // RETARGETING: For Buttons/IconBoxes, we don't want to upload the Frame itself, but its Icon child.
+                    let targetNode = node;
+                    if (widget.type === 'button' || widget.type === 'icon-box') {
+                        const iconChild = findIconChild(node as SceneNode);
+                        if (iconChild) {
+                            console.log(`[NO-AI] Found internal icon for ${widget.type}: ${iconChild.name}`);
+                            targetNode = iconChild;
+                            format = 'SVG';
+                        } else {
+                            // If no icon found in button, DO NOT upload the button frame as an image/icon.
+                            // Unless it's an Image-Button? No, usually 'button' is standard.
+                            console.log(`[NO-AI] No icon child found in ${widget.type}. Skipping upload.`);
+                            return;
+                        }
+                    }
+
+                    const result = await uploader.uploadToWordPress(targetNode as SceneNode, format as any);
                     if (result) {
                         if (widget.type === 'image-box') {
                             if (!widget.styles) widget.styles = {};
@@ -726,7 +937,141 @@ figma.ui.onmessage = async (msg) => {
             }
             break;
 
+        case 'APPLY_NAMES':
+            try {
+                const renames = msg.renames as Array<{ id: string; newName: string }>;
+                if (!Array.isArray(renames) || renames.length === 0) {
+                    figma.notify('Nenhum nome para aplicar.', { timeout: 2000 });
+                    break;
+                }
 
+                let successCount = 0;
+                for (const rename of renames) {
+                    console.log(`[INTELLISENSE] Renaming: id=${rename.id}, newName=${rename.newName}`);
+                    const node = figma.getNodeById(rename.id);
+                    console.log(`[INTELLISENSE] Found node: ${node ? `name=${(node as any).name}, type=${node.type}` : 'NULL'}`);
+                    if (node && 'name' in node) {
+                        const oldName = (node as any).name;
+                        (node as any).name = rename.newName;
+                        console.log(`[INTELLISENSE] Renamed: "${oldName}" -> "${rename.newName}"`);
+                        successCount++;
+                    }
+                }
+
+                figma.notify(`✅ ${successCount} layer(s) renomeado(s)!`, { timeout: 2000 });
+                figma.ui.postMessage({ type: 'RENAME_SUCCESS', count: successCount });
+                // Don't close plugin - keep modal open for more renames
+            } catch (e: any) {
+                const error = (safeGet(e, 'message') as string) || e;
+                figma.notify(`Erro ao renomear: ${error}`, { timeout: 3000 });
+                figma.ui.postMessage({ type: 'RENAME_ERROR', message: error });
+            }
+            break;
+
+        case 'GET_INTELLISENSE_SUGGESTIONS':
+            try {
+                const query = (msg.query as string) || '';
+                const selection = figma.currentPage.selection;
+                const nodeTypes = [...new Set(selection.map(n => n.type))];
+
+                let detectedWidget: string | null = null;
+                // Heurística de Predição para single selection (boost quando query vazia)
+                if (selection.length === 1) {
+                    try {
+                        const snapshot = createNodeSnapshot(selection[0]);
+                        const analysisResult = analyzeTreeWithHeuristics(snapshot as any);
+                        // Filtra containers genéricos para evitar boost inútil
+                        if (analysisResult && analysisResult.widget &&
+                            !['unknown', 'div', 'frame', 'group'].includes(analysisResult.widget)) { // Allow 'container' to boost
+                            detectedWidget = analysisResult.widget.replace(/^w:/, '');
+                        }
+                    } catch (e) {
+                        // ignore heuristic errors
+                    }
+                }
+
+                // Import WVL inline to avoid module issues
+                const rawSuggestions = getIntelliSenseSuggestions(query, 15);
+
+                // Enriquecer com warnings e Smart Scoring
+                const suggestions = rawSuggestions.map(s => {
+                    let warning = getCompatibilityWarning(nodeTypes, s.name);
+                    let smartScore = s.score;
+                    const sName = s.name.replace(/^w:/, '');
+
+                    // HOTFIX: Garantir compatibilidade de texto (Resolve falso positivo reportado)
+                    if (nodeTypes.includes('TEXT') && ['heading', 'text-editor', 'paragraph'].includes(sName)) {
+                        warning = null;
+                        if (!detectedWidget) smartScore = 2.0; // Force boost se heurística falhou
+                    }
+
+                    // BOOST: Se a heurística detectou essa estrutura exata
+                    if (detectedWidget && (sName === detectedWidget || s.name === detectedWidget)) {
+                        smartScore = 2.0; // Topo
+                    } else if (warning) {
+                        smartScore *= 0.5;
+                    } else if (nodeTypes.length > 0) {
+                        smartScore *= 1.2;
+                    }
+
+                    // STRUCTURAL BOOST: Frame/Group -> Container
+                    if (['FRAME', 'GROUP', 'SECTION'].some(t => nodeTypes.includes(t)) &&
+                        ['container', 'inner-container', 'inner-section', 'section'].includes(sName)) {
+                        smartScore = 3.0;
+                    }
+
+                    // VISUAL BOOST: Rectangle/Vector -> Image/Button/Divider/Spacer
+                    if (['RECTANGLE', 'VECTOR', 'ELLIPSE', 'STAR', 'LINE'].some(t => nodeTypes.includes(t))) {
+                        if (['image', 'button', 'divider', 'spacer', 'icon', 'video'].includes(sName)) {
+                            smartScore = 2.5; // High priority for visual types
+                        } else if (['container', 'inner-container'].includes(sName)) {
+                            // Soft demotion for containers on primitives (unless user really wants it)
+                            // We don't punish hard because it's valid, but we let Visual wins.
+                            // Current score is ~1.0 or 1.2. 2.5 will beat it.
+                        }
+                    }
+
+                    return { ...s, warning: warning || undefined, score: smartScore };
+                });
+
+                // Reordenar por score ajustado
+                suggestions.sort((a, b) => b.score - a.score);
+
+                figma.ui.postMessage({ type: 'INTELLISENSE_SUGGESTIONS', suggestions });
+            } catch (e: any) {
+                console.error('IntelliSense error:', e);
+                figma.ui.postMessage({ type: 'INTELLISENSE_SUGGESTIONS', suggestions: [] });
+            }
+            break;
+
+        case 'REQUEST_SELECTION_FOR_RENAME':
+            try {
+                const selection = figma.currentPage.selection;
+                console.log('[INTELLISENSE] Button clicked - Selection count:', selection.length);
+
+                if (selection.length === 0) {
+                    figma.notify('Selecione pelo menos um layer para renomear.', { timeout: 3000 });
+                    break;
+                }
+
+                const nodes = selection.map(node => {
+                    console.log(`[INTELLISENSE] Selected node: id=${node.id}, name=${node.name}, type=${node.type}`);
+                    return {
+                        id: node.id,
+                        name: node.name,
+                        type: node.type
+                    };
+                });
+
+                figma.ui.postMessage({
+                    type: 'INIT_RENAME_MODAL',
+                    nodes: nodes
+                });
+            } catch (e: any) {
+                console.error('Error getting selection:', e);
+                figma.notify('Erro ao obter seleção.', { timeout: 2000 });
+            }
+            break;
 
         case 'test-gemini':
             try {

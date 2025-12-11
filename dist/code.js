@@ -486,6 +486,13 @@
       const rich = buildHtmlFromSegments(node);
       styles.customCss = rich.css;
     }
+    const isBoxWidget = node.type === "FRAME" || node.type === "INSTANCE" || node.type === "COMPONENT" || node.type === "RECTANGLE" || node.type === "GROUP";
+    const boxLikeWidgets = ["w:button", "w:icon-box", "w:image-box", "w:call-to-action", "button", "icon-box", "image-box"];
+    const isExplicitBox = node.name && boxLikeWidgets.some((w) => node.name.startsWith(w) || node.name === w);
+    if (isBoxWidget || isExplicitBox) {
+      const containerStyles = extractContainerStyles(node);
+      Object.assign(styles, containerStyles);
+    }
     return styles;
   }
   function extractContainerStyles(node) {
@@ -532,10 +539,22 @@
               color: `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${c.a || 1})`
             };
           });
+          let angle = 180;
+          if (fill.gradientTransform) {
+            const [row1, row2] = fill.gradientTransform;
+            const a = row1[0];
+            const b = row2[0];
+            const rad = Math.atan2(b, a);
+            const deg = rad * (180 / Math.PI);
+            angle = Math.round(deg + 90);
+            if (angle < 0) angle += 360;
+            if (angle >= 360) angle -= 360;
+          }
           styles.background = {
             type: "gradient",
             gradientType: fill.type === "GRADIENT_RADIAL" ? "radial" : "linear",
-            stops
+            stops,
+            angle
           };
         } else if (fill.type === "IMAGE") {
           styles.background = {
@@ -554,8 +573,17 @@
         const anyNode = node;
         const hasIndividualStrokes = anyNode.strokeTopWeight !== void 0 || anyNode.strokeRightWeight !== void 0 || anyNode.strokeBottomWeight !== void 0 || anyNode.strokeLeftWeight !== void 0;
         if (!hasIndividualStrokes && anyNode.strokeWeight !== void 0 && anyNode.strokeWeight !== "mixed") {
+          let borderStyle = "solid";
+          if (node.dashPattern && node.dashPattern.length > 0) {
+            const [dash, gap] = node.dashPattern;
+            if (dash === gap && dash <= 3) {
+              borderStyle = "dotted";
+            } else {
+              borderStyle = "dashed";
+            }
+          }
           styles.border = {
-            type: "solid",
+            type: borderStyle,
             width: anyNode.strokeWeight,
             color,
             radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 0
@@ -2429,16 +2457,15 @@ ${refText}` });
           settings.flex_gap = gapValue;
         }
       }
-      const pTop = typeof styles.paddingTop === "number" ? styles.paddingTop : 0;
-      const pRight = typeof styles.paddingRight === "number" ? styles.paddingRight : 0;
-      const pBottom = typeof styles.paddingBottom === "number" ? styles.paddingBottom : 0;
-      const pLeft = typeof styles.paddingLeft === "number" ? styles.paddingLeft : 0;
-      if (pTop !== 0 || pRight !== 0 || pBottom !== 0 || pLeft !== 0) {
+      if (styles.paddingTop !== void 0 || styles.paddingRight !== void 0 || styles.paddingBottom !== void 0 || styles.paddingLeft !== void 0) {
+        const pTop = styles.paddingTop || 0;
+        const pRight = styles.paddingRight || 0;
+        const pBottom = styles.paddingBottom || 0;
+        const pLeft = styles.paddingLeft || 0;
         const paddingValue = normalizePadding(pTop, pRight, pBottom, pLeft);
         if (paddingValue) {
           settings.padding = paddingValue;
           settings._padding = paddingValue;
-          console.log("[figtoel-boxmodel] container padding applied:", paddingValue);
         }
       }
       if (styles.background) {
@@ -2458,7 +2485,8 @@ ${refText}` });
             settings.background_color_b = bg.stops[bg.stops.length - 1].color;
             settings.background_color_b_stop = { unit: "%", size: bg.stops[bg.stops.length - 1].position, sizes: [] };
           }
-          settings.background_gradient_angle = { unit: "deg", size: 180, sizes: [] };
+          const angle = bg.angle !== void 0 ? bg.angle : 180;
+          settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
         } else if (bg.type === "image" && bg.imageHash) {
           settings.background_background = "classic";
           settings.background_image = { url: "", id: 0, imageHash: bg.imageHash };
@@ -2631,7 +2659,7 @@ ${refText}` });
       return normalized;
     }
     compileWidget(widget) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
       const widgetId = generateGUID();
       const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
       Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
@@ -2691,7 +2719,27 @@ ${refText}` });
           settings.text = widget.content || "Button";
           Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
           if ((_d = widget.styles) == null ? void 0 : _d.background) {
-            settings.background_color = this.sanitizeColor(widget.styles.background);
+            const bg = widget.styles.background;
+            if (bg.type === "solid") {
+              settings.background_background = "classic";
+              settings.background_color = this.sanitizeColor(bg.color);
+            } else if (bg.type === "gradient") {
+              settings.background_background = "gradient";
+              settings.background_gradient_type = bg.gradientType || "linear";
+              if (bg.stops && bg.stops.length > 0) {
+                settings.background_color = bg.stops[0].color;
+                settings.background_color_stop = { unit: "%", size: bg.stops[0].position, sizes: [] };
+                if (bg.stops.length > 1) {
+                  settings.background_color_b = bg.stops[bg.stops.length - 1].color;
+                  settings.background_color_b_stop = { unit: "%", size: bg.stops[bg.stops.length - 1].position, sizes: [] };
+                }
+              }
+              const angle = bg.angle !== void 0 ? bg.angle : 180;
+              settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
+            } else if (bg.type === "image") {
+              settings.background_background = "classic";
+              settings.background_image = { url: "", id: 0, imageHash: bg.imageHash };
+            }
           } else if (((_e = widget.styles) == null ? void 0 : _e.fills) && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
             const solidFill = widget.styles.fills.find((f) => f.type === "SOLID");
             if (solidFill) {
@@ -2704,26 +2752,39 @@ ${refText}` });
           if (((_f = widget.styles) == null ? void 0 : _f.paddingTop) !== void 0 || ((_g = widget.styles) == null ? void 0 : _g.paddingRight) !== void 0 || ((_h = widget.styles) == null ? void 0 : _h.paddingBottom) !== void 0 || ((_i = widget.styles) == null ? void 0 : _i.paddingLeft) !== void 0) {
             settings.button_padding = {
               unit: "px",
-              top: widget.styles.paddingTop || 0,
-              right: widget.styles.paddingRight || 0,
-              bottom: widget.styles.paddingBottom || 0,
-              left: widget.styles.paddingLeft || 0,
+              top: String(widget.styles.paddingTop || 0),
+              right: String(widget.styles.paddingRight || 0),
+              bottom: String(widget.styles.paddingBottom || 0),
+              left: String(widget.styles.paddingLeft || 0),
               isLinked: false
             };
           }
-          if (((_j = widget.styles) == null ? void 0 : _j.cornerRadius) !== void 0) {
+          if ((_j = widget.styles) == null ? void 0 : _j.border) {
+            const b = widget.styles.border;
+            if (b.type) settings.border_border = b.type;
+            if (b.width !== void 0) {
+              const w = String(b.width);
+              settings.border_width = { unit: "px", top: w, right: w, bottom: w, left: w, isLinked: true };
+            }
+            if (b.color) settings.border_color = b.color;
+            if (b.radius) {
+              const r = String(b.radius);
+              settings.border_radius = { unit: "px", top: r, right: r, bottom: r, left: r, isLinked: true };
+            }
+          } else if (((_k = widget.styles) == null ? void 0 : _k.cornerRadius) !== void 0) {
+            const r = String(widget.styles.cornerRadius);
             settings.border_radius = {
               unit: "px",
-              top: widget.styles.cornerRadius,
-              right: widget.styles.cornerRadius,
-              bottom: widget.styles.cornerRadius,
-              left: widget.styles.cornerRadius,
+              top: r,
+              bottom: r,
+              left: r,
+              right: r,
               isLinked: true
             };
           }
           if (widget.imageId) {
             settings.selected_icon = this.normalizeSelectedIcon(
-              ((_k = widget.styles) == null ? void 0 : _k.selected_icon) || baseSettings.selected_icon || widget.content,
+              ((_l = widget.styles) == null ? void 0 : _l.selected_icon) || baseSettings.selected_icon || widget.content,
               widget.imageId,
               { value: "fas fa-arrow-right", library: "fa-solid" }
             );
@@ -2741,7 +2802,7 @@ ${refText}` });
           break;
         case "icon":
           widgetType = "icon";
-          settings.selected_icon = ((_l = widget.styles) == null ? void 0 : _l.selected_icon) || baseSettings.selected_icon || widget.content;
+          settings.selected_icon = ((_m = widget.styles) == null ? void 0 : _m.selected_icon) || baseSettings.selected_icon || widget.content;
           break;
         case "custom":
         default:
@@ -2750,6 +2811,10 @@ ${refText}` });
           break;
       }
       const finalSettings = this.normalizeIconSettings(widgetType, settings, widget);
+      if (finalSettings.background_color && typeof finalSettings.background_color === "object") {
+        console.warn("[ElementorCompiler] \u26A0\uFE0F Sanitizing invalid background_color object for", widgetType);
+        delete finalSettings.background_color;
+      }
       return {
         id: widgetId,
         elType: "widget",
@@ -10996,6 +11061,157 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     return compatState;
   }
 
+  // src/linter/rules/widget-compatibility.ts
+  var WIDGET_COMPATIBILITY_MAP = {
+    // Nós de Texto só podem virar widgets baseados em texto
+    TEXT: [
+      "heading",
+      "text-editor",
+      "paragraph",
+      "rich-text",
+      "post-title",
+      "post-excerpt",
+      "post-content",
+      "post-info",
+      "post-date",
+      "post-author",
+      "post-terms",
+      "site-title",
+      "site-tagline",
+      "archive-title",
+      "archive-description",
+      "call-to-action",
+      // CTA pode ser aplicado a texto se for apenas o link? Geralmente CTA é um container. Mas aceitamos para conversão de texto isolado em botão simples as vezes.
+      "button",
+      // Texto pode virar botão (apenas o label)
+      "icon",
+      // Ícones de fonte (FontAwesome) são texto
+      "shortcode",
+      "html",
+      "menu-anchor"
+    ],
+    // Retângulos e Vetores
+    RECTANGLE: [
+      "image",
+      "button",
+      "icon",
+      "divider",
+      "spacer",
+      "video",
+      "lottie",
+      "google-maps",
+      "menu-anchor",
+      "container",
+      // Retângulo pode ser background de container
+      "inner-container"
+    ],
+    ELLIPSE: ["image", "icon", "avatar", "button"],
+    VECTOR: ["icon", "divider", "spacer", "star-rating", "svg"],
+    STAR: ["icon", "star-rating"],
+    LINE: ["divider", "spacer"],
+    // Frames e Grupos (Containers e Composites)
+    FRAME: [
+      "container",
+      "inner-container",
+      "button",
+      "checkbox",
+      "radio",
+      "switch",
+      "select",
+      "icon-box",
+      "image-box",
+      "card",
+      "form",
+      "nav-menu",
+      "tabs",
+      "accordion",
+      "toggle",
+      "gallery",
+      "image-gallery",
+      "slider",
+      "slides",
+      "carousel",
+      "image-carousel",
+      "media-carousel",
+      "testimonial-carousel",
+      "loop-carousel",
+      "loop-grid",
+      "loop-item",
+      "reviews",
+      "testimonial",
+      "progress-tracker",
+      "table-of-contents",
+      "price-table",
+      "price-list",
+      "login",
+      "search-form",
+      "blockquote",
+      "global-widget"
+    ],
+    GROUP: [
+      "container",
+      "inner-container",
+      "button",
+      "checkbox",
+      "radio",
+      "switch",
+      "select",
+      "icon-box",
+      "image-box",
+      "card",
+      "form",
+      "nav-menu",
+      "tabs",
+      "accordion",
+      "toggle",
+      "gallery",
+      "slider",
+      "carousel",
+      "loop-grid",
+      "gallery",
+      "image-gallery",
+      "slider",
+      "slides",
+      "carousel",
+      "image-carousel",
+      "loop-grid",
+      "loop-item",
+      "price-table",
+      "price-list",
+      "login",
+      "search-form"
+    ],
+    // Instances (Componentes) - Geralmente tratados como Frames
+    INSTANCE: [
+      "global-widget",
+      "template",
+      "container",
+      "inner-container",
+      "button",
+      // Componente de botão
+      "icon-box",
+      "image-box",
+      "card",
+      "form",
+      "nav-menu"
+    ]
+  };
+  function getCompatibilityWarning(nodeTypes, widgetName) {
+    if (!nodeTypes || nodeTypes.length === 0) return null;
+    const plainName = widgetName.toLowerCase().replace(/^(w:|woo:|loop:|c:)/, "").trim();
+    const incompatibleTypes = nodeTypes.filter((type) => {
+      const allowed = WIDGET_COMPATIBILITY_MAP[type];
+      if (!allowed) return false;
+      return !allowed.includes(plainName);
+    });
+    if (incompatibleTypes.length > 0) {
+      const uniqueTypes = [...new Set(incompatibleTypes)];
+      const typeStr = uniqueTypes.join(", ");
+      return `Incomum para ${typeStr}`;
+    }
+    return null;
+  }
+
   // src/licensing/LicenseConfig.ts
   var LICENSE_BACKEND_URL = "https://figmatoelementor.pljr.com.br";
   var LICENSE_VALIDATE_ENDPOINT = "/wp-json/figtoel/v1/license/validate";
@@ -11685,18 +11901,245 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
   });
   var logger = new FileLogger(console.log.bind(console));
   figma.notify("Plugin carregou!");
-  figma.showUI(__html__, { width: 600, height: 820, themeColors: true });
+  figma.showUI(__html__, { width: 380, height: 640, themeColors: true });
   safeInvoke(() => figma.ui.postMessage({
     type: "runtime-health",
     status: runtimeHealth.runtime,
     warnings: runtimeHealth.warnings || []
   }));
+  figma.on("selectionchange", () => {
+    const selection = figma.currentPage.selection;
+    const nodes = selection.map((node) => ({
+      id: node.id,
+      name: node.name,
+      type: node.type
+    }));
+    figma.ui.postMessage({
+      type: "UPDATE_SELECTION",
+      nodes
+    });
+  });
   var pipeline = new ConversionPipeline();
   var lastJSON = null;
   var noaiUploader = null;
   var DEFAULT_TIMEOUT_MS3 = 12e3;
   var DEFAULT_PROVIDER = "gemini";
   var DEFAULT_GPT_MODEL2 = "gpt-4.1-mini";
+  var INTELLISENSE_WIDGETS = [
+    // Containers (Priority)
+    "container",
+    "inner-container",
+    "section",
+    "inner-section",
+    // Basic
+    "heading",
+    "text-editor",
+    "button",
+    "image",
+    "icon",
+    "video",
+    "divider",
+    "spacer",
+    "image-box",
+    "icon-box",
+    "star-rating",
+    "counter",
+    "progress",
+    "tabs",
+    "accordion",
+    "toggle",
+    "alert",
+    "social-icons",
+    "soundcloud",
+    "shortcode",
+    "html",
+    "menu-anchor",
+    "sidebar",
+    "read-more",
+    "image-carousel",
+    "image-gallery",
+    "icon-list",
+    "testimonial",
+    "google-maps",
+    "audio",
+    "rating",
+    "inner-section",
+    // Pro
+    "form",
+    "login",
+    "call-to-action",
+    "media-carousel",
+    "portfolio",
+    "slides",
+    "flip-box",
+    "animated-headline",
+    "post-navigation",
+    "share-buttons",
+    "table-of-contents",
+    "countdown",
+    "blockquote",
+    "testimonial-carousel",
+    "reviews",
+    "hotspots",
+    "sitemap",
+    "author-box",
+    "price-table",
+    "price-list",
+    "progress-tracker",
+    "nav-menu",
+    "breadcrumb",
+    "lottie",
+    "video-playlist",
+    "search-form",
+    "global-widget",
+    // Theme Builder
+    "post-title",
+    "post-excerpt",
+    "post-content",
+    "post-featured-image",
+    "post-info",
+    "post-author",
+    "post-date",
+    "post-terms",
+    "archive-title",
+    "archive-description",
+    "site-logo",
+    "site-title",
+    "site-tagline",
+    "search-results",
+    // Loop Builder
+    "loop-grid",
+    "loop-carousel",
+    "loop-item",
+    "loop-image",
+    "loop-title",
+    "loop-meta",
+    "loop-terms",
+    "loop-rating",
+    "loop-price",
+    "loop-add-to-cart",
+    "loop-read-more",
+    "loop-pagination",
+    // Containers (Moved to top)
+    // 'container', 'inner-container',
+    // Hierarchical
+    "accordion:item",
+    "accordion:title",
+    "accordion:content",
+    "tabs:item",
+    "tabs:title",
+    "tabs:content",
+    "list:item",
+    "list:icon",
+    "list:text",
+    "toggle:item",
+    "toggle:title",
+    "toggle:content",
+    "countdown:days",
+    "countdown:hours",
+    "countdown:minutes",
+    "countdown:seconds",
+    "slide:1",
+    "slide:2",
+    "carousel:slide"
+  ];
+  var WIDGET_ALIASES = {
+    "heading": ["w:heading", "title", "h1", "h2", "h3", "titulo"],
+    "text-editor": ["w:text-editor", "text", "paragraph", "texto"],
+    "button": ["w:button", "btn", "cta", "botao"],
+    "image": ["w:image", "img", "photo", "imagem", "foto"],
+    "icon": ["w:icon", "icone"],
+    "video": ["w:video", "player"],
+    "divider": ["w:divider", "separator", "line", "hr"],
+    "spacer": ["w:spacer", "gap", "spacing"],
+    "image-box": ["w:image-box", "imgbox"],
+    "icon-box": ["w:icon-box", "iconbox"],
+    "container": ["w:container", "c:container", "section", "wrapper", "box"],
+    "inner-container": ["w:inner-container", "c:inner", "inner"],
+    "tabs": ["w:tabs", "tabpanel"],
+    "accordion": ["w:accordion", "faq", "collapse"],
+    "form": ["w:form", "formulario", "contact-form"],
+    "nav-menu": ["w:nav-menu", "menu", "navigation"],
+    "image-gallery": ["w:image-gallery", "gallery", "galeria"],
+    "image-carousel": ["w:image-carousel", "carousel", "slider"],
+    "icon-list": ["w:icon-list", "list", "lista"],
+    "testimonial": ["w:testimonial", "depoimento", "review"],
+    "google-maps": ["w:google-maps", "maps", "mapa"],
+    "countdown": ["w:countdown", "timer"],
+    "site-logo": ["w:site-logo", "logo"],
+    "search-form": ["w:search-form", "search", "busca"],
+    "progress": ["w:progress", "progressbar"],
+    "counter": ["w:counter", "number"],
+    "star-rating": ["w:star-rating", "rating", "stars"],
+    "social-icons": ["w:social-icons", "social", "redes-sociais"],
+    "slides": ["w:slides", "slider:slides", "slideshow"],
+    "price-table": ["w:price-table", "pricing"],
+    "blockquote": ["w:blockquote", "quote", "citacao"],
+    "author-box": ["w:author-box", "author"],
+    "post-title": ["w:post-title", "loop:title"],
+    "post-featured-image": ["w:post-featured-image", "loop:featured-image", "loop:image"],
+    "loop-grid": ["w:loop-grid", "loop:grid", "posts-grid"],
+    "loop-carousel": ["w:loop-carousel", "loop:carousel", "posts-carousel"]
+  };
+  function levenshtein(a, b) {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+  function getIntelliSenseSuggestions(query, limit = 15) {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) {
+      return INTELLISENSE_WIDGETS.slice(0, limit).map((name) => ({ name, score: 1 }));
+    }
+    const results = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const widget of INTELLISENSE_WIDGETS) {
+      if (widget === q) {
+        results.push({ name: widget, score: 1 });
+        seen.add(widget);
+        continue;
+      }
+      if (widget.startsWith(q)) {
+        results.push({ name: widget, score: 0.9 });
+        seen.add(widget);
+        continue;
+      }
+      if (widget.includes(q)) {
+        results.push({ name: widget, score: 0.7 });
+        seen.add(widget);
+        continue;
+      }
+      const distance = levenshtein(q, widget);
+      const similarity = 1 - distance / Math.max(q.length, widget.length);
+      if (similarity > 0.4) {
+        results.push({ name: widget, score: similarity });
+        seen.add(widget);
+      }
+    }
+    for (const [widget, aliases] of Object.entries(WIDGET_ALIASES)) {
+      if (seen.has(widget)) continue;
+      for (const alias of aliases) {
+        const aliasLower = alias.toLowerCase();
+        if (aliasLower === q || aliasLower.startsWith(q) || aliasLower.includes(q)) {
+          results.push({ name: widget, score: 0.85, alias });
+          seen.add(widget);
+          break;
+        }
+      }
+    }
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, limit);
+  }
   function getActiveProvider(providerId) {
     return providerId === "gpt" ? openaiProvider : geminiProvider;
   }
@@ -11979,6 +12422,17 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
               }
               return false;
             };
+            const findIconChild = (n) => {
+              if (n.name.toLowerCase().includes("icon") || n.name.toLowerCase().includes("vector")) return n;
+              if (isVectorNode(n)) return n;
+              if ("children" in n) {
+                for (const c of n.children) {
+                  const found = findIconChild(c);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
             if ("locked" in node && node.locked) {
               if (hasImageChildren(node)) {
                 format = "WEBP";
@@ -11990,10 +12444,23 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
             } else if (hasVectorChildren(node)) {
               format = "SVG";
             }
-            if (node.name === "Icon" || widget.type === "icon" || widget.type === "list-item" || widget.type === "accordion" || widget.type === "toggle") {
+            const explicitIconTypes = ["icon", "list-item", "accordion", "toggle", "button", "icon-box"];
+            if (node.name === "Icon" || explicitIconTypes.includes(widget.type)) {
               format = "SVG";
             }
-            const result = await uploader.uploadToWordPress(node, format);
+            let targetNode = node;
+            if (widget.type === "button" || widget.type === "icon-box") {
+              const iconChild = findIconChild(node);
+              if (iconChild) {
+                console.log(`[NO-AI] Found internal icon for ${widget.type}: ${iconChild.name}`);
+                targetNode = iconChild;
+                format = "SVG";
+              } else {
+                console.log(`[NO-AI] No icon child found in ${widget.type}. Skipping upload.`);
+                return;
+              }
+            }
+            const result = await uploader.uploadToWordPress(targetNode, format);
             if (result) {
               if (widget.type === "image-box") {
                 if (!widget.styles) widget.styles = {};
@@ -12227,6 +12694,108 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
           figma.ui.postMessage({ type: "preview", payload: lastJSON, action: "download" });
         } else {
           log("Nenhum JSON para baixar.", "warn");
+        }
+        break;
+      case "APPLY_NAMES":
+        try {
+          const renames = msg.renames;
+          if (!Array.isArray(renames) || renames.length === 0) {
+            figma.notify("Nenhum nome para aplicar.", { timeout: 2e3 });
+            break;
+          }
+          let successCount = 0;
+          for (const rename of renames) {
+            console.log(`[INTELLISENSE] Renaming: id=${rename.id}, newName=${rename.newName}`);
+            const node = figma.getNodeById(rename.id);
+            console.log(`[INTELLISENSE] Found node: ${node ? `name=${node.name}, type=${node.type}` : "NULL"}`);
+            if (node && "name" in node) {
+              const oldName = node.name;
+              node.name = rename.newName;
+              console.log(`[INTELLISENSE] Renamed: "${oldName}" -> "${rename.newName}"`);
+              successCount++;
+            }
+          }
+          figma.notify(`\u2705 ${successCount} layer(s) renomeado(s)!`, { timeout: 2e3 });
+          figma.ui.postMessage({ type: "RENAME_SUCCESS", count: successCount });
+        } catch (e) {
+          const error = safeGet(e, "message") || e;
+          figma.notify(`Erro ao renomear: ${error}`, { timeout: 3e3 });
+          figma.ui.postMessage({ type: "RENAME_ERROR", message: error });
+        }
+        break;
+      case "GET_INTELLISENSE_SUGGESTIONS":
+        try {
+          const query = msg.query || "";
+          const selection = figma.currentPage.selection;
+          const nodeTypes = [...new Set(selection.map((n) => n.type))];
+          let detectedWidget = null;
+          if (selection.length === 1) {
+            try {
+              const snapshot = createNodeSnapshot(selection[0]);
+              const analysisResult = analyzeTreeWithHeuristics(snapshot);
+              if (analysisResult && analysisResult.widget && !["unknown", "div", "frame", "group"].includes(analysisResult.widget)) {
+                detectedWidget = analysisResult.widget.replace(/^w:/, "");
+              }
+            } catch (e) {
+            }
+          }
+          const rawSuggestions = getIntelliSenseSuggestions(query, 15);
+          const suggestions = rawSuggestions.map((s) => {
+            let warning = getCompatibilityWarning(nodeTypes, s.name);
+            let smartScore = s.score;
+            const sName = s.name.replace(/^w:/, "");
+            if (nodeTypes.includes("TEXT") && ["heading", "text-editor", "paragraph"].includes(sName)) {
+              warning = null;
+              if (!detectedWidget) smartScore = 2;
+            }
+            if (detectedWidget && (sName === detectedWidget || s.name === detectedWidget)) {
+              smartScore = 2;
+            } else if (warning) {
+              smartScore *= 0.5;
+            } else if (nodeTypes.length > 0) {
+              smartScore *= 1.2;
+            }
+            if (["FRAME", "GROUP", "SECTION"].some((t) => nodeTypes.includes(t)) && ["container", "inner-container", "inner-section", "section"].includes(sName)) {
+              smartScore = 3;
+            }
+            if (["RECTANGLE", "VECTOR", "ELLIPSE", "STAR", "LINE"].some((t) => nodeTypes.includes(t))) {
+              if (["image", "button", "divider", "spacer", "icon", "video"].includes(sName)) {
+                smartScore = 2.5;
+              } else if (["container", "inner-container"].includes(sName)) {
+              }
+            }
+            return __spreadProps(__spreadValues({}, s), { warning: warning || void 0, score: smartScore });
+          });
+          suggestions.sort((a, b) => b.score - a.score);
+          figma.ui.postMessage({ type: "INTELLISENSE_SUGGESTIONS", suggestions });
+        } catch (e) {
+          console.error("IntelliSense error:", e);
+          figma.ui.postMessage({ type: "INTELLISENSE_SUGGESTIONS", suggestions: [] });
+        }
+        break;
+      case "REQUEST_SELECTION_FOR_RENAME":
+        try {
+          const selection = figma.currentPage.selection;
+          console.log("[INTELLISENSE] Button clicked - Selection count:", selection.length);
+          if (selection.length === 0) {
+            figma.notify("Selecione pelo menos um layer para renomear.", { timeout: 3e3 });
+            break;
+          }
+          const nodes = selection.map((node) => {
+            console.log(`[INTELLISENSE] Selected node: id=${node.id}, name=${node.name}, type=${node.type}`);
+            return {
+              id: node.id,
+              name: node.name,
+              type: node.type
+            };
+          });
+          figma.ui.postMessage({
+            type: "INIT_RENAME_MODAL",
+            nodes
+          });
+        } catch (e) {
+          console.error("Error getting selection:", e);
+          figma.notify("Erro ao obter sele\xE7\xE3o.", { timeout: 2e3 });
         }
         break;
       case "test-gemini":

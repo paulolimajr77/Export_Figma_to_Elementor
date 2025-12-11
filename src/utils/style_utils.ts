@@ -152,6 +152,24 @@ export function extractWidgetStyles(node: SerializedNode): Record<string, any> {
         // Note: Content needs to be handled by the caller as it replaces the widget content
     }
 
+    // For Buttons, Icon Boxes, and other widgets that use a Box Model (frames),
+    // we must also extract container styles (background, border, padding, gap).
+    // This allows hydrateStyles to provide the correct visual data to the compiler,
+    // overriding potentially incorrect AI hallucinations.
+    const isBoxWidget = node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT' ||
+        node.type === 'RECTANGLE' || node.type === 'GROUP';
+
+    // Explicit list of widgets that are "Box-like"
+    const boxLikeWidgets = ['w:button', 'w:icon-box', 'w:image-box', 'w:call-to-action', 'button', 'icon-box', 'image-box'];
+    const isExplicitBox = node.name && boxLikeWidgets.some(w => node.name.startsWith(w) || node.name === w);
+
+    if (isBoxWidget || isExplicitBox) {
+        const containerStyles = extractContainerStyles(node);
+        // Merge container styles, but let existing specific widget styles (like text color) take precedence if conflicts arise?
+        // Actually, we want container styles to fill in the gaps.
+        Object.assign(styles, containerStyles);
+    }
+
     return styles;
 }
 
@@ -218,10 +236,25 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
                         color: `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${c.a || 1})`
                     };
                 });
+
+                // Calculate Angle
+                let angle = 180;
+                if (fill.gradientTransform) {
+                    const [row1, row2] = fill.gradientTransform;
+                    const a = row1[0];
+                    const b = row2[0];
+                    const rad = Math.atan2(b, a);
+                    const deg = rad * (180 / Math.PI);
+                    angle = Math.round(deg + 90);
+                    if (angle < 0) angle += 360;
+                    if (angle >= 360) angle -= 360;
+                }
+
                 styles.background = {
                     type: 'gradient',
                     gradientType: fill.type === 'GRADIENT_RADIAL' ? 'radial' : 'linear',
-                    stops: stops
+                    stops: stops,
+                    angle: angle
                 };
             } else if (fill.type === 'IMAGE') {
                 styles.background = {
@@ -248,9 +281,21 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
                 anyNode.strokeLeftWeight !== undefined;
 
             if (!hasIndividualStrokes && anyNode.strokeWeight !== undefined && anyNode.strokeWeight !== 'mixed') {
+                // Determine border style based on dashPattern
+                let borderStyle = 'solid';
+                if (node.dashPattern && node.dashPattern.length > 0) {
+                    const [dash, gap] = node.dashPattern;
+                    // Heuristic: if dash equals gap and is small, it's likely dotted. Otherwise dashed.
+                    if (dash === gap && dash <= 3) {
+                        borderStyle = 'dotted';
+                    } else {
+                        borderStyle = 'dashed';
+                    }
+                }
+
                 // Borda uniforme
                 styles.border = {
-                    type: 'solid',
+                    type: borderStyle,
                     width: anyNode.strokeWeight,
                     color: color,
                     radius: typeof node.cornerRadius === 'number' ? node.cornerRadius : 0

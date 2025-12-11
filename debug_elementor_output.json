@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "12f58bb",
+      "id": "5388e3a",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "12f58bb",
+        "_element_id": "5388e3a",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -24,6 +24,22 @@
         "flex_align_items": "center",
         "align_items_tablet": "",
         "align_items_mobile": "",
+        "padding": {
+          "unit": "px",
+          "top": "0",
+          "right": "0",
+          "bottom": "0",
+          "left": "0",
+          "isLinked": true
+        },
+        "_padding": {
+          "unit": "px",
+          "top": "0",
+          "right": "0",
+          "bottom": "0",
+          "left": "0",
+          "isLinked": true
+        },
         "width": {
           "unit": "%",
           "size": "",
@@ -46,12 +62,12 @@
       },
       "elements": [
         {
-          "id": "f104e83",
+          "id": "d2751d5",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "f104e83",
+            "_element_id": "d2751d5",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -104,7 +120,7 @@
             },
             "background_gradient_angle": {
               "unit": "deg",
-              "size": 180,
+              "size": 165,
               "sizes": []
             },
             "width": {
@@ -123,13 +139,13 @@
           },
           "elements": [
             {
-              "id": "b13bbe9",
+              "id": "c424b67",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "b13bbe9",
+                "_element_id": "c424b67",
                 "minHeight": 690,
                 "justify_content": "flex-start",
                 "align_items": "flex-start",
@@ -150,13 +166,13 @@
               "elements": []
             },
             {
-              "id": "4e97d21",
+              "id": "9312c90",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "text-editor",
               "settings": {
-                "_element_id": "4e97d21",
+                "_element_id": "9312c90",
                 "align": "center",
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",

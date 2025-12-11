@@ -23,7 +23,18 @@ export function extractBorderStyles(node: SceneNode): ElementorSettings {
         const stroke = node.strokes[0];
         if (stroke.type === 'SOLID') {
             settings.border_color = rgbaFromSolid(stroke);
-            settings.border_border = 'solid';
+
+            // Determine border style based on dashPattern
+            if (node.dashPattern && node.dashPattern.length > 0) {
+                const [dash, gap] = node.dashPattern;
+                if (dash === gap && dash <= 2) {
+                    settings.border_border = 'dotted'; // Dot usually is small dash equal to gap
+                } else {
+                    settings.border_border = 'dashed';
+                }
+            } else {
+                settings.border_border = 'solid';
+            }
 
             const anyNode = node as any;
 

@@ -10,7 +10,75 @@
  * @author Figma → Elementor Compiler
  */
 
-import widgetVocabulary from '../../../dist/widget_vocabulary_list.json';
+// Widget Vocabulary List (inline to avoid JSON import issues)
+const widgetVocabulary = {
+    categories: {
+        basic: {
+            source: 'elementor-core', widgets: [
+                { name: 'heading', aliases: ['w:heading', 'title', 'h1', 'titulo'] },
+                { name: 'text-editor', aliases: ['w:text-editor', 'text', 'paragraph', 'texto'] },
+                { name: 'button', aliases: ['w:button', 'btn', 'cta', 'botao'] },
+                { name: 'image', aliases: ['w:image', 'img', 'photo', 'imagem'] },
+                { name: 'icon', aliases: ['w:icon', 'icone'] },
+                { name: 'video', aliases: ['w:video', 'player'] },
+                { name: 'divider', aliases: ['w:divider', 'separator', 'line'] },
+                { name: 'spacer', aliases: ['w:spacer', 'gap'] },
+                { name: 'image-box', aliases: ['w:image-box'] },
+                { name: 'icon-box', aliases: ['w:icon-box'] },
+                { name: 'tabs', aliases: ['w:tabs'] },
+                { name: 'accordion', aliases: ['w:accordion', 'faq'] },
+                { name: 'toggle', aliases: ['w:toggle'] },
+                { name: 'counter', aliases: ['w:counter'] },
+                { name: 'progress', aliases: ['w:progress'] },
+                { name: 'star-rating', aliases: ['w:star-rating', 'rating'] },
+                { name: 'icon-list', aliases: ['w:icon-list', 'list'] },
+                { name: 'image-carousel', aliases: ['w:image-carousel', 'carousel', 'slider'] },
+                { name: 'image-gallery', aliases: ['w:image-gallery', 'gallery'] },
+                { name: 'testimonial', aliases: ['w:testimonial', 'depoimento'] },
+                { name: 'google-maps', aliases: ['w:google-maps', 'maps', 'mapa'] },
+                { name: 'social-icons', aliases: ['w:social-icons', 'social'] },
+                { name: 'alert', aliases: ['w:alert'] },
+                { name: 'audio', aliases: ['w:audio'] },
+                { name: 'shortcode', aliases: ['w:shortcode'] },
+                { name: 'html', aliases: ['w:html'] },
+                { name: 'menu-anchor', aliases: ['w:menu-anchor'] },
+                { name: 'sidebar', aliases: ['w:sidebar'] },
+                { name: 'read-more', aliases: ['w:read-more'] }
+            ]
+        },
+        pro: {
+            source: 'elementor-pro', widgets: [
+                { name: 'form', aliases: ['w:form', 'formulario'] },
+                { name: 'nav-menu', aliases: ['w:nav-menu', 'menu', 'navigation'] },
+                { name: 'countdown', aliases: ['w:countdown', 'timer'] },
+                { name: 'slides', aliases: ['w:slides', 'slideshow'] },
+                { name: 'price-table', aliases: ['w:price-table', 'pricing'] },
+                { name: 'flip-box', aliases: ['w:flip-box'] },
+                { name: 'call-to-action', aliases: ['w:call-to-action'] },
+                { name: 'search-form', aliases: ['w:search-form', 'search', 'busca'] },
+                { name: 'lottie', aliases: ['w:lottie'] },
+                { name: 'blockquote', aliases: ['w:blockquote', 'quote'] }
+            ]
+        },
+        'theme-builder': {
+            source: 'elementor-pro', widgets: [
+                { name: 'post-title', aliases: ['w:post-title'] },
+                { name: 'post-content', aliases: ['w:post-content'] },
+                { name: 'post-featured-image', aliases: ['w:post-featured-image'] },
+                { name: 'site-logo', aliases: ['w:site-logo', 'logo'] },
+                { name: 'site-title', aliases: ['w:site-title'] },
+                { name: 'archive-title', aliases: ['w:archive-title'] }
+            ]
+        },
+        containers: {
+            source: 'elementor-core', widgets: [
+                { name: 'container', aliases: ['w:container', 'c:container', 'section', 'wrapper'] },
+                { name: 'inner-container', aliases: ['w:inner-container', 'c:inner', 'inner'] }
+            ]
+        }
+    },
+    prefixes: { 'w:': 'widget', 'c:': 'container', 'woo:': 'woocommerce', 'loop:': 'loop-builder' }
+};
 
 // ============================================================================
 // TYPES
@@ -183,7 +251,7 @@ export function validateWidgetName(name: string): ValidationResult {
         return {
             valid: true,
             normalized: entry.name,
-            category: entry.category
+            category: entry.category || undefined
         };
     }
 

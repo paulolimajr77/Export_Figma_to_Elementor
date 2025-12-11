@@ -45,12 +45,12 @@
       --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08);
       --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 
-      /* Spacing */
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 16px;
-      --space-4: 24px;
-      --space-5: 32px;
+      /* Spacing - Compact Mode */
+      --space-1: 2px;
+      --space-2: 6px;
+      --space-3: 10px;
+      --space-4: 16px;
+      --space-5: 24px;
 
       /* Transitions */
       --anim-fast: 150ms ease;
@@ -191,8 +191,9 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      height: 36px;
-      padding: 0 16px;
+      height: 32px;
+      /* Compact height */
+      padding: 0 12px;
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
       font-weight: 400;
@@ -416,8 +417,55 @@
     .row {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-3);
-      margin-bottom: var(--space-3);
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    /* Grid Actions */
+    .grid-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .grid-actions .full-span {
+      grid-column: 1 / -1;
+    }
+
+    /* Collapsible Logs */
+    details.compact-details {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    details.compact-details summary {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+      background: var(--color-surface-alt);
+    }
+
+    details.compact-details summary:hover {
+      background: var(--color-bg);
+    }
+
+    details.compact-details[open] summary {
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    details.compact-details .details-content {
+      padding: 8px;
+      background: var(--color-bg);
     }
 
     /* Cards */
@@ -425,8 +473,9 @@
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      padding: var(--space-3);
-      margin-bottom: var(--space-4);
+      padding: 10px 12px;
+      /* Compact padding */
+      margin-bottom: 12px;
       box-shadow: var(--shadow-sm);
     }
 
@@ -743,23 +792,31 @@
     /* Resizer handle */
     #resizer-handle {
       position: fixed;
-      width: 26px;
-      height: 26px;
+      width: 24px;
+      height: 24px;
       right: 0px;
       bottom: 0px;
       cursor: se-resize;
-      opacity: 1;
-      /* background: var(--color-panel); */
-      /* border: 1px solid var(--color-border); */
-      /* border-radius: 10px; */
-      /* transition: opacity var(--anim), background var(--anim), transform var(--anim); */
       z-index: 9999;
-      /* box-shadow: var(--shadow-1); */
       pointer-events: auto;
-      background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 18 18' xmlns='http://www.w3.org/2000/svg' fill='%23f5a905' stroke='%23f5a905'><path fill='%23000000' d='M14.228 16.227a1 1 0 0 1-.707-1.707l1-1a1 1 0 0 1 1.416 1.414l-1 1a1 1 0 0 1-.707.293zm-5.638 0a1 1 0 0 1-.707-1.707l6.638-6.638a1 1 0 0 1 1.416 1.414l-6.638 6.638a1 1 0 0 1-.707.293zm-5.84 0a1 1 0 0 1-.707-1.707L14.52 2.043a1 1 0 1 1 1.415 1.414L3.457 15.934a1 1 0 0 1-.707.293z'></path></svg>");
-      background-repeat: no-repeat;
-      background-position: center;
-      /* background-size: 16px; */
+    }
+
+    #resizer-handle::after {
+      content: '';
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      width: 6px;
+      height: 6px;
+      border-right: 2px solid var(--color-icon);
+      border-bottom: 2px solid var(--color-icon);
+      border-bottom-right-radius: 2px;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+
+    #resizer-handle:hover::after {
+      opacity: 1;
     }
 
     #resizer-handle:hover {
@@ -2363,13 +2420,18 @@
 
     <main class="tab-panels">
       <section class="tab-panel active" data-panel="layout">
-        <div class="card">
-          <div class="card-title">A&#231;&#245;es r&#225;pidas</div>
-          <div class="row">
-            <button id="btn_inspect" class="btn secondary">Inspecionar Json Figma</button>
-            <button id="btn_analyze" class="btn secondary">Analisador de Layout</button>
-            <button id="btn_generate" class="btn primary">Gerar para Elementor</button>
-            <button id="btn_reset" class="btn secondary" data-action="reset">Reset</button>
+        <div class="card compact">
+          <div class="card-title small">Ações Rápidas</div>
+          <div class="grid-actions">
+            <!-- Grid 2 cols defined in CSS -->
+            <button id="btn_generate" class="btn primary full-span">Gerar para Elementor</button>
+
+            <button id="btn_analyze" class="btn secondary">Analisar Layout</button>
+            <button id="btn_intellisense" class="btn secondary"
+              title="Renomear layer selecionado com IntelliSense (Ctrl+Alt+R)">Renomear</button>
+
+            <button id="btn_inspect" class="btn ghost">Inspecionar</button>
+            <button id="btn_reset" class="btn ghost" data-action="reset">Reset</button>
           </div>
         </div>
 
@@ -2383,24 +2445,52 @@
           <div id="linter-summary" class="linter-summary"></div>
           <div id="linter-issues" class="linter-issues"></div>
         </div>
-        <div class="card">
+        <div class="card compact">
           <div id="progress" class="progress hidden">
             <div class="progress-bar"></div>
             <span class="progress-text">Processando pipeline...</span>
           </div>
-          <textarea id="output" placeholder="O JSON gerado aparecer&#225; aqui" readonly></textarea>
-          <div id="logs" class="logs"></div>
-          <div style="margin-top:12px;">
-            <label style="display:block;font-size:12px;margin-bottom:6px;">JSON gerado (selecionamos automaticamente; se
-              precisar use Ctrl+C):</label>
-            <textarea id="figma-json-output" style="width:100%;height:200px"
-              placeholder="JSON para copiar/colar no Elementor"></textarea>
-            <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-              <button class="btn secondary" id="copy-manual">Copiar JSON</button>
-              <span style="font-size:12px;color:#999;">Se o navegador bloquear, selecione o campo e pressione
-                Ctrl+C.</span>
+
+          <!-- Logs Collapsible -->
+          <details class="compact-details">
+            <summary>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 3h18v18H3z" />
+              </svg>
+              Logs de Processamento
+            </summary>
+            <div class="details-content">
+              <div id="logs" class="logs" style="max-height: 150px; overflow-y: auto;"></div>
             </div>
-          </div>
+          </details>
+
+          <!-- Output Collapsible -->
+          <details class="compact-details" open style="margin-top: 8px;">
+            <summary>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+              </svg>
+              JSON de Saída
+            </summary>
+            <div class="details-content">
+              <!-- Original Output Textarea -->
+              <textarea id="output" placeholder="O JSON gerado aparecer&#225; aqui" readonly
+                style="height: 60px; min-height: 60px; margin-bottom: 8px;"></textarea>
+
+              <!-- Elementor JSON Bridge -->
+              <div style="margin-top:4px;">
+                <label style="display:block;font-size:10px;margin-bottom:4px;color:var(--color-text-secondary);">JSON
+                  Final (Copiar este):</label>
+                <textarea id="figma-json-output" style="width:100%;height:120px;font-family:monospace;font-size:11px;"
+                  placeholder="JSON para copiar/colar no Elementor"></textarea>
+                <div style="display:flex;gap:8px;margin-top:6px;align-items:center;">
+                  <button class="btn secondary small full-width" id="copy-manual">Copiar JSON para Área de
+                    Transferência</button>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -2827,6 +2917,12 @@
 
       document.getElementById('btn_inspect').onclick = () => {
         send('inspect');
+      };
+
+      // IntelliSense Rename button handler
+      document.getElementById('btn_intellisense').onclick = () => {
+        // Request current selection from plugin backend
+        send('REQUEST_SELECTION_FOR_RENAME');
       };
       const themeToggle = document.getElementById('theme-toggle');
       const darkSheet = document.getElementById('theme-dark');
@@ -4176,8 +4272,8 @@
       if (resizer) {
         let startX = 0, startY = 0, startW = window.innerWidth, startH = window.innerHeight;
         const onMove = (clientX, clientY) => {
-          const newW = Math.min(1500, Math.max(600, startW + (clientX - startX)));
-          const newH = Math.min(1000, Math.max(500, startH + (clientY - startY)));
+          const newW = Math.min(1500, Math.max(300, startW + (clientX - startX)));
+          const newH = Math.min(1000, Math.max(400, startH + (clientY - startY)));
           send('resize-ui', { width: newW, height: newH });
         };
         const onMouseMove = (e) => { e.preventDefault(); onMove(e.clientX, e.clientY); };
@@ -5482,6 +5578,435 @@ Gerado em: ${new Date().toLocaleString('pt-BR')}`;
         return suggestions[ruleId] || suggestions.default;
       }
 
+    })();
+  </script>
+
+  <!-- ========== INTELLISENSE RENAME MODAL ========== -->
+  <style>
+    /* IntelliSense Modal Styles */
+    #intellisense-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--color-bg);
+      z-index: 9999;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    #intellisense-modal.visible {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .intellisense-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .intellisense-header h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .intellisense-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--color-text-secondary);
+      padding: 4px;
+      line-height: 1;
+    }
+
+    .intellisense-close:hover {
+      color: var(--color-text);
+    }
+
+    .intellisense-node-info {
+      background: var(--color-surface);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+
+    .intellisense-node-info .node-name {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .intellisense-node-info .node-type {
+      color: var(--color-text-secondary);
+      margin-left: 8px;
+    }
+
+    .intellisense-input-wrapper {
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    #intellisense-input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 14px;
+      border: 2px solid var(--color-primary);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      color: var(--color-text);
+      outline: none;
+    }
+
+    #intellisense-input:focus {
+      box-shadow: 0 0 0 3px rgba(168, 117, 255, 0.2);
+    }
+
+    .intellisense-suggestions {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+    }
+
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--color-border);
+      transition: background var(--anim-fast);
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:hover,
+    .suggestion-item.highlighted {
+      background: rgba(168, 117, 255, 0.1);
+    }
+
+    .suggestion-item.highlighted {
+      background: rgba(168, 117, 255, 0.2);
+    }
+
+    .suggestion-name {
+      font-weight: 500;
+      color: var(--color-text);
+      font-size: 13px;
+    }
+
+    .suggestion-alias {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      margin-left: 8px;
+    }
+
+    .suggestion-warning {
+      color: #ffaa00;
+      margin-left: 8px;
+      font-size: 14px;
+      cursor: help;
+      flex-shrink: 0;
+    }
+
+    .suggestion-score {
+      font-size: 10px;
+      color: var(--color-text-tertiary);
+      margin-left: 8px;
+      font-family: monospace;
+      opacity: 0.6;
+      flex-shrink: 0;
+      background: none;
+      padding: 0;
+    }
+
+    .intellisense-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .intellisense-hint {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+    }
+
+    .intellisense-hint kbd {
+      background: var(--color-surface-alt);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 10px;
+      margin: 0 2px;
+    }
+
+    .intellisense-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .intellisense-empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--color-text-secondary);
+      font-size: 12px;
+    }
+
+    .multi-select-info {
+      background: rgba(168, 117, 255, 0.1);
+      border: 1px solid rgba(168, 117, 255, 0.3);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: var(--color-text-secondary);
+    }
+  </style>
+
+  <div id="intellisense-modal">
+    <div class="intellisense-header">
+      <h3>Rename with IntelliSense</h3>
+      <button class="intellisense-close" id="intellisense-close">×</button>
+    </div>
+
+    <div id="intellisense-node-info" class="intellisense-node-info">
+      <span class="node-name" id="intellisense-current-name">—</span>
+      <span class="node-type" id="intellisense-node-type">—</span>
+    </div>
+
+    <div id="intellisense-multi-info" class="multi-select-info" style="display: none;">
+      <strong>📋 Multi-seleção:</strong> <span id="multi-count">0</span> elementos serão renomeados
+    </div>
+
+    <div class="intellisense-input-wrapper">
+      <input type="text" id="intellisense-input" placeholder="Digite para buscar widgets..." autocomplete="off" />
+    </div>
+
+    <div class="intellisense-suggestions" id="intellisense-suggestions">
+      <div class="intellisense-empty">Digite para ver sugestões...</div>
+    </div>
+
+    <div class="intellisense-footer">
+      <div class="intellisense-hint"
+        style="display: block; text-align: center; width: 100%; color: var(--color-text-secondary); margin-top: 8px;">
+        <kbd>Clique</kbd> na sugestão ou tecle <kbd>Enter</kbd> para renomear.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========== INTELLISENSE RENAME LOGIC ==========
+    (function () {
+      const modal = document.getElementById('intellisense-modal');
+      const input = document.getElementById('intellisense-input');
+      const suggestions = document.getElementById('intellisense-suggestions');
+      const closeBtn = document.getElementById('intellisense-close');
+      const currentNameEl = document.getElementById('intellisense-current-name');
+      const nodeTypeEl = document.getElementById('intellisense-node-type');
+      const multiInfoEl = document.getElementById('intellisense-multi-info');
+      const multiCountEl = document.getElementById('multi-count');
+
+      let currentNodes = [];
+      let currentSuggestions = [];
+      let highlightedIndex = -1;
+      let debounceTimer = null;
+
+      // Listen for INIT_RENAME_MODAL from backend
+      window.addEventListener('message', (event) => {
+        const msg = event.data?.pluginMessage || event.data;
+        if (!msg) return;
+
+        if (msg.type === 'INIT_RENAME_MODAL') {
+          currentNodes = msg.nodes || [];
+          openModal();
+        }
+
+        if (msg.type === 'INTELLISENSE_SUGGESTIONS') {
+          renderSuggestions(msg.suggestions || []);
+        }
+
+        if (msg.type === 'RENAME_SUCCESS') {
+          // Show success feedback
+          if (modal.classList.contains('visible')) {
+            input.value = '';
+            input.placeholder = `✅ ${msg.count} layer(s) renomeado(s)! Continue digitando...`;
+            setTimeout(() => {
+              input.placeholder = 'Digite para buscar widgets...';
+            }, 2000);
+          }
+        }
+
+        // Handle selection changes from Figma
+        if (msg.type === 'UPDATE_SELECTION') {
+          // Only update if modal is open
+          if (modal.classList.contains('visible')) {
+            currentNodes = msg.nodes || [];
+            updateModalInfo();
+            // Refresh IntelliSense context (Crucial fix)
+            requestSuggestions(input.value || '');
+          }
+        }
+      });
+
+      function openModal() {
+        if (currentNodes.length === 0) return;
+
+        modal.classList.add('visible');
+        updateModalInfo();
+
+        input.value = '';
+        highlightedIndex = -1;
+
+        // Request initial suggestions
+        requestSuggestions('');
+
+        setTimeout(() => input.focus(), 100);
+      }
+
+      // Update modal display when selection changes
+      function updateModalInfo() {
+        if (currentNodes.length === 0) {
+          currentNameEl.textContent = 'Nenhum layer selecionado';
+          nodeTypeEl.textContent = '';
+          multiInfoEl.style.display = 'none';
+        } else if (currentNodes.length === 1) {
+          currentNameEl.textContent = currentNodes[0].name;
+          nodeTypeEl.textContent = `(${currentNodes[0].type})`;
+          multiInfoEl.style.display = 'none';
+        } else {
+          currentNameEl.textContent = `${currentNodes.length} elementos selecionados`;
+          nodeTypeEl.textContent = '';
+          multiInfoEl.style.display = 'block';
+          multiCountEl.textContent = currentNodes.length;
+        }
+      }
+
+      function closeModal() {
+        modal.classList.remove('visible');
+        currentNodes = [];
+        currentSuggestions = [];
+        highlightedIndex = -1;
+      }
+
+      function requestSuggestions(query) {
+        parent.postMessage({
+          pluginMessage: {
+            type: 'GET_INTELLISENSE_SUGGESTIONS',
+            query: query
+          }
+        }, '*');
+      }
+
+      function renderSuggestions(items) {
+        currentSuggestions = items;
+        highlightedIndex = items.length > 0 ? 0 : -1;
+
+        if (items.length === 0) {
+          suggestions.innerHTML = `
+            <div class="intellisense-empty">
+              ${input.value ? '❌ Nenhum widget encontrado para "' + input.value + '"' : 'Digite para ver sugestões...'}
+            </div>
+          `;
+          return;
+        }
+
+        suggestions.innerHTML = items.map((item, idx) => {
+          const displayScore = Math.max(1, Math.min(Math.round(item.score * 100), 99));
+          return `
+          <div class="suggestion-item ${idx === highlightedIndex ? 'highlighted' : ''}" data-index="${idx}" data-name="${item.name}">
+            <div style="display:flex; align-items:center; width:100%">
+              <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                <span class="suggestion-name">w:${item.name}</span>
+                ${item.alias ? `<span class="suggestion-alias">via ${item.alias}</span>` : ''}
+              </div>
+              <span class="suggestion-score" title="Relevância IA">${displayScore}%</span>
+              ${item.warning ? `<span class="suggestion-warning" title="${item.warning}">⚠️</span>` : ''}
+            </div>
+          </div>
+        `}).join('');
+
+        // Add click handlers
+        suggestions.querySelectorAll('.suggestion-item').forEach(el => {
+          el.addEventListener('click', () => {
+            const name = el.dataset.name;
+            applyRename(`w:${name}`);
+          });
+        });
+      }
+
+      function updateHighlight() {
+        suggestions.querySelectorAll('.suggestion-item').forEach((el, idx) => {
+          el.classList.toggle('highlighted', idx === highlightedIndex);
+          if (idx === highlightedIndex) {
+            el.scrollIntoView({ block: 'nearest' });
+          }
+        });
+      }
+
+      function applyRename(name) {
+        if (!name || currentNodes.length === 0) return;
+
+        // Build renames array - all layers get the same name
+        const renames = currentNodes.map((node) => ({
+          id: node.id,
+          newName: name
+        }));
+
+        parent.postMessage({
+          pluginMessage: {
+            type: 'APPLY_NAMES',
+            renames: renames
+          }
+        }, '*');
+      }
+
+      // Input handler
+      input.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          requestSuggestions(input.value);
+        }, 150);
+      });
+
+      // NOTE: Keyboard navigation (ArrowUp/ArrowDown/Enter) removed because
+      // they conflict with Figma's native shortcuts. Use mouse clicks instead.
+
+      // Close handlers
+      closeBtn.addEventListener('click', closeModal);
+
+      // Escape key & Enter key handling
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (highlightedIndex >= 0 && currentSuggestions[highlightedIndex]) {
+            applyRename(`w:${currentSuggestions[highlightedIndex].name}`);
+          } else if (input.value.trim()) {
+            applyRename(input.value.trim()); // Custom name
+          }
+        }
+      });
     })();
   </script>
 </body>
