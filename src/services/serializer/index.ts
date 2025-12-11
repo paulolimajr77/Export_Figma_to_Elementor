@@ -133,11 +133,23 @@ function serializeNodeInternal(node: SceneNode, parentId?: string): SerializedNo
             }
             return { type: stroke.type, visible: stroke.visible };
         });
-        data.strokeWeight = (node as any).strokeWeight;
-        data.strokeAlign = (node as any).strokeAlign;
-        data.strokeCap = (node as any).strokeCap;
-        data.strokeJoin = (node as any).strokeJoin;
-        data.dashPattern = (node as any).dashPattern;
+
+        // Stroke weight - pode ser uniforme ou individual por lado
+        const anyNode = node as any;
+        if (anyNode.strokeWeight !== figma.mixed && anyNode.strokeWeight !== undefined) {
+            data.strokeWeight = anyNode.strokeWeight;
+        } else {
+            // Bordas individuais por lado
+            if (anyNode.strokeTopWeight !== undefined) data.strokeTopWeight = anyNode.strokeTopWeight;
+            if (anyNode.strokeRightWeight !== undefined) data.strokeRightWeight = anyNode.strokeRightWeight;
+            if (anyNode.strokeBottomWeight !== undefined) data.strokeBottomWeight = anyNode.strokeBottomWeight;
+            if (anyNode.strokeLeftWeight !== undefined) data.strokeLeftWeight = anyNode.strokeLeftWeight;
+        }
+
+        data.strokeAlign = anyNode.strokeAlign;
+        data.strokeCap = anyNode.strokeCap;
+        data.strokeJoin = anyNode.strokeJoin;
+        data.dashPattern = anyNode.dashPattern;
     }
 
     if ('effects' in node && (node as any).effects !== figma.mixed) {

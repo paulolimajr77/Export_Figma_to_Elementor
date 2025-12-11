@@ -232,18 +232,42 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
         }
     }
 
-    // Borders
-    if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
+    // Borders - suporta bordas uniformes e individuais por lado
+    if (node.strokes && node.strokes.length > 0) {
         const stroke = node.strokes.find((s: any) => s.type === 'SOLID' && s.visible !== false);
         if (stroke) {
             const { r, g, b } = stroke.color;
             const a = stroke.opacity !== undefined ? stroke.opacity : 1;
-            styles.border = {
-                type: 'solid',
-                width: node.strokeWeight,
-                color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`,
-                radius: typeof node.cornerRadius === 'number' ? node.cornerRadius : 0
-            };
+            const color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+
+            // Verificar se tem strokeWeight uniforme ou individual
+            const anyNode = node as any;
+            const hasIndividualStrokes = anyNode.strokeTopWeight !== undefined ||
+                anyNode.strokeRightWeight !== undefined ||
+                anyNode.strokeBottomWeight !== undefined ||
+                anyNode.strokeLeftWeight !== undefined;
+
+            if (!hasIndividualStrokes && anyNode.strokeWeight !== undefined && anyNode.strokeWeight !== 'mixed') {
+                // Borda uniforme
+                styles.border = {
+                    type: 'solid',
+                    width: anyNode.strokeWeight,
+                    color: color,
+                    radius: typeof node.cornerRadius === 'number' ? node.cornerRadius : 0
+                };
+            } else if (hasIndividualStrokes) {
+                // Bordas individuais por lado
+                styles.border = {
+                    type: 'solid',
+                    widthTop: anyNode.strokeTopWeight || 0,
+                    widthRight: anyNode.strokeRightWeight || 0,
+                    widthBottom: anyNode.strokeBottomWeight || 0,
+                    widthLeft: anyNode.strokeLeftWeight || 0,
+                    color: color,
+                    radius: typeof node.cornerRadius === 'number' ? node.cornerRadius : 0
+                };
+                console.log('[figtoel-boxmodel] extractContainerStyles border individual:', styles.border);
+            }
         }
     } else if (typeof node.cornerRadius === 'number' && node.cornerRadius > 0) {
         styles.border = { radius: node.cornerRadius };

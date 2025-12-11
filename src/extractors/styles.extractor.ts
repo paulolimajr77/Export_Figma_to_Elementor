@@ -14,6 +14,7 @@ function hasCornerRadius(node: SceneNode): node is FrameNode | RectangleNode | C
 
 /**
  * Extrai borda (stroke) de forma direta.
+ * Suporta bordas uniformes e individuais por lado (strokeTopWeight, etc.)
  */
 export function extractBorderStyles(node: SceneNode): ElementorSettings {
     const settings: ElementorSettings = {};
@@ -24,8 +25,18 @@ export function extractBorderStyles(node: SceneNode): ElementorSettings {
             settings.border_color = rgbaFromSolid(stroke);
             settings.border_border = 'solid';
 
-            if ((node as any).strokeWeight !== figma.mixed) {
-                const w = (node as any).strokeWeight;
+            const anyNode = node as any;
+
+            // Verificar se tem bordas individuais por lado
+            const hasIndividualStrokes = anyNode.strokeTopWeight !== undefined ||
+                anyNode.strokeRightWeight !== undefined ||
+                anyNode.strokeBottomWeight !== undefined ||
+                anyNode.strokeLeftWeight !== undefined;
+
+            // Verificar se tem strokeWeight uniforme ou individual
+            if (!hasIndividualStrokes && anyNode.strokeWeight !== undefined && anyNode.strokeWeight !== figma.mixed) {
+                // Stroke uniforme - usar mesmo valor para todos os lados
+                const w = String(anyNode.strokeWeight);
                 settings.border_width = {
                     unit: 'px',
                     top: w,
@@ -34,6 +45,24 @@ export function extractBorderStyles(node: SceneNode): ElementorSettings {
                     left: w,
                     isLinked: true
                 };
+            } else if (hasIndividualStrokes) {
+                // Bordas individuais por lado (strokeTopWeight, strokeRightWeight, etc.)
+                const top = anyNode.strokeTopWeight !== undefined ? anyNode.strokeTopWeight : 0;
+                const right = anyNode.strokeRightWeight !== undefined ? anyNode.strokeRightWeight : 0;
+                const bottom = anyNode.strokeBottomWeight !== undefined ? anyNode.strokeBottomWeight : 0;
+                const left = anyNode.strokeLeftWeight !== undefined ? anyNode.strokeLeftWeight : 0;
+
+                // Converter para strings (formato Elementor Dimensions)
+                settings.border_width = {
+                    unit: 'px',
+                    top: String(top),
+                    right: String(right),
+                    bottom: String(bottom),
+                    left: String(left),
+                    isLinked: top === right && right === bottom && bottom === left
+                };
+
+                console.log('[figtoel-boxmodel] extractBorderStyles individual:', settings.border_width);
             }
         }
     }
@@ -43,6 +72,7 @@ export function extractBorderStyles(node: SceneNode): ElementorSettings {
 
     return settings;
 }
+
 
 /**
  * Extrai corner radius (uniforme ou individual).

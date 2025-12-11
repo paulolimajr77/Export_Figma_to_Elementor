@@ -130,11 +130,19 @@
         }
         return { type: stroke.type, visible: stroke.visible };
       });
-      data.strokeWeight = node.strokeWeight;
-      data.strokeAlign = node.strokeAlign;
-      data.strokeCap = node.strokeCap;
-      data.strokeJoin = node.strokeJoin;
-      data.dashPattern = node.dashPattern;
+      const anyNode = node;
+      if (anyNode.strokeWeight !== figma.mixed && anyNode.strokeWeight !== void 0) {
+        data.strokeWeight = anyNode.strokeWeight;
+      } else {
+        if (anyNode.strokeTopWeight !== void 0) data.strokeTopWeight = anyNode.strokeTopWeight;
+        if (anyNode.strokeRightWeight !== void 0) data.strokeRightWeight = anyNode.strokeRightWeight;
+        if (anyNode.strokeBottomWeight !== void 0) data.strokeBottomWeight = anyNode.strokeBottomWeight;
+        if (anyNode.strokeLeftWeight !== void 0) data.strokeLeftWeight = anyNode.strokeLeftWeight;
+      }
+      data.strokeAlign = anyNode.strokeAlign;
+      data.strokeCap = anyNode.strokeCap;
+      data.strokeJoin = anyNode.strokeJoin;
+      data.dashPattern = anyNode.dashPattern;
     }
     if ("effects" in node && node.effects !== figma.mixed) {
       data.effects = node.effects.map((effect) => ({
@@ -317,6 +325,55 @@
   function normalizeFlexGap(gap, unit = "px") {
     return normalizeGap(gap, unit);
   }
+  var ELEMENTOR_BREAKPOINTS = ["widescreen", "laptop", "tablet_extra", "tablet", "mobile_extra", "mobile"];
+  function convertFigmaAlignToElementor(figmaAlign) {
+    if (!figmaAlign) return "";
+    const map = {
+      "LEFT": "left",
+      "CENTER": "center",
+      "RIGHT": "right",
+      "JUSTIFIED": "justify",
+      "left": "left",
+      "center": "center",
+      "right": "right",
+      "justify": "justify"
+    };
+    return map[figmaAlign] || "";
+  }
+  function normalizeTextAlign(align, inheritToBreakpoints = true) {
+    const normalizedAlign = convertFigmaAlignToElementor(align);
+    const result = {
+      text_align: normalizedAlign
+    };
+    if (inheritToBreakpoints) {
+      ELEMENTOR_BREAKPOINTS.forEach((bp) => {
+        result[`text_align_${bp}`] = "";
+      });
+    }
+    console.log("[figtoel-boxmodel] normalizeTextAlign:", result);
+    return result;
+  }
+  function normalizeFlexAlign(value) {
+    if (!value) return "";
+    const map = {
+      "start": "flex-start",
+      "flex-start": "flex-start",
+      "center": "center",
+      "end": "flex-end",
+      "flex-end": "flex-end",
+      "stretch": "stretch",
+      "space-between": "space-between",
+      "space-around": "space-around",
+      "space-evenly": "space-evenly",
+      // Figma values
+      "MIN": "flex-start",
+      "CENTER": "center",
+      "MAX": "flex-end",
+      "STRETCH": "stretch",
+      "SPACE_BETWEEN": "space-between"
+    };
+    return map[value] || "";
+  }
 
   // src/utils/style_utils.ts
   function buildHtmlFromSegments(node) {
@@ -488,17 +545,33 @@
         }
       }
     }
-    if (node.strokes && node.strokes.length > 0 && node.strokeWeight) {
+    if (node.strokes && node.strokes.length > 0) {
       const stroke = node.strokes.find((s) => s.type === "SOLID" && s.visible !== false);
       if (stroke) {
         const { r, g, b } = stroke.color;
         const a = stroke.opacity !== void 0 ? stroke.opacity : 1;
-        styles.border = {
-          type: "solid",
-          width: node.strokeWeight,
-          color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`,
-          radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 0
-        };
+        const color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+        const anyNode = node;
+        const hasIndividualStrokes = anyNode.strokeTopWeight !== void 0 || anyNode.strokeRightWeight !== void 0 || anyNode.strokeBottomWeight !== void 0 || anyNode.strokeLeftWeight !== void 0;
+        if (!hasIndividualStrokes && anyNode.strokeWeight !== void 0 && anyNode.strokeWeight !== "mixed") {
+          styles.border = {
+            type: "solid",
+            width: anyNode.strokeWeight,
+            color,
+            radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 0
+          };
+        } else if (hasIndividualStrokes) {
+          styles.border = {
+            type: "solid",
+            widthTop: anyNode.strokeTopWeight || 0,
+            widthRight: anyNode.strokeRightWeight || 0,
+            widthBottom: anyNode.strokeBottomWeight || 0,
+            widthLeft: anyNode.strokeLeftWeight || 0,
+            color,
+            radius: typeof node.cornerRadius === "number" ? node.cornerRadius : 0
+          };
+          console.log("[figtoel-boxmodel] extractContainerStyles border individual:", styles.border);
+        }
       }
     } else if (typeof node.cornerRadius === "number" && node.cornerRadius > 0) {
       styles.border = { radius: node.cornerRadius };
@@ -729,36 +802,71 @@ ${refText}` });
       family: "action",
       aliases: generateAliases("button", ["bot\xE3o", "link", "chamada para a\xE7\xE3o"], ["btn", "cta", "action button", "clique aqui"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
         console.log("[REGISTRY DEBUG] Compiling button widget:", w.type);
         console.log("[REGISTRY DEBUG] Button has", ((_a = w.children) == null ? void 0 : _a.length) || 0, "child widgets");
         let buttonText = w.content || "Button";
         let iconId = w.imageId;
         let textColor;
         let textStyles = {};
+        let iconIndex = -1;
+        let textIndex = -1;
+        const isTextChild = (child) => {
+          var _a2, _b2;
+          const type = ((_a2 = child.type) == null ? void 0 : _a2.toLowerCase()) || "";
+          const name = ((_b2 = child.name) == null ? void 0 : _b2.toLowerCase()) || "";
+          return type === "heading" || type === "text" || name.includes("w:heading") || name.includes("w:text") || child.type === "TEXT";
+        };
+        const isIconChild = (child) => {
+          var _a2, _b2;
+          const type = ((_a2 = child.type) == null ? void 0 : _a2.toLowerCase()) || "";
+          const name = ((_b2 = child.name) == null ? void 0 : _b2.toLowerCase()) || "";
+          return type === "image" || type === "icon" || name.includes("w:icon") || name.includes("w:image") || child.type === "FRAME" && name.includes("icon");
+        };
         if (w.children && Array.isArray(w.children) && w.children.length > 0) {
-          console.log("[REGISTRY DEBUG] Processing child widgets:", w.children.map((c) => ({ type: c.type, content: c.content })));
-          const textChild = w.children.find(
-            (child) => child.type === "heading" || child.type === "text"
-          );
-          if (textChild && textChild.content) {
-            buttonText = textChild.content;
-            console.log("[REGISTRY DEBUG] \u2705 Extracted text from child:", buttonText);
+          console.log("[REGISTRY DEBUG] Processing child widgets:", w.children.map((c) => ({ type: c.type, name: c.name, content: c.content })));
+          const textChild = w.children.find((child, idx) => {
+            if (isTextChild(child)) {
+              textIndex = idx;
+              return true;
+            }
+            return false;
+          });
+          if (textChild) {
+            buttonText = textChild.content || textChild.characters || buttonText;
+            console.log("[REGISTRY DEBUG] \u2705 Extracted text from child:", buttonText, "at index:", textIndex);
             if ((_b = textChild.styles) == null ? void 0 : _b.color) {
               const { r, g, b } = textChild.styles.color;
               textColor = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
               console.log("[REGISTRY DEBUG] \u2705 Extracted text color from child:", textColor);
+            } else if (textChild.color) {
+              const { r, g, b } = textChild.color;
+              textColor = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
             }
             if (textChild.styles) {
               textStyles = textChild.styles;
+            } else if (textChild.fontName) {
+              textStyles = {
+                fontName: textChild.fontName,
+                fontSize: textChild.fontSize,
+                fontWeight: textChild.fontWeight,
+                letterSpacing: textChild.letterSpacing,
+                lineHeight: textChild.lineHeight,
+                textCase: textChild.textCase,
+                textDecoration: textChild.textDecoration
+              };
             }
           }
-          const imageChild = w.children.find(
-            (child) => child.type === "image" || child.type === "icon"
-          );
-          if (imageChild && imageChild.imageId) {
-            iconId = imageChild.imageId;
-            console.log("[REGISTRY DEBUG] \u2705 Extracted icon from child:", iconId);
+          const imageChild = w.children.find((child, idx) => {
+            if (isIconChild(child)) {
+              iconIndex = idx;
+              return true;
+            }
+            return false;
+          });
+          if (imageChild) {
+            iconId = imageChild.imageId || imageChild.id || "";
+            console.log("[REGISTRY DEBUG] \u2705 Found icon child:", imageChild.name, "at index:", iconIndex, "iconId:", iconId);
           }
         }
         const settings = __spreadProps(__spreadValues({}, base), {
@@ -851,15 +959,40 @@ ${refText}` });
             }
           }
           if (!iconUrl && ((_n = (_m = w.styles) == null ? void 0 : _m.selected_icon) == null ? void 0 : _n.value)) {
-            iconUrl = w.styles.selected_icon.value;
+            const sv = w.styles.selected_icon.value;
+            iconUrl = typeof sv === "object" && sv.url ? sv.url : sv;
           }
           console.log("[BUTTON ICON DEBUG] iconId:", iconId);
           console.log("[BUTTON ICON DEBUG] Final iconUrl:", iconUrl);
-          settings.selected_icon = {
-            value: isNaN(imgId) ? iconId : { url: iconUrl, id: imgId },
-            library: isNaN(imgId) ? "fa-solid" : "svg"
-          };
-          settings.icon_align = "left";
+          if (!isNaN(imgId) && imgId > 0) {
+            settings.selected_icon = {
+              value: { url: iconUrl, id: imgId },
+              library: "svg"
+            };
+          } else if (iconId.startsWith("fa")) {
+            settings.selected_icon = {
+              value: iconId,
+              library: "fa-solid"
+            };
+          } else {
+            settings.selected_icon = {
+              value: iconId || "fas fa-star",
+              library: "fa-solid"
+            };
+          }
+          let iconPosition = "before";
+          if (iconIndex !== -1 && textIndex !== -1) {
+            iconPosition = iconIndex < textIndex ? "before" : "after";
+          } else if ((_o = w.styles) == null ? void 0 : _o.iconPosition) {
+            iconPosition = w.styles.iconPosition;
+          }
+          settings.icon_align = iconPosition === "after" ? "row-reverse" : "row";
+          const iconSpacing = ((_p = w.styles) == null ? void 0 : _p.itemSpacing) || w.itemSpacing;
+          if (iconSpacing && iconSpacing > 0) {
+            settings.icon_indent = { unit: "px", size: iconSpacing, sizes: [] };
+          }
+          console.log("[BUTTON ICON DEBUG] iconIndex:", iconIndex, "textIndex:", textIndex, "iconPosition:", iconPosition, "icon_align:", settings.icon_align);
+          console.log("[BUTTON ICON DEBUG] selected_icon:", settings.selected_icon, "icon_indent:", settings.icon_indent);
         }
         return { widgetType: "button", settings };
       }
@@ -907,7 +1040,7 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("image-box", ["caixa de imagem", "box imagem", "card com imagem"], ["image box", "box image", "card image", "feature box", "service box"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
         const imgId = w.imageId ? parseInt(w.imageId, 10) : 0;
         const settings = __spreadProps(__spreadValues({}, base), {
           image: { url: base.image_url || "", id: isNaN(imgId) ? "" : imgId },
@@ -936,12 +1069,16 @@ ${refText}` });
           if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: "px", size: descStyles.letterSpacing, sizes: [] };
           if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
           if (descStyles.color) settings.description_color = descStyles.color;
-          if (descStyles.textAlign && !settings.align) settings.align = descStyles.textAlign;
         }
-        const padTop = typeof ((_e = w.styles) == null ? void 0 : _e.paddingTop) === "number" ? w.styles.paddingTop : 0;
-        const padRight = typeof ((_f = w.styles) == null ? void 0 : _f.paddingRight) === "number" ? w.styles.paddingRight : 0;
-        const padBottom = typeof ((_g = w.styles) == null ? void 0 : _g.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
-        const padLeft = typeof ((_h = w.styles) == null ? void 0 : _h.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
+        const alignSource = (titleStyles == null ? void 0 : titleStyles.textAlign) || (descStyles == null ? void 0 : descStyles.textAlign) || ((_e = w.styles) == null ? void 0 : _e.align);
+        if (alignSource) {
+          const alignSettings = normalizeTextAlign(alignSource);
+          Object.assign(settings, alignSettings);
+        }
+        const padTop = typeof ((_f = w.styles) == null ? void 0 : _f.paddingTop) === "number" ? w.styles.paddingTop : 0;
+        const padRight = typeof ((_g = w.styles) == null ? void 0 : _g.paddingRight) === "number" ? w.styles.paddingRight : 0;
+        const padBottom = typeof ((_h = w.styles) == null ? void 0 : _h.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
+        const padLeft = typeof ((_i = w.styles) == null ? void 0 : _i.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
         if (padTop || padRight || padBottom || padLeft) {
           const paddingValue = normalizePadding(padTop, padRight, padBottom, padLeft);
           if (paddingValue) {
@@ -949,12 +1086,12 @@ ${refText}` });
             console.log("[figtoel-boxmodel] image-box _padding applied:", paddingValue);
           }
         }
-        const gap = typeof ((_i = w.styles) == null ? void 0 : _i.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
+        const gap = typeof ((_j = w.styles) == null ? void 0 : _j.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
         if (gap !== void 0) {
           settings.image_spacing = normalizeSize(gap);
           settings.title_bottom_space = normalizeSize(gap);
         }
-        if ((_j = w.styles) == null ? void 0 : _j.customCss) {
+        if ((_k = w.styles) == null ? void 0 : _k.customCss) {
           let css = w.styles.customCss;
           css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "").replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
           settings.custom_css = css.trim();
@@ -975,7 +1112,7 @@ ${refText}` });
       family: "media",
       aliases: generateAliases("icon-box", ["caixa de \xEDcone", "box \xEDcone", "card com \xEDcone"], ["icon box", "box icon", "card icon", "feature icon"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
         const settings = __spreadProps(__spreadValues({}, base), {
           // Prioritize w.styles.selected_icon (from upload) over base.selected_icon
           selected_icon: ((_a = w.styles) == null ? void 0 : _a.selected_icon) || base.selected_icon || { value: "fas fa-star", library: "fa-solid" },
@@ -1004,10 +1141,15 @@ ${refText}` });
           if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
           if (descStyles.color) settings.description_color = descStyles.color;
         }
-        const padTop = typeof ((_f = w.styles) == null ? void 0 : _f.paddingTop) === "number" ? w.styles.paddingTop : 0;
-        const padRight = typeof ((_g = w.styles) == null ? void 0 : _g.paddingRight) === "number" ? w.styles.paddingRight : 0;
-        const padBottom = typeof ((_h = w.styles) == null ? void 0 : _h.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
-        const padLeft = typeof ((_i = w.styles) == null ? void 0 : _i.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
+        const alignSource = (titleStyles == null ? void 0 : titleStyles.textAlign) || (descStyles == null ? void 0 : descStyles.textAlign) || ((_f = w.styles) == null ? void 0 : _f.align);
+        if (alignSource) {
+          const alignSettings = normalizeTextAlign(alignSource);
+          Object.assign(settings, alignSettings);
+        }
+        const padTop = typeof ((_g = w.styles) == null ? void 0 : _g.paddingTop) === "number" ? w.styles.paddingTop : 0;
+        const padRight = typeof ((_h = w.styles) == null ? void 0 : _h.paddingRight) === "number" ? w.styles.paddingRight : 0;
+        const padBottom = typeof ((_i = w.styles) == null ? void 0 : _i.paddingBottom) === "number" ? w.styles.paddingBottom : 0;
+        const padLeft = typeof ((_j = w.styles) == null ? void 0 : _j.paddingLeft) === "number" ? w.styles.paddingLeft : 0;
         const hasPadding = padTop || padRight || padBottom || padLeft;
         if (hasPadding) {
           const paddingValue = normalizePadding(padTop, padRight, padBottom, padLeft);
@@ -1016,12 +1158,12 @@ ${refText}` });
             console.log("[figtoel-boxmodel] icon-box _padding applied:", paddingValue);
           }
         }
-        const gap = typeof ((_j = w.styles) == null ? void 0 : _j.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
+        const gap = typeof ((_k = w.styles) == null ? void 0 : _k.itemSpacing) === "number" ? w.styles.itemSpacing : void 0;
         if (gap !== void 0) {
           settings.icon_space = normalizeSize(gap);
           settings.title_bottom_space = normalizeSize(gap);
         }
-        if ((_k = w.styles) == null ? void 0 : _k.customCss) {
+        if ((_l = w.styles) == null ? void 0 : _l.customCss) {
           let css = w.styles.customCss;
           css = css.replace(/^\s*padding:[^;]+;?\s*$/gm, "").replace(/^\s*row-gap:[^;]+;?\s*$/gm, "").replace(/^\s*column-gap:[^;]+;?\s*$/gm, "");
           settings.custom_css = css.trim();
@@ -2263,19 +2405,23 @@ ${refText}` });
         paddingLeft: styles.paddingLeft,
         sourceName: styles.sourceName
       });
-      const normalizeFlexValue = (value) => {
-        if (!value) return void 0;
-        if (value === "start") return "flex-start";
-        if (value === "end") return "flex-end";
-        return value;
-      };
       if (styles.justify_content) {
-        settings.justify_content = normalizeFlexValue(styles.justify_content);
-        settings.flex_justify_content = settings.justify_content;
+        const jc = normalizeFlexAlign(styles.justify_content);
+        if (jc) {
+          settings.justify_content = jc;
+          settings.flex_justify_content = jc;
+          settings.justify_content_tablet = "";
+          settings.justify_content_mobile = "";
+        }
       }
       if (styles.align_items) {
-        settings.align_items = normalizeFlexValue(styles.align_items);
-        settings.flex_align_items = settings.align_items;
+        const ai = normalizeFlexAlign(styles.align_items);
+        if (ai) {
+          settings.align_items = ai;
+          settings.flex_align_items = ai;
+          settings.align_items_tablet = "";
+          settings.align_items_mobile = "";
+        }
       }
       if (typeof styles.gap === "number" && styles.gap > 0) {
         const gapValue = normalizeFlexGap(styles.gap);
@@ -2344,11 +2490,26 @@ ${refText}` });
       if (styles.border) {
         const b = styles.border;
         if (b.type) settings.border_border = b.type;
-        if (b.width) settings.border_width = { unit: "px", top: b.width, right: b.width, bottom: b.width, left: b.width, isLinked: true };
+        if (b.width !== void 0) {
+          const w = String(b.width);
+          settings.border_width = { unit: "px", top: w, right: w, bottom: w, left: w, isLinked: true };
+        } else if (b.widthTop !== void 0 || b.widthRight !== void 0 || b.widthBottom !== void 0 || b.widthLeft !== void 0) {
+          const top = String(b.widthTop || 0);
+          const right = String(b.widthRight || 0);
+          const bottom = String(b.widthBottom || 0);
+          const left = String(b.widthLeft || 0);
+          const isLinked = top === right && right === bottom && bottom === left;
+          settings.border_width = { unit: "px", top, right, bottom, left, isLinked };
+          console.log("[figtoel-boxmodel] container border_width individual:", settings.border_width);
+        }
         if (b.color) settings.border_color = b.color;
-        if (b.radius) settings.border_radius = { unit: "px", top: b.radius, right: b.radius, bottom: b.radius, left: b.radius, isLinked: true };
+        if (b.radius) {
+          const r = String(b.radius);
+          settings.border_radius = { unit: "px", top: r, right: r, bottom: r, left: r, isLinked: true };
+        }
       } else if (styles.cornerRadius) {
-        settings.border_radius = { unit: "px", top: styles.cornerRadius, right: styles.cornerRadius, bottom: styles.cornerRadius, left: styles.cornerRadius, isLinked: true };
+        const r = String(styles.cornerRadius);
+        settings.border_radius = { unit: "px", top: r, right: r, bottom: r, left: r, isLinked: true };
       }
       return settings;
     }
@@ -4525,6 +4686,9 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
                 visible: true
               }];
             }
+            if (widgetType === "button" && node.itemSpacing !== void 0) {
+              mergedStyles.itemSpacing = node.itemSpacing;
+            }
             let content = analysis.text;
             if (!content) {
               const isTechnicalName = node.name.includes(":") || node.name.startsWith("w-") || node.name.startsWith("Frame ") || node.name.startsWith("Group ");
@@ -4539,7 +4703,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
               content,
               imageId: analysis.iconId,
               styles: mergedStyles,
-              children: analysis.childWidgets
+              // For buttons, use original serialized children for icon position detection
+              children: widgetType === "button" ? node.children || [] : analysis.childWidgets
             };
           } else {
             console.log(`[V2-ENGINE] Score ${v2Score.toFixed(2)} < ${V2_MIN_CONFIDENCE} for ${best.widget} - falling through to fallback`);
@@ -4747,7 +4912,10 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
           mergedStyles.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 }, opacity: 0, visible: true }];
         }
-        return { type: "button", content: buttonData.text || node.name, imageId: buttonData.iconId, styles: mergedStyles };
+        if (node.itemSpacing !== void 0) {
+          mergedStyles.itemSpacing = node.itemSpacing;
+        }
+        return { type: "button", content: buttonData.text || node.name, imageId: buttonData.iconId, styles: mergedStyles, children: node.children || [] };
       }
       if (widgetType === "slides") {
         const slides = children.map((child, i) => {

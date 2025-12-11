@@ -2,7 +2,7 @@
 import { ElementorJSON, ElementorElement, ElementorSettings, WPConfig } from '../types/elementor.types';
 import { generateGUID } from '../utils/guid';
 import { compileWithRegistry } from '../config/widget.registry';
-import { normalizeColor, normalizeElementorSettings, normalizePadding, normalizeFlexGap } from '../utils/style_normalizer';
+import { normalizeColor, normalizeElementorSettings, normalizePadding, normalizeFlexGap, normalizeFlexAlign } from '../utils/style_normalizer';
 
 /**
  * Compilador Elementor para Flexbox Containers (Elementor 3.19+)
@@ -106,20 +106,26 @@ export class ElementorCompiler {
             sourceName: styles.sourceName
         });
 
-        const normalizeFlexValue = (value?: string): string | undefined => {
-            if (!value) return undefined;
-            if (value === 'start') return 'flex-start';
-            if (value === 'end') return 'flex-end';
-            return value;
-        };
-
+        // Flex alignment - usando função centralizada com valores normalizados
         if (styles.justify_content) {
-            settings.justify_content = normalizeFlexValue(styles.justify_content);
-            settings.flex_justify_content = settings.justify_content;
+            const jc = normalizeFlexAlign(styles.justify_content);
+            if (jc) {
+                settings.justify_content = jc;
+                settings.flex_justify_content = jc;
+                // Breakpoints responsivos vazios (herdam do base)
+                (settings as any).justify_content_tablet = '';
+                (settings as any).justify_content_mobile = '';
+            }
         }
         if (styles.align_items) {
-            settings.align_items = normalizeFlexValue(styles.align_items);
-            settings.flex_align_items = settings.align_items;
+            const ai = normalizeFlexAlign(styles.align_items);
+            if (ai) {
+                settings.align_items = ai;
+                settings.flex_align_items = ai;
+                // Breakpoints responsivos vazios (herdam do base)
+                (settings as any).align_items_tablet = '';
+                (settings as any).align_items_mobile = '';
+            }
         }
 
         // Only set gap if it's a valid number > 0 (ignore auto/undefined)
@@ -212,11 +218,31 @@ export class ElementorCompiler {
         if (styles.border) {
             const b = styles.border;
             if (b.type) settings.border_border = b.type;
-            if (b.width) settings.border_width = { unit: 'px', top: b.width, right: b.width, bottom: b.width, left: b.width, isLinked: true };
+
+            // Suportar bordas uniformes ou individuais por lado
+            if (b.width !== undefined) {
+                // Borda uniforme
+                const w = String(b.width);
+                settings.border_width = { unit: 'px', top: w, right: w, bottom: w, left: w, isLinked: true };
+            } else if (b.widthTop !== undefined || b.widthRight !== undefined || b.widthBottom !== undefined || b.widthLeft !== undefined) {
+                // Bordas individuais por lado
+                const top = String(b.widthTop || 0);
+                const right = String(b.widthRight || 0);
+                const bottom = String(b.widthBottom || 0);
+                const left = String(b.widthLeft || 0);
+                const isLinked = top === right && right === bottom && bottom === left;
+                settings.border_width = { unit: 'px', top, right, bottom, left, isLinked };
+                console.log('[figtoel-boxmodel] container border_width individual:', settings.border_width);
+            }
+
             if (b.color) settings.border_color = b.color;
-            if (b.radius) settings.border_radius = { unit: 'px', top: b.radius, right: b.radius, bottom: b.radius, left: b.radius, isLinked: true };
+            if (b.radius) {
+                const r = String(b.radius);
+                settings.border_radius = { unit: 'px', top: r, right: r, bottom: r, left: r, isLinked: true };
+            }
         } else if (styles.cornerRadius) {
-            settings.border_radius = { unit: 'px', top: styles.cornerRadius, right: styles.cornerRadius, bottom: styles.cornerRadius, left: styles.cornerRadius, isLinked: true };
+            const r = String(styles.cornerRadius);
+            settings.border_radius = { unit: 'px', top: r, right: r, bottom: r, left: r, isLinked: true };
         }
 
         return settings;

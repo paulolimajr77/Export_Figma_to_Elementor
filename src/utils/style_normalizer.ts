@@ -208,24 +208,47 @@ export function normalizeBorderRadius(
 }
 
 /**
- * Normaliza border-width para estrutura Elementor
- * @param width - Largura da borda
+ * Normaliza border-width para estrutura Elementor com valores STRING
+ * Suporta largura uniforme ou valores por lado
+ * 
+ * @param top - Largura do topo ou largura uniforme se outros undefined
+ * @param right - Largura direita (opcional)
+ * @param bottom - Largura inferior (opcional)
+ * @param left - Largura esquerda (opcional)
  * @param unit - Unidade
- * @returns Objeto no formato Elementor
+ * @returns Objeto no formato Elementor Dimensions
  */
 export function normalizeBorderWidth(
-    width: number | undefined,
+    top?: number,
+    right?: number,
+    bottom?: number,
+    left?: number,
     unit: string = 'px'
-): { unit: string; top: number | string; right: number | string; bottom: number | string; left: number | string; isLinked: boolean } | undefined {
-    if (width === undefined || width === null) return undefined;
+): ElementorDimensions | undefined {
+    // Se tudo undefined, retorna undefined
+    if (top === undefined && right === undefined && bottom === undefined && left === undefined) {
+        return undefined;
+    }
+
+    // Converter para strings usando normalizeBoxModelValue
+    const t = normalizeBoxModelValue(top);
+    const r = normalizeBoxModelValue(right !== undefined ? right : top);
+    const b = normalizeBoxModelValue(bottom !== undefined ? bottom : top);
+    const l = normalizeBoxModelValue(left !== undefined ? left : top);
+
+    // isLinked = true se todos valores iguais e pelo menos um tem valor
+    const allEqual = t === r && r === b && b === l;
+    const hasValue = t !== '' || r !== '' || b !== '' || l !== '';
+
+    console.log('[figtoel-boxmodel] normalizeBorderWidth:', { top: t, right: r, bottom: b, left: l, isLinked: allEqual && hasValue });
 
     return {
         unit,
-        top: width,
-        right: width,
-        bottom: width,
-        left: width,
-        isLinked: true
+        top: t,
+        right: r,
+        bottom: b,
+        left: l,
+        isLinked: allEqual && hasValue
     };
 }
 
@@ -347,4 +370,164 @@ export function normalizeElementorSettings(settings: Record<string, any>): Recor
     });
 
     return normalized;
+}
+
+/**
+ * Breakpoints do Elementor para alinhamento responsivo
+ */
+export const ELEMENTOR_BREAKPOINTS = ['widescreen', 'laptop', 'tablet_extra', 'tablet', 'mobile_extra', 'mobile'] as const;
+export type ElementorBreakpoint = typeof ELEMENTOR_BREAKPOINTS[number];
+
+/**
+ * Valores válidos para text_align
+ */
+export type TextAlignValue = 'left' | 'center' | 'right' | 'justify' | '';
+
+/**
+ * Interface para alinhamento com breakpoints
+ */
+export interface TextAlignSettings {
+    text_align: TextAlignValue;
+    text_align_widescreen: TextAlignValue;
+    text_align_laptop: TextAlignValue;
+    text_align_tablet_extra: TextAlignValue;
+    text_align_tablet: TextAlignValue;
+    text_align_mobile_extra: TextAlignValue;
+    text_align_mobile: TextAlignValue;
+}
+
+/**
+ * Converte alinhamento do Figma para valor Elementor
+ * @param figmaAlign - Valor do Figma (LEFT, CENTER, RIGHT, JUSTIFIED)
+ * @returns Valor Elementor (left, center, right, justify)
+ */
+export function convertFigmaAlignToElementor(figmaAlign?: string): TextAlignValue {
+    if (!figmaAlign) return '';
+    const map: Record<string, TextAlignValue> = {
+        'LEFT': 'left',
+        'CENTER': 'center',
+        'RIGHT': 'right',
+        'JUSTIFIED': 'justify',
+        'left': 'left',
+        'center': 'center',
+        'right': 'right',
+        'justify': 'justify'
+    };
+    return map[figmaAlign] || '';
+}
+
+/**
+ * Normaliza text_align para formato Elementor com todos os breakpoints
+ * 
+ * @param align - Valor de alinhamento (Figma ou já normalizado)
+ * @param inheritToBreakpoints - Se true, preenche todos breakpoints com string vazia (herdam do base)
+ * @returns Objeto com text_align e todas as variantes responsivas
+ * 
+ * @example
+ * normalizeTextAlign('CENTER')
+ * // { text_align: 'center', text_align_widescreen: '', text_align_laptop: '', ... }
+ */
+export function normalizeTextAlign(
+    align?: string,
+    inheritToBreakpoints: boolean = true
+): Partial<TextAlignSettings> {
+    const normalizedAlign = convertFigmaAlignToElementor(align);
+
+    const result: Partial<TextAlignSettings> = {
+        text_align: normalizedAlign
+    };
+
+    if (inheritToBreakpoints) {
+        // Preencher variantes responsivas com string vazia (herdam do valor base)
+        ELEMENTOR_BREAKPOINTS.forEach(bp => {
+            result[`text_align_${bp}` as keyof TextAlignSettings] = '';
+        });
+    }
+
+    console.log('[figtoel-boxmodel] normalizeTextAlign:', result);
+    return result;
+}
+
+/**
+ * Normaliza align para widgets simples (heading, text-editor, button, etc)
+ * Retorna apenas o campo 'align' normalizado
+ */
+export function normalizeWidgetAlign(align?: string): { align: TextAlignValue } | undefined {
+    if (!align) return undefined;
+    const normalized = convertFigmaAlignToElementor(align);
+    if (!normalized) return undefined;
+    return { align: normalized };
+}
+
+/**
+ * Valores válidos para flex alignment
+ */
+export type FlexAlignValue = 'flex-start' | 'center' | 'flex-end' | 'stretch' | 'space-between' | 'space-around' | 'space-evenly' | '';
+
+/**
+ * Normaliza justify_content/align_items para containers
+ * Converte valores 'start'/'end' para 'flex-start'/'flex-end'
+ */
+export function normalizeFlexAlign(value?: string): FlexAlignValue {
+    if (!value) return '';
+    const map: Record<string, FlexAlignValue> = {
+        'start': 'flex-start',
+        'flex-start': 'flex-start',
+        'center': 'center',
+        'end': 'flex-end',
+        'flex-end': 'flex-end',
+        'stretch': 'stretch',
+        'space-between': 'space-between',
+        'space-around': 'space-around',
+        'space-evenly': 'space-evenly',
+        // Figma values
+        'MIN': 'flex-start',
+        'CENTER': 'center',
+        'MAX': 'flex-end',
+        'STRETCH': 'stretch',
+        'SPACE_BETWEEN': 'space-between'
+    };
+    return map[value] || '';
+}
+
+/**
+ * Interface para flex alignment com breakpoints
+ */
+export interface FlexAlignSettings {
+    justify_content: FlexAlignValue;
+    justify_content_tablet: FlexAlignValue;
+    justify_content_mobile: FlexAlignValue;
+    align_items: FlexAlignValue;
+    align_items_tablet: FlexAlignValue;
+    align_items_mobile: FlexAlignValue;
+}
+
+/**
+ * Normaliza flex alignment para containers com breakpoints
+ */
+export function normalizeFlexAlignment(
+    justify?: string,
+    alignItems?: string,
+    inheritToBreakpoints: boolean = true
+): Partial<FlexAlignSettings> {
+    const result: Partial<FlexAlignSettings> = {};
+
+    if (justify) {
+        result.justify_content = normalizeFlexAlign(justify);
+        if (inheritToBreakpoints) {
+            result.justify_content_tablet = '';
+            result.justify_content_mobile = '';
+        }
+    }
+
+    if (alignItems) {
+        result.align_items = normalizeFlexAlign(alignItems);
+        if (inheritToBreakpoints) {
+            result.align_items_tablet = '';
+            result.align_items_mobile = '';
+        }
+    }
+
+    console.log('[figtoel-boxmodel] normalizeFlexAlignment:', result);
+    return result;
 }

@@ -1,6 +1,6 @@
 ﻿import type { PipelineWidget } from '../types/pipeline.schema';
 import type { ElementorSettings } from '../types/elementor.types';
-import { normalizeColor, normalizeElementorSettings, normalizePadding, normalizeSize } from '../utils/style_normalizer';
+import { normalizeColor, normalizeElementorSettings, normalizePadding, normalizeSize, normalizeTextAlign } from '../utils/style_normalizer';
 import { generateGUID } from '../utils/guid';
 
 export interface WidgetDefinition {
@@ -100,39 +100,86 @@ const registry: WidgetDefinition[] = [
             let textStyles: any = {};
 
             // Check for child widgets (heading for text, image for icon)
+            // Note: children can be either intermediate schema widgets (type='heading')
+            // or serialized Figma nodes (type='FRAME' with name='w:icon')
+            let iconIndex = -1;
+            let textIndex = -1;
+
+            // Helper to check if a child is a text/heading widget
+            const isTextChild = (child: any) => {
+                const type = child.type?.toLowerCase() || '';
+                const name = child.name?.toLowerCase() || '';
+                return type === 'heading' || type === 'text' ||
+                    name.includes('w:heading') || name.includes('w:text') ||
+                    child.type === 'TEXT';
+            };
+
+            // Helper to check if a child is an icon/image widget
+            const isIconChild = (child: any) => {
+                const type = child.type?.toLowerCase() || '';
+                const name = child.name?.toLowerCase() || '';
+                return type === 'image' || type === 'icon' ||
+                    name.includes('w:icon') || name.includes('w:image') ||
+                    (child.type === 'FRAME' && name.includes('icon'));
+            };
+
             if (w.children && Array.isArray(w.children) && w.children.length > 0) {
-                console.log('[REGISTRY DEBUG] Processing child widgets:', w.children.map(c => ({ type: c.type, content: c.content })));
+                console.log('[REGISTRY DEBUG] Processing child widgets:', w.children.map(c => ({ type: c.type, name: c.name, content: c.content })));
 
                 // Find heading/text child for button text
-                const textChild = w.children.find(child =>
-                    child.type === 'heading' || child.type === 'text'
-                );
+                const textChild = w.children.find((child, idx) => {
+                    if (isTextChild(child)) {
+                        textIndex = idx;
+                        return true;
+                    }
+                    return false;
+                });
 
-                if (textChild && textChild.content) {
-                    buttonText = textChild.content;
-                    console.log('[REGISTRY DEBUG] ✅ Extracted text from child:', buttonText);
+                if (textChild) {
+                    // Get text content from either content property or characters (for serialized TEXT nodes)
+                    buttonText = textChild.content || textChild.characters || buttonText;
+                    console.log('[REGISTRY DEBUG] ✅ Extracted text from child:', buttonText, 'at index:', textIndex);
 
                     // Extract text color from child
                     if (textChild.styles?.color) {
                         const { r, g, b } = textChild.styles.color;
                         textColor = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
                         console.log('[REGISTRY DEBUG] ✅ Extracted text color from child:', textColor);
+                    } else if (textChild.color) {
+                        // For serialized TEXT nodes
+                        const { r, g, b } = textChild.color;
+                        textColor = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
                     }
 
                     // Extract typography from child
                     if (textChild.styles) {
                         textStyles = textChild.styles;
+                    } else if (textChild.fontName) {
+                        // For serialized TEXT nodes
+                        textStyles = {
+                            fontName: textChild.fontName,
+                            fontSize: textChild.fontSize,
+                            fontWeight: textChild.fontWeight,
+                            letterSpacing: textChild.letterSpacing,
+                            lineHeight: textChild.lineHeight,
+                            textCase: textChild.textCase,
+                            textDecoration: textChild.textDecoration
+                        };
                     }
                 }
 
-                // Find image child for icon
-                const imageChild = w.children.find(child =>
-                    child.type === 'image' || child.type === 'icon'
-                );
+                // Find image/icon child
+                const imageChild = w.children.find((child, idx) => {
+                    if (isIconChild(child)) {
+                        iconIndex = idx;
+                        return true;
+                    }
+                    return false;
+                });
 
-                if (imageChild && imageChild.imageId) {
-                    iconId = imageChild.imageId;
-                    console.log('[REGISTRY DEBUG] ✅ Extracted icon from child:', iconId);
+                if (imageChild) {
+                    iconId = imageChild.imageId || imageChild.id || '';
+                    console.log('[REGISTRY DEBUG] ✅ Found icon child:', imageChild.name, 'at index:', iconIndex, 'iconId:', iconId);
                 }
             }
 
@@ -247,17 +294,58 @@ const registry: WidgetDefinition[] = [
 
                 // Fallback to widget.styles.selected_icon if available
                 if (!iconUrl && w.styles?.selected_icon?.value) {
-                    iconUrl = w.styles.selected_icon.value;
+                    const sv = w.styles.selected_icon.value;
+                    // Se value for objeto com url, usar a url
+                    iconUrl = typeof sv === 'object' && sv.url ? sv.url : sv;
                 }
 
                 console.log('[BUTTON ICON DEBUG] iconId:', iconId);
                 console.log('[BUTTON ICON DEBUG] Final iconUrl:', iconUrl);
 
-                settings.selected_icon = {
-                    value: isNaN(imgId) ? iconId : { url: iconUrl, id: imgId },
-                    library: isNaN(imgId) ? 'fa-solid' : 'svg'
-                };
-                settings.icon_align = 'left'; // Icon on left, text on right
+                // Formato correto para selected_icon:
+                // - FontAwesome: { value: 'fas fa-star', library: 'fa-solid' }
+                // - SVG: { value: { url: 'http://...', id: 123 }, library: 'svg' }
+                if (!isNaN(imgId) && imgId > 0) {
+                    // É um SVG com ID do WordPress
+                    settings.selected_icon = {
+                        value: { url: iconUrl, id: imgId },
+                        library: 'svg'
+                    };
+                } else if (iconId.startsWith('fa')) {
+                    // É um ícone FontAwesome
+                    settings.selected_icon = {
+                        value: iconId,
+                        library: 'fa-solid'
+                    };
+                } else {
+                    // Fallback para FontAwesome
+                    settings.selected_icon = {
+                        value: iconId || 'fas fa-star',
+                        library: 'fa-solid'
+                    };
+                }
+
+                // Posição do ícone: 'row' = ícone antes do texto, 'row-reverse' = ícone depois do texto
+                // Determinar baseado na ordem dos filhos: se o ícone vem antes do texto na lista, está à esquerda
+                let iconPosition = 'before';
+                if (iconIndex !== -1 && textIndex !== -1) {
+                    // Se o ícone está antes do texto na ordem dos filhos, está à esquerda
+                    iconPosition = iconIndex < textIndex ? 'before' : 'after';
+                } else if (w.styles?.iconPosition) {
+                    // Fallback para o estilo iconPosition se definido
+                    iconPosition = w.styles.iconPosition;
+                }
+
+                settings.icon_align = iconPosition === 'after' ? 'row-reverse' : 'row';
+
+                // Icon spacing (icon_indent) - from itemSpacing of the button container
+                const iconSpacing = w.styles?.itemSpacing || (w as any).itemSpacing;
+                if (iconSpacing && iconSpacing > 0) {
+                    settings.icon_indent = { unit: 'px', size: iconSpacing, sizes: [] };
+                }
+
+                console.log('[BUTTON ICON DEBUG] iconIndex:', iconIndex, 'textIndex:', textIndex, 'iconPosition:', iconPosition, 'icon_align:', settings.icon_align);
+                console.log('[BUTTON ICON DEBUG] selected_icon:', settings.selected_icon, 'icon_indent:', settings.icon_indent);
             }
 
             return { widgetType: 'button', settings };
@@ -339,7 +427,13 @@ const registry: WidgetDefinition[] = [
                 if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: 'px', size: descStyles.letterSpacing, sizes: [] };
                 if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
                 if (descStyles.color) settings.description_color = descStyles.color;
-                if (descStyles.textAlign && !settings.align) settings.align = descStyles.textAlign;
+            }
+
+            // ===== TEXT ALIGNMENT (com breakpoints responsivos) =====
+            const alignSource = titleStyles?.textAlign || descStyles?.textAlign || w.styles?.align;
+            if (alignSource) {
+                const alignSettings = normalizeTextAlign(alignSource);
+                Object.assign(settings, alignSettings);
             }
 
             // Map native spacing/padding when available
@@ -423,6 +517,13 @@ const registry: WidgetDefinition[] = [
                 if (descStyles.letterSpacing) settings.description_typography_letter_spacing = { unit: 'px', size: descStyles.letterSpacing, sizes: [] };
                 if (descStyles.textTransform) settings.description_typography_text_transform = descStyles.textTransform;
                 if (descStyles.color) settings.description_color = descStyles.color;
+            }
+
+            // ===== TEXT ALIGNMENT (com breakpoints responsivos) =====
+            const alignSource = titleStyles?.textAlign || descStyles?.textAlign || w.styles?.align;
+            if (alignSource) {
+                const alignSettings = normalizeTextAlign(alignSource);
+                Object.assign(settings, alignSettings);
             }
 
             // Map native spacing/padding when available

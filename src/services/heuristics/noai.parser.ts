@@ -640,6 +640,11 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                         }];
                     }
 
+                    // Include itemSpacing for button icon spacing
+                    if (widgetType === 'button' && node.itemSpacing !== undefined) {
+                        mergedStyles.itemSpacing = node.itemSpacing;
+                    }
+
                     // Content fallback
                     let content = analysis.text;
                     if (!content) {
@@ -662,7 +667,8 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                         content: content,
                         imageId: analysis.iconId,
                         styles: mergedStyles,
-                        children: analysis.childWidgets
+                        // For buttons, use original serialized children for icon position detection
+                        children: widgetType === 'button' ? ((node as any).children || []) : analysis.childWidgets
                     };
                 } else {
                     // V2 score too low - log and continue to fallback
@@ -687,9 +693,9 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 type: 'image-box',
                 content: boxContent.title || node.name,
                 imageId: boxContent.imageId || findFirstImageId(node) || null,
-                styles: { 
-                    ...styles, 
-                    title_text: boxContent.title, 
+                styles: {
+                    ...styles,
+                    title_text: boxContent.title,
                     description_text: boxContent.description,
                     titleStyles: boxContent.titleStyles,
                     descriptionStyles: boxContent.descriptionStyles,
@@ -703,9 +709,9 @@ function detectWidget(node: SerializedNode): MaybeWidget {
                 type: 'icon-box',
                 content: boxContent.title || node.name,
                 imageId: boxContent.imageId || findFirstImageId(node) || null,
-                styles: { 
-                    ...styles, 
-                    title_text: boxContent.title, 
+                styles: {
+                    ...styles,
+                    title_text: boxContent.title,
                     description_text: boxContent.description,
                     titleStyles: boxContent.titleStyles,
                     descriptionStyles: boxContent.descriptionStyles,
@@ -927,7 +933,11 @@ function detectWidget(node: SerializedNode): MaybeWidget {
             if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
                 mergedStyles.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, opacity: 0, visible: true }];
             }
-            return { type: 'button', content: buttonData.text || node.name, imageId: buttonData.iconId, styles: mergedStyles };
+            // Include itemSpacing for icon spacing detection
+            if (node.itemSpacing !== undefined) {
+                mergedStyles.itemSpacing = node.itemSpacing;
+            }
+            return { type: 'button', content: buttonData.text || node.name, imageId: buttonData.iconId, styles: mergedStyles, children: (node as any).children || [] };
         }
         if (widgetType === 'slides') {
             const slides = children.map((child, i) => {

@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "75676dc",
+      "id": "6cc763a",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "75676dc",
+        "_element_id": "6cc763a",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -18,8 +18,12 @@
         "overflow": "hidden",
         "justify_content": "flex-start",
         "flex_justify_content": "flex-start",
+        "justify_content_tablet": "",
+        "justify_content_mobile": "",
         "align_items": "center",
         "flex_align_items": "center",
+        "align_items_tablet": "",
+        "align_items_mobile": "",
         "width": {
           "unit": "%",
           "size": "",
@@ -42,12 +46,12 @@
       },
       "elements": [
         {
-          "id": "7e4c418",
+          "id": "890efd2",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "7e4c418",
+            "_element_id": "890efd2",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -56,8 +60,12 @@
             "overflow": "hidden",
             "justify_content": "flex-start",
             "flex_justify_content": "flex-start",
+            "justify_content_tablet": "",
+            "justify_content_mobile": "",
             "align_items": "center",
             "flex_align_items": "center",
+            "align_items_tablet": "",
+            "align_items_mobile": "",
             "flex_gap": {
               "unit": "px",
               "column": "10",
@@ -115,13 +123,13 @@
           },
           "elements": [
             {
-              "id": "b762cb6",
+              "id": "8f254ac",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "b762cb6",
+                "_element_id": "8f254ac",
                 "minHeight": 690,
                 "justify_content": "flex-start",
                 "align_items": "flex-start",
@@ -142,13 +150,13 @@
               "elements": []
             },
             {
-              "id": "21c203c",
+              "id": "3eb1a66",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "text-editor",
               "settings": {
-                "_element_id": "21c203c",
+                "_element_id": "3eb1a66",
                 "align": "center",
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",
@@ -178,12 +186,12 @@
           ]
         },
         {
-          "id": "eb6230e",
+          "id": "dfddecc",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "eb6230e",
+            "_element_id": "dfddecc",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -192,8 +200,12 @@
             "overflow": "hidden",
             "justify_content": "center",
             "flex_justify_content": "center",
+            "justify_content_tablet": "",
+            "justify_content_mobile": "",
             "align_items": "center",
             "flex_align_items": "center",
+            "align_items_tablet": "",
+            "align_items_mobile": "",
             "flex_gap": {
               "unit": "px",
               "column": "10",
@@ -234,12 +246,12 @@
           },
           "elements": [
             {
-              "id": "b9309ed",
+              "id": "bc33c6a",
               "elType": "container",
               "isInner": true,
               "isLocked": false,
               "settings": {
-                "_element_id": "b9309ed",
+                "_element_id": "bc33c6a",
                 "container_type": "flex",
                 "content_width": "full",
                 "flex_direction": "column",
@@ -248,8 +260,12 @@
                 "overflow": "hidden",
                 "justify_content": "flex-start",
                 "flex_justify_content": "flex-start",
+                "justify_content_tablet": "",
+                "justify_content_mobile": "",
                 "align_items": "center",
                 "flex_align_items": "center",
+                "align_items_tablet": "",
+                "align_items_mobile": "",
                 "flex_gap": {
                   "unit": "px",
                   "column": "96",
@@ -272,12 +288,12 @@
               },
               "elements": [
                 {
-                  "id": "9226e97",
+                  "id": "076268c",
                   "elType": "container",
                   "isInner": true,
                   "isLocked": false,
                   "settings": {
-                    "_element_id": "9226e97",
+                    "_element_id": "076268c",
                     "container_type": "flex",
                     "content_width": "full",
                     "flex_direction": "column",
@@ -286,8 +302,12 @@
                     "overflow": "hidden",
                     "justify_content": "center",
                     "flex_justify_content": "center",
+                    "justify_content_tablet": "",
+                    "justify_content_mobile": "",
                     "align_items": "center",
                     "flex_align_items": "center",
+                    "align_items_tablet": "",
+                    "align_items_mobile": "",
                     "flex_gap": {
                       "unit": "px",
                       "column": "48",
@@ -310,12 +330,12 @@
                   },
                   "elements": [
                     {
-                      "id": "c774ebc",
+                      "id": "7aad877",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "c774ebc",
+                        "_element_id": "7aad877",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "column",
@@ -324,8 +344,12 @@
                         "overflow": "hidden",
                         "justify_content": "flex-start",
                         "flex_justify_content": "flex-start",
+                        "justify_content_tablet": "",
+                        "justify_content_mobile": "",
                         "align_items": "center",
                         "flex_align_items": "center",
+                        "align_items_tablet": "",
+                        "align_items_mobile": "",
                         "flex_gap": {
                           "unit": "px",
                           "column": "24",
@@ -348,13 +372,13 @@
                       },
                       "elements": [
                         {
-                          "id": "51c5220",
+                          "id": "3f724a8",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "heading",
                           "settings": {
-                            "_element_id": "51c5220",
+                            "_element_id": "3f724a8",
                             "minHeight": 106,
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
@@ -384,13 +408,13 @@
                           "elements": []
                         },
                         {
-                          "id": "bf51c24",
+                          "id": "7c18f06",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "text-editor",
                           "settings": {
-                            "_element_id": "bf51c24",
+                            "_element_id": "7c18f06",
                             "minHeight": 45,
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
@@ -418,12 +442,12 @@
                       ]
                     },
                     {
-                      "id": "b997eaa",
+                      "id": "2c2156d",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "b997eaa",
+                        "_element_id": "2c2156d",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "row",
@@ -432,8 +456,12 @@
                         "overflow": "hidden",
                         "justify_content": "center",
                         "flex_justify_content": "center",
+                        "justify_content_tablet": "",
+                        "justify_content_mobile": "",
                         "align_items": "flex-start",
                         "flex_align_items": "flex-start",
+                        "align_items_tablet": "",
+                        "align_items_mobile": "",
                         "padding": {
                           "unit": "px",
                           "top": "0",
@@ -472,13 +500,13 @@
                       },
                       "elements": [
                         {
-                          "id": "cd40478",
+                          "id": "31e9d8c",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "button",
                           "settings": {
-                            "_element_id": "cd40478",
+                            "_element_id": "31e9d8c",
                             "minHeight": 47,
                             "justify_content": "center",
                             "align_items": "center",
@@ -501,7 +529,7 @@
                             "size": "sm",
                             "button_type": "",
                             "background_color": "rgba(255, 255, 255, 1)",
-                            "button_text_color": "rgba(NaN, NaN, NaN, 1)",
+                            "button_text_color": "rgba(0, 0, 0, 1)",
                             "button_padding": {
                               "unit": "px",
                               "top": 12,
