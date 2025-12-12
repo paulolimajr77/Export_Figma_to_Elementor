@@ -2267,79 +2267,84 @@
       <div class="onboarding-header">
         <div class="onboarding-header-text">
           <h1>Bem-vindo ao Figma → Elementor</h1>
-          <p>Veja em 1 minuto como funciona o fluxo completo antes de começar.</p>
+          <p>Veja como funciona o fluxo de conversão antes de começar.</p>
         </div>
         <button id="onboarding-close-x" class="onboarding-close-btn" aria-label="Fechar introdução">✕</button>
       </div>
 
       <div class="onboarding-section">
-        <h2>Fluxo geral em 4 passos</h2>
+        <h2>Fluxo em 3 passos</h2>
         <ul>
-          <li><strong>1. Examinar</strong> o layout Figma (Linter) – corrigir auto layout, nomes e estrutura.</li>
-          <li><strong>2. Configurar</strong> chaves: Licença do plugin + chave de IA (opcional).</li>
-          <li><strong>3. Conectar</strong> ao seu WordPress – informar URL do site e testar conexão.</li>
-          <li><strong>4. Converter</strong> para Elementor – gerar JSON, menus, imagens e ícones.</li>
+          <li><strong>1. Conectar</strong> ao WordPress – configure URL e credenciais.</li>
+          <li><strong>2. Preparar</strong> o layout – use Auto Layout, nomes claros e estrutura organizada.</li>
+          <li><strong>3. Converter</strong> por dobras (seções) – gere JSON para cada seção do layout.</li>
         </ul>
       </div>
 
       <div class="onboarding-section">
-        <h2>Examinar layout e Linter</h2>
+        <h2>⚠️ Importante: Exporte por DOBRAS</h2>
         <div class="rich-text">
-          • Use a aba <strong>Validador / Análise</strong> para examinar o frame selecionado.<br>
-          • O plugin identifica problemas: falta de Auto Layout, grupos desnecessários, textos soltos.<br>
-          • Corrija o layout no Figma antes de compilar para melhores resultados.
+          • <strong>Selecione UMA SEÇÃO por vez</strong> (dobra/fold) no Figma, não a página inteira.<br>
+          • Cada seção vira um Container Flex no Elementor, facilitando edição posterior.<br>
+          • Exporte cada dobra, cole no Elementor, e repita para a próxima seção.<br>
+          • Isso garante <strong>melhor organização</strong> e evita JSONs muito grandes.
         </div>
       </div>
 
       <div class="onboarding-section">
-        <h2>Compilação com e sem IA</h2>
+        <h2>Preparando seu layout</h2>
         <div class="rich-text">
-          • <strong>Modo sem IA (No-AI)</strong> – usa regras fixas e heurísticas.<br>
-          • <strong>Modo com IA</strong> – envia um snapshot para sua IA configurada.<br>
-          • A IA ajuda a detectar padrões complexos (cards, grids, seções especiais).
-        </div>
-      </div>
-
-      <div class="onboarding-section">
-        <h2>Chave de IA do usuário</h2>
-        <div class="rich-text">
-          • O plugin não fornece créditos de IA: você conecta sua conta (OpenAI, Google Gemini).<br>
-          • Na aba <strong>Configurações de IA</strong>, informe sua API key e modelo.<br>
-          • Sem chave de IA, o plugin funciona apenas em modo No-AI.
+          • Use <strong>Auto Layout</strong> em todos os frames – o plugin converte para Flexbox.<br>
+          • Nomeie frames com prefixos: <code>w:button</code>, <code>w:heading</code>, <code>c:container</code>.<br>
+          • Evite grupos soltos; prefira frames com Auto Layout.<br>
+          • Use a aba <strong>Validador / Análise</strong> para identificar problemas.
         </div>
       </div>
 
       <div class="onboarding-section">
         <h2>Conectando ao WordPress</h2>
         <div class="rich-text">
-          • Na aba <strong>Conexão WordPress</strong>, configure a URL do site (ex: https://seusite.com).<br>
-          • Valide sua licença através do portal figmatoelementor.pljr.com.br.<br>
-          • Uma vez conectado, você pode enviar JSON, imagens e menus diretamente.
+          • Na aba <strong>WordPress</strong>, configure a URL do site (ex: https://seusite.com).<br>
+          • Informe usuário e <strong>Application Password</strong> (não a senha normal).<br>
+          • Gere o Application Password em: <em>Usuários → Perfil → Application Passwords</em>.<br>
+          • Valide sua licença para liberar todas as funcionalidades.
         </div>
       </div>
 
       <div class="onboarding-section">
         <h2>Exportar imagens e ícones</h2>
         <div class="rich-text">
-          • Ao compilar, o plugin exporta imagens e ícones marcados para export.<br>
-          • Os arquivos são enviados otimizados para a Biblioteca Media do WordPress.<br>
-          • No JSON gerado, os widgets de imagem já apontam para as URLs corretas.
+          • Marque a opção <strong>Exportar imagens automaticamente</strong> na aba WordPress.<br>
+          • Imagens são convertidas para WebP (qualidade configurável).<br>
+          • Ícones SVG são enviados para a Biblioteca de Mídia do WordPress.<br>
+          • No JSON gerado, os widgets já apontam para as URLs corretas.
         </div>
       </div>
 
       <div class="onboarding-section">
-        <h2>Dica: Agrupar elementos em uma única imagem</h2>
+        <h2>Dica: Elementos como imagem única</h2>
         <div class="rich-text">
-          • Para fundos complexos ou colagens, agrupe os elementos no Figma.<br>
-          • <strong>Trave o grupo (lock)</strong> para indicar que deve ser exportado inteiro.<br>
-          • Isso simplifica o HTML no Elementor e melhora a performance.
+          • Para fundos complexos ou ilustrações, agrupe os elementos.<br>
+          • <strong>Trave o grupo (lock)</strong> para indicar que deve virar uma única imagem.<br>
+          • Isso simplifica o HTML e melhora a performance no Elementor.
+        </div>
+      </div>
+
+      <div class="onboarding-section">
+        <h2>Widgets Suportados</h2>
+        <div class="rich-text">
+          • <strong>Textos:</strong> heading, text-editor<br>
+          • <strong>Mídia:</strong> image, icon, image-box, icon-box<br>
+          • <strong>Ação:</strong> button (com gradiente, ícone e padding)<br>
+          • <strong>Listas:</strong> icon-list, accordion, toggle<br>
+          • <strong>Galerias:</strong> image-carousel, basic-gallery
         </div>
       </div>
 
       <div class="onboarding-footer">
         <div class="onboarding-checkbox-wrapper">
           <input type="checkbox" id="onboarding-dont-show-again" />
-          <label for="onboarding-dont-show-again">Não mostrar esta explicação novamente</label>
+          <label for="onboarding-dont-show-again">Não mostrar esta explicação novamente (sóesta sessão)</label>
         </div>
         <div class="onboarding-actions">
           <a href="https://figmatoelementor.pljr.com.br/docs/" target="_blank" class="onboarding-docs-link">
