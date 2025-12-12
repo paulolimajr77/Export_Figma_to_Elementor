@@ -3960,12 +3960,10 @@
           // ============================================================
           case 'onboarding-state': {
             console.log('[ONBOARDING] Estado recebido:', msg);
-            onboardingHidden = !!msg.hidden;
-
-            // Se licença foi validada com sucesso e onboarding não está oculto
-            if (!onboardingHidden) {
-              showOnboarding();
-            }
+            // Ignorar o estado salvo - sempre mostrar o modal ao iniciar o plugin
+            // O checkbox apenas evita que apareça novamente durante a mesma sessão
+            onboardingHidden = false; // Reset para garantir que apareça
+            forceShowOnboarding(); // Sempre mostrar ao iniciar
             break;
           }
 
