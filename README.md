@@ -2,125 +2,208 @@
 
 ![Figma Compatible](https://img.shields.io/badge/Figma-Compatible-blue) ![Elementor Ready](https://img.shields.io/badge/Elementor-3.19%2B-brightgreen) ![WordPress](https://img.shields.io/badge/WordPress-REST%20API%20Ready-informational)
 
-Transforme layouts do Figma em paginas Elementor completas, com exportacao automatica para WordPress e widgets avancados.
-[Acesse o site comercial](https://figtoel.example.com)
+Transforme layouts do Figma em páginas Elementor completas, com exportação automática para WordPress e widgets avançados.
 
 ---
 
-## Descricao Geral
-FigToEL e um plugin comercial que converte designs do Figma em paginas Elementor com alta fidelidade. Le a estrutura do frame, cria containers Flexbox, mapeia widgets automaticamente, envia imagens para a midia do WordPress e usa IA (Gemini) para interpretar layouts complexos. Funciona com Elementor e Elementor Pro.
+## Descrição Geral
+
+FigToEL é um plugin que converte designs do Figma em páginas Elementor com alta fidelidade. Lê a estrutura do frame, cria containers Flexbox, mapeia widgets automaticamente e envia imagens/ícones para a mídia do WordPress. Funciona com Elementor e Elementor Pro.
 
 ---
 
-## Como Instalar (Versao Comercial)
-1. Abra o Figma Desktop e va em **Plugins -> Manage Plugins**.
+## Como Instalar
+
+1. Abra o Figma Desktop e vá em **Plugins -> Manage Plugins**.
 2. Clique em **Import plugin from manifest**.
-3. Selecione o arquivo `manifest.json` fornecido na sua conta FigToEL.
-4. O plugin aparecera no painel de Plugins do Figma.
+3. Selecione o arquivo `manifest.json` fornecido.
+4. O plugin aparecerá no painel de Plugins do Figma.
 
 ---
 
-## Requisitos do Produto
+## Requisitos
+
 - Figma Desktop
-- Chave da API Gemini (para IA)
 - Elementor 3.19+
 - Elementor Pro (para slides, tabs, accordion, loop grid)
-- WordPress com REST API ativa (para exportacao automatica)
-
-## OpenAI / GPT
-- Como habilitar: na aba "Configuracao da IA" selecione "GPT (OpenAI)" no dropdown de provedor de IA.
-- Como inserir a API Key: cole a chave no campo "OpenAI API Key"; o plugin grava em clientStorage seguro do Figma.
-- Como testar a conexao: clique em "Testar conexao" na area do GPT para validar a chave e ver o status na UI.
-- Modelos suportados:
-  - gpt-4.1
-  - gpt-o1
-  - gpt-mini
-- Fallback: o pipeline usa sempre o provedor selecionado para gerar o schema Flex; ao trocar de provedor todo o fluxo IA -> schema -> compiler segue a escolha ativa.
+- WordPress com REST API ativa (para exportação automática)
+- Plugin companion WordPress (opcional, para menus remotos)
 
 ---
 
-## Como Usar (Fluxo do Usuario)
+## Como Usar
+
 1. Abra seu layout no Figma.
 2. Selecione um frame.
 3. Abra o plugin **FigToEL**.
-4. Clique em **Inspecionar Layout**.
-5. Revise o preview detectado.
-6. Clique em **Gerar JSON Elementor**.
-7. Copie ou exporte diretamente para o WordPress.
+4. Configure as credenciais do WordPress (URL, usuário, token).
+5. Clique em **Inspecionar Layout**.
+6. Revise o preview detectado.
+7. Clique em **Gerar JSON Elementor**.
+8. Copie ou exporte diretamente para o WordPress.
 
-Dica de saida:
-- O JSON final (com ou sem IA) aparece automaticamente no campo "JSON gerado..." (textarea figma-json-output) pronto para copiar/colar no Elementor.
+### Ações de Exportação
 
-Acoes de exportacao:
-- **Copiar JSON**
-- **Baixar JSON**
-- **Exportar para WordPress automaticamente**
-
----
-
-## Recursos e Beneficios
-- Conversao fiel do Figma para Elementor com containers Flexbox.
-- Suporte a widgets avancados (image box, icon box, slides, tabs, accordion, galleries, loop grid).
-- Exportacao automatica de midia para WordPress.
-- Exportacao 1-click de paginas completas.
-- Fallback inteligente para evitar perda de elementos.
-- UI moderna com tema claro/escuro.
-
-## Modo sem IA (NO-AI)
-- Como ativar/desativar: na aba "Configuração da IA", desmarque "Usar IA para conversão".
-- O que acontece: o pipeline usa heurísticas determinísticas (sem chamadas de IA) para mapear containers flex e widgets básicos (heading, text-editor, image, button, icon, image-box, icon-box, basic-gallery, icon-list) com fallback para w:custom.
-- Limitações: não expande widgets avançados (Pro/Woo/Loop) quando em modo NO-AI; se não reconhecer, retorna w:custom.
-- Fluxo completo: seleção do frame → Inspecionar Layout → Gerar JSON (com IA ligada ou desligada) → copiar/baixar/exportar WP.
-- Validação: JSON segue o schema flex; containers e widgets preservam ordem e ids; background/padding/gap alinhados ao layout.
+- **Copiar JSON** - Copia o JSON para a área de transferência
+- **Baixar JSON** - Faz download do arquivo JSON
+- **Exportar para WordPress** - Envia diretamente para o WordPress via REST API
 
 ---
 
-## Notas de versao
-- **Fix (Image Widget):** Resolvido um bug onde nós do Figma (especialmente Frames) com preenchimento de imagem não eram exportados como widgets de imagem do Elementor. A heurística de detecção de mídia foi aprimorada para identificar esses casos, acionar o upload da imagem para o WordPress e preencher corretamente a URL e o ID no widget de imagem gerado.
-- **Fix (SVG Icons):** Corrigido um bug crítico onde ícones SVG não eram exibidos no Elementor. A estrutura JSON para widgets `icon`, `icon-box` e `icon-list` foi ajustada para corresponder ao formato esperado pelo Elementor, que requer um objeto `{ value: { id, url }, library: 'svg' }`. Antes, apenas a URL era enviada, causando falha na renderização.
-- **Fix (pipeline):** Implementada uma correção em duas etapas para resolver a duplicação de nós em conversões com IA.
-    1.  Containers otimizados pela IA são agora marcados com uma flag (`_aiOptimized`) durante a fase de fusão de schemas.
-    2.  A lógica de "resgate" de nós na fase de normalização agora ignora os containers marcados, impedindo que ela readicione nós filhos que a IA removeu propositalmente ao criar widgets mais complexos (como listas).
-- Ajuste de SVGs: `selected_icon` agora segue o formato do Elementor (`{ value: { url, id }, library: 'svg' }`) quando a origem e URL/upload do WordPress, evitando cones brancos mesmo com ID de mdia.
-- Containers boxed preservam padding/altura: o pai com largura >=1440 mantem padding/altura originais, usa apenas a largura do inner e mapeia `min_height` para o Elementor.
-- Carrosseis: `media:carousel`, `slider:slides` e `slideshow` passam a ser exportados como `image-carousel` com `slides` vlidos (incluindo objeto `image`), evitando erros de importacao e lista vazia.
-- Slides de carrossel: IDs agora sao convertidos para numericos e URLs/objetos image sao garantidos, fazendo as imagens aparecerem no widget do Elementor.
-- Regra de container boxer: frames >=1440px com inner menor agora viram containers `boxed` em Elementor, herdando largura/gap/padding/alinhamento do inner e reaproveitando apenas os filhos internos (sem descartar nenhum node).
-- Correcao de icones exportados: widgets `icon`, `icon-box` e itens de `icon-list` normalizam automaticamente `selected_icon` para `library: svg` quando o valor e URL, evitando icones vazios mesmo com a URL setada.
-- Correcao de cores de texto: widgets `heading` e `text-editor` agora recebem `title_color`/`text_color` ao compilar pelo registry, evitando que a cor do tema sobrescreva a cor exportada do layout.
-- Alinhamentos de containers preservados: `justify_content` e `align_items` extraídos do Figma são respeitados no compiler antes dos defaults, evitando que containers caiam para `start/start`.
-- Normalizacao de flex-start/flex-end: alinhamentos dos containers agora usam valores `flex-start`/`flex-end`, compatíveis com o Elementor, evitando perda de alinhamento ao importar.
-- Compat extra Elementor: `flex_justify_content`/`flex_align_items` e flags `flex__is_row`/`flex__is_column` passam a ser preenchidas para refletir alinhamentos na UI do Elementor.
-- Normalizacao do JSON Elementor para colagem/importacao: raiz agora inclui `type: elementor`, `version` 0.4 e `elements`, e o bridge de copia envia o objeto completo pronto para colar.
-- Pipeline, schema e compiler migrados para Containers Flex com reconciliacao 1:1 (nenhum node se perde).
-- **Unificação de Estilos:** Lógica de extração de estilos centralizada em `style_utils.ts` para consistência entre modos AI e NO-AI.
-- **Correção de Ícones (w:icon):** Nós do Figma nomeados como `w:icon` e do tipo `IMAGE` agora são corretamente compilados como widgets de ícone no Elementor.
-- **Refatoração do Compiler:** A lógica de compilação de widgets foi movida para o novo arquivo `compiler-utils.ts`.
-- **Fix (Image Export):** Implementada conversão automática de PNG para WebP no cliente (UI) para otimização de upload. Frames bloqueados contendo imagens agora são exportados corretamente como WebP, enquanto frames bloqueados contendo apenas vetores continuam sendo exportados como SVG. Imagens soltas também são convertidas para WebP.
+## Recursos e Funcionalidades
+
+### Conversão de Layout
+- Conversão fiel do Figma para Elementor com **Containers Flexbox**
+- Preservação de alinhamentos (`justify_content`, `align_items`)
+- Suporte a containers `boxed` (frames >= 1440px)
+- Padding, gap e dimensões preservados
+
+### Widgets Suportados
+| Widget | Descrição |
+|--------|-----------|
+| `heading` | Títulos e cabeçalhos |
+| `text-editor` | Blocos de texto com rich text |
+| `button` | Botões com gradiente, ícone, padding e border |
+| `image` | Imagens com upload automático para WordPress |
+| `icon` | Ícones SVG exportados e uploadados |
+| `image-box` | Imagem com título e descrição |
+| `icon-box` | Ícone com título e descrição |
+| `icon-list` | Lista com ícones personalizados |
+| `image-carousel` | Carrossel de imagens |
+| `basic-gallery` | Galeria de imagens |
+| `accordion` | Acordeão expansível |
+| `toggle` | Toggle switches |
+| `nav-menu` | Menus de navegação (com plugin companion) |
+
+### Exportação de Mídia
+- **Imagens**: Convertidas automaticamente para WebP com qualidade configurável
+- **Ícones SVG**: Uploadados para WordPress Media Library
+- **Cache de hash**: Evita upload duplicado de mesmos assets
+
+### Estilização Completa
+- Background sólido e gradiente
+- Border (cor, largura, radius)
+- Padding individual (top, right, bottom, left)
+- Tipografia (font-family, size, weight, line-height, letter-spacing)
+- Cores de texto extraídas do Figma
 
 ---
 
-## Capturas de Tela / GIFs
+## Nomenclatura de Widgets no Figma
+
+Use prefixos nos nomes dos frames/grupos para forçar tipos de widget:
+
+| Prefixo | Widget Elementor |
+|---------|------------------|
+| `w:heading` | Heading |
+| `w:text` ou `w:text-editor` | Text Editor |
+| `w:button` | Button |
+| `w:image` | Image |
+| `w:icon` | Icon |
+| `w:image-box` | Image Box |
+| `w:icon-box` | Icon Box |
+| `w:icon-list` | Icon List |
+| `c:container` | Container Flex |
+| `media:carousel` | Image Carousel |
+
+---
+
+## Correções e Melhorias Recentes
+
+### v1.4.0 - Button Widget Refactor
+- **Background Gradient**: Cores agora em formato HEX (`#FD6060`) ao invés de objeto
+- **Padding**: Usa `text_padding` (padrão Elementor) ao invés de `button_padding`
+- **Ângulo do Gradiente**: Default de 180° (vertical)
+- **Hover Transition**: Adicionado `button_hover_transition_duration` (0.3s)
+- **Ícone do Botão**: Corrigido ID do WordPress (antes usava ID do Figma)
+- **Border**: Mapeamento completo de cor, largura e radius
+
+### v1.3.0 - Estabilidade e Estilos
+- **Fix (Image Widget)**: Frames com preenchimento de imagem agora exportam corretamente
+- **Fix (SVG Icons)**: Estrutura `{ value: { id, url }, library: 'svg' }` corrigida
+- **Fix (Cores de Texto)**: Widgets heading/text-editor recebem cor correta
+- **Containers Flexbox**: Alinhamentos `flex-start`/`flex-end` normalizados
+- **Conversão WebP**: Imagens PNG convertidas automaticamente no upload
+
+### v1.2.0 - Containers e Carrosséis
+- **Containers Boxed**: Frames >= 1440px viram containers boxed
+- **Carrosséis**: `image-carousel` com slides válidos
+- **Normalização JSON**: Raiz inclui `type: elementor`, `version: 0.4`
+
+---
+
+## Configuração do WordPress
+
+### Credenciais Necessárias
+1. **URL do Site**: Ex: `https://seusite.com.br`
+2. **Usuário**: Usuário do WordPress com permissão de upload
+3. **Application Password**: Gere em Usuários > Perfil > Application Passwords
+
+### Opções de Exportação
+- **Exportar imagens automaticamente**: Habilita upload de imagens/ícones
+- **Qualidade WebP**: Slider de 0-100% (padrão 85%)
+
+---
+
+## Capturas de Tela
+
 ![Preview](assets/preview.png)
 ![Pipeline](assets/pipeline.png)
 
 ---
 
-## Planos e Assinatura
-- **Starter** para freelancers iniciando no Elementor.
-- **Pro** para agencias com multiplos projetos.
-- **Agency** para equipes grandes e alto volume de exportacoes.
+## Arquitetura do Projeto
 
-[Escolha seu plano](https://figtoel.example.com/pricing) (link placeholder).
+```
+src/
+├── code.ts              # Entry point do plugin Figma
+├── ui.html              # Interface do usuário
+├── pipeline.ts          # Orquestração do fluxo de conversão
+├── compiler/
+│   └── elementor.compiler.ts  # Compilador para JSON Elementor
+├── config/
+│   └── widget.registry.ts     # Registro e compilação de widgets
+├── services/
+│   ├── media/           # Upload de mídia para WordPress
+│   └── serializer/      # Serialização de nós Figma
+├── extractors/
+│   └── background.extractor.ts  # Extração de backgrounds
+└── utils/
+    ├── style_utils.ts   # Utilitários de extração de estilos
+    └── style_normalizer.ts  # Normalização de valores
+```
+
+---
+
+## Desenvolvimento
+
+```bash
+# Instalar dependências
+npm install
+
+# Build
+npm run build
+
+# Build com watch
+npm run watch
+
+# Limpar e rebuild
+npm run clean && npm run build
+
+# Executar testes
+npm run test
+```
 
 ---
 
 ## Suporte e Contato
-- Suporte: support@figtoel.example.com (placeholder)
-- Documentacao: https://figtoel.example.com/docs
+
+- Suporte: support@figtoel.example.com
+- Documentação: https://figtoel.example.com/docs
 - Central de ajuda: https://figtoel.example.com/help
 
 ---
 
-## Aviso Legal / Licenciamento Comercial
-Este plugin e distribuido apenas como produto comercial. O codigo-fonte nao faz parte da distribuicao publica. Uso nao autorizado, distribuicao ou engenharia reversa nao sao permitidos.
+## Licenciamento
+
+Este plugin é distribuído como produto comercial. O código-fonte não faz parte da distribuição pública. Uso não autorizado, distribuição ou engenharia reversa não são permitidos.

@@ -16,6 +16,41 @@ function slugFromKey(key: string): string {
     return key.replace(/^w:/i, '').replace(/^woo:/i, '').replace(/^loop:/i, '').replace(/:/g, '-');
 }
 
+/**
+ * Convert any color format (rgba, rgb, {r,g,b}, string) to HEX string
+ * Elementor Button widget prefers HEX colors
+ */
+function toHex(value: any): string {
+    if (!value) return '#000000';
+
+    // Already HEX
+    if (typeof value === 'string' && value.startsWith('#')) {
+        return value.toUpperCase();
+    }
+
+    // RGB/RGBA string: "rgba(253, 96, 96, 1)" or "rgb(253, 96, 96)"
+    if (typeof value === 'string' && (value.startsWith('rgba') || value.startsWith('rgb'))) {
+        const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (match) {
+            const r = parseInt(match[1], 10);
+            const g = parseInt(match[2], 10);
+            const b = parseInt(match[3], 10);
+            return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+    }
+
+    // Object with r, g, b (0-1 range from Figma)
+    if (typeof value === 'object' && value.r !== undefined) {
+        const r = Math.round((value.r || 0) * 255);
+        const g = Math.round((value.g || 0) * 255);
+        const b = Math.round((value.b || 0) * 255);
+        return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+    }
+
+    // Fallback: return as-is or black
+    return typeof value === 'string' ? value : '#000000';
+}
+
 function stubDefinition(key: string, family: WidgetDefinition['family'] = 'misc', aliases: string[] = []): WidgetDefinition {
     const widgetType = slugFromKey(key);
     return {
@@ -178,8 +213,15 @@ const registry: WidgetDefinition[] = [
                 });
 
                 if (imageChild) {
-                    iconId = imageChild.imageId || imageChild.id || '';
-                    console.log('[REGISTRY DEBUG] ✅ Found icon child:', imageChild.name, 'at index:', iconIndex, 'iconId:', iconId);
+                    // Priority: 1) WordPress ID from selected_icon, 2) imageId (if it's a WordPress ID), 3) fallback
+                    const wpIconId = w.styles?.selected_icon?.value?.id || imageChild.styles?.selected_icon?.value?.id;
+                    const rawImageId = imageChild.imageId;
+
+                    // Check if imageId looks like a WordPress ID (number > 100) vs Figma node ID (contains :)
+                    const isWpId = rawImageId && !String(rawImageId).includes(':') && parseInt(rawImageId, 10) > 100;
+
+                    iconId = wpIconId ? String(wpIconId) : (isWpId ? rawImageId : '');
+                    console.log('[REGISTRY DEBUG] ✅ Found icon child:', imageChild.name, 'at index:', iconIndex, 'wpIconId:', wpIconId, 'rawImageId:', rawImageId, 'final iconId:', iconId);
                 }
             }
 
@@ -219,41 +261,102 @@ const registry: WidgetDefinition[] = [
                 if (alignMap[styles.textAlignHorizontal]) settings.align = alignMap[styles.textAlignHorizontal];
             }
 
-            // 2. Colors
-            // Background Color (from button frame itself)
-            if (w.styles?.background) {
-                settings.background_color = w.styles.background.color || w.styles.background;
+            // 2. Colors & Background
+            // Process background: solid, gradient, or image
+            const bg = w.styles?.background;
+            if (bg) {
+                if (bg.type === 'gradient' || (bg.stops && Array.isArray(bg.stops))) {
+                    // Gradient background
+                    settings.background_background = 'gradient';
+                    settings.background_gradient_type = bg.gradientType || 'linear';
+
+                    // Angle: use extracted value, fallback to 180 (vertical)
+                    const angle = bg.angle !== undefined ? bg.angle : 180;
+                    settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
+
+                    if (bg.stops && bg.stops.length > 0) {
+                        settings.background_color = toHex(bg.stops[0].color);
+
+                        // Normalize stop positions (0-1 -> 0-100)
+                        let stopA = bg.stops[0].position;
+                        if (stopA <= 1 && stopA > 0) stopA = Math.round(stopA * 100);
+                        settings.background_color_stop = { unit: '%', size: stopA || 0, sizes: [] };
+
+                        if (bg.stops.length > 1) {
+                            const last = bg.stops[bg.stops.length - 1];
+                            settings.background_color_b = toHex(last.color);
+
+                            let stopB = last.position;
+                            if (stopB <= 1 && stopB > 0) stopB = Math.round(stopB * 100);
+                            settings.background_color_b_stop = { unit: '%', size: stopB || 100, sizes: [] };
+                        }
+                    }
+                } else if (bg.type === 'solid' || bg.color) {
+                    // Solid background
+                    settings.background_background = 'classic';
+                    settings.background_color = toHex(bg.color || bg);
+                }
             } else if (w.styles?.fills && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
+                // Fallback: check fills array
+                const gradientFill = w.styles.fills.find((f: any) => f.type === 'GRADIENT_LINEAR' || f.type === 'GRADIENT_RADIAL');
                 const solidFill = w.styles.fills.find((f: any) => f.type === 'SOLID');
-                if (solidFill && solidFill.color) {
-                    const { r, g, b } = solidFill.color;
-                    const a = solidFill.opacity !== undefined ? solidFill.opacity : 1;
-                    settings.background_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+
+                if (gradientFill && gradientFill.gradientStops) {
+                    settings.background_background = 'gradient';
+                    settings.background_gradient_type = 'linear';
+                    settings.background_gradient_angle = { unit: 'deg', size: 180, sizes: [] };
+
+                    if (gradientFill.gradientStops.length > 0) {
+                        settings.background_color = toHex(gradientFill.gradientStops[0].color);
+                        settings.background_color_stop = { unit: '%', size: Math.round(gradientFill.gradientStops[0].position * 100), sizes: [] };
+
+                        if (gradientFill.gradientStops.length > 1) {
+                            const last = gradientFill.gradientStops[gradientFill.gradientStops.length - 1];
+                            settings.background_color_b = toHex(last.color);
+                            settings.background_color_b_stop = { unit: '%', size: Math.round(last.position * 100), sizes: [] };
+                        }
+                    }
+                } else if (solidFill && solidFill.color) {
+                    settings.background_background = 'classic';
+                    settings.background_color = toHex(solidFill.color);
                 }
             }
 
-            // Text Color (prefer child color, fallback to widget color)
+            // Text Color (prefer child color, fallback to widget color) - always HEX
             if (textColor) {
-                settings.button_text_color = textColor;
+                settings.button_text_color = toHex(textColor);
             } else if (w.styles?.color) {
-                const { r, g, b } = w.styles.color;
-                settings.button_text_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
+                settings.button_text_color = toHex(w.styles.color);
             } else if (base.color) {
-                settings.button_text_color = base.color;
+                settings.button_text_color = toHex(base.color);
             }
 
-            // 3. Padding
+            // 3. Padding - use text_padding (NOT button_padding)
             if (w.styles?.paddingTop !== undefined || w.styles?.paddingRight !== undefined ||
                 w.styles?.paddingBottom !== undefined || w.styles?.paddingLeft !== undefined) {
-                settings.button_padding = {
+                settings.text_padding = {
                     unit: 'px',
-                    top: w.styles.paddingTop || 0,
-                    right: w.styles.paddingRight || 0,
-                    bottom: w.styles.paddingBottom || 0,
-                    left: w.styles.paddingLeft || 0,
+                    top: String(w.styles.paddingTop || 0),
+                    right: String(w.styles.paddingRight || 0),
+                    bottom: String(w.styles.paddingBottom || 0),
+                    left: String(w.styles.paddingLeft || 0),
                     isLinked: false
                 };
             }
+
+            // Border Style
+            if (w.styles?.border) {
+                const b = w.styles.border;
+                if (b.type) settings.border_border = b.type;
+                if (b.width !== undefined) {
+                    const bw = String(b.width);
+                    settings.border_width = { unit: 'px', top: bw, right: bw, bottom: bw, left: bw, isLinked: true };
+                }
+                if (b.color) settings.border_color = toHex(b.color);
+            }
+
+            // Hover Transition Duration (default 0.3s for smooth UX)
+            settings.button_hover_transition_duration = { unit: 's', size: 0.3, sizes: [] };
 
             // 4. Border Radius
             if (w.styles?.border?.radius !== undefined) {

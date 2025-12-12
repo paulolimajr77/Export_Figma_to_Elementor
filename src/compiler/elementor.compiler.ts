@@ -18,6 +18,41 @@ export class ElementorCompiler {
         return normalizeColor(value);
     }
 
+    /**
+     * Convert any color format (rgba, rgb, {r,g,b}, string) to HEX string
+     * Elementor Button widget prefers HEX colors for background_color
+     */
+    private toHex(value: any): string {
+        if (!value) return '#000000';
+
+        // Already HEX
+        if (typeof value === 'string' && value.startsWith('#')) {
+            return value.toUpperCase();
+        }
+
+        // RGB/RGBA string: "rgba(253, 96, 96, 1)" or "rgb(253, 96, 96)"
+        if (typeof value === 'string' && (value.startsWith('rgba') || value.startsWith('rgb'))) {
+            const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (match) {
+                const r = parseInt(match[1], 10);
+                const g = parseInt(match[2], 10);
+                const b = parseInt(match[3], 10);
+                return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+            }
+        }
+
+        // Object with r, g, b (0-1 range from Figma)
+        if (typeof value === 'object' && value.r !== undefined) {
+            const r = Math.round((value.r || 0) * 255);
+            const g = Math.round((value.g || 0) * 255);
+            const b = Math.round((value.b || 0) * 255);
+            return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+
+        // Fallback: return as-is or black
+        return typeof value === 'string' ? value : '#000000';
+    }
+
     public compile(schema: PipelineSchema): ElementorJSON {
         const elements = schema.containers.map(container => this.compileContainer(container, false));
 
@@ -36,8 +71,9 @@ export class ElementorCompiler {
     }
 
     private compileContainer(container: PipelineContainer, isInner: boolean): ElementorElement {
-        // Fast-path: if this "container" is naively wrapping a single widget with explicit widget name (w:icon-box, w:image-box),
-        // return the widget directly to avoid extra wrapper.
+        // Fast-path: if this "container" is naively wrapping a single widget,
+        // return the widget directly to avoid extra wrapper (atomic widget pattern).
+        // This is critical for buttons, icon-box, image-box to work correctly in Elementor.
         if (
             container.children?.length === 0 &&
             Array.isArray(container.widgets) &&
@@ -50,7 +86,24 @@ export class ElementorCompiler {
                 soleWidget.type ||
                 ''
             ).toLowerCase();
-            if (sourceName.startsWith('w:icon-box') || sourceName.startsWith('w:image-box')) {
+            const widgetType = soleWidget.type?.toLowerCase() || '';
+
+            // Atomic widgets that should NOT be wrapped in a container
+            const atomicWidgets = ['w:icon-box', 'w:image-box', 'w:button', 'button', 'icon-box', 'image-box'];
+            const isAtomic = atomicWidgets.some(w => sourceName.startsWith(w) || widgetType === w.replace('w:', ''));
+
+            if (isAtomic) {
+                // Transfer container styles (background, border, padding) to the widget
+                // This ensures button gets all visual properties
+                if (container.styles && !soleWidget.styles) {
+                    soleWidget.styles = { ...container.styles };
+                } else if (container.styles && soleWidget.styles) {
+                    // Merge: widget styles take precedence, but fill gaps from container
+                    soleWidget.styles = {
+                        ...container.styles,
+                        ...soleWidget.styles
+                    };
+                }
                 return this.compileWidget(soleWidget);
             }
         }
@@ -427,59 +480,92 @@ export class ElementorCompiler {
             case 'button':
                 widgetType = 'button';
                 settings.text = widget.content || 'Button';
+                settings.size = 'sm'; // Match JSON B default
+
+                // Reset Button Type to ensure custom styles apply (avoids Theme styles like Success/Green)
+                settings.button_type = '';
 
                 // Typography
                 Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
 
                 // Background (Solid, Gradient, Image)
-                if (widget.styles?.background) {
-                    const bg = widget.styles.background;
-                    if (bg.type === 'solid') {
+                // CAUTION: AI might return a complex 'background_color' object instead of 'background'. Check both.
+                const bg = widget.styles?.background || (typeof (widget as any).settings?.background_color === 'object' ? (widget as any).settings.background_color : null);
+
+                if (bg) {
+                    if (bg.type === 'solid' || (bg.color && !bg.stops)) {
+                        const c = bg.color || bg;
                         settings.background_background = 'classic';
-                        settings.background_color = this.sanitizeColor(bg.color);
-                    } else if (bg.type === 'gradient') {
+                        settings.background_color = this.toHex(c);
+                    } else if (bg.type === 'gradient' || (bg.stops && Array.isArray(bg.stops))) {
                         settings.background_background = 'gradient';
                         settings.background_gradient_type = bg.gradientType || 'linear';
-                        if (bg.stops && bg.stops.length > 0) {
-                            settings.background_color = bg.stops[0].color;
-                            settings.background_color_stop = { unit: '%', size: bg.stops[0].position, sizes: [] };
-                            if (bg.stops.length > 1) {
-                                settings.background_color_b = bg.stops[bg.stops.length - 1].color;
-                                settings.background_color_b_stop = { unit: '%', size: bg.stops[bg.stops.length - 1].position, sizes: [] };
-                            }
-                        }
+
+                        // Gradient Angle: use extracted value, fallback to 180 (vertical) NOT 0
                         const angle = bg.angle !== undefined ? bg.angle : 180;
                         settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
+
+                        if (bg.stops && bg.stops.length > 0) {
+                            // Convert to HEX for Elementor compatibility
+                            settings.background_color = this.toHex(bg.stops[0].color);
+
+                            // Normalize Stop Position (0-1 -> 0-100)
+                            let stopA = bg.stops[0].position;
+                            if (stopA <= 1 && stopA > 0) stopA = Math.round(stopA * 100);
+                            settings.background_color_stop = { unit: '%', size: stopA || 0, sizes: [] };
+
+                            if (bg.stops.length > 1) {
+                                const last = bg.stops[bg.stops.length - 1];
+                                settings.background_color_b = this.toHex(last.color);
+
+                                let stopB = last.position;
+                                if (stopB <= 1 && stopB > 0) stopB = Math.round(stopB * 100);
+                                settings.background_color_b_stop = { unit: '%', size: stopB || 100, sizes: [] };
+                            }
+                        }
                     } else if (bg.type === 'image') {
                         settings.background_background = 'classic';
                         settings.background_image = { url: '', id: 0, imageHash: bg.imageHash };
                     }
-                } else if (widget.styles?.fills && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
-                    // Fallback for direct fills if background object missing
-                    const solidFill = widget.styles.fills.find((f: any) => f.type === 'SOLID');
-                    if (solidFill) {
-                        settings.background_color = this.sanitizeColor(solidFill.color);
+                }
+
+                // Cleanup: If background_color came in as an object (from AI), remove it now
+                if (settings.background_color && typeof settings.background_color === 'object') {
+                    delete settings.background_color;
+                }
+
+                // Text color - convert to HEX
+                if (baseSettings.color) {
+                    settings.button_text_color = this.toHex(baseSettings.color);
+                }
+
+                // Padding - use text_padding (NOT button_padding)
+                if (widget.styles?.button_padding || widget.styles?.padding || widget.styles?.paddingTop !== undefined) {
+                    const p = widget.styles?.button_padding || widget.styles?.padding;
+
+                    if (p && typeof p === 'object') {
+                        settings.text_padding = {
+                            unit: 'px',
+                            top: String(p.top || p.paddingTop || 0),
+                            right: String(p.right || p.paddingRight || 0),
+                            bottom: String(p.bottom || p.paddingBottom || 0),
+                            left: String(p.left || p.paddingLeft || 0),
+                            isLinked: false
+                        };
+                    } else if (widget.styles?.paddingTop !== undefined) {
+                        settings.text_padding = {
+                            unit: 'px',
+                            top: String(widget.styles.paddingTop || 0),
+                            right: String(widget.styles.paddingRight || 0),
+                            bottom: String(widget.styles.paddingBottom || 0),
+                            left: String(widget.styles.paddingLeft || 0),
+                            isLinked: false
+                        };
                     }
                 }
 
-                // Text color
-                if (baseSettings.color) {
-                    settings.button_text_color = baseSettings.color;
-                }
-
-                // Padding
-                // Standard Elementor Button uses 'button_padding' not 'padding'
-                if (widget.styles?.paddingTop !== undefined || widget.styles?.paddingRight !== undefined ||
-                    widget.styles?.paddingBottom !== undefined || widget.styles?.paddingLeft !== undefined) {
-                    settings.button_padding = {
-                        unit: 'px',
-                        top: String(widget.styles.paddingTop || 0),
-                        right: String(widget.styles.paddingRight || 0),
-                        bottom: String(widget.styles.paddingBottom || 0),
-                        left: String(widget.styles.paddingLeft || 0),
-                        isLinked: false
-                    };
-                }
+                // Cleanup incorrect key if present
+                if ((settings as any).button_padding) delete (settings as any).button_padding;
 
                 // Border Style & Radius
                 if (widget.styles?.border) {
@@ -489,18 +575,21 @@ export class ElementorCompiler {
                         const w = String(b.width);
                         settings.border_width = { unit: 'px', top: w, right: w, bottom: w, left: w, isLinked: true };
                     }
-                    if (b.color) settings.border_color = b.color;
-                    if (b.radius) {
+                    if (b.color) settings.border_color = this.toHex(b.color);
+                    if (b.radius !== undefined) {
                         const r = String(b.radius);
                         settings.border_radius = { unit: 'px', top: r, right: r, bottom: r, left: r, isLinked: true };
                     }
-                } else if (widget.styles?.cornerRadius !== undefined) {
-                    const r = String(widget.styles.cornerRadius);
-                    settings.border_radius = {
-                        unit: 'px',
-                        top: r, bottom: r, left: r, right: r, isLinked: true
-                    };
                 }
+
+                // Fallback: cornerRadius directly from styles
+                if (!settings.border_radius && widget.styles?.cornerRadius !== undefined) {
+                    const r = String(widget.styles.cornerRadius);
+                    settings.border_radius = { unit: 'px', top: r, right: r, bottom: r, left: r, isLinked: true };
+                }
+
+                // Hover Transition Duration (default 0.3s for smooth UX)
+                settings.button_hover_transition_duration = { unit: 's', size: 0.3, sizes: [] };
 
                 // Icon
                 if (widget.imageId) {
@@ -509,7 +598,13 @@ export class ElementorCompiler {
                         widget.imageId,
                         { value: 'fas fa-arrow-right', library: 'fa-solid' }
                     );
-                    settings.icon_align = 'right'; // Default to right alignment
+                    // icon_align: 'row-reverse' means icon on RIGHT (matches JSON B)
+                    settings.icon_align = 'row-reverse';
+
+                    // Icon indent (spacing between text and icon)
+                    if (widget.styles?.gap !== undefined) {
+                        settings.icon_indent = { unit: 'px', size: widget.styles.gap, sizes: [] };
+                    }
                 }
 
                 break;

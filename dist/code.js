@@ -35,11 +35,11 @@
 
   // src/utils/image_utils.ts
   function rgbToHex(rgb) {
-    const toHex = (c) => {
+    const toHex2 = (c) => {
       const hex = Math.round(c * 255).toString(16);
       return hex.length === 1 ? "0" + hex : hex;
     };
-    return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+    return `#${toHex2(rgb.r)}${toHex2(rgb.g)}${toHex2(rgb.b)}`;
   }
 
   // src/services/serializer/index.ts
@@ -458,11 +458,11 @@
           const r = Math.round((stop.color.r || 0) * 255);
           const g = Math.round((stop.color.g || 0) * 255);
           const b = Math.round((stop.color.b || 0) * 255);
-          const toHex = (n) => {
+          const toHex2 = (n) => {
             const hex2 = n.toString(16);
             return hex2.length === 1 ? "0" + hex2 : hex2;
           };
-          const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+          const hex = `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`.toUpperCase();
           const pos = Math.round((stop.position || 0) * 100);
           return `${hex} ${pos}%`;
         }).join(", ");
@@ -488,7 +488,7 @@
     }
     const isBoxWidget = node.type === "FRAME" || node.type === "INSTANCE" || node.type === "COMPONENT" || node.type === "RECTANGLE" || node.type === "GROUP";
     const boxLikeWidgets = ["w:button", "w:icon-box", "w:image-box", "w:call-to-action", "button", "icon-box", "image-box"];
-    const isExplicitBox = node.name && boxLikeWidgets.some((w) => node.name.startsWith(w) || node.name === w);
+    const isExplicitBox = node.name && boxLikeWidgets.some((w) => node.name.toLowerCase().startsWith(w) || node.name.toLowerCase() === w);
     if (isBoxWidget || isExplicitBox) {
       const containerStyles = extractContainerStyles(node);
       Object.assign(styles, containerStyles);
@@ -766,6 +766,28 @@ ${refText}` });
     if (!key) return "";
     return key.replace(/^w:/i, "").replace(/^woo:/i, "").replace(/^loop:/i, "").replace(/:/g, "-");
   }
+  function toHex(value) {
+    if (!value) return "#000000";
+    if (typeof value === "string" && value.startsWith("#")) {
+      return value.toUpperCase();
+    }
+    if (typeof value === "string" && (value.startsWith("rgba") || value.startsWith("rgb"))) {
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (match) {
+        const r = parseInt(match[1], 10);
+        const g = parseInt(match[2], 10);
+        const b = parseInt(match[3], 10);
+        return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+      }
+    }
+    if (typeof value === "object" && value.r !== void 0) {
+      const r = Math.round((value.r || 0) * 255);
+      const g = Math.round((value.g || 0) * 255);
+      const b = Math.round((value.b || 0) * 255);
+      return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+    }
+    return typeof value === "string" ? value : "#000000";
+  }
   function stubDefinition(key, family = "misc", aliases = []) {
     const widgetType = slugFromKey(key);
     return {
@@ -830,7 +852,7 @@ ${refText}` });
       family: "action",
       aliases: generateAliases("button", ["bot\xE3o", "link", "chamada para a\xE7\xE3o"], ["btn", "cta", "action button", "clique aqui"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
         console.log("[REGISTRY DEBUG] Compiling button widget:", w.type);
         console.log("[REGISTRY DEBUG] Button has", ((_a = w.children) == null ? void 0 : _a.length) || 0, "child widgets");
         let buttonText = w.content || "Button";
@@ -893,8 +915,11 @@ ${refText}` });
             return false;
           });
           if (imageChild) {
-            iconId = imageChild.imageId || imageChild.id || "";
-            console.log("[REGISTRY DEBUG] \u2705 Found icon child:", imageChild.name, "at index:", iconIndex, "iconId:", iconId);
+            const wpIconId = ((_e = (_d = (_c = w.styles) == null ? void 0 : _c.selected_icon) == null ? void 0 : _d.value) == null ? void 0 : _e.id) || ((_h = (_g = (_f = imageChild.styles) == null ? void 0 : _f.selected_icon) == null ? void 0 : _g.value) == null ? void 0 : _h.id);
+            const rawImageId = imageChild.imageId;
+            const isWpId = rawImageId && !String(rawImageId).includes(":") && parseInt(rawImageId, 10) > 100;
+            iconId = wpIconId ? String(wpIconId) : isWpId ? rawImageId : "";
+            console.log("[REGISTRY DEBUG] \u2705 Found icon child:", imageChild.name, "at index:", iconIndex, "wpIconId:", wpIconId, "rawImageId:", rawImageId, "final iconId:", iconId);
           }
         }
         const settings = __spreadProps(__spreadValues({}, base), {
@@ -927,35 +952,79 @@ ${refText}` });
           const alignMap = { LEFT: "left", CENTER: "center", RIGHT: "right", JUSTIFIED: "justify" };
           if (alignMap[styles.textAlignHorizontal]) settings.align = alignMap[styles.textAlignHorizontal];
         }
-        if ((_c = w.styles) == null ? void 0 : _c.background) {
-          settings.background_color = w.styles.background.color || w.styles.background;
-        } else if (((_d = w.styles) == null ? void 0 : _d.fills) && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
+        const bg = (_i = w.styles) == null ? void 0 : _i.background;
+        if (bg) {
+          if (bg.type === "gradient" || bg.stops && Array.isArray(bg.stops)) {
+            settings.background_background = "gradient";
+            settings.background_gradient_type = bg.gradientType || "linear";
+            const angle = bg.angle !== void 0 ? bg.angle : 180;
+            settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
+            if (bg.stops && bg.stops.length > 0) {
+              settings.background_color = toHex(bg.stops[0].color);
+              let stopA = bg.stops[0].position;
+              if (stopA <= 1 && stopA > 0) stopA = Math.round(stopA * 100);
+              settings.background_color_stop = { unit: "%", size: stopA || 0, sizes: [] };
+              if (bg.stops.length > 1) {
+                const last = bg.stops[bg.stops.length - 1];
+                settings.background_color_b = toHex(last.color);
+                let stopB = last.position;
+                if (stopB <= 1 && stopB > 0) stopB = Math.round(stopB * 100);
+                settings.background_color_b_stop = { unit: "%", size: stopB || 100, sizes: [] };
+              }
+            }
+          } else if (bg.type === "solid" || bg.color) {
+            settings.background_background = "classic";
+            settings.background_color = toHex(bg.color || bg);
+          }
+        } else if (((_j = w.styles) == null ? void 0 : _j.fills) && Array.isArray(w.styles.fills) && w.styles.fills.length > 0) {
+          const gradientFill = w.styles.fills.find((f) => f.type === "GRADIENT_LINEAR" || f.type === "GRADIENT_RADIAL");
           const solidFill = w.styles.fills.find((f) => f.type === "SOLID");
-          if (solidFill && solidFill.color) {
-            const { r, g, b } = solidFill.color;
-            const a = solidFill.opacity !== void 0 ? solidFill.opacity : 1;
-            settings.background_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+          if (gradientFill && gradientFill.gradientStops) {
+            settings.background_background = "gradient";
+            settings.background_gradient_type = "linear";
+            settings.background_gradient_angle = { unit: "deg", size: 180, sizes: [] };
+            if (gradientFill.gradientStops.length > 0) {
+              settings.background_color = toHex(gradientFill.gradientStops[0].color);
+              settings.background_color_stop = { unit: "%", size: Math.round(gradientFill.gradientStops[0].position * 100), sizes: [] };
+              if (gradientFill.gradientStops.length > 1) {
+                const last = gradientFill.gradientStops[gradientFill.gradientStops.length - 1];
+                settings.background_color_b = toHex(last.color);
+                settings.background_color_b_stop = { unit: "%", size: Math.round(last.position * 100), sizes: [] };
+              }
+            }
+          } else if (solidFill && solidFill.color) {
+            settings.background_background = "classic";
+            settings.background_color = toHex(solidFill.color);
           }
         }
         if (textColor) {
-          settings.button_text_color = textColor;
-        } else if ((_e = w.styles) == null ? void 0 : _e.color) {
-          const { r, g, b } = w.styles.color;
-          settings.button_text_color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 1)`;
+          settings.button_text_color = toHex(textColor);
+        } else if ((_k = w.styles) == null ? void 0 : _k.color) {
+          settings.button_text_color = toHex(w.styles.color);
         } else if (base.color) {
-          settings.button_text_color = base.color;
+          settings.button_text_color = toHex(base.color);
         }
-        if (((_f = w.styles) == null ? void 0 : _f.paddingTop) !== void 0 || ((_g = w.styles) == null ? void 0 : _g.paddingRight) !== void 0 || ((_h = w.styles) == null ? void 0 : _h.paddingBottom) !== void 0 || ((_i = w.styles) == null ? void 0 : _i.paddingLeft) !== void 0) {
-          settings.button_padding = {
+        if (((_l = w.styles) == null ? void 0 : _l.paddingTop) !== void 0 || ((_m = w.styles) == null ? void 0 : _m.paddingRight) !== void 0 || ((_n = w.styles) == null ? void 0 : _n.paddingBottom) !== void 0 || ((_o = w.styles) == null ? void 0 : _o.paddingLeft) !== void 0) {
+          settings.text_padding = {
             unit: "px",
-            top: w.styles.paddingTop || 0,
-            right: w.styles.paddingRight || 0,
-            bottom: w.styles.paddingBottom || 0,
-            left: w.styles.paddingLeft || 0,
+            top: String(w.styles.paddingTop || 0),
+            right: String(w.styles.paddingRight || 0),
+            bottom: String(w.styles.paddingBottom || 0),
+            left: String(w.styles.paddingLeft || 0),
             isLinked: false
           };
         }
-        if (((_k = (_j = w.styles) == null ? void 0 : _j.border) == null ? void 0 : _k.radius) !== void 0) {
+        if ((_p = w.styles) == null ? void 0 : _p.border) {
+          const b = w.styles.border;
+          if (b.type) settings.border_border = b.type;
+          if (b.width !== void 0) {
+            const bw = String(b.width);
+            settings.border_width = { unit: "px", top: bw, right: bw, bottom: bw, left: bw, isLinked: true };
+          }
+          if (b.color) settings.border_color = toHex(b.color);
+        }
+        settings.button_hover_transition_duration = { unit: "s", size: 0.3, sizes: [] };
+        if (((_r = (_q = w.styles) == null ? void 0 : _q.border) == null ? void 0 : _r.radius) !== void 0) {
           settings.border_radius = {
             unit: "px",
             top: w.styles.border.radius,
@@ -964,7 +1033,7 @@ ${refText}` });
             left: w.styles.border.radius,
             isLinked: true
           };
-        } else if (((_l = w.styles) == null ? void 0 : _l.cornerRadius) !== void 0) {
+        } else if (((_s = w.styles) == null ? void 0 : _s.cornerRadius) !== void 0) {
           settings.border_radius = {
             unit: "px",
             top: w.styles.cornerRadius,
@@ -986,7 +1055,7 @@ ${refText}` });
               console.log("[BUTTON ICON DEBUG] Found icon URL from child:", iconUrl);
             }
           }
-          if (!iconUrl && ((_n = (_m = w.styles) == null ? void 0 : _m.selected_icon) == null ? void 0 : _n.value)) {
+          if (!iconUrl && ((_u = (_t = w.styles) == null ? void 0 : _t.selected_icon) == null ? void 0 : _u.value)) {
             const sv = w.styles.selected_icon.value;
             iconUrl = typeof sv === "object" && sv.url ? sv.url : sv;
           }
@@ -1011,11 +1080,11 @@ ${refText}` });
           let iconPosition = "before";
           if (iconIndex !== -1 && textIndex !== -1) {
             iconPosition = iconIndex < textIndex ? "before" : "after";
-          } else if ((_o = w.styles) == null ? void 0 : _o.iconPosition) {
+          } else if ((_v = w.styles) == null ? void 0 : _v.iconPosition) {
             iconPosition = w.styles.iconPosition;
           }
           settings.icon_align = iconPosition === "after" ? "row-reverse" : "row";
-          const iconSpacing = ((_p = w.styles) == null ? void 0 : _p.itemSpacing) || w.itemSpacing;
+          const iconSpacing = ((_w = w.styles) == null ? void 0 : _w.itemSpacing) || w.itemSpacing;
           if (iconSpacing && iconSpacing > 0) {
             settings.icon_indent = { unit: "px", size: iconSpacing, sizes: [] };
           }
@@ -2360,6 +2429,32 @@ ${refText}` });
     sanitizeColor(value) {
       return normalizeColor(value);
     }
+    /**
+     * Convert any color format (rgba, rgb, {r,g,b}, string) to HEX string
+     * Elementor Button widget prefers HEX colors for background_color
+     */
+    toHex(value) {
+      if (!value) return "#000000";
+      if (typeof value === "string" && value.startsWith("#")) {
+        return value.toUpperCase();
+      }
+      if (typeof value === "string" && (value.startsWith("rgba") || value.startsWith("rgb"))) {
+        const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (match) {
+          const r = parseInt(match[1], 10);
+          const g = parseInt(match[2], 10);
+          const b = parseInt(match[3], 10);
+          return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+        }
+      }
+      if (typeof value === "object" && value.r !== void 0) {
+        const r = Math.round((value.r || 0) * 255);
+        const g = Math.round((value.g || 0) * 255);
+        const b = Math.round((value.b || 0) * 255);
+        return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+      }
+      return typeof value === "string" ? value : "#000000";
+    }
     compile(schema) {
       var _a;
       const elements = schema.containers.map((container) => this.compileContainer(container, false));
@@ -2375,13 +2470,21 @@ ${refText}` });
       return template;
     }
     compileContainer(container, isInner) {
-      var _a, _b, _c;
+      var _a, _b, _c, _d;
       if (((_a = container.children) == null ? void 0 : _a.length) === 0 && Array.isArray(container.widgets) && container.widgets.length === 1) {
         const soleWidget = container.widgets[0];
         const sourceName = String(
           ((_b = soleWidget.styles) == null ? void 0 : _b.sourceName) || ((_c = container.styles) == null ? void 0 : _c.sourceName) || soleWidget.type || ""
         ).toLowerCase();
-        if (sourceName.startsWith("w:icon-box") || sourceName.startsWith("w:image-box")) {
+        const widgetType = ((_d = soleWidget.type) == null ? void 0 : _d.toLowerCase()) || "";
+        const atomicWidgets = ["w:icon-box", "w:image-box", "w:button", "button", "icon-box", "image-box"];
+        const isAtomic = atomicWidgets.some((w) => sourceName.startsWith(w) || widgetType === w.replace("w:", ""));
+        if (isAtomic) {
+          if (container.styles && !soleWidget.styles) {
+            soleWidget.styles = __spreadValues({}, container.styles);
+          } else if (container.styles && soleWidget.styles) {
+            soleWidget.styles = __spreadValues(__spreadValues({}, container.styles), soleWidget.styles);
+          }
           return this.compileWidget(soleWidget);
         }
       }
@@ -2659,7 +2762,7 @@ ${refText}` });
       return normalized;
     }
     compileWidget(widget) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
       const widgetId = generateGUID();
       const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
       Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
@@ -2717,78 +2820,95 @@ ${refText}` });
         case "button":
           widgetType = "button";
           settings.text = widget.content || "Button";
+          settings.size = "sm";
+          settings.button_type = "";
           Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
-          if ((_d = widget.styles) == null ? void 0 : _d.background) {
-            const bg = widget.styles.background;
-            if (bg.type === "solid") {
+          const bg = ((_d = widget.styles) == null ? void 0 : _d.background) || (typeof ((_e = widget.settings) == null ? void 0 : _e.background_color) === "object" ? widget.settings.background_color : null);
+          if (bg) {
+            if (bg.type === "solid" || bg.color && !bg.stops) {
+              const c = bg.color || bg;
               settings.background_background = "classic";
-              settings.background_color = this.sanitizeColor(bg.color);
-            } else if (bg.type === "gradient") {
+              settings.background_color = this.toHex(c);
+            } else if (bg.type === "gradient" || bg.stops && Array.isArray(bg.stops)) {
               settings.background_background = "gradient";
               settings.background_gradient_type = bg.gradientType || "linear";
-              if (bg.stops && bg.stops.length > 0) {
-                settings.background_color = bg.stops[0].color;
-                settings.background_color_stop = { unit: "%", size: bg.stops[0].position, sizes: [] };
-                if (bg.stops.length > 1) {
-                  settings.background_color_b = bg.stops[bg.stops.length - 1].color;
-                  settings.background_color_b_stop = { unit: "%", size: bg.stops[bg.stops.length - 1].position, sizes: [] };
-                }
-              }
               const angle = bg.angle !== void 0 ? bg.angle : 180;
               settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
+              if (bg.stops && bg.stops.length > 0) {
+                settings.background_color = this.toHex(bg.stops[0].color);
+                let stopA = bg.stops[0].position;
+                if (stopA <= 1 && stopA > 0) stopA = Math.round(stopA * 100);
+                settings.background_color_stop = { unit: "%", size: stopA || 0, sizes: [] };
+                if (bg.stops.length > 1) {
+                  const last = bg.stops[bg.stops.length - 1];
+                  settings.background_color_b = this.toHex(last.color);
+                  let stopB = last.position;
+                  if (stopB <= 1 && stopB > 0) stopB = Math.round(stopB * 100);
+                  settings.background_color_b_stop = { unit: "%", size: stopB || 100, sizes: [] };
+                }
+              }
             } else if (bg.type === "image") {
               settings.background_background = "classic";
               settings.background_image = { url: "", id: 0, imageHash: bg.imageHash };
             }
-          } else if (((_e = widget.styles) == null ? void 0 : _e.fills) && Array.isArray(widget.styles.fills) && widget.styles.fills.length > 0) {
-            const solidFill = widget.styles.fills.find((f) => f.type === "SOLID");
-            if (solidFill) {
-              settings.background_color = this.sanitizeColor(solidFill.color);
-            }
+          }
+          if (settings.background_color && typeof settings.background_color === "object") {
+            delete settings.background_color;
           }
           if (baseSettings.color) {
-            settings.button_text_color = baseSettings.color;
+            settings.button_text_color = this.toHex(baseSettings.color);
           }
-          if (((_f = widget.styles) == null ? void 0 : _f.paddingTop) !== void 0 || ((_g = widget.styles) == null ? void 0 : _g.paddingRight) !== void 0 || ((_h = widget.styles) == null ? void 0 : _h.paddingBottom) !== void 0 || ((_i = widget.styles) == null ? void 0 : _i.paddingLeft) !== void 0) {
-            settings.button_padding = {
-              unit: "px",
-              top: String(widget.styles.paddingTop || 0),
-              right: String(widget.styles.paddingRight || 0),
-              bottom: String(widget.styles.paddingBottom || 0),
-              left: String(widget.styles.paddingLeft || 0),
-              isLinked: false
-            };
+          if (((_f = widget.styles) == null ? void 0 : _f.button_padding) || ((_g = widget.styles) == null ? void 0 : _g.padding) || ((_h = widget.styles) == null ? void 0 : _h.paddingTop) !== void 0) {
+            const p = ((_i = widget.styles) == null ? void 0 : _i.button_padding) || ((_j = widget.styles) == null ? void 0 : _j.padding);
+            if (p && typeof p === "object") {
+              settings.text_padding = {
+                unit: "px",
+                top: String(p.top || p.paddingTop || 0),
+                right: String(p.right || p.paddingRight || 0),
+                bottom: String(p.bottom || p.paddingBottom || 0),
+                left: String(p.left || p.paddingLeft || 0),
+                isLinked: false
+              };
+            } else if (((_k = widget.styles) == null ? void 0 : _k.paddingTop) !== void 0) {
+              settings.text_padding = {
+                unit: "px",
+                top: String(widget.styles.paddingTop || 0),
+                right: String(widget.styles.paddingRight || 0),
+                bottom: String(widget.styles.paddingBottom || 0),
+                left: String(widget.styles.paddingLeft || 0),
+                isLinked: false
+              };
+            }
           }
-          if ((_j = widget.styles) == null ? void 0 : _j.border) {
+          if (settings.button_padding) delete settings.button_padding;
+          if ((_l = widget.styles) == null ? void 0 : _l.border) {
             const b = widget.styles.border;
             if (b.type) settings.border_border = b.type;
             if (b.width !== void 0) {
               const w = String(b.width);
               settings.border_width = { unit: "px", top: w, right: w, bottom: w, left: w, isLinked: true };
             }
-            if (b.color) settings.border_color = b.color;
-            if (b.radius) {
+            if (b.color) settings.border_color = this.toHex(b.color);
+            if (b.radius !== void 0) {
               const r = String(b.radius);
               settings.border_radius = { unit: "px", top: r, right: r, bottom: r, left: r, isLinked: true };
             }
-          } else if (((_k = widget.styles) == null ? void 0 : _k.cornerRadius) !== void 0) {
-            const r = String(widget.styles.cornerRadius);
-            settings.border_radius = {
-              unit: "px",
-              top: r,
-              bottom: r,
-              left: r,
-              right: r,
-              isLinked: true
-            };
           }
+          if (!settings.border_radius && ((_m = widget.styles) == null ? void 0 : _m.cornerRadius) !== void 0) {
+            const r = String(widget.styles.cornerRadius);
+            settings.border_radius = { unit: "px", top: r, right: r, bottom: r, left: r, isLinked: true };
+          }
+          settings.button_hover_transition_duration = { unit: "s", size: 0.3, sizes: [] };
           if (widget.imageId) {
             settings.selected_icon = this.normalizeSelectedIcon(
-              ((_l = widget.styles) == null ? void 0 : _l.selected_icon) || baseSettings.selected_icon || widget.content,
+              ((_n = widget.styles) == null ? void 0 : _n.selected_icon) || baseSettings.selected_icon || widget.content,
               widget.imageId,
               { value: "fas fa-arrow-right", library: "fa-solid" }
             );
-            settings.icon_align = "right";
+            settings.icon_align = "row-reverse";
+            if (((_o = widget.styles) == null ? void 0 : _o.gap) !== void 0) {
+              settings.icon_indent = { unit: "px", size: widget.styles.gap, sizes: [] };
+            }
           }
           break;
         case "image":
@@ -2802,7 +2922,7 @@ ${refText}` });
           break;
         case "icon":
           widgetType = "icon";
-          settings.selected_icon = ((_m = widget.styles) == null ? void 0 : _m.selected_icon) || baseSettings.selected_icon || widget.content;
+          settings.selected_icon = ((_p = widget.styles) == null ? void 0 : _p.selected_icon) || baseSettings.selected_icon || widget.content;
           break;
         case "custom":
         default:
@@ -6086,8 +6206,8 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
         const solidFill = fills.find((f) => f.type === "SOLID");
         if (solidFill == null ? void 0 : solidFill.color) {
           const { r, g, b } = solidFill.color;
-          const toHex = (c) => ("0" + Math.round(c * 255).toString(16)).slice(-2);
-          const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+          const toHex2 = (c) => ("0" + Math.round(c * 255).toString(16)).slice(-2);
+          const hex = `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
           return { primaryColor: hex, secondaryColor: "#FFFFFF" };
         }
       }

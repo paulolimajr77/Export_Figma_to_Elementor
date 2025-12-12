@@ -161,7 +161,7 @@ export function extractWidgetStyles(node: SerializedNode): Record<string, any> {
 
     // Explicit list of widgets that are "Box-like"
     const boxLikeWidgets = ['w:button', 'w:icon-box', 'w:image-box', 'w:call-to-action', 'button', 'icon-box', 'image-box'];
-    const isExplicitBox = node.name && boxLikeWidgets.some(w => node.name.startsWith(w) || node.name === w);
+    const isExplicitBox = node.name && boxLikeWidgets.some(w => node.name.toLowerCase().startsWith(w) || node.name.toLowerCase() === w);
 
     if (isBoxWidget || isExplicitBox) {
         const containerStyles = extractContainerStyles(node);

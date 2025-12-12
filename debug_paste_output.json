@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "6f700df",
+      "id": "c65f05a",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "6f700df",
+        "_element_id": "c65f05a",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -62,12 +62,12 @@
       },
       "elements": [
         {
-          "id": "8b0a39e",
+          "id": "0242fde",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "8b0a39e",
+            "_element_id": "0242fde",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -139,13 +139,13 @@
           },
           "elements": [
             {
-              "id": "92ede6e",
+              "id": "e5f8143",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "92ede6e",
+                "_element_id": "e5f8143",
                 "minHeight": 690,
                 "justify_content": "flex-start",
                 "align_items": "flex-start",
@@ -166,13 +166,13 @@
               "elements": []
             },
             {
-              "id": "412276a",
+              "id": "2d01019",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "text-editor",
               "settings": {
-                "_element_id": "412276a",
+                "_element_id": "2d01019",
                 "align": "center",
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",
@@ -202,12 +202,12 @@
           ]
         },
         {
-          "id": "33591bb",
+          "id": "cf8d2c0",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "33591bb",
+            "_element_id": "cf8d2c0",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -262,12 +262,12 @@
           },
           "elements": [
             {
-              "id": "5d24e05",
+              "id": "a7c5448",
               "elType": "container",
               "isInner": true,
               "isLocked": false,
               "settings": {
-                "_element_id": "5d24e05",
+                "_element_id": "a7c5448",
                 "container_type": "flex",
                 "content_width": "full",
                 "flex_direction": "column",
@@ -320,12 +320,12 @@
               },
               "elements": [
                 {
-                  "id": "cd9d2b3",
+                  "id": "b53613a",
                   "elType": "container",
                   "isInner": true,
                   "isLocked": false,
                   "settings": {
-                    "_element_id": "cd9d2b3",
+                    "_element_id": "b53613a",
                     "container_type": "flex",
                     "content_width": "full",
                     "flex_direction": "column",
@@ -378,12 +378,12 @@
                   },
                   "elements": [
                     {
-                      "id": "b3efa83",
+                      "id": "2155526",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "b3efa83",
+                        "_element_id": "2155526",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "column",
@@ -436,13 +436,13 @@
                       },
                       "elements": [
                         {
-                          "id": "09b740e",
+                          "id": "546f5b7",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "heading",
                           "settings": {
-                            "_element_id": "09b740e",
+                            "_element_id": "546f5b7",
                             "minHeight": 106,
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
@@ -472,13 +472,13 @@
                           "elements": []
                         },
                         {
-                          "id": "70a42b8",
+                          "id": "a3979fa",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "text-editor",
                           "settings": {
-                            "_element_id": "70a42b8",
+                            "_element_id": "a3979fa",
                             "minHeight": 45,
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
@@ -506,117 +506,57 @@
                       ]
                     },
                     {
-                      "id": "bd66cb7",
-                      "elType": "container",
-                      "isInner": true,
+                      "id": "9dd70ec",
+                      "elType": "widget",
+                      "isInner": false,
                       "isLocked": false,
+                      "widgetType": "button",
                       "settings": {
-                        "_element_id": "bd66cb7",
-                        "container_type": "flex",
-                        "content_width": "full",
-                        "flex_direction": "row",
-                        "flex__is_row": "row",
-                        "flex__is_column": "column",
-                        "overflow": "hidden",
+                        "_element_id": "9dd70ec",
+                        "minHeight": 47,
                         "justify_content": "center",
-                        "flex_justify_content": "center",
-                        "justify_content_tablet": "",
-                        "justify_content_mobile": "",
-                        "align_items": "flex-start",
-                        "flex_align_items": "flex-start",
-                        "align_items_tablet": "",
-                        "align_items_mobile": "",
-                        "padding": {
+                        "align_items": "center",
+                        "align": "center",
+                        "color": "rgba(0, 0, 0, 1)",
+                        "typography_typography": "custom",
+                        "typography_font_family": "Figtree",
+                        "typography_font_weight": 500,
+                        "typography_font_size": {
                           "unit": "px",
-                          "top": "0",
-                          "right": "420",
-                          "bottom": "0",
-                          "left": "420",
+                          "size": 14
+                        },
+                        "typography_line_height": {
+                          "unit": "px",
+                          "size": 22.399999618530273
+                        },
+                        "typography_text_decoration": "none",
+                        "typography_text_transform": "none",
+                        "text": "Shop Now    |    $49",
+                        "size": "sm",
+                        "button_type": "",
+                        "background_color": "rgba(255, 255, 255, 1)",
+                        "button_text_color": "rgba(0, 0, 0, 1)",
+                        "button_padding": {
+                          "unit": "px",
+                          "top": 12,
+                          "right": 20,
+                          "bottom": 12,
+                          "left": 20,
                           "isLinked": false
                         },
-                        "_padding": {
+                        "border_radius": {
                           "unit": "px",
-                          "top": "0",
-                          "right": "420",
-                          "bottom": "0",
-                          "left": "420",
-                          "isLinked": false
-                        },
-                        "width": {
-                          "unit": "%",
-                          "size": "",
-                          "sizes": []
-                        },
-                        "min_height": {
-                          "unit": "px",
-                          "size": 47,
-                          "sizes": []
-                        },
-                        "flex_gap": {
-                          "unit": "px",
-                          "column": "",
-                          "row": "",
+                          "top": 14,
+                          "right": 14,
+                          "bottom": 14,
+                          "left": 14,
                           "isLinked": true
                         }
                       },
                       "defaultEditSettings": {
                         "defaultEditRoute": "content"
                       },
-                      "elements": [
-                        {
-                          "id": "472ae91",
-                          "elType": "widget",
-                          "isInner": false,
-                          "isLocked": false,
-                          "widgetType": "button",
-                          "settings": {
-                            "_element_id": "472ae91",
-                            "minHeight": 47,
-                            "justify_content": "center",
-                            "align_items": "center",
-                            "align": "center",
-                            "color": "rgba(0, 0, 0, 1)",
-                            "typography_typography": "custom",
-                            "typography_font_family": "Figtree",
-                            "typography_font_weight": 500,
-                            "typography_font_size": {
-                              "unit": "px",
-                              "size": 14
-                            },
-                            "typography_line_height": {
-                              "unit": "px",
-                              "size": 22.399999618530273
-                            },
-                            "typography_text_decoration": "none",
-                            "typography_text_transform": "none",
-                            "text": "Shop Now    |    $49",
-                            "size": "sm",
-                            "button_type": "",
-                            "background_color": "rgba(255, 255, 255, 1)",
-                            "button_text_color": "rgba(0, 0, 0, 1)",
-                            "button_padding": {
-                              "unit": "px",
-                              "top": 12,
-                              "right": 20,
-                              "bottom": 12,
-                              "left": 20,
-                              "isLinked": false
-                            },
-                            "border_radius": {
-                              "unit": "px",
-                              "top": 14,
-                              "right": 14,
-                              "bottom": 14,
-                              "left": 14,
-                              "isLinked": true
-                            }
-                          },
-                          "defaultEditSettings": {
-                            "defaultEditRoute": "content"
-                          },
-                          "elements": []
-                        }
-                      ]
+                      "elements": []
                     }
                   ]
                 }
