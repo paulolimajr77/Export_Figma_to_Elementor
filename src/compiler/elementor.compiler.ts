@@ -53,6 +53,51 @@ export class ElementorCompiler {
         return typeof value === 'string' ? value : '#000000';
     }
 
+    private appendCustomCss(settings: ElementorSettings, css: string | undefined) {
+        if (!css) return;
+        const snippet = css.trim();
+        if (!snippet) return;
+        settings.custom_css = settings.custom_css ? `${settings.custom_css}\n${snippet}`.trim() : snippet;
+    }
+
+    private normalizeStopPosition(value: number | undefined, index: number, total: number): number {
+        if (typeof value === 'number') {
+            if (value <= 1 && value >= 0) return Math.round(value * 100);
+            return Math.round(value);
+        }
+        if (total <= 1) return 0;
+        return Math.round((index / (total - 1)) * 100);
+    }
+
+    private formatGradientColor(value: any): string {
+        if (!value) return '#000000';
+        if (typeof value === 'string') return value;
+        return this.sanitizeColor(value) || '#000000';
+    }
+
+    private buildGradientCssString(gradient: any): string | null {
+        if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length < 2) return null;
+        const stops = gradient.stops.map((stop: any, idx: number) => {
+            const color = this.formatGradientColor(stop?.color);
+            const pos = this.normalizeStopPosition(stop?.position, idx, gradient.stops.length);
+            return `${color} ${pos}%`;
+        });
+        if (stops.length < 2) return null;
+        if ((gradient.gradientType || '').toLowerCase() === 'radial') {
+            return `radial-gradient(circle, ${stops.join(', ')})`;
+        }
+        const angle = typeof gradient.angle === 'number' ? gradient.angle : 180;
+        return `linear-gradient(${angle}deg, ${stops.join(', ')})`;
+    }
+
+    private applyGradientCustomCss(settings: ElementorSettings, gradient: any, selector: string, property: string = 'background-image') {
+        if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length <= 2) return;
+        const cssValue = this.buildGradientCssString(gradient);
+        if (!cssValue) return;
+        const rule = `${selector} { ${property}: ${cssValue} !important; }`;
+        this.appendCustomCss(settings, rule);
+    }
+
     public compile(schema: PipelineSchema): ElementorJSON {
         const elements = schema.containers.map(container => this.compileContainer(container, false));
 
@@ -217,7 +262,8 @@ export class ElementorCompiler {
                 typeKey: string;
                 angleKey: string;
             },
-            gradient: any
+            gradient: any,
+            options?: { selector?: string; property?: string }
         ) => {
             const stops = Array.isArray(gradient.stops) ? gradient.stops : [];
             if (stops.length === 0) return;
@@ -230,6 +276,11 @@ export class ElementorCompiler {
             (settings as any)[target.colorBKey] = lastStop.color;
             (settings as any)[target.colorBStopKey] = { unit: '%', size: lastStop.position ?? 100, sizes: [] };
             (settings as any)[target.angleKey] = { unit: 'deg', size: gradient.angle ?? 180, sizes: [] };
+
+            if (stops.length > 2) {
+                const selector = options?.selector || '{{WRAPPER}}';
+                this.applyGradientCustomCss(settings, gradient, selector, options?.property || 'background-image');
+            }
         };
 
         const backgroundImage = styles.backgroundImage || (styles.background?.type === 'image' ? styles.background : undefined);
@@ -261,6 +312,7 @@ export class ElementorCompiler {
             settings.background_color_b_stop = { unit: '%', size: lastStop.position, sizes: [] };
             const angle = backgroundGradient.angle !== undefined ? backgroundGradient.angle : 180;
             settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
+            this.applyGradientCustomCss(settings, backgroundGradient, '{{WRAPPER}}');
         } else if (backgroundSolid && backgroundSolid.color) {
             const sanitizedColor = this.sanitizeColor(backgroundSolid.color);
             if (sanitizedColor) {
@@ -282,6 +334,7 @@ export class ElementorCompiler {
                 settings.background_color_b_stop = { unit: '%', size: lastStop.position, sizes: [] };
                 const angle = bg.angle !== undefined ? bg.angle : 180;
                 settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
+                this.applyGradientCustomCss(settings, bg, '{{WRAPPER}}');
             } else if ((bg.type === 'solid' || bg.color)) {
                 const sanitizedColor = this.sanitizeColor(bg.color);
                 if (sanitizedColor) {
@@ -302,7 +355,8 @@ export class ElementorCompiler {
                     typeKey: 'background_overlay_gradient_type',
                     angleKey: 'background_overlay_gradient_angle'
                 },
-                styles.backgroundOverlay
+                styles.backgroundOverlay,
+                { selector: '{{WRAPPER}} > .elementor-background-overlay' }
             );
             if (!settings.background_overlay_opacity) {
                 settings.background_overlay_opacity = { unit: '%', size: 100, sizes: [] };
@@ -617,6 +671,7 @@ export class ElementorCompiler {
                                 settings.background_color_b_stop = { unit: '%', size: stopB || 100, sizes: [] };
                             }
                         }
+                        this.applyGradientCustomCss(settings, bg, '{{WRAPPER}} .elementor-button');
                     } else if (bg.type === 'image') {
                         settings.background_background = 'classic';
                         settings.background_image = { url: '', id: 0, imageHash: bg.imageHash };

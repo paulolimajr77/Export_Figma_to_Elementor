@@ -12,6 +12,7 @@ export class ImageUploader {
     private nodeHashCache: Map<string, string> = new Map();
     private quality: number = 0.85;
     private wpConfig: WPConfig;
+    private overwriteExisting: boolean = false;
 
     constructor(wpConfig: WPConfig, quality: number = 0.85) {
         this.wpConfig = wpConfig;
@@ -84,6 +85,7 @@ export class ImageUploader {
             ...wpConfig,
             password: wpConfig?.password || (wpConfig as any)?.token
         };
+        this.overwriteExisting = !!(wpConfig as any)?.overwriteImages;
     }
 
     clearCache(): void {
@@ -156,7 +158,8 @@ export class ImageUploader {
                 mimeType: mime,
                 targetMimeType: needsConversion ? 'image/webp' : mime,
                 data: bytes,
-                needsConversion: !!needsConversion
+                needsConversion: !!needsConversion,
+                overwrite: this.overwriteExisting
             });
         });
     }

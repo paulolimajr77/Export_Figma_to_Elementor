@@ -51,6 +51,44 @@ function toHex(value: any): string {
     return typeof value === 'string' ? value : '#000000';
 }
 
+function appendCustomCss(settings: ElementorSettings, css: string | undefined) {
+    if (!css) return;
+    const snippet = css.trim();
+    if (!snippet) return;
+    settings.custom_css = settings.custom_css ? `${settings.custom_css}\n${snippet}`.trim() : snippet;
+}
+
+function normalizeStopPosition(value: number | undefined, index: number, total: number): number {
+    if (typeof value === 'number') {
+        if (value <= 1 && value >= 0) return Math.round(value * 100);
+        return Math.round(value);
+    }
+    if (total <= 1) return 0;
+    return Math.round((index / (total - 1)) * 100);
+}
+
+function buildGradientCssString(gradient: any): string | null {
+    if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length < 2) return null;
+    const stops = gradient.stops.map((stop: any, idx: number) => {
+        const color = typeof stop?.color === 'string' ? stop.color : toHex(stop?.color);
+        const pos = normalizeStopPosition(stop?.position, idx, gradient.stops.length);
+        return `${color} ${pos}%`;
+    });
+    if (stops.length < 2) return null;
+    if ((gradient.gradientType || '').toLowerCase() === 'radial') {
+        return `radial-gradient(circle, ${stops.join(', ')})`;
+    }
+    const angle = typeof gradient.angle === 'number' ? gradient.angle : 180;
+    return `linear-gradient(${angle}deg, ${stops.join(', ')})`;
+}
+
+function applyGradientCustomCss(settings: ElementorSettings, gradient: any, selector: string) {
+    if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length <= 2) return;
+    const cssValue = buildGradientCssString(gradient);
+    if (!cssValue) return;
+    appendCustomCss(settings, `${selector} { background-image: ${cssValue} !important; }`);
+}
+
 function stubDefinition(key: string, family: WidgetDefinition['family'] = 'misc', aliases: string[] = []): WidgetDefinition {
     const widgetType = slugFromKey(key);
     return {
@@ -282,15 +320,16 @@ const registry: WidgetDefinition[] = [
                         if (stopA <= 1 && stopA > 0) stopA = Math.round(stopA * 100);
                         settings.background_color_stop = { unit: '%', size: stopA || 0, sizes: [] };
 
-                        if (bg.stops.length > 1) {
-                            const last = bg.stops[bg.stops.length - 1];
-                            settings.background_color_b = toHex(last.color);
+                            if (bg.stops.length > 1) {
+                                const last = bg.stops[bg.stops.length - 1];
+                                settings.background_color_b = toHex(last.color);
 
-                            let stopB = last.position;
-                            if (stopB <= 1 && stopB > 0) stopB = Math.round(stopB * 100);
-                            settings.background_color_b_stop = { unit: '%', size: stopB || 100, sizes: [] };
+                                let stopB = last.position;
+                                if (stopB <= 1 && stopB > 0) stopB = Math.round(stopB * 100);
+                                settings.background_color_b_stop = { unit: '%', size: stopB || 100, sizes: [] };
+                            }
                         }
-                    }
+                    applyGradientCustomCss(settings, bg, '{{WRAPPER}} .elementor-button');
                 } else if (bg.type === 'solid' || bg.color) {
                     // Solid background
                     settings.background_background = 'classic';
@@ -316,6 +355,11 @@ const registry: WidgetDefinition[] = [
                             settings.background_color_b_stop = { unit: '%', size: Math.round(last.position * 100), sizes: [] };
                         }
                     }
+                    applyGradientCustomCss(
+                        settings,
+                        { gradientType: 'linear', stops: gradientFill.gradientStops, angle: 180 },
+                        '{{WRAPPER}} .elementor-button'
+                    );
                 } else if (solidFill && solidFill.color) {
                     settings.background_background = 'classic';
                     settings.background_color = toHex(solidFill.color);

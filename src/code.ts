@@ -364,6 +364,7 @@ async function loadWPConfig(): Promise<WPConfig> {
     const user = await loadSetting<string>('gptel_wp_user', '');
     const token = await loadSetting<string>('gptel_wp_token', '');
     const exportImages = await loadSetting<boolean>('gptel_export_images', false);
+    const overwriteImages = await loadSetting<boolean>('gptel_overwrite_images', false);
     const webpQuality = await loadSetting<number>('gptel_webp_quality', 85);
     // legacy fallback
     if (!url || !token || !user) {
@@ -374,11 +375,12 @@ async function loadWPConfig(): Promise<WPConfig> {
                 user: legacy.user || user,
                 token: legacy.auth || token,
                 exportImages,
+                overwriteImages,
                 webpQuality
             } as any;
         }
     }
-    return { url, user, token, exportImages, webpQuality } as any;
+    return { url, user, token, exportImages, overwriteImages, webpQuality } as any;
 }
 
 async function resolveProviderConfig(msg?: any): Promise<{ provider: SchemaProvider; apiKey: string; providerId: string }> {
@@ -528,17 +530,25 @@ function sendPreview(data: any) {
 function warnExcessiveLineHeight(root: SerializedNode) {
     if (!root) return;
     const THRESHOLD = 1.5;
-    type LineHeightIssue = { nodeName: string; linePx: number; fontSize: number; ratio: number };
+    type LineHeightIssue = {
+        nodeId: string;
+        nodeName: string;
+        linePx: number;
+        fontSize: number;
+        ratio: number;
+    };
     const issues: LineHeightIssue[] = [];
 
-    const ensureIssue = (fontSize?: number, lineHeight?: any, nodeName?: string): boolean => {
-        if (!fontSize || !lineHeight) return false;
+    const ensureIssue = (node: SerializedNode, fontSize?: number, lineHeight?: any): boolean => {
+        if (!node || !fontSize || !lineHeight) return false;
         const px = resolveLineHeightPx(lineHeight, fontSize);
         if (!px) return false;
         const ratio = px / fontSize;
         if (ratio > THRESHOLD) {
+            const name = (node as any).name || ((node as any).characters ? ((node as any).characters as string).slice(0, 40) : (node as any).id || 'Texto');
             issues.push({
-                nodeName: nodeName || 'Texto',
+                nodeId: ((node as any).id || '') as string,
+                nodeName: name,
                 linePx: px,
                 fontSize,
                 ratio
@@ -551,17 +561,16 @@ function warnExcessiveLineHeight(root: SerializedNode) {
     const walk = (node: SerializedNode | null | undefined) => {
         if (!node) return;
         if ((node as any).type === 'TEXT') {
-            const name = (node as any).name || ((node as any).characters ? ((node as any).characters as string).slice(0, 40) : node.id);
             const baseFontSize = typeof (node as any).fontSize === 'number' ? (node as any).fontSize : undefined;
             const baseLineHeight = (node as any).lineHeight;
-            let warned = ensureIssue(baseFontSize, baseLineHeight, name);
+            let warned = ensureIssue(node, baseFontSize, baseLineHeight);
 
             const segments = (node as any).styledTextSegments;
             if (!warned && Array.isArray(segments)) {
                 for (const segment of segments) {
                     const segFont = typeof segment.fontSize === 'number' ? segment.fontSize : baseFontSize;
                     const segLine = segment.lineHeight || baseLineHeight;
-                    if (ensureIssue(segFont, segLine, name)) {
+                    if (ensureIssue(node, segFont, segLine)) {
                         warned = true;
                         break;
                     }
@@ -578,9 +587,24 @@ function warnExcessiveLineHeight(root: SerializedNode) {
 
     if (issues.length > 0) {
         issues.forEach(issue => {
-            const message = `Line-height alto detectado em "${issue.nodeName}": ${issue.linePx.toFixed(1)}px (${issue.ratio.toFixed(2)}x o font-size ${issue.fontSize}px). Ajuste no Figma para evitar esticar o botão.`;
+            const message = `Line-height alto detectado em "${issue.nodeName}": ${issue.linePx.toFixed(1)}px (${issue.ratio.toFixed(2)}x o font-size ${issue.fontSize}px). Ajuste no Figma para evitar esticar o bot?o.`;
             log(message, 'warn');
         });
+
+        const summary = issues.length === 1
+            ? `Line-height alto em "${issues[0].nodeName}".`
+            : `${issues.length} textos com line-height acima de ${THRESHOLD}x.`;
+        safeInvoke(() => figma.notify(`${summary} Ajuste-os no Figma para evitar bot?es esticados.`, { timeout: 5000 }));
+        safeInvoke(() => figma.ui.postMessage({
+            type: 'line-height-warning',
+            issues: issues.map(issue => ({
+                nodeId: issue.nodeId,
+                nodeName: issue.nodeName,
+                lineHeightPx: issue.linePx,
+                fontSize: issue.fontSize,
+                ratio: issue.ratio
+            }))
+        }));
     }
 }
 
@@ -1175,6 +1199,8 @@ async function sendStoredSettings() {
     const wpUser = await loadSetting<string>('gptel_wp_user', '');
     const wpToken = await loadSetting<string>('gptel_wp_token', '');
     const exportImages = await loadSetting<boolean>('gptel_export_images', false);
+    const overwriteImages = await loadSetting<boolean>('gptel_overwrite_images', false);
+    const autoPage = await loadSetting<boolean>('gptel_auto_page', false);
     const webpQuality = await loadSetting<number>('gptel_webp_quality', 85);
     const darkMode = await loadSetting<boolean>('gptel_dark_mode', false);
     const useAI = await loadSetting<boolean>('gptel_use_ai', true);
@@ -1201,6 +1227,8 @@ async function sendStoredSettings() {
             wpUser,
             wpToken,
             exportImages,
+            overwriteImages,
+            autoPage,
             webpQuality,
             darkMode,
             useAI,
@@ -1521,6 +1549,7 @@ figma.ui.onmessage = async (msg) => {
                 await saveSetting('gptel_wp_token', token);
                 await saveSetting('gptel_export_images', !!(cfg as any).exportImages);
                 await saveSetting('gptel_auto_page', !!autoPage);
+                await saveSetting('gptel_overwrite_images', !!(cfg as any).overwriteImages);
                 figma.ui.postMessage({ type: 'wp-status', success: true, message: 'Conexao com WordPress verificada.' });
             } catch (e: any) {
                 const wpError = (safeGet(e, 'message') as string) || e;

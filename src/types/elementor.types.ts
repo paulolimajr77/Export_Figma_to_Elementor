@@ -9,6 +9,7 @@ export interface WPConfig {
     exportImages?: boolean;
     autoPage?: boolean;
     autoMenu?: boolean;
+    overwriteImages?: boolean;
 }
 
 export interface ElementorSettings {
