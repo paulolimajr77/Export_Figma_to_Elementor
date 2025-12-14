@@ -705,48 +705,31 @@ ${JSON.stringify(baseSchema, null, 2)}
 
             // Button Icon Upload
             if (widget.type === 'button') {
-                // Check if button has an icon URL that needs uploading (from child extraction)
-                // The registry might have set selected_icon.value to { url: "Icon", id: 6090 } where "Icon" is the name
-                // We need to find the actual child node ID if possible, or use the ID provided if it's a valid node ID.
-                const iconValue = widget.styles?.selected_icon?.value;
-                if (iconValue && typeof iconValue === 'object' && iconValue.id) {
-                    // If ID is a number, it might be already uploaded or a partial Figma ID (if parsed).
-                    // If it's a string like "6090:5830", it's a Figma ID.
-                    // The registry currently parses it to int. We might need to look at children to find the real ID if it's missing.
+                let iconNodeId = widget.imageId;
 
-                    // However, let's try to find the icon child in the widget's children if available
-                    // The pipeline widget might not have children populated if it came from AI, 
-                    // but if it came from Heuristics/Base, it might.
-                    // Actually, 'processWidget' receives the widget from the schema.
-
-                    // If we can't find the child, we rely on the ID in selected_icon.
-                    // But if registry parsed "6090:5830" to 6090, we can't use it for uploadNodeImage easily if we need the full ID.
-                    // Let's assume for now we can try to find the child by type 'icon' or 'vector' in the container's original node?
-                    // No, we don't have easy access to the node here without looking it up.
-
-                    // Workaround: If we have a numeric ID that matches a node in Figma (partial match?), we could try.
-                    // But better: let's try to upload using the ID we have, assuming it might be valid or we can find it.
-                    // If iconValue.url is "Icon" (name), we definitely need to upload.
-
-                    // Let's try to find the original node using the widget.imageId if available, or look up children.
-                    // But widget.imageId for button is usually the button frame itself.
-
-                    // Let's try to find a child of the button node that is a vector/icon.
-                    if (widget.styles?.sourceId) {
-                        const buttonNode = figma.getNodeById(widget.styles.sourceId);
-                        if (buttonNode && 'children' in buttonNode) {
-                            const iconChild = (buttonNode as any).children.find((c: any) => c.name === 'Icon' || c.type === 'VECTOR' || c.name.toLowerCase().includes('icon'));
-                            if (iconChild) {
-                                try {
-                                    const result = await uploadNodeImage(iconChild.id, true);
-                                    if (result) {
-                                        widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: 'svg' };
-                                    }
-                                } catch (e) {
-                                    console.error(`[Pipeline] Failed to upload button icon ${iconChild.id}:`, e);
-                                }
-                            }
+                if (!iconNodeId && widget.styles?.sourceId) {
+                    const buttonNode = figma.getNodeById(widget.styles.sourceId);
+                    if (buttonNode && 'children' in buttonNode) {
+                        const iconChild = (buttonNode as any).children.find((c: any) => {
+                            const name = (c.name || '').toLowerCase();
+                            return c.type === 'VECTOR' || name.includes('icon');
+                        });
+                        if (iconChild) {
+                            iconNodeId = iconChild.id;
                         }
+                    }
+                }
+
+                if (iconNodeId) {
+                    try {
+                        const result = await uploadNodeImage(iconNodeId, true);
+                        if (result) {
+                            if (!widget.styles) widget.styles = {};
+                            widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: 'svg' };
+                            widget.imageId = result.id.toString();
+                        }
+                    } catch (e) {
+                        console.error(`[Pipeline] Failed to upload button icon ${iconNodeId}:`, e);
                     }
                 }
             }
@@ -754,7 +737,33 @@ ${JSON.stringify(baseSchema, null, 2)}
 
         const uploadPromises: Promise<void>[] = [];
 
+        const processContainerBackground = async (container: PipelineContainer) => {
+            const styles = container.styles || {};
+            const backgroundImage = (styles.backgroundImage as any) || (styles.background && styles.background.type === 'image' ? styles.background : null);
+            const imageHash = backgroundImage?.imageHash;
+            if (!imageHash) return;
+
+            try {
+                const sourceLabel = container.id || styles.sourceId || 'container';
+                const uploaded = await this.imageUploader.uploadImageHash(imageHash, String(sourceLabel));
+                if (uploaded) {
+                    if (!styles.backgroundImage) {
+                        styles.backgroundImage = { type: 'image', imageHash };
+                    }
+                    (styles.backgroundImage as any).wpUrl = uploaded.url;
+                    (styles.backgroundImage as any).wpId = uploaded.id;
+                    container.styles = styles;
+                }
+            } catch (error) {
+                console.error('[Pipeline] Failed to upload container background:', error);
+            }
+        };
+
         const collectUploads = (container: PipelineContainer) => {
+            if (container.styles) {
+                uploadPromises.push(processContainerBackground(container));
+            }
+
             if (container.widgets) {
                 for (const widget of container.widgets) {
                     uploadPromises.push(processWidget(widget));
@@ -780,6 +789,24 @@ ${JSON.stringify(baseSchema, null, 2)}
 
     private hydrateStyles(schema: PipelineSchema, flatNodes: SerializedNode[]): void {
         const nodeMap = new Map(flatNodes.map(n => [n.id, n]));
+        const vectorTypes = new Set(['VECTOR', 'ELLIPSE', 'POLYGON', 'STAR', 'BOOLEAN_OPERATION', 'LINE']);
+        const findVectorChildNode = (root?: SerializedNode | null): SerializedNode | null => {
+            if (!root) return null;
+            if (vectorTypes.has((root as any).type)) {
+                return root;
+            }
+            const children = (root as any).children;
+            if (Array.isArray(children) && children.length > 0) {
+                for (const child of children) {
+                    const found = findVectorChildNode(child as SerializedNode);
+                    if (found) return found;
+                }
+            }
+            if (((root as any).name || '').toLowerCase().includes('icon')) {
+                return root;
+            }
+            return null;
+        };
 
         const processContainer = (container: PipelineContainer) => {
             // Hydrate Container Styles
@@ -837,6 +864,13 @@ ${JSON.stringify(baseSchema, null, 2)}
                                     // Ensure content is up to date with node if it's simple text
                                     // (Optional, AI might have summarized it, but usually we want exact text)
                                     widget.content = (node as any).characters || node.name;
+                                }
+                            }
+
+                            if (!widget.imageId && (widget.type === 'button' || widget.type === 'icon' || widget.type === 'icon-box')) {
+                                const vectorChild = findVectorChildNode(node);
+                                if (vectorChild) {
+                                    widget.imageId = vectorChild.id;
                                 }
                             }
                         }
@@ -1169,9 +1203,65 @@ ${JSON.stringify(baseSchema, null, 2)}
         console.log('[NAV MENU SYNC] ========== START ==========');
         console.log('[NAV MENU SYNC] WPConfig:', { url: wpConfig.url, user: (wpConfig as any).user, hasPassword: !!((wpConfig as any).password || (wpConfig as any).token) });
 
+        const sendUiMessage = (level: 'success' | 'info' | 'warn' | 'error', message: string) => {
+            try {
+                figma.ui.postMessage({ type: 'log', level, message });
+            } catch (err) {
+                console.warn('[NAV MENU SYNC] Unable to send UI message:', err);
+            }
+        };
+
         const syncEnabled = !!(wpConfig && wpConfig.url && (wpConfig as any).user && ((wpConfig as any).password || (wpConfig as any).token));
         if (!syncEnabled) {
             console.log('[NAV MENU SYNC] ❌ Skipped: WordPress config not provided.');
+            sendUiMessage('warn', 'Sincroniza??o de menus desativada: informe URL, usu?rio e senha do WordPress para criar o menu.');
+            return;
+        }
+
+        const endpoint = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
+        const btoaPolyfill = (str: string): string => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+            let output = '';
+            let i = 0;
+
+            while (i < str.length) {
+                const a = str.charCodeAt(i++);
+                const b = i < str.length ? str.charCodeAt(i++) : 0;
+                const c = i < str.length ? str.charCodeAt(i++) : 0;
+
+                const bitmap = (a << 16) | (b << 8) | c;
+
+                output += chars.charAt((bitmap >> 18) & 63);
+                output += chars.charAt((bitmap >> 12) & 63);
+                output += chars.charAt(b ? (bitmap >> 6) & 63 : 64);
+                output += chars.charAt(c ? bitmap & 63 : 64);
+            }
+
+            return output;
+        };
+        const auth = 'Basic ' + btoaPolyfill(`${(wpConfig as any).user}:${(wpConfig as any).password || (wpConfig as any).token}`);
+
+        try {
+            const checkResponse = await fetch(endpoint, {
+                method: 'OPTIONS',
+                headers: {
+                    'Authorization': auth
+                }
+            });
+
+            if (checkResponse.status === 404) {
+                console.error('[NAV MENU SYNC] Endpoint /wp-json/figtoel-remote-menus/v1/sync não encontrado.');
+                sendUiMessage('error', 'Instale e ative o plugin WordPress figtoel-remote-menus para habilitar o endpoint de sincronização de menus.');
+                return;
+            }
+
+            if (!checkResponse.ok && checkResponse.status !== 401 && checkResponse.status !== 403 && checkResponse.status !== 405) {
+                console.warn('[NAV MENU SYNC] Endpoint check retornou status inesperado:', checkResponse.status);
+                sendUiMessage('warn', `Não foi possível validar o endpoint de menus (status ${checkResponse.status}). Tentando sincronizar mesmo assim...`);
+            }
+        } catch (error) {
+            console.error('[NAV MENU SYNC] Falha ao verificar endpoint:', error);
+            sendUiMessage('error', `Não foi possível verificar o endpoint do plugin figtoel-remote-menus: ${error}`);
             return;
         }
 
@@ -1230,35 +1320,9 @@ ${JSON.stringify(baseSchema, null, 2)}
                     items
                 };
 
-                const url = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
+                console.log(`[NAV MENU SYNC] Posting to ${endpoint}...`, payload);
 
-                // Pure JavaScript btoa polyfill (Figma doesn't have Buffer or btoa)
-                const btoaPolyfill = (str: string): string => {
-                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-                    let output = '';
-                    let i = 0;
-
-                    while (i < str.length) {
-                        const a = str.charCodeAt(i++);
-                        const b = i < str.length ? str.charCodeAt(i++) : 0;
-                        const c = i < str.length ? str.charCodeAt(i++) : 0;
-
-                        const bitmap = (a << 16) | (b << 8) | c;
-
-                        output += chars.charAt((bitmap >> 18) & 63);
-                        output += chars.charAt((bitmap >> 12) & 63);
-                        output += chars.charAt(b ? (bitmap >> 6) & 63 : 64);
-                        output += chars.charAt(c ? bitmap & 63 : 64);
-                    }
-
-                    return output;
-                };
-
-                const auth = 'Basic ' + btoaPolyfill(`${(wpConfig as any).user}:${(wpConfig as any).password || (wpConfig as any).token}`);
-
-                console.log(`[NAV MENU SYNC] Posting to ${url}...`, payload);
-
-                const response = await fetch(url, {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1267,19 +1331,27 @@ ${JSON.stringify(baseSchema, null, 2)}
                     body: JSON.stringify(payload)
                 });
 
-                const result = await response.json();
+                let responseText = '';
+                let result: any = null;
+                try {
+                    responseText = await response.text();
+                    result = responseText ? JSON.parse(responseText) : null;
+                } catch {
+                    result = null;
+                }
 
-                if (response.ok && result.success) {
+                if (response.ok && result?.success) {
                     console.log(`[NAV MENU SYNC] ✅ Menu "${menuName}" synced successfully. Items created: ${result.items_created}`);
-                    figma.ui.postMessage({ type: 'log', level: 'success', message: `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.` });
+                    sendUiMessage('success', `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.`);
                 } else {
-                    console.error(`[NAV MENU SYNC] ❌ Failed to sync menu "${menuName}":`, result);
-                    figma.ui.postMessage({ type: 'log', level: 'error', message: `Erro ao criar menu "${menuName}": ${result.error || 'Desconhecido'}` });
+                    const detailedError = result?.error || result?.message || responseText || response.statusText || 'Desconhecido';
+                    console.error(`[NAV MENU SYNC] ❌ Failed to sync menu "${menuName}":`, { status: response.status, body: responseText });
+                    sendUiMessage('error', `Erro ${response.status} ao criar o menu "${menuName}": ${detailedError}`);
                 }
 
             } catch (error) {
                 console.error(`[NAV MENU SYNC] Exception:`, error);
-                figma.ui.postMessage({ type: 'log', level: 'error', message: `Erro ao sincronizar menu: ${error}` });
+                sendUiMessage('error', `Erro ao sincronizar menu "${menuName}": ${error}`);
             }
         }
     }

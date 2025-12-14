@@ -98,9 +98,11 @@ export function extractWidgetStyles(node: SerializedNode): Record<string, any> {
     // Dimensions (for images, icons, etc.)
     if (typeof node.width === 'number') {
         styles.width = node.width;
+        styles._frameWidth = node.width;
     }
     if (typeof node.height === 'number') {
         styles.height = node.height;
+        styles._frameHeight = node.height;
     }
 
     // Color & Gradients
@@ -211,56 +213,123 @@ export function extractContainerStyles(node: SerializedNode): Record<string, any
         styles.paddingLeft = node.paddingLeft || 0;
     }
 
-    // Background (solid or gradient)
+    // Background (solid, gradient and overlays)
     const fills = node.fills;
     if (Array.isArray(fills) && fills.length > 0) {
-        const visibleFills = fills.filter((f: any) => f.visible !== false);
+        const visibleFills = fills
+            .map((fill: any, index: number) => ({ fill, index }))
+            .filter(({ fill }) => fill.visible !== false);
+
+        const toRgba = (color: any, opacity?: number) => {
+            const r = Math.round((color?.r || 0) * 255);
+            const g = Math.round((color?.g || 0) * 255);
+            const b = Math.round((color?.b || 0) * 255);
+            const a = opacity !== undefined ? opacity : (color?.a !== undefined ? color.a : 1);
+            return `rgba(${r}, ${g}, ${b}, ${a})`;
+        };
+
+        const buildGradient = (fill: any) => {
+            const stops = (fill?.gradientStops || []).map((stop: any) => ({
+                position: stop.position > 1 ? Math.round(stop.position) : Math.round((stop.position || 0) * 100),
+                color: toRgba(stop.color || {})
+            }));
+
+            let angle = 180;
+            if (fill?.gradientTransform) {
+                const [row1, row2] = fill.gradientTransform;
+                const a = row1[0];
+                const b = row2[0];
+                const rad = Math.atan2(b, a);
+                const deg = rad * (180 / Math.PI);
+                angle = Math.round(deg + 90);
+                if (angle < 0) angle += 360;
+                if (angle >= 360) angle -= 360;
+            }
+
+            return {
+                type: 'gradient',
+                gradientType: fill.type === 'GRADIENT_RADIAL' ? 'radial' : 'linear',
+                stops,
+                angle
+            };
+        };
+
         if (visibleFills.length > 0) {
-            // Use the top-most visible fill
-            const fill = visibleFills[visibleFills.length - 1];
+            const imageLayers = visibleFills.filter(({ fill }) => fill.type === 'IMAGE');
+            const gradientLayers = visibleFills.filter(({ fill }) => typeof fill.type === 'string' && fill.type.startsWith('GRADIENT'));
+            const solidLayers = visibleFills.filter(({ fill }) => fill.type === 'SOLID');
 
-            if (fill.type === 'SOLID' && fill.color) {
-                const { r, g, b } = fill.color;
-                const a = fill.opacity !== undefined ? fill.opacity : 1;
-                styles.background = {
-                    type: 'solid',
-                    color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`
-                };
-            } else if (fill.type === 'GRADIENT_LINEAR' || fill.type === 'GRADIENT_RADIAL' ||
-                fill.type === 'GRADIENT_ANGULAR' || fill.type === 'GRADIENT_DIAMOND') {
-                // Extract gradient stops
-                const stops = (fill.gradientStops || []).map((stop: any) => {
-                    const c = stop.color || { r: 0, g: 0, b: 0, a: 1 };
-                    return {
-                        position: Math.round(stop.position * 100),
-                        color: `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${c.a || 1})`
-                    };
-                });
+            const pickTopMost = (layers: Array<{ fill: any, index: number }>): { fill: any, index: number } | null => {
+                if (!layers || layers.length === 0) return null;
+                return layers.reduce((prev, curr) => (curr.index > prev.index ? curr : prev));
+            };
 
-                // Calculate Angle
-                let angle = 180;
-                if (fill.gradientTransform) {
-                    const [row1, row2] = fill.gradientTransform;
-                    const a = row1[0];
-                    const b = row2[0];
-                    const rad = Math.atan2(b, a);
-                    const deg = rad * (180 / Math.PI);
-                    angle = Math.round(deg + 90);
-                    if (angle < 0) angle += 360;
-                    if (angle >= 360) angle -= 360;
+            const topGradient = pickTopMost(gradientLayers);
+
+            let preferredImage: { fill: any, index: number } | null = null;
+            if (imageLayers.length > 0) {
+                if (topGradient) {
+                    preferredImage = imageLayers
+                        .filter(img => img.index < topGradient.index)
+                        .sort((a, b) => b.index - a.index)[0] || null;
                 }
+                if (!preferredImage) {
+                    preferredImage = pickTopMost(imageLayers);
+                }
+            }
 
-                styles.background = {
-                    type: 'gradient',
-                    gradientType: fill.type === 'GRADIENT_RADIAL' ? 'radial' : 'linear',
-                    stops: stops,
-                    angle: angle
-                };
-            } else if (fill.type === 'IMAGE') {
-                styles.background = {
+            if (preferredImage) {
+                const imageBackground = {
                     type: 'image',
-                    imageHash: fill.imageHash || null
+                    imageHash: preferredImage.fill.imageHash || null
                 };
+                styles.background = imageBackground;
+                styles.backgroundImage = imageBackground;
+            }
+
+            if (preferredImage && topGradient) {
+                styles.backgroundOverlay = buildGradient(topGradient.fill);
+            } else if (!preferredImage && topGradient) {
+                const gradientBackground = buildGradient(topGradient.fill);
+                styles.background = gradientBackground;
+                styles.backgroundGradient = gradientBackground;
+            }
+
+            if (!styles.background && solidLayers.length > 0) {
+                const topSolid = pickTopMost(solidLayers);
+                if (topSolid?.fill?.color) {
+                    const solidBackground = {
+                        type: 'solid',
+                        color: toRgba(topSolid.fill.color, topSolid.fill.opacity)
+                    };
+                    styles.background = solidBackground;
+                    styles.backgroundSolid = solidBackground;
+                }
+            }
+
+            if (!styles.background) {
+                const fallbackFill = pickTopMost(visibleFills);
+                if (fallbackFill) {
+                    if (fallbackFill.fill.type === 'SOLID' && fallbackFill.fill.color) {
+                        const solidBackground = {
+                            type: 'solid',
+                            color: toRgba(fallbackFill.fill.color, fallbackFill.fill.opacity)
+                        };
+                        styles.background = solidBackground;
+                        styles.backgroundSolid = solidBackground;
+                    } else if (typeof fallbackFill.fill.type === 'string' && fallbackFill.fill.type.startsWith('GRADIENT')) {
+                        const gradientBackground = buildGradient(fallbackFill.fill);
+                        styles.background = gradientBackground;
+                        styles.backgroundGradient = gradientBackground;
+                    } else if (fallbackFill.fill.type === 'IMAGE') {
+                        const imageBackground = {
+                            type: 'image',
+                            imageHash: fallbackFill.fill.imageHash || null
+                        };
+                        styles.background = imageBackground;
+                        styles.backgroundImage = imageBackground;
+                    }
+                }
             }
         }
     }

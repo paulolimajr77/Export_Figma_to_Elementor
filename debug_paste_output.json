@@ -4,12 +4,12 @@
   "siteurl": "",
   "elements": [
     {
-      "id": "c65f05a",
+      "id": "09ace3c",
       "elType": "container",
       "isInner": false,
       "isLocked": false,
       "settings": {
-        "_element_id": "c65f05a",
+        "_element_id": "09ace3c",
         "container_type": "flex",
         "content_width": "full",
         "flex_direction": "column",
@@ -62,12 +62,12 @@
       },
       "elements": [
         {
-          "id": "0242fde",
+          "id": "d38fb86",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "0242fde",
+            "_element_id": "d38fb86",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -104,23 +104,34 @@
               "left": "0",
               "isLinked": false
             },
-            "background_background": "gradient",
-            "background_gradient_type": "linear",
-            "background_color": "rgba(255, 71, 15, 1)",
-            "background_color_stop": {
+            "background_background": "classic",
+            "background_image": {
+              "url": "",
+              "id": 0,
+              "imageHash": "fca9c90b59338d09f59ac53c01edef83927986ef"
+            },
+            "background_overlay_background": "gradient",
+            "background_overlay_gradient_type": "linear",
+            "background_overlay_color": "rgba(255, 71, 15, 0)",
+            "background_overlay_color_stop": {
               "unit": "%",
               "size": 0,
               "sizes": []
             },
-            "background_color_b": "rgba(255, 71, 15, 0.05999999865889549)",
-            "background_color_b_stop": {
+            "background_overlay_color_b": "rgba(255, 71, 15, 0.05999999865889549)",
+            "background_overlay_color_b_stop": {
               "unit": "%",
               "size": 100,
               "sizes": []
             },
-            "background_gradient_angle": {
+            "background_overlay_gradient_angle": {
               "unit": "deg",
               "size": 165,
+              "sizes": []
+            },
+            "background_overlay_opacity": {
+              "unit": "%",
+              "size": 100,
               "sizes": []
             },
             "width": {
@@ -139,13 +150,13 @@
           },
           "elements": [
             {
-              "id": "e5f8143",
+              "id": "03a9b1b",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "image",
               "settings": {
-                "_element_id": "e5f8143",
+                "_element_id": "03a9b1b",
                 "minHeight": 690,
                 "justify_content": "flex-start",
                 "align_items": "flex-start",
@@ -166,13 +177,13 @@
               "elements": []
             },
             {
-              "id": "2d01019",
+              "id": "5af67d0",
               "elType": "widget",
               "isInner": false,
               "isLocked": false,
               "widgetType": "text-editor",
               "settings": {
-                "_element_id": "2d01019",
+                "_element_id": "5af67d0",
                 "align": "center",
                 "typography_typography": "custom",
                 "typography_font_family": "Figtree",
@@ -202,12 +213,12 @@
           ]
         },
         {
-          "id": "cf8d2c0",
+          "id": "8bc0339",
           "elType": "container",
           "isInner": true,
           "isLocked": false,
           "settings": {
-            "_element_id": "cf8d2c0",
+            "_element_id": "8bc0339",
             "container_type": "flex",
             "content_width": "full",
             "flex_direction": "column",
@@ -222,12 +233,6 @@
             "flex_align_items": "center",
             "align_items_tablet": "",
             "align_items_mobile": "",
-            "flex_gap": {
-              "unit": "px",
-              "column": "10",
-              "row": "10",
-              "isLinked": true
-            },
             "padding": {
               "unit": "px",
               "top": "130",
@@ -262,12 +267,12 @@
           },
           "elements": [
             {
-              "id": "a7c5448",
+              "id": "7b7f2d4",
               "elType": "container",
               "isInner": true,
               "isLocked": false,
               "settings": {
-                "_element_id": "a7c5448",
+                "_element_id": "7b7f2d4",
                 "container_type": "flex",
                 "content_width": "full",
                 "flex_direction": "column",
@@ -282,12 +287,6 @@
                 "flex_align_items": "center",
                 "align_items_tablet": "",
                 "align_items_mobile": "",
-                "flex_gap": {
-                  "unit": "px",
-                  "column": "96",
-                  "row": "96",
-                  "isLinked": true
-                },
                 "padding": {
                   "unit": "px",
                   "top": "0",
@@ -320,12 +319,12 @@
               },
               "elements": [
                 {
-                  "id": "b53613a",
+                  "id": "162677c",
                   "elType": "container",
                   "isInner": true,
                   "isLocked": false,
                   "settings": {
-                    "_element_id": "b53613a",
+                    "_element_id": "162677c",
                     "container_type": "flex",
                     "content_width": "full",
                     "flex_direction": "column",
@@ -378,12 +377,12 @@
                   },
                   "elements": [
                     {
-                      "id": "2155526",
+                      "id": "0a3d74c",
                       "elType": "container",
                       "isInner": true,
                       "isLocked": false,
                       "settings": {
-                        "_element_id": "2155526",
+                        "_element_id": "0a3d74c",
                         "container_type": "flex",
                         "content_width": "full",
                         "flex_direction": "column",
@@ -436,14 +435,18 @@
                       },
                       "elements": [
                         {
-                          "id": "546f5b7",
+                          "id": "8925292",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "heading",
                           "settings": {
-                            "_element_id": "546f5b7",
+                            "_element_id": "8925292",
                             "minHeight": 106,
+                            "backgroundSolid": {
+                              "type": "solid",
+                              "color": "rgba(255, 255, 255, 1)"
+                            },
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
                             "typography_typography": "custom",
@@ -472,14 +475,18 @@
                           "elements": []
                         },
                         {
-                          "id": "a3979fa",
+                          "id": "06c8970",
                           "elType": "widget",
                           "isInner": false,
                           "isLocked": false,
                           "widgetType": "text-editor",
                           "settings": {
-                            "_element_id": "a3979fa",
+                            "_element_id": "06c8970",
                             "minHeight": 45,
+                            "backgroundSolid": {
+                              "type": "solid",
+                              "color": "rgba(255, 255, 255, 0.4000000059604645)"
+                            },
                             "align": "center",
                             "color": "rgba(255, 255, 255, 1)",
                             "typography_typography": "custom",
@@ -506,16 +513,20 @@
                       ]
                     },
                     {
-                      "id": "9dd70ec",
+                      "id": "7582f1e",
                       "elType": "widget",
                       "isInner": false,
                       "isLocked": false,
                       "widgetType": "button",
                       "settings": {
-                        "_element_id": "9dd70ec",
+                        "_element_id": "7582f1e",
                         "minHeight": 47,
                         "justify_content": "center",
                         "align_items": "center",
+                        "backgroundSolid": {
+                          "type": "solid",
+                          "color": "rgba(255, 255, 255, 1)"
+                        },
                         "align": "center",
                         "color": "rgba(0, 0, 0, 1)",
                         "typography_typography": "custom",
@@ -534,15 +545,33 @@
                         "text": "Shop Now    |    $49",
                         "size": "sm",
                         "button_type": "",
-                        "background_color": "rgba(255, 255, 255, 1)",
-                        "button_text_color": "rgba(0, 0, 0, 1)",
-                        "button_padding": {
+                        "background_background": "classic",
+                        "background_color": "#FFFFFF",
+                        "button_text_color": "#000000",
+                        "text_padding": {
                           "unit": "px",
-                          "top": 12,
-                          "right": 20,
-                          "bottom": 12,
-                          "left": 20,
+                          "top": "12",
+                          "right": "20",
+                          "bottom": "12",
+                          "left": "20",
                           "isLinked": false
+                        },
+                        "width": {
+                          "unit": "px",
+                          "size": 162,
+                          "sizes": []
+                        },
+                        "min_height": {
+                          "unit": "px",
+                          "size": 47,
+                          "sizes": []
+                        },
+                        "flex_grow": 0,
+                        "align_self": "flex-start",
+                        "button_hover_transition_duration": {
+                          "unit": "s",
+                          "size": 0.3,
+                          "sizes": []
                         },
                         "border_radius": {
                           "unit": "px",

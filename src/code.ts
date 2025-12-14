@@ -1,6 +1,8 @@
 ﻿import { ConversionPipeline } from './pipeline';
 import type { WPConfig, ElementorJSON } from './types/elementor.types';
+import type { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipeline.schema';
 import { serializeNode, SerializedNode } from './utils/serialization_utils';
+import { extractContainerStyles, extractWidgetStyles, buildHtmlFromSegments } from './utils/style_utils';
 import { GEMINI_MODEL, geminiProvider } from './api_gemini';
 import { openaiProvider, testOpenAIConnection } from './api_openai';
 import { SchemaProvider, DeterministicDiffMode, PipelineRunOptions } from './types/providers';
@@ -442,6 +444,7 @@ async function generateElementorJSON(aiPayload?: any, customWP?: WPConfig, debug
     const useAIPayload = safeGet(aiPayload, 'useAI');
     const useAI = typeof useAIPayload === 'boolean' ? useAIPayload : await loadSetting<boolean>('gptel_use_ai', true);
     const serialized = serializeNode(node);
+    warnExcessiveLineHeight(serialized);
     const includeScreenshotPayload = safeGet(aiPayload, 'includeScreenshot');
     const includeScreenshot = typeof includeScreenshotPayload === 'boolean' ? includeScreenshotPayload : await loadSetting<boolean>('gptel_include_screenshot', true);
     const includeReferencesPayload = safeGet(aiPayload, 'includeReferences');
@@ -522,9 +525,350 @@ function sendPreview(data: any) {
     figma.ui.postMessage({ type: 'preview', payload });
 }
 
+function warnExcessiveLineHeight(root: SerializedNode) {
+    if (!root) return;
+    const THRESHOLD = 1.5;
+    type LineHeightIssue = { nodeName: string; linePx: number; fontSize: number; ratio: number };
+    const issues: LineHeightIssue[] = [];
+
+    const ensureIssue = (fontSize?: number, lineHeight?: any, nodeName?: string): boolean => {
+        if (!fontSize || !lineHeight) return false;
+        const px = resolveLineHeightPx(lineHeight, fontSize);
+        if (!px) return false;
+        const ratio = px / fontSize;
+        if (ratio > THRESHOLD) {
+            issues.push({
+                nodeName: nodeName || 'Texto',
+                linePx: px,
+                fontSize,
+                ratio
+            });
+            return true;
+        }
+        return false;
+    };
+
+    const walk = (node: SerializedNode | null | undefined) => {
+        if (!node) return;
+        if ((node as any).type === 'TEXT') {
+            const name = (node as any).name || ((node as any).characters ? ((node as any).characters as string).slice(0, 40) : node.id);
+            const baseFontSize = typeof (node as any).fontSize === 'number' ? (node as any).fontSize : undefined;
+            const baseLineHeight = (node as any).lineHeight;
+            let warned = ensureIssue(baseFontSize, baseLineHeight, name);
+
+            const segments = (node as any).styledTextSegments;
+            if (!warned && Array.isArray(segments)) {
+                for (const segment of segments) {
+                    const segFont = typeof segment.fontSize === 'number' ? segment.fontSize : baseFontSize;
+                    const segLine = segment.lineHeight || baseLineHeight;
+                    if (ensureIssue(segFont, segLine, name)) {
+                        warned = true;
+                        break;
+                    }
+                }
+            }
+        }
+        const children = (node as any).children;
+        if (Array.isArray(children)) {
+            children.forEach(child => walk(child));
+        }
+    };
+
+    walk(root);
+
+    if (issues.length > 0) {
+        issues.forEach(issue => {
+            const message = `Line-height alto detectado em "${issue.nodeName}": ${issue.linePx.toFixed(1)}px (${issue.ratio.toFixed(2)}x o font-size ${issue.fontSize}px). Ajuste no Figma para evitar esticar o botão.`;
+            log(message, 'warn');
+        });
+    }
+}
+
+function resolveLineHeightPx(lineHeight: any, fontSize?: number): number | null {
+    if (!lineHeight) return null;
+    if (typeof lineHeight === 'number') return lineHeight;
+    if (typeof lineHeight === 'object') {
+        const unit = lineHeight.unit;
+        const value = lineHeight.value;
+        if (unit === 'AUTO') return null;
+        if (unit === 'PIXELS' && typeof value === 'number') return value;
+        if (unit === 'PERCENT' && typeof value === 'number' && typeof fontSize === 'number') {
+            return (fontSize * value) / 100;
+        }
+    }
+    return null;
+}
+
+
+function hydrateSchemaWithRealStyles(schema: PipelineSchema, root: SerializedNode): void {
+    if (!schema || !schema.containers || schema.containers.length === 0 || !root) {
+        return;
+    }
+
+    const nodeMap = new Map<string, SerializedNode>();
+    const walk = (node: SerializedNode | undefined | null) => {
+        if (!node || !node.id) return;
+        nodeMap.set(node.id, node);
+        const children = (node as any).children;
+        if (Array.isArray(children)) {
+            children.forEach((child: SerializedNode) => walk(child));
+        }
+    };
+    walk(root);
+
+    const vectorTypes = new Set(['VECTOR', 'ELLIPSE', 'POLYGON', 'STAR', 'BOOLEAN_OPERATION', 'LINE']);
+    const findVectorChildNode = (source?: SerializedNode | null): SerializedNode | null => {
+        if (!source) return null;
+        if (vectorTypes.has((source as any).type)) {
+            return source;
+        }
+        const children = (source as any).children;
+        if (Array.isArray(children)) {
+            for (const child of children) {
+                const found = findVectorChildNode(child as SerializedNode);
+                if (found) return found;
+            }
+        }
+        if (((source as any).name || '').toLowerCase().includes('icon')) {
+            return source;
+        }
+        return null;
+    };
+
+    const processContainer = (container: PipelineContainer) => {
+        if (!container) return;
+        const sourceId = container.styles?.sourceId;
+        if (sourceId && nodeMap.has(sourceId)) {
+            const node = nodeMap.get(sourceId)!;
+            const realStyles = extractContainerStyles(node);
+            container.styles = { ...(container.styles || {}), ...realStyles };
+            if (realStyles.paddingTop !== undefined) container.styles.paddingTop = realStyles.paddingTop;
+            if (realStyles.paddingRight !== undefined) container.styles.paddingRight = realStyles.paddingRight;
+            if (realStyles.paddingBottom !== undefined) container.styles.paddingBottom = realStyles.paddingBottom;
+            if (realStyles.paddingLeft !== undefined) container.styles.paddingLeft = realStyles.paddingLeft;
+            if (realStyles.gap !== undefined) container.styles.gap = realStyles.gap;
+            if (realStyles.justify_content) container.styles.justify_content = realStyles.justify_content;
+            if (realStyles.align_items) container.styles.align_items = realStyles.align_items;
+            if (container.styles.background && container.styles.background.type === 'image' && !container.styles.backgroundImage) {
+                container.styles.backgroundImage = container.styles.background;
+            }
+            if (realStyles.backgroundImage && !container.styles.backgroundImage) {
+                container.styles.backgroundImage = realStyles.backgroundImage;
+            }
+        }
+
+        if (Array.isArray(container.widgets)) {
+            for (const widget of container.widgets) {
+                if (!widget.styles) widget.styles = {};
+                const widgetSourceId = widget.styles.sourceId;
+                if (widgetSourceId && nodeMap.has(widgetSourceId)) {
+                    const node = nodeMap.get(widgetSourceId)!;
+                    const realStyles = extractWidgetStyles(node);
+                    const preservedDimensions: Record<string, any> = {};
+                    const dimensionKeys = ['width', '_frameWidth', 'height', '_frameHeight', 'minHeight', 'maxHeight'];
+                    dimensionKeys.forEach(key => {
+                        if (widget.styles && widget.styles[key] !== undefined) {
+                            preservedDimensions[key] = widget.styles[key];
+                        }
+                    });
+                    widget.styles = { ...widget.styles, ...realStyles };
+                    Object.keys(preservedDimensions).forEach(key => {
+                        widget.styles[key] = preservedDimensions[key];
+                    });
+
+                    if (node.type === 'TEXT' && (widget.type === 'heading' || widget.type === 'text')) {
+                        if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+                            const rich = buildHtmlFromSegments(node);
+                            widget.content = rich.html;
+                            widget.styles.customCss = rich.css;
+                        } else {
+                            widget.content = (node as any).characters || widget.content || node.name;
+                        }
+                    }
+
+                    if (!widget.imageId && (widget.type === 'button' || widget.type === 'icon' || widget.type === 'icon-box')) {
+                        const vectorChild = findVectorChildNode(node);
+                        if (vectorChild) {
+                            widget.imageId = vectorChild.id;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (Array.isArray(container.children)) {
+            container.children.forEach(processContainer);
+        }
+    };
+
+    schema.containers.forEach(processContainer);
+}
+
+async function syncNavMenusLegacy(schema: PipelineSchema, wpConfig: WPConfig): Promise<void> {
+    if (!schema || !schema.containers || schema.containers.length === 0) {
+        return;
+    }
+
+    log('[NAV MENU SYNC] ========== START ==========', 'info');
+
+    const sendUiMessage = (level: 'success' | 'info' | 'warn' | 'error', message: string) => {
+        try {
+            figma.ui.postMessage({ type: 'log', level, message });
+        } catch (err) {
+            console.warn('[NAV MENU SYNC] Unable to send UI message:', err);
+        }
+    };
+
+    const syncEnabled = !!(wpConfig && wpConfig.url && (wpConfig as any).user && ((wpConfig as any).password || (wpConfig as any).token));
+    if (!syncEnabled) {
+        sendUiMessage('warn', 'Sincronização de menus desativada: informe URL, usuário e senha do WordPress para criar o menu.');
+        return;
+    }
+
+    const endpointBase = (wpConfig.url || '').replace(/\/$/, '');
+    const endpoint = `${endpointBase}/wp-json/figtoel-remote-menus/v1/sync`;
+    const btoaPolyfill = (str: string): string => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        let output = '';
+        let i = 0;
+
+        while (i < str.length) {
+            const a = str.charCodeAt(i++);
+            const b = i < str.length ? str.charCodeAt(i++) : 0;
+            const c = i < str.length ? str.charCodeAt(i++) : 0;
+
+            const bitmap = (a << 16) | (b << 8) | c;
+
+            output += chars.charAt((bitmap >> 18) & 63);
+            output += chars.charAt((bitmap >> 12) & 63);
+            output += chars.charAt(b ? (bitmap >> 6) & 63 : 64);
+            output += chars.charAt(c ? bitmap & 63 : 64);
+        }
+
+        return output;
+    };
+    const auth = 'Basic ' + btoaPolyfill(`${(wpConfig as any).user}:${(wpConfig as any).password || (wpConfig as any).token}`);
+
+    try {
+        const checkResponse = await fetch(endpoint, {
+            method: 'OPTIONS',
+            headers: { 'Authorization': auth }
+        });
+
+        if (checkResponse.status === 404) {
+            sendUiMessage('error', 'Instale e ative o plugin WordPress figtoel-remote-menus para habilitar o endpoint de sincronização de menus.');
+            return;
+        }
+
+        if (!checkResponse.ok && ![401, 403, 405].includes(checkResponse.status)) {
+            sendUiMessage('warn', `Não foi possível validar o endpoint de menus (status ${checkResponse.status}). Tentando sincronizar mesmo assim...`);
+        }
+    } catch (error) {
+        sendUiMessage('error', `Não foi possível verificar o endpoint do plugin figtoel-remote-menus: ${error}`);
+        return;
+    }
+
+    const navMenus: Array<{ widget: PipelineWidget; container: PipelineContainer }> = [];
+    const collectNavMenus = (container: PipelineContainer) => {
+        if (container.widgets) {
+            for (const widget of container.widgets) {
+                if (widget.type === 'nav-menu') {
+                    navMenus.push({ widget, container });
+                }
+            }
+        }
+        if (container.children) {
+            for (const child of container.children) {
+                collectNavMenus(child);
+            }
+        }
+    };
+
+    schema.containers.forEach(collectNavMenus);
+
+    if (navMenus.length === 0) {
+        log('[NAV MENU SYNC] No nav-menu widgets found.', 'info');
+        return;
+    }
+
+    for (const { widget, container } of navMenus) {
+        const sourceId = widget.styles?.sourceId || container.id;
+        const figmaNode = sourceId ? figma.getNodeById(sourceId) : null;
+        if (!figmaNode || !('children' in figmaNode)) {
+            log(`[NAV MENU SYNC] Cannot find Figma node for nav-menu: ${sourceId}`, 'warn');
+            continue;
+        }
+
+        const items = extractMenuItemsFromNode(figmaNode as FrameNode);
+        const menuName = widget.content || figmaNode.name || 'Menu Principal';
+        const payload = {
+            menu_name: menuName,
+            menu_location: 'primary',
+            replace_existing: true,
+            items
+        };
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': auth
+                },
+                body: JSON.stringify(payload)
+            });
+
+            let responseText = '';
+            let result: any = null;
+            try {
+                responseText = await response.text();
+                result = responseText ? JSON.parse(responseText) : null;
+            } catch {
+                result = null;
+            }
+
+            if (response.ok && result?.success) {
+                sendUiMessage('success', `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.`);
+            } else {
+                const detailedError = result?.error || result?.message || responseText || response.statusText || 'Desconhecido';
+                sendUiMessage('error', `Erro ${response.status} ao criar o menu "${menuName}": ${detailedError}`);
+            }
+        } catch (error) {
+            sendUiMessage('error', `Erro ao sincronizar menu "${menuName}": ${error}`);
+        }
+    }
+}
+
+function extractMenuItemsFromNode(navMenuNode: FrameNode): Array<{ title: string; url: string; children?: any[] }> {
+    const items: Array<{ title: string; url: string; children?: any[] }> = [];
+    if (!navMenuNode.children) return items;
+
+    for (const child of navMenuNode.children) {
+        if (child.type === 'TEXT') {
+            const title = (child as TextNode).characters;
+            items.push({ title, url: '#' });
+            continue;
+        }
+
+        if (child.type === 'FRAME' || child.type === 'GROUP') {
+            let title = child.name;
+            if ('children' in child) {
+                const textChild = (child as FrameNode).children.find(c => c.type === 'TEXT');
+                if (textChild) {
+                    title = (textChild as TextNode).characters;
+                }
+            }
+            items.push({ title, url: '#' });
+        }
+    }
+
+    return items;
+}
+
 async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WPConfig = {}): Promise<ElementorJSON> {
     const analyzed = analyzeTreeWithHeuristics(serializedTree as any);
-    const schema = convertToFlexSchema(analyzed as any);
+    const schema = convertToFlexSchema(analyzed as any) as PipelineSchema;
+    hydrateSchemaWithRealStyles(schema, serializedTree);
 
     // ============================================================
     // SHADOW MODE V2: Run V2 engine in parallel and log differences
@@ -579,8 +923,31 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
     const uploadEnabled = !!(normalizedWP && normalizedWP.url && (normalizedWP as any).user && (normalizedWP as any).password && (normalizedWP as any).exportImages);
 
     const uploadPromises: Promise<void>[] = [];
+    const containerUploadPromises: Promise<void>[] = [];
 
     await enforceWidgetTypes(schema);
+
+    const processContainerBackground = async (container: PipelineContainer) => {
+        if (!uploadEnabled || !noaiUploader) return;
+        const styles = container.styles || {};
+        const backgroundImage = (styles.backgroundImage as any) || (styles.background && styles.background.type === 'image' ? styles.background : null);
+        const imageHash = backgroundImage?.imageHash;
+        if (!imageHash) return;
+        try {
+            const label = container.id || styles.sourceId || 'container';
+            const uploaded = await noaiUploader.uploadImageHash(imageHash, String(label));
+            if (uploaded) {
+                if (!styles.backgroundImage || !styles.backgroundImage.imageHash) {
+                    styles.backgroundImage = { type: 'image', imageHash };
+                }
+                (styles.backgroundImage as any).wpUrl = uploaded.url;
+                (styles.backgroundImage as any).wpId = uploaded.id;
+                container.styles = styles;
+            }
+        } catch (error) {
+            console.error('[NO-AI] Failed to upload container background:', error);
+        }
+    };
 
     const processWidget = async (widget: any) => {
         const uploader = noaiUploader;
@@ -751,7 +1118,10 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
         }
     };
 
-    const collectUploads = (container: any) => {
+    const collectUploads = (container: PipelineContainer) => {
+        if (uploadEnabled) {
+            containerUploadPromises.push(processContainerBackground(container));
+        }
         for (const widget of container.widgets || []) {
             uploadPromises.push(processWidget(widget));
             // Process child widgets recursively (e.g., button with icon + text children)
@@ -770,9 +1140,12 @@ async function runPipelineWithoutAI(serializedTree: SerializedNode, wpConfig: WP
         collectUploads(container);
     }
 
-    if (uploadPromises.length > 0) {
-        await Promise.all(uploadPromises);
+    const pendingUploads = [...uploadPromises, ...containerUploadPromises];
+    if (pendingUploads.length > 0) {
+        await Promise.all(pendingUploads);
     }
+
+    await syncNavMenusLegacy(schema, normalizedWP);
 
     const compiler = new ElementorCompiler();
     compiler.setWPConfig(normalizedWP);
@@ -1803,4 +2176,3 @@ figma.ui.onmessage = async (msg) => {
 };
 
 sendStoredSettings();
-

@@ -355,6 +355,20 @@ const registry: WidgetDefinition[] = [
                 if (b.color) settings.border_color = toHex(b.color);
             }
 
+            // Dimensions & flex behaviour
+            const frameWidth = typeof (w.styles as any)?.width === 'number' ? (w.styles as any).width : (w.styles as any)?._frameWidth;
+            if (typeof frameWidth === 'number' && frameWidth > 0) {
+                settings.width = { unit: 'px', size: frameWidth, sizes: [] };
+            }
+            const frameHeight = typeof (w.styles as any)?.height === 'number' ? (w.styles as any).height : (w.styles as any)?._frameHeight;
+            if (typeof frameHeight === 'number' && frameHeight > 0) {
+                settings.min_height = { unit: 'px', size: frameHeight, sizes: [] };
+            }
+            settings.flex_grow = 0;
+            if (!settings.align_self) {
+                settings.align_self = 'flex-start';
+            }
+
             // Hover Transition Duration (default 0.3s for smooth UX)
             settings.button_hover_transition_duration = { unit: 's', size: 0.3, sizes: [] };
 

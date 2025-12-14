@@ -110,6 +110,7 @@ export class ElementorCompiler {
 
         const id = generateGUID();
         const flexDirection = container.direction === 'row' ? 'row' : 'column';
+        const totalItems = (container.widgets?.length || 0) + (container.children?.length || 0);
         const settings: ElementorSettings = {
             _element_id: id,
             container_type: 'flex',
@@ -119,8 +120,10 @@ export class ElementorCompiler {
             flex__is_column: 'column',
             ...this.mapContainerStyles(container.styles, container.width !== 'full')
         };
-        if (!settings.flex_gap) {
+        if (!settings.flex_gap && totalItems > 1) {
             settings.flex_gap = { unit: 'px', column: '', row: '', isLinked: true };
+        } else if (settings.flex_gap && totalItems <= 1) {
+            delete settings.flex_gap;
         }
         if (!settings.justify_content) settings.justify_content = 'flex-start';
         if (!settings.align_items) settings.align_items = 'flex-start';
@@ -204,38 +207,105 @@ export class ElementorCompiler {
             }
         }
 
-        if (styles.background) {
-            const bg = styles.background;
+        const applyGradientValues = (
+            target: {
+                backgroundKey: string;
+                colorKey: string;
+                colorStopKey: string;
+                colorBKey: string;
+                colorBStopKey: string;
+                typeKey: string;
+                angleKey: string;
+            },
+            gradient: any
+        ) => {
+            const stops = Array.isArray(gradient.stops) ? gradient.stops : [];
+            if (stops.length === 0) return;
+            const firstStop = stops[0];
+            const lastStop = stops[stops.length - 1] || firstStop;
+            (settings as any)[target.backgroundKey] = 'gradient';
+            (settings as any)[target.typeKey] = gradient.gradientType || 'linear';
+            (settings as any)[target.colorKey] = firstStop.color;
+            (settings as any)[target.colorStopKey] = { unit: '%', size: firstStop.position ?? 0, sizes: [] };
+            (settings as any)[target.colorBKey] = lastStop.color;
+            (settings as any)[target.colorBStopKey] = { unit: '%', size: lastStop.position ?? 100, sizes: [] };
+            (settings as any)[target.angleKey] = { unit: 'deg', size: gradient.angle ?? 180, sizes: [] };
+        };
 
-            if (bg.type === 'solid' || bg.color) {
-                // Handle solid color background
+        const backgroundImage = styles.backgroundImage || (styles.background?.type === 'image' ? styles.background : undefined);
+        const backgroundGradient = styles.backgroundGradient || (styles.background?.type === 'gradient' ? styles.background : undefined);
+        const backgroundSolid = styles.backgroundSolid || (styles.background?.type === 'solid' ? styles.background : undefined);
+
+        const backgroundImageFile = backgroundImage && ((backgroundImage as any).wpUrl || (backgroundImage as any).wpId) ? {
+            url: (backgroundImage as any).wpUrl || '',
+            id: (backgroundImage as any).wpId || 0
+        } : null;
+
+        if (backgroundImage?.imageHash || backgroundImageFile) {
+            settings.background_background = 'classic';
+            const imageSetting: any = {
+                url: backgroundImageFile?.url || '',
+                id: backgroundImageFile?.id || 0
+            };
+            if (backgroundImage?.imageHash) {
+                imageSetting.imageHash = backgroundImage.imageHash;
+            }
+            settings.background_image = imageSetting;
+        } else if (backgroundGradient && backgroundGradient.stops && backgroundGradient.stops.length >= 2) {
+            settings.background_background = 'gradient';
+            settings.background_gradient_type = backgroundGradient.gradientType || 'linear';
+            settings.background_color = backgroundGradient.stops[0].color;
+            settings.background_color_stop = { unit: '%', size: backgroundGradient.stops[0].position, sizes: [] };
+            const lastStop = backgroundGradient.stops[backgroundGradient.stops.length - 1];
+            settings.background_color_b = lastStop.color;
+            settings.background_color_b_stop = { unit: '%', size: lastStop.position, sizes: [] };
+            const angle = backgroundGradient.angle !== undefined ? backgroundGradient.angle : 180;
+            settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
+        } else if (backgroundSolid && backgroundSolid.color) {
+            const sanitizedColor = this.sanitizeColor(backgroundSolid.color);
+            if (sanitizedColor) {
+                settings.background_background = 'classic';
+                settings.background_color = sanitizedColor;
+            }
+        } else if (styles.background) {
+            const bg = styles.background;
+            if (bg.type === 'image' && bg.imageHash) {
+                settings.background_background = 'classic';
+                settings.background_image = { url: '', id: 0, imageHash: bg.imageHash };
+            } else if (bg.type === 'gradient' && bg.stops && bg.stops.length >= 2) {
+                settings.background_background = 'gradient';
+                settings.background_gradient_type = bg.gradientType || 'linear';
+                settings.background_color = bg.stops[0].color;
+                settings.background_color_stop = { unit: '%', size: bg.stops[0].position, sizes: [] };
+                const lastStop = bg.stops[bg.stops.length - 1];
+                settings.background_color_b = lastStop.color;
+                settings.background_color_b_stop = { unit: '%', size: lastStop.position, sizes: [] };
+                const angle = bg.angle !== undefined ? bg.angle : 180;
+                settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
+            } else if ((bg.type === 'solid' || bg.color)) {
                 const sanitizedColor = this.sanitizeColor(bg.color);
                 if (sanitizedColor) {
                     settings.background_background = 'classic';
                     settings.background_color = sanitizedColor;
                 }
-            } else if (bg.type === 'gradient' && bg.stops && bg.stops.length >= 2) {
-                // Handle gradient background
-                settings.background_background = 'gradient';
-                settings.background_gradient_type = bg.gradientType || 'linear';
+            }
+        }
 
-                // Set first color (color)
-                settings.background_color = bg.stops[0].color;
-                settings.background_color_stop = { unit: '%', size: bg.stops[0].position, sizes: [] };
-
-                // Set second color (color_b)
-                if (bg.stops.length >= 2) {
-                    settings.background_color_b = bg.stops[bg.stops.length - 1].color;
-                    settings.background_color_b_stop = { unit: '%', size: bg.stops[bg.stops.length - 1].position, sizes: [] };
-                }
-
-                // Set gradient angle use provided angle or default 180
-                const angle = bg.angle !== undefined ? bg.angle : 180;
-                settings.background_gradient_angle = { unit: 'deg', size: angle, sizes: [] };
-            } else if (bg.type === 'image' && bg.imageHash) {
-                settings.background_background = 'classic';
-                // Image URL will be resolved by uploader
-                settings.background_image = { url: '', id: 0, imageHash: bg.imageHash };
+        if ((backgroundImage || backgroundImageFile || (styles.background?.type === 'image')) && styles.backgroundOverlay && styles.backgroundOverlay.type === 'gradient') {
+            applyGradientValues(
+                {
+                    backgroundKey: 'background_overlay_background',
+                    colorKey: 'background_overlay_color',
+                    colorStopKey: 'background_overlay_color_stop',
+                    colorBKey: 'background_overlay_color_b',
+                    colorBStopKey: 'background_overlay_color_b_stop',
+                    typeKey: 'background_overlay_gradient_type',
+                    angleKey: 'background_overlay_gradient_angle'
+                },
+                styles.backgroundOverlay
+            );
+            if (!settings.background_overlay_opacity) {
+                settings.background_overlay_opacity = { unit: '%', size: 100, sizes: [] };
             }
         }
 
@@ -325,7 +395,7 @@ export class ElementorCompiler {
             'counterAxisAlignItems', 'primaryAxisSizingMode', 'counterAxisSizingMode',
             'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'itemSpacing',
             'gap', 'background', 'border', 'cornerRadius', 'width', 'height',
-            'sourceId', 'sourceName', '_order'
+            '_frameWidth', '_frameHeight', 'sourceId', 'sourceName', '_order'
         ];
 
         Object.keys(raw).forEach(k => {
@@ -402,6 +472,17 @@ export class ElementorCompiler {
         if (widgetType === 'icon' || widgetType === 'icon-box') {
             const imageId = widget?.imageId || (normalized.selected_icon as any)?.id || (normalized.selected_icon as any)?.wpId;
             normalized.selected_icon = this.normalizeSelectedIcon(normalized.selected_icon, imageId);
+        }
+
+        if (widgetType === 'button') {
+            const iconSource = normalized.selected_icon || widget?.styles?.selected_icon;
+            if (iconSource || widget?.imageId) {
+                normalized.selected_icon = this.normalizeSelectedIcon(
+                    iconSource,
+                    widget?.imageId,
+                    { value: 'fas fa-arrow-right', library: 'fa-solid' }
+                );
+            }
         }
 
         if (widgetType === 'icon-list') {
@@ -487,6 +568,19 @@ export class ElementorCompiler {
 
                 // Typography
                 Object.assign(settings, this.mapTypography(widget.styles || {}, 'typography'));
+
+                const frameWidth = typeof (widget.styles as any)?.width === 'number' ? (widget.styles as any).width : (widget.styles as any)?._frameWidth;
+                const frameHeight = typeof (widget.styles as any)?.height === 'number' ? (widget.styles as any).height : (widget.styles as any)?._frameHeight;
+                if (typeof frameWidth === 'number' && frameWidth > 0) {
+                    settings.width = { unit: 'px', size: frameWidth, sizes: [] };
+                }
+                if (typeof frameHeight === 'number' && frameHeight > 0) {
+                    settings.min_height = { unit: 'px', size: frameHeight, sizes: [] };
+                }
+                settings.flex_grow = 0;
+                if (!settings.align_self) {
+                    settings.align_self = 'flex-start';
+                }
 
                 // Background (Solid, Gradient, Image)
                 // CAUTION: AI might return a complex 'background_color' object instead of 'background'. Check both.
@@ -592,17 +686,20 @@ export class ElementorCompiler {
                 settings.button_hover_transition_duration = { unit: 's', size: 0.3, sizes: [] };
 
                 // Icon
-                if (widget.imageId) {
+                const iconFromStyles = widget.styles?.selected_icon;
+                if (widget.imageId || iconFromStyles) {
                     settings.selected_icon = this.normalizeSelectedIcon(
-                        widget.styles?.selected_icon || baseSettings.selected_icon || widget.content,
+                        iconFromStyles,
                         widget.imageId,
                         { value: 'fas fa-arrow-right', library: 'fa-solid' }
                     );
                     // icon_align: 'row-reverse' means icon on RIGHT (matches JSON B)
-                    settings.icon_align = 'row-reverse';
+                    if (!settings.icon_align) {
+                        settings.icon_align = 'row-reverse';
+                    }
 
                     // Icon indent (spacing between text and icon)
-                    if (widget.styles?.gap !== undefined) {
+                    if (typeof widget.styles?.gap === 'number') {
                         settings.icon_indent = { unit: 'px', size: widget.styles.gap, sizes: [] };
                     }
                 }

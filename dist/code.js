@@ -445,9 +445,11 @@
     }
     if (typeof node.width === "number") {
       styles.width = node.width;
+      styles._frameWidth = node.width;
     }
     if (typeof node.height === "number") {
       styles.height = node.height;
+      styles._frameHeight = node.height;
     }
     if (node.fills && Array.isArray(node.fills)) {
       const gradient = node.fills.find(
@@ -496,6 +498,7 @@
     return styles;
   }
   function extractContainerStyles(node) {
+    var _a;
     const styles = {
       sourceId: node.id,
       sourceName: node.name
@@ -521,46 +524,104 @@
     }
     const fills = node.fills;
     if (Array.isArray(fills) && fills.length > 0) {
-      const visibleFills = fills.filter((f) => f.visible !== false);
+      const visibleFills = fills.map((fill, index) => ({ fill, index })).filter(({ fill }) => fill.visible !== false);
+      const toRgba = (color, opacity) => {
+        const r = Math.round(((color == null ? void 0 : color.r) || 0) * 255);
+        const g = Math.round(((color == null ? void 0 : color.g) || 0) * 255);
+        const b = Math.round(((color == null ? void 0 : color.b) || 0) * 255);
+        const a = opacity !== void 0 ? opacity : (color == null ? void 0 : color.a) !== void 0 ? color.a : 1;
+        return `rgba(${r}, ${g}, ${b}, ${a})`;
+      };
+      const buildGradient = (fill) => {
+        const stops = ((fill == null ? void 0 : fill.gradientStops) || []).map((stop) => ({
+          position: stop.position > 1 ? Math.round(stop.position) : Math.round((stop.position || 0) * 100),
+          color: toRgba(stop.color || {})
+        }));
+        let angle = 180;
+        if (fill == null ? void 0 : fill.gradientTransform) {
+          const [row1, row2] = fill.gradientTransform;
+          const a = row1[0];
+          const b = row2[0];
+          const rad = Math.atan2(b, a);
+          const deg = rad * (180 / Math.PI);
+          angle = Math.round(deg + 90);
+          if (angle < 0) angle += 360;
+          if (angle >= 360) angle -= 360;
+        }
+        return {
+          type: "gradient",
+          gradientType: fill.type === "GRADIENT_RADIAL" ? "radial" : "linear",
+          stops,
+          angle
+        };
+      };
       if (visibleFills.length > 0) {
-        const fill = visibleFills[visibleFills.length - 1];
-        if (fill.type === "SOLID" && fill.color) {
-          const { r, g, b } = fill.color;
-          const a = fill.opacity !== void 0 ? fill.opacity : 1;
-          styles.background = {
-            type: "solid",
-            color: `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`
-          };
-        } else if (fill.type === "GRADIENT_LINEAR" || fill.type === "GRADIENT_RADIAL" || fill.type === "GRADIENT_ANGULAR" || fill.type === "GRADIENT_DIAMOND") {
-          const stops = (fill.gradientStops || []).map((stop) => {
-            const c = stop.color || { r: 0, g: 0, b: 0, a: 1 };
-            return {
-              position: Math.round(stop.position * 100),
-              color: `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${c.a || 1})`
-            };
-          });
-          let angle = 180;
-          if (fill.gradientTransform) {
-            const [row1, row2] = fill.gradientTransform;
-            const a = row1[0];
-            const b = row2[0];
-            const rad = Math.atan2(b, a);
-            const deg = rad * (180 / Math.PI);
-            angle = Math.round(deg + 90);
-            if (angle < 0) angle += 360;
-            if (angle >= 360) angle -= 360;
+        const imageLayers = visibleFills.filter(({ fill }) => fill.type === "IMAGE");
+        const gradientLayers = visibleFills.filter(({ fill }) => typeof fill.type === "string" && fill.type.startsWith("GRADIENT"));
+        const solidLayers = visibleFills.filter(({ fill }) => fill.type === "SOLID");
+        const pickTopMost = (layers) => {
+          if (!layers || layers.length === 0) return null;
+          return layers.reduce((prev, curr) => curr.index > prev.index ? curr : prev);
+        };
+        const topGradient = pickTopMost(gradientLayers);
+        let preferredImage = null;
+        if (imageLayers.length > 0) {
+          if (topGradient) {
+            preferredImage = imageLayers.filter((img) => img.index < topGradient.index).sort((a, b) => b.index - a.index)[0] || null;
           }
-          styles.background = {
-            type: "gradient",
-            gradientType: fill.type === "GRADIENT_RADIAL" ? "radial" : "linear",
-            stops,
-            angle
-          };
-        } else if (fill.type === "IMAGE") {
-          styles.background = {
+          if (!preferredImage) {
+            preferredImage = pickTopMost(imageLayers);
+          }
+        }
+        if (preferredImage) {
+          const imageBackground = {
             type: "image",
-            imageHash: fill.imageHash || null
+            imageHash: preferredImage.fill.imageHash || null
           };
+          styles.background = imageBackground;
+          styles.backgroundImage = imageBackground;
+        }
+        if (preferredImage && topGradient) {
+          styles.backgroundOverlay = buildGradient(topGradient.fill);
+        } else if (!preferredImage && topGradient) {
+          const gradientBackground = buildGradient(topGradient.fill);
+          styles.background = gradientBackground;
+          styles.backgroundGradient = gradientBackground;
+        }
+        if (!styles.background && solidLayers.length > 0) {
+          const topSolid = pickTopMost(solidLayers);
+          if ((_a = topSolid == null ? void 0 : topSolid.fill) == null ? void 0 : _a.color) {
+            const solidBackground = {
+              type: "solid",
+              color: toRgba(topSolid.fill.color, topSolid.fill.opacity)
+            };
+            styles.background = solidBackground;
+            styles.backgroundSolid = solidBackground;
+          }
+        }
+        if (!styles.background) {
+          const fallbackFill = pickTopMost(visibleFills);
+          if (fallbackFill) {
+            if (fallbackFill.fill.type === "SOLID" && fallbackFill.fill.color) {
+              const solidBackground = {
+                type: "solid",
+                color: toRgba(fallbackFill.fill.color, fallbackFill.fill.opacity)
+              };
+              styles.background = solidBackground;
+              styles.backgroundSolid = solidBackground;
+            } else if (typeof fallbackFill.fill.type === "string" && fallbackFill.fill.type.startsWith("GRADIENT")) {
+              const gradientBackground = buildGradient(fallbackFill.fill);
+              styles.background = gradientBackground;
+              styles.backgroundGradient = gradientBackground;
+            } else if (fallbackFill.fill.type === "IMAGE") {
+              const imageBackground = {
+                type: "image",
+                imageHash: fallbackFill.fill.imageHash || null
+              };
+              styles.background = imageBackground;
+              styles.backgroundImage = imageBackground;
+            }
+          }
         }
       }
     }
@@ -852,7 +913,7 @@ ${refText}` });
       family: "action",
       aliases: generateAliases("button", ["bot\xE3o", "link", "chamada para a\xE7\xE3o"], ["btn", "cta", "action button", "clique aqui"]),
       compile: (w, base) => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
         console.log("[REGISTRY DEBUG] Compiling button widget:", w.type);
         console.log("[REGISTRY DEBUG] Button has", ((_a = w.children) == null ? void 0 : _a.length) || 0, "child widgets");
         let buttonText = w.content || "Button";
@@ -1023,8 +1084,20 @@ ${refText}` });
           }
           if (b.color) settings.border_color = toHex(b.color);
         }
+        const frameWidth = typeof ((_q = w.styles) == null ? void 0 : _q.width) === "number" ? w.styles.width : (_r = w.styles) == null ? void 0 : _r._frameWidth;
+        if (typeof frameWidth === "number" && frameWidth > 0) {
+          settings.width = { unit: "px", size: frameWidth, sizes: [] };
+        }
+        const frameHeight = typeof ((_s = w.styles) == null ? void 0 : _s.height) === "number" ? w.styles.height : (_t = w.styles) == null ? void 0 : _t._frameHeight;
+        if (typeof frameHeight === "number" && frameHeight > 0) {
+          settings.min_height = { unit: "px", size: frameHeight, sizes: [] };
+        }
+        settings.flex_grow = 0;
+        if (!settings.align_self) {
+          settings.align_self = "flex-start";
+        }
         settings.button_hover_transition_duration = { unit: "s", size: 0.3, sizes: [] };
-        if (((_r = (_q = w.styles) == null ? void 0 : _q.border) == null ? void 0 : _r.radius) !== void 0) {
+        if (((_v = (_u = w.styles) == null ? void 0 : _u.border) == null ? void 0 : _v.radius) !== void 0) {
           settings.border_radius = {
             unit: "px",
             top: w.styles.border.radius,
@@ -1033,7 +1106,7 @@ ${refText}` });
             left: w.styles.border.radius,
             isLinked: true
           };
-        } else if (((_s = w.styles) == null ? void 0 : _s.cornerRadius) !== void 0) {
+        } else if (((_w = w.styles) == null ? void 0 : _w.cornerRadius) !== void 0) {
           settings.border_radius = {
             unit: "px",
             top: w.styles.cornerRadius,
@@ -1055,7 +1128,7 @@ ${refText}` });
               console.log("[BUTTON ICON DEBUG] Found icon URL from child:", iconUrl);
             }
           }
-          if (!iconUrl && ((_u = (_t = w.styles) == null ? void 0 : _t.selected_icon) == null ? void 0 : _u.value)) {
+          if (!iconUrl && ((_y = (_x = w.styles) == null ? void 0 : _x.selected_icon) == null ? void 0 : _y.value)) {
             const sv = w.styles.selected_icon.value;
             iconUrl = typeof sv === "object" && sv.url ? sv.url : sv;
           }
@@ -1080,11 +1153,11 @@ ${refText}` });
           let iconPosition = "before";
           if (iconIndex !== -1 && textIndex !== -1) {
             iconPosition = iconIndex < textIndex ? "before" : "after";
-          } else if ((_v = w.styles) == null ? void 0 : _v.iconPosition) {
+          } else if ((_z = w.styles) == null ? void 0 : _z.iconPosition) {
             iconPosition = w.styles.iconPosition;
           }
           settings.icon_align = iconPosition === "after" ? "row-reverse" : "row";
-          const iconSpacing = ((_w = w.styles) == null ? void 0 : _w.itemSpacing) || w.itemSpacing;
+          const iconSpacing = ((_A = w.styles) == null ? void 0 : _A.itemSpacing) || w.itemSpacing;
           if (iconSpacing && iconSpacing > 0) {
             settings.icon_indent = { unit: "px", size: iconSpacing, sizes: [] };
           }
@@ -2470,7 +2543,7 @@ ${refText}` });
       return template;
     }
     compileContainer(container, isInner) {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e, _f;
       if (((_a = container.children) == null ? void 0 : _a.length) === 0 && Array.isArray(container.widgets) && container.widgets.length === 1) {
         const soleWidget = container.widgets[0];
         const sourceName = String(
@@ -2490,6 +2563,7 @@ ${refText}` });
       }
       const id = generateGUID();
       const flexDirection = container.direction === "row" ? "row" : "column";
+      const totalItems = (((_e = container.widgets) == null ? void 0 : _e.length) || 0) + (((_f = container.children) == null ? void 0 : _f.length) || 0);
       const settings = __spreadValues({
         _element_id: id,
         container_type: "flex",
@@ -2498,8 +2572,10 @@ ${refText}` });
         flex__is_row: "row",
         flex__is_column: "column"
       }, this.mapContainerStyles(container.styles, container.width !== "full"));
-      if (!settings.flex_gap) {
+      if (!settings.flex_gap && totalItems > 1) {
         settings.flex_gap = { unit: "px", column: "", row: "", isLinked: true };
+      } else if (settings.flex_gap && totalItems <= 1) {
+        delete settings.flex_gap;
       }
       if (!settings.justify_content) settings.justify_content = "flex-start";
       if (!settings.align_items) settings.align_items = "flex-start";
@@ -2525,6 +2601,7 @@ ${refText}` });
       };
     }
     mapContainerStyles(styles, isBoxed = false) {
+      var _a, _b, _c, _d;
       const settings = {};
       settings.overflow = "hidden";
       if (!styles) return settings;
@@ -2571,28 +2648,91 @@ ${refText}` });
           settings._padding = paddingValue;
         }
       }
-      if (styles.background) {
+      const applyGradientValues = (target, gradient) => {
+        var _a2, _b2, _c2;
+        const stops = Array.isArray(gradient.stops) ? gradient.stops : [];
+        if (stops.length === 0) return;
+        const firstStop = stops[0];
+        const lastStop = stops[stops.length - 1] || firstStop;
+        settings[target.backgroundKey] = "gradient";
+        settings[target.typeKey] = gradient.gradientType || "linear";
+        settings[target.colorKey] = firstStop.color;
+        settings[target.colorStopKey] = { unit: "%", size: (_a2 = firstStop.position) != null ? _a2 : 0, sizes: [] };
+        settings[target.colorBKey] = lastStop.color;
+        settings[target.colorBStopKey] = { unit: "%", size: (_b2 = lastStop.position) != null ? _b2 : 100, sizes: [] };
+        settings[target.angleKey] = { unit: "deg", size: (_c2 = gradient.angle) != null ? _c2 : 180, sizes: [] };
+      };
+      const backgroundImage = styles.backgroundImage || (((_a = styles.background) == null ? void 0 : _a.type) === "image" ? styles.background : void 0);
+      const backgroundGradient = styles.backgroundGradient || (((_b = styles.background) == null ? void 0 : _b.type) === "gradient" ? styles.background : void 0);
+      const backgroundSolid = styles.backgroundSolid || (((_c = styles.background) == null ? void 0 : _c.type) === "solid" ? styles.background : void 0);
+      const backgroundImageFile = backgroundImage && (backgroundImage.wpUrl || backgroundImage.wpId) ? {
+        url: backgroundImage.wpUrl || "",
+        id: backgroundImage.wpId || 0
+      } : null;
+      if ((backgroundImage == null ? void 0 : backgroundImage.imageHash) || backgroundImageFile) {
+        settings.background_background = "classic";
+        const imageSetting = {
+          url: (backgroundImageFile == null ? void 0 : backgroundImageFile.url) || "",
+          id: (backgroundImageFile == null ? void 0 : backgroundImageFile.id) || 0
+        };
+        if (backgroundImage == null ? void 0 : backgroundImage.imageHash) {
+          imageSetting.imageHash = backgroundImage.imageHash;
+        }
+        settings.background_image = imageSetting;
+      } else if (backgroundGradient && backgroundGradient.stops && backgroundGradient.stops.length >= 2) {
+        settings.background_background = "gradient";
+        settings.background_gradient_type = backgroundGradient.gradientType || "linear";
+        settings.background_color = backgroundGradient.stops[0].color;
+        settings.background_color_stop = { unit: "%", size: backgroundGradient.stops[0].position, sizes: [] };
+        const lastStop = backgroundGradient.stops[backgroundGradient.stops.length - 1];
+        settings.background_color_b = lastStop.color;
+        settings.background_color_b_stop = { unit: "%", size: lastStop.position, sizes: [] };
+        const angle = backgroundGradient.angle !== void 0 ? backgroundGradient.angle : 180;
+        settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
+      } else if (backgroundSolid && backgroundSolid.color) {
+        const sanitizedColor = this.sanitizeColor(backgroundSolid.color);
+        if (sanitizedColor) {
+          settings.background_background = "classic";
+          settings.background_color = sanitizedColor;
+        }
+      } else if (styles.background) {
         const bg = styles.background;
-        if (bg.type === "solid" || bg.color) {
-          const sanitizedColor = this.sanitizeColor(bg.color);
-          if (sanitizedColor) {
-            settings.background_background = "classic";
-            settings.background_color = sanitizedColor;
-          }
+        if (bg.type === "image" && bg.imageHash) {
+          settings.background_background = "classic";
+          settings.background_image = { url: "", id: 0, imageHash: bg.imageHash };
         } else if (bg.type === "gradient" && bg.stops && bg.stops.length >= 2) {
           settings.background_background = "gradient";
           settings.background_gradient_type = bg.gradientType || "linear";
           settings.background_color = bg.stops[0].color;
           settings.background_color_stop = { unit: "%", size: bg.stops[0].position, sizes: [] };
-          if (bg.stops.length >= 2) {
-            settings.background_color_b = bg.stops[bg.stops.length - 1].color;
-            settings.background_color_b_stop = { unit: "%", size: bg.stops[bg.stops.length - 1].position, sizes: [] };
-          }
+          const lastStop = bg.stops[bg.stops.length - 1];
+          settings.background_color_b = lastStop.color;
+          settings.background_color_b_stop = { unit: "%", size: lastStop.position, sizes: [] };
           const angle = bg.angle !== void 0 ? bg.angle : 180;
           settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
-        } else if (bg.type === "image" && bg.imageHash) {
-          settings.background_background = "classic";
-          settings.background_image = { url: "", id: 0, imageHash: bg.imageHash };
+        } else if (bg.type === "solid" || bg.color) {
+          const sanitizedColor = this.sanitizeColor(bg.color);
+          if (sanitizedColor) {
+            settings.background_background = "classic";
+            settings.background_color = sanitizedColor;
+          }
+        }
+      }
+      if ((backgroundImage || backgroundImageFile || ((_d = styles.background) == null ? void 0 : _d.type) === "image") && styles.backgroundOverlay && styles.backgroundOverlay.type === "gradient") {
+        applyGradientValues(
+          {
+            backgroundKey: "background_overlay_background",
+            colorKey: "background_overlay_color",
+            colorStopKey: "background_overlay_color_stop",
+            colorBKey: "background_overlay_color_b",
+            colorBStopKey: "background_overlay_color_b_stop",
+            typeKey: "background_overlay_gradient_type",
+            angleKey: "background_overlay_gradient_angle"
+          },
+          styles.backgroundOverlay
+        );
+        if (!settings.background_overlay_opacity) {
+          settings.background_overlay_opacity = { unit: "%", size: 100, sizes: [] };
         }
       }
       if (styles.width) {
@@ -2691,6 +2831,8 @@ ${refText}` });
         "cornerRadius",
         "width",
         "height",
+        "_frameWidth",
+        "_frameHeight",
         "sourceId",
         "sourceName",
         "_order"
@@ -2750,11 +2892,21 @@ ${refText}` });
       return settings;
     }
     normalizeIconSettings(widgetType, settings, widget) {
-      var _a, _b;
+      var _a, _b, _c;
       const normalized = __spreadValues({}, settings);
       if (widgetType === "icon" || widgetType === "icon-box") {
         const imageId = (widget == null ? void 0 : widget.imageId) || ((_a = normalized.selected_icon) == null ? void 0 : _a.id) || ((_b = normalized.selected_icon) == null ? void 0 : _b.wpId);
         normalized.selected_icon = this.normalizeSelectedIcon(normalized.selected_icon, imageId);
+      }
+      if (widgetType === "button") {
+        const iconSource = normalized.selected_icon || ((_c = widget == null ? void 0 : widget.styles) == null ? void 0 : _c.selected_icon);
+        if (iconSource || (widget == null ? void 0 : widget.imageId)) {
+          normalized.selected_icon = this.normalizeSelectedIcon(
+            iconSource,
+            widget == null ? void 0 : widget.imageId,
+            { value: "fas fa-arrow-right", library: "fa-solid" }
+          );
+        }
       }
       if (widgetType === "icon-list") {
         this.normalizeIconList(normalized);
@@ -2762,7 +2914,7 @@ ${refText}` });
       return normalized;
     }
     compileWidget(widget) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
       const widgetId = generateGUID();
       const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
       Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
@@ -2823,7 +2975,19 @@ ${refText}` });
           settings.size = "sm";
           settings.button_type = "";
           Object.assign(settings, this.mapTypography(widget.styles || {}, "typography"));
-          const bg = ((_d = widget.styles) == null ? void 0 : _d.background) || (typeof ((_e = widget.settings) == null ? void 0 : _e.background_color) === "object" ? widget.settings.background_color : null);
+          const frameWidth = typeof ((_d = widget.styles) == null ? void 0 : _d.width) === "number" ? widget.styles.width : (_e = widget.styles) == null ? void 0 : _e._frameWidth;
+          const frameHeight = typeof ((_f = widget.styles) == null ? void 0 : _f.height) === "number" ? widget.styles.height : (_g = widget.styles) == null ? void 0 : _g._frameHeight;
+          if (typeof frameWidth === "number" && frameWidth > 0) {
+            settings.width = { unit: "px", size: frameWidth, sizes: [] };
+          }
+          if (typeof frameHeight === "number" && frameHeight > 0) {
+            settings.min_height = { unit: "px", size: frameHeight, sizes: [] };
+          }
+          settings.flex_grow = 0;
+          if (!settings.align_self) {
+            settings.align_self = "flex-start";
+          }
+          const bg = ((_h = widget.styles) == null ? void 0 : _h.background) || (typeof ((_i = widget.settings) == null ? void 0 : _i.background_color) === "object" ? widget.settings.background_color : null);
           if (bg) {
             if (bg.type === "solid" || bg.color && !bg.stops) {
               const c = bg.color || bg;
@@ -2858,8 +3022,8 @@ ${refText}` });
           if (baseSettings.color) {
             settings.button_text_color = this.toHex(baseSettings.color);
           }
-          if (((_f = widget.styles) == null ? void 0 : _f.button_padding) || ((_g = widget.styles) == null ? void 0 : _g.padding) || ((_h = widget.styles) == null ? void 0 : _h.paddingTop) !== void 0) {
-            const p = ((_i = widget.styles) == null ? void 0 : _i.button_padding) || ((_j = widget.styles) == null ? void 0 : _j.padding);
+          if (((_j = widget.styles) == null ? void 0 : _j.button_padding) || ((_k = widget.styles) == null ? void 0 : _k.padding) || ((_l = widget.styles) == null ? void 0 : _l.paddingTop) !== void 0) {
+            const p = ((_m = widget.styles) == null ? void 0 : _m.button_padding) || ((_n = widget.styles) == null ? void 0 : _n.padding);
             if (p && typeof p === "object") {
               settings.text_padding = {
                 unit: "px",
@@ -2869,7 +3033,7 @@ ${refText}` });
                 left: String(p.left || p.paddingLeft || 0),
                 isLinked: false
               };
-            } else if (((_k = widget.styles) == null ? void 0 : _k.paddingTop) !== void 0) {
+            } else if (((_o = widget.styles) == null ? void 0 : _o.paddingTop) !== void 0) {
               settings.text_padding = {
                 unit: "px",
                 top: String(widget.styles.paddingTop || 0),
@@ -2881,7 +3045,7 @@ ${refText}` });
             }
           }
           if (settings.button_padding) delete settings.button_padding;
-          if ((_l = widget.styles) == null ? void 0 : _l.border) {
+          if ((_p = widget.styles) == null ? void 0 : _p.border) {
             const b = widget.styles.border;
             if (b.type) settings.border_border = b.type;
             if (b.width !== void 0) {
@@ -2894,19 +3058,22 @@ ${refText}` });
               settings.border_radius = { unit: "px", top: r, right: r, bottom: r, left: r, isLinked: true };
             }
           }
-          if (!settings.border_radius && ((_m = widget.styles) == null ? void 0 : _m.cornerRadius) !== void 0) {
+          if (!settings.border_radius && ((_q = widget.styles) == null ? void 0 : _q.cornerRadius) !== void 0) {
             const r = String(widget.styles.cornerRadius);
             settings.border_radius = { unit: "px", top: r, right: r, bottom: r, left: r, isLinked: true };
           }
           settings.button_hover_transition_duration = { unit: "s", size: 0.3, sizes: [] };
-          if (widget.imageId) {
+          const iconFromStyles = (_r = widget.styles) == null ? void 0 : _r.selected_icon;
+          if (widget.imageId || iconFromStyles) {
             settings.selected_icon = this.normalizeSelectedIcon(
-              ((_n = widget.styles) == null ? void 0 : _n.selected_icon) || baseSettings.selected_icon || widget.content,
+              iconFromStyles,
               widget.imageId,
               { value: "fas fa-arrow-right", library: "fa-solid" }
             );
-            settings.icon_align = "row-reverse";
-            if (((_o = widget.styles) == null ? void 0 : _o.gap) !== void 0) {
+            if (!settings.icon_align) {
+              settings.icon_align = "row-reverse";
+            }
+            if (typeof ((_s = widget.styles) == null ? void 0 : _s.gap) === "number") {
               settings.icon_indent = { unit: "px", size: widget.styles.gap, sizes: [] };
             }
           }
@@ -2922,7 +3089,7 @@ ${refText}` });
           break;
         case "icon":
           widgetType = "icon";
-          settings.selected_icon = ((_p = widget.styles) == null ? void 0 : _p.selected_icon) || baseSettings.selected_icon || widget.content;
+          settings.selected_icon = ((_t = widget.styles) == null ? void 0 : _t.selected_icon) || baseSettings.selected_icon || widget.content;
           break;
         case "custom":
         default:
@@ -3087,67 +3254,45 @@ ${refText}` });
       this.quality = quality;
     }
     /**
-     * Faz upload de uma imagem para o WordPress
-     * @param node Nó do Figma a ser exportado
-     * @param format Formato da imagem
-     * @returns Objeto com URL e ID da imagem no WordPress ou null
+     * Faz upload de uma imagem baseada em um SceneNode do Figma.
      */
     async uploadToWordPress(node, format = "WEBP") {
-      if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
-        console.warn("[F2E] WP config ausente.");
-        return null;
-      }
+      if (!this.canUpload()) return null;
       try {
         const targetFormat = format === "SVG" ? "SVG" : "WEBP";
         const result = await exportNodeAsImage(node, targetFormat, this.quality);
         if (!result) return null;
-        const { bytes, mime, ext, needsConversion } = result;
-        const hash = await computeHash(bytes);
-        if (this.mediaHashCache.has(hash)) {
-          return this.mediaHashCache.get(hash);
-        }
-        this.nodeHashCache.set(node.id, hash);
-        const id = generateGUID();
         const safeId = node.id.replace(/[^a-z0-9]/gi, "_");
-        const name = `w_${safeId}_${hash}.${ext}`;
-        return new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            if (this.pendingUploads.has(id)) {
-              this.pendingUploads.delete(id);
-              resolve(null);
-            }
-          }, 9e4);
-          this.pendingUploads.set(id, (result2) => {
-            clearTimeout(timeout);
-            if (result2.success) {
-              console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result2.url}, ID: ${result2.wpId}`);
-              const mediaData = { url: result2.url, id: result2.wpId || 0 };
-              this.mediaHashCache.set(hash, mediaData);
-              resolve(mediaData);
-            } else {
-              console.error(`[ImageUploader] Falha no upload:`, result2.error);
-              resolve(null);
-            }
-          });
-          figma.ui.postMessage({
-            type: "upload-image-request",
-            id,
-            name,
-            mimeType: mime,
-            targetMimeType: "image/webp",
-            data: bytes,
-            needsConversion: !!needsConversion
-          });
-        });
-      } catch (e) {
-        console.error("Error preparing upload:", e);
+        const hash = await computeHash(result.bytes);
+        this.nodeHashCache.set(node.id, hash);
+        return this.enqueueUpload(result.bytes, result.mime, result.ext, safeId, !!result.needsConversion);
+      } catch (error) {
+        console.error("[ImageUploader] Error preparing upload:", error);
+        return null;
+      }
+    }
+    /**
+     * Faz upload de um fill de imagem usando o hash do Figma.
+     */
+    async uploadImageHash(imageHash, nameHint = "fill") {
+      if (!this.canUpload()) return null;
+      const image = figma.getImageByHash(imageHash);
+      if (!image) {
+        console.warn("[ImageUploader] N\xE3o foi poss\xEDvel localizar imagem para o hash:", imageHash);
+        return null;
+      }
+      try {
+        const bytes = await image.getBytesAsync();
+        const detected = this.detectImageFormat(bytes);
+        const safeId = `${nameHint}_${imageHash.replace(/[^a-z0-9]/gi, "").slice(0, 8) || "img"}`;
+        return this.enqueueUpload(bytes, detected.mime, detected.ext, safeId, false);
+      } catch (error) {
+        console.error("[ImageUploader] Falhou ao exportar imageHash:", error);
         return null;
       }
     }
     /**
      * Processa resposta de upload da UI
-     * @param id ID do upload
-     * @param result Resultado do upload
      */
     handleUploadResponse(id, result) {
       const resolver = this.pendingUploads.get(id);
@@ -3158,28 +3303,74 @@ ${refText}` });
         console.warn(`[ImageUploader] Nenhuma promessa pendente encontrada para ${id}`);
       }
     }
-    /**
-     * Atualiza a qualidade de exportação
-     * @param quality Nova qualidade (0.1 a 1.0)
-     */
     setQuality(quality) {
       this.quality = Math.max(0.1, Math.min(1, quality));
     }
-    /**
-     * Atualiza a configuração do WordPress
-     * @param wpConfig Nova configuração
-     */
     setWPConfig(wpConfig) {
       this.wpConfig = __spreadProps(__spreadValues({}, wpConfig), {
         password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token)
       });
     }
-    /**
-     * Limpa o cache de hashes
-     */
     clearCache() {
       this.mediaHashCache.clear();
       this.nodeHashCache.clear();
+    }
+    canUpload() {
+      if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
+        console.warn("[F2E] WP config ausente.");
+        return false;
+      }
+      return true;
+    }
+    detectImageFormat(bytes) {
+      if (bytes.length >= 8 && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71) {
+        return { mime: "image/png", ext: "png" };
+      }
+      if (bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+        return { mime: "image/jpeg", ext: "jpg" };
+      }
+      if (bytes.length >= 3 && bytes[0] === 71 && bytes[1] === 73 && bytes[2] === 70) {
+        return { mime: "image/gif", ext: "gif" };
+      }
+      return { mime: "image/png", ext: "png" };
+    }
+    async enqueueUpload(bytes, mime, ext, safeId, needsConversion) {
+      const hash = await computeHash(bytes);
+      if (this.mediaHashCache.has(hash)) {
+        return this.mediaHashCache.get(hash);
+      }
+      const id = generateGUID();
+      const sanitizedId = safeId.replace(/[^a-z0-9]/gi, "_");
+      const name = `w_${sanitizedId}_${hash}.${ext}`;
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          if (this.pendingUploads.has(id)) {
+            this.pendingUploads.delete(id);
+            resolve(null);
+          }
+        }, 9e4);
+        this.pendingUploads.set(id, (result) => {
+          clearTimeout(timeout);
+          if (result.success) {
+            console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result.url}, ID: ${result.wpId}`);
+            const mediaData = { url: result.url, id: result.wpId || 0 };
+            this.mediaHashCache.set(hash, mediaData);
+            resolve(mediaData);
+          } else {
+            console.error("[ImageUploader] Falha no upload:", result.error);
+            resolve(null);
+          }
+        });
+        figma.ui.postMessage({
+          type: "upload-image-request",
+          id,
+          name,
+          mimeType: mime,
+          targetMimeType: needsConversion ? "image/webp" : mime,
+          data: bytes,
+          needsConversion: !!needsConversion
+        });
+      });
     }
   };
 
@@ -5093,7 +5284,23 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
       if (widgetType === "button") {
         const buttonData = analyzeButtonStructure(node);
         const containerStyles = extractContainerStyles(node);
-        const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), containerStyles), buttonData.textStyles);
+        const textStyles = __spreadValues({}, buttonData.textStyles);
+        delete textStyles.width;
+        delete textStyles.height;
+        delete textStyles._frameWidth;
+        delete textStyles._frameHeight;
+        delete textStyles.minHeight;
+        delete textStyles.maxHeight;
+        const mergedStyles = __spreadValues(__spreadValues(__spreadValues({}, styles), containerStyles), textStyles);
+        if (typeof node.width === "number") {
+          mergedStyles.width = node.width;
+          mergedStyles._frameWidth = node.width;
+        }
+        if (typeof node.height === "number") {
+          mergedStyles.height = node.height;
+          mergedStyles._frameHeight = node.height;
+          mergedStyles.minHeight = node.height;
+        }
         if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
           mergedStyles.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 }, opacity: 0, visible: true }];
         }
@@ -6442,7 +6649,7 @@ ${JSON.stringify(baseSchema, null, 2)}
         return this.imageUploader.uploadToWordPress(node, format);
       };
       const processWidget = async (widget) => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d;
         console.log(`[PIPELINE] Processing widget: ${widget.type} (ID: ${widget.imageId || "none"})`);
         if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item")) {
           try {
@@ -6509,29 +6716,58 @@ ${JSON.stringify(baseSchema, null, 2)}
           widget.styles.gallery = widget.styles.gallery.filter((item) => item.url && item.id);
         }
         if (widget.type === "button") {
-          const iconValue = (_e = (_d = widget.styles) == null ? void 0 : _d.selected_icon) == null ? void 0 : _e.value;
-          if (iconValue && typeof iconValue === "object" && iconValue.id) {
-            if ((_f = widget.styles) == null ? void 0 : _f.sourceId) {
-              const buttonNode = figma.getNodeById(widget.styles.sourceId);
-              if (buttonNode && "children" in buttonNode) {
-                const iconChild = buttonNode.children.find((c) => c.name === "Icon" || c.type === "VECTOR" || c.name.toLowerCase().includes("icon"));
-                if (iconChild) {
-                  try {
-                    const result = await uploadNodeImage(iconChild.id, true);
-                    if (result) {
-                      widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
-                    }
-                  } catch (e) {
-                    console.error(`[Pipeline] Failed to upload button icon ${iconChild.id}:`, e);
-                  }
-                }
+          let iconNodeId = widget.imageId;
+          if (!iconNodeId && ((_d = widget.styles) == null ? void 0 : _d.sourceId)) {
+            const buttonNode = figma.getNodeById(widget.styles.sourceId);
+            if (buttonNode && "children" in buttonNode) {
+              const iconChild = buttonNode.children.find((c) => {
+                const name = (c.name || "").toLowerCase();
+                return c.type === "VECTOR" || name.includes("icon");
+              });
+              if (iconChild) {
+                iconNodeId = iconChild.id;
               }
+            }
+          }
+          if (iconNodeId) {
+            try {
+              const result = await uploadNodeImage(iconNodeId, true);
+              if (result) {
+                if (!widget.styles) widget.styles = {};
+                widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
+                widget.imageId = result.id.toString();
+              }
+            } catch (e) {
+              console.error(`[Pipeline] Failed to upload button icon ${iconNodeId}:`, e);
             }
           }
         }
       };
       const uploadPromises = [];
+      const processContainerBackground = async (container) => {
+        const styles = container.styles || {};
+        const backgroundImage = styles.backgroundImage || (styles.background && styles.background.type === "image" ? styles.background : null);
+        const imageHash = backgroundImage == null ? void 0 : backgroundImage.imageHash;
+        if (!imageHash) return;
+        try {
+          const sourceLabel = container.id || styles.sourceId || "container";
+          const uploaded = await this.imageUploader.uploadImageHash(imageHash, String(sourceLabel));
+          if (uploaded) {
+            if (!styles.backgroundImage) {
+              styles.backgroundImage = { type: "image", imageHash };
+            }
+            styles.backgroundImage.wpUrl = uploaded.url;
+            styles.backgroundImage.wpId = uploaded.id;
+            container.styles = styles;
+          }
+        } catch (error) {
+          console.error("[Pipeline] Failed to upload container background:", error);
+        }
+      };
       const collectUploads = (container) => {
+        if (container.styles) {
+          uploadPromises.push(processContainerBackground(container));
+        }
         if (container.widgets) {
           for (const widget of container.widgets) {
             uploadPromises.push(processWidget(widget));
@@ -6554,6 +6790,24 @@ ${JSON.stringify(baseSchema, null, 2)}
     }
     hydrateStyles(schema, flatNodes) {
       const nodeMap = new Map(flatNodes.map((n) => [n.id, n]));
+      const vectorTypes2 = /* @__PURE__ */ new Set(["VECTOR", "ELLIPSE", "POLYGON", "STAR", "BOOLEAN_OPERATION", "LINE"]);
+      const findVectorChildNode = (root) => {
+        if (!root) return null;
+        if (vectorTypes2.has(root.type)) {
+          return root;
+        }
+        const children = root.children;
+        if (Array.isArray(children) && children.length > 0) {
+          for (const child of children) {
+            const found = findVectorChildNode(child);
+            if (found) return found;
+          }
+        }
+        if ((root.name || "").toLowerCase().includes("icon")) {
+          return root;
+        }
+        return null;
+      };
       const processContainer = (container) => {
         var _a, _b, _c;
         if ((_a = container.styles) == null ? void 0 : _a.sourceId) {
@@ -6594,6 +6848,12 @@ ${JSON.stringify(baseSchema, null, 2)}
                     widget.styles.customCss = rich.css;
                   } else {
                     widget.content = node.characters || node.name;
+                  }
+                }
+                if (!widget.imageId && (widget.type === "button" || widget.type === "icon" || widget.type === "icon-box")) {
+                  const vectorChild = findVectorChildNode(node);
+                  if (vectorChild) {
+                    widget.imageId = vectorChild.id;
                   }
                 }
               }
@@ -6845,9 +7105,56 @@ ${JSON.stringify(baseSchema, null, 2)}
       var _a;
       console.log("[NAV MENU SYNC] ========== START ==========");
       console.log("[NAV MENU SYNC] WPConfig:", { url: wpConfig.url, user: wpConfig.user, hasPassword: !!(wpConfig.password || wpConfig.token) });
+      const sendUiMessage = (level, message) => {
+        try {
+          figma.ui.postMessage({ type: "log", level, message });
+        } catch (err) {
+          console.warn("[NAV MENU SYNC] Unable to send UI message:", err);
+        }
+      };
       const syncEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token));
       if (!syncEnabled) {
         console.log("[NAV MENU SYNC] \u274C Skipped: WordPress config not provided.");
+        sendUiMessage("warn", "Sincroniza??o de menus desativada: informe URL, usu?rio e senha do WordPress para criar o menu.");
+        return;
+      }
+      const endpoint = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
+      const btoaPolyfill = (str) => {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+        let output = "";
+        let i = 0;
+        while (i < str.length) {
+          const a = str.charCodeAt(i++);
+          const b = i < str.length ? str.charCodeAt(i++) : 0;
+          const c = i < str.length ? str.charCodeAt(i++) : 0;
+          const bitmap = a << 16 | b << 8 | c;
+          output += chars.charAt(bitmap >> 18 & 63);
+          output += chars.charAt(bitmap >> 12 & 63);
+          output += chars.charAt(b ? bitmap >> 6 & 63 : 64);
+          output += chars.charAt(c ? bitmap & 63 : 64);
+        }
+        return output;
+      };
+      const auth = "Basic " + btoaPolyfill(`${wpConfig.user}:${wpConfig.password || wpConfig.token}`);
+      try {
+        const checkResponse = await fetch(endpoint, {
+          method: "OPTIONS",
+          headers: {
+            "Authorization": auth
+          }
+        });
+        if (checkResponse.status === 404) {
+          console.error("[NAV MENU SYNC] Endpoint /wp-json/figtoel-remote-menus/v1/sync n\xE3o encontrado.");
+          sendUiMessage("error", "Instale e ative o plugin WordPress figtoel-remote-menus para habilitar o endpoint de sincroniza\xE7\xE3o de menus.");
+          return;
+        }
+        if (!checkResponse.ok && checkResponse.status !== 401 && checkResponse.status !== 403 && checkResponse.status !== 405) {
+          console.warn("[NAV MENU SYNC] Endpoint check retornou status inesperado:", checkResponse.status);
+          sendUiMessage("warn", `N\xE3o foi poss\xEDvel validar o endpoint de menus (status ${checkResponse.status}). Tentando sincronizar mesmo assim...`);
+        }
+      } catch (error) {
+        console.error("[NAV MENU SYNC] Falha ao verificar endpoint:", error);
+        sendUiMessage("error", `N\xE3o foi poss\xEDvel verificar o endpoint do plugin figtoel-remote-menus: ${error}`);
         return;
       }
       const navMenus = [];
@@ -6881,34 +7188,16 @@ ${JSON.stringify(baseSchema, null, 2)}
             continue;
           }
           const items = this.extractMenuItems(figmaNode);
-          const menuName = widget.content || figmaNode.name || "Menu Principal";
+          const menuName2 = widget.content || figmaNode.name || "Menu Principal";
           const payload = {
-            menu_name: menuName,
+            menu_name: menuName2,
             menu_location: "primary",
             // Default location
             replace_existing: true,
             items
           };
-          const url = `${wpConfig.url}/wp-json/figtoel-remote-menus/v1/sync`;
-          const btoaPolyfill = (str) => {
-            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-            let output = "";
-            let i = 0;
-            while (i < str.length) {
-              const a = str.charCodeAt(i++);
-              const b = i < str.length ? str.charCodeAt(i++) : 0;
-              const c = i < str.length ? str.charCodeAt(i++) : 0;
-              const bitmap = a << 16 | b << 8 | c;
-              output += chars.charAt(bitmap >> 18 & 63);
-              output += chars.charAt(bitmap >> 12 & 63);
-              output += chars.charAt(b ? bitmap >> 6 & 63 : 64);
-              output += chars.charAt(c ? bitmap & 63 : 64);
-            }
-            return output;
-          };
-          const auth = "Basic " + btoaPolyfill(`${wpConfig.user}:${wpConfig.password || wpConfig.token}`);
-          console.log(`[NAV MENU SYNC] Posting to ${url}...`, payload);
-          const response = await fetch(url, {
+          console.log(`[NAV MENU SYNC] Posting to ${endpoint}...`, payload);
+          const response = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -6916,17 +7205,25 @@ ${JSON.stringify(baseSchema, null, 2)}
             },
             body: JSON.stringify(payload)
           });
-          const result = await response.json();
-          if (response.ok && result.success) {
-            console.log(`[NAV MENU SYNC] \u2705 Menu "${menuName}" synced successfully. Items created: ${result.items_created}`);
-            figma.ui.postMessage({ type: "log", level: "success", message: `Menu "${menuName}" criado no WordPress com ${result.items_created} itens.` });
+          let responseText = "";
+          let result = null;
+          try {
+            responseText = await response.text();
+            result = responseText ? JSON.parse(responseText) : null;
+          } catch (e) {
+            result = null;
+          }
+          if (response.ok && (result == null ? void 0 : result.success)) {
+            console.log(`[NAV MENU SYNC] \u2705 Menu "${menuName2}" synced successfully. Items created: ${result.items_created}`);
+            sendUiMessage("success", `Menu "${menuName2}" criado no WordPress com ${result.items_created} itens.`);
           } else {
-            console.error(`[NAV MENU SYNC] \u274C Failed to sync menu "${menuName}":`, result);
-            figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao criar menu "${menuName}": ${result.error || "Desconhecido"}` });
+            const detailedError = (result == null ? void 0 : result.error) || (result == null ? void 0 : result.message) || responseText || response.statusText || "Desconhecido";
+            console.error(`[NAV MENU SYNC] \u274C Failed to sync menu "${menuName2}":`, { status: response.status, body: responseText });
+            sendUiMessage("error", `Erro ${response.status} ao criar o menu "${menuName2}": ${detailedError}`);
           }
         } catch (error) {
           console.error(`[NAV MENU SYNC] Exception:`, error);
-          figma.ui.postMessage({ type: "log", level: "error", message: `Erro ao sincronizar menu: ${error}` });
+          sendUiMessage("error", `Erro ao sincronizar menu "${menuName}": ${error}`);
         }
       }
     }
@@ -12405,6 +12702,7 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     const useAIPayload = safeGet(aiPayload, "useAI");
     const useAI = typeof useAIPayload === "boolean" ? useAIPayload : await loadSetting("gptel_use_ai", true);
     const serialized = serializeNode(node);
+    warnExcessiveLineHeight(serialized);
     const includeScreenshotPayload = safeGet(aiPayload, "includeScreenshot");
     const includeScreenshot = typeof includeScreenshotPayload === "boolean" ? includeScreenshotPayload : await loadSetting("gptel_include_screenshot", true);
     const includeReferencesPayload = safeGet(aiPayload, "includeReferences");
@@ -12472,9 +12770,310 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     const payload = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     figma.ui.postMessage({ type: "preview", payload });
   }
+  function warnExcessiveLineHeight(root) {
+    if (!root) return;
+    const THRESHOLD = 1.5;
+    const issues = [];
+    const ensureIssue = (fontSize, lineHeight, nodeName) => {
+      if (!fontSize || !lineHeight) return false;
+      const px = resolveLineHeightPx(lineHeight, fontSize);
+      if (!px) return false;
+      const ratio = px / fontSize;
+      if (ratio > THRESHOLD) {
+        issues.push({
+          nodeName: nodeName || "Texto",
+          linePx: px,
+          fontSize,
+          ratio
+        });
+        return true;
+      }
+      return false;
+    };
+    const walk = (node) => {
+      if (!node) return;
+      if (node.type === "TEXT") {
+        const name = node.name || (node.characters ? node.characters.slice(0, 40) : node.id);
+        const baseFontSize = typeof node.fontSize === "number" ? node.fontSize : void 0;
+        const baseLineHeight = node.lineHeight;
+        let warned = ensureIssue(baseFontSize, baseLineHeight, name);
+        const segments = node.styledTextSegments;
+        if (!warned && Array.isArray(segments)) {
+          for (const segment of segments) {
+            const segFont = typeof segment.fontSize === "number" ? segment.fontSize : baseFontSize;
+            const segLine = segment.lineHeight || baseLineHeight;
+            if (ensureIssue(segFont, segLine, name)) {
+              warned = true;
+              break;
+            }
+          }
+        }
+      }
+      const children = node.children;
+      if (Array.isArray(children)) {
+        children.forEach((child) => walk(child));
+      }
+    };
+    walk(root);
+    if (issues.length > 0) {
+      issues.forEach((issue) => {
+        const message = `Line-height alto detectado em "${issue.nodeName}": ${issue.linePx.toFixed(1)}px (${issue.ratio.toFixed(2)}x o font-size ${issue.fontSize}px). Ajuste no Figma para evitar esticar o bot\xE3o.`;
+        log(message, "warn");
+      });
+    }
+  }
+  function resolveLineHeightPx(lineHeight, fontSize) {
+    if (!lineHeight) return null;
+    if (typeof lineHeight === "number") return lineHeight;
+    if (typeof lineHeight === "object") {
+      const unit = lineHeight.unit;
+      const value = lineHeight.value;
+      if (unit === "AUTO") return null;
+      if (unit === "PIXELS" && typeof value === "number") return value;
+      if (unit === "PERCENT" && typeof value === "number" && typeof fontSize === "number") {
+        return fontSize * value / 100;
+      }
+    }
+    return null;
+  }
+  function hydrateSchemaWithRealStyles(schema, root) {
+    if (!schema || !schema.containers || schema.containers.length === 0 || !root) {
+      return;
+    }
+    const nodeMap = /* @__PURE__ */ new Map();
+    const walk = (node) => {
+      if (!node || !node.id) return;
+      nodeMap.set(node.id, node);
+      const children = node.children;
+      if (Array.isArray(children)) {
+        children.forEach((child) => walk(child));
+      }
+    };
+    walk(root);
+    const vectorTypes2 = /* @__PURE__ */ new Set(["VECTOR", "ELLIPSE", "POLYGON", "STAR", "BOOLEAN_OPERATION", "LINE"]);
+    const findVectorChildNode = (source) => {
+      if (!source) return null;
+      if (vectorTypes2.has(source.type)) {
+        return source;
+      }
+      const children = source.children;
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          const found = findVectorChildNode(child);
+          if (found) return found;
+        }
+      }
+      if ((source.name || "").toLowerCase().includes("icon")) {
+        return source;
+      }
+      return null;
+    };
+    const processContainer = (container) => {
+      var _a;
+      if (!container) return;
+      const sourceId = (_a = container.styles) == null ? void 0 : _a.sourceId;
+      if (sourceId && nodeMap.has(sourceId)) {
+        const node = nodeMap.get(sourceId);
+        const realStyles = extractContainerStyles(node);
+        container.styles = __spreadValues(__spreadValues({}, container.styles || {}), realStyles);
+        if (realStyles.paddingTop !== void 0) container.styles.paddingTop = realStyles.paddingTop;
+        if (realStyles.paddingRight !== void 0) container.styles.paddingRight = realStyles.paddingRight;
+        if (realStyles.paddingBottom !== void 0) container.styles.paddingBottom = realStyles.paddingBottom;
+        if (realStyles.paddingLeft !== void 0) container.styles.paddingLeft = realStyles.paddingLeft;
+        if (realStyles.gap !== void 0) container.styles.gap = realStyles.gap;
+        if (realStyles.justify_content) container.styles.justify_content = realStyles.justify_content;
+        if (realStyles.align_items) container.styles.align_items = realStyles.align_items;
+        if (container.styles.background && container.styles.background.type === "image" && !container.styles.backgroundImage) {
+          container.styles.backgroundImage = container.styles.background;
+        }
+        if (realStyles.backgroundImage && !container.styles.backgroundImage) {
+          container.styles.backgroundImage = realStyles.backgroundImage;
+        }
+      }
+      if (Array.isArray(container.widgets)) {
+        for (const widget of container.widgets) {
+          if (!widget.styles) widget.styles = {};
+          const widgetSourceId = widget.styles.sourceId;
+          if (widgetSourceId && nodeMap.has(widgetSourceId)) {
+            const node = nodeMap.get(widgetSourceId);
+            const realStyles = extractWidgetStyles(node);
+            const preservedDimensions = {};
+            const dimensionKeys = ["width", "_frameWidth", "height", "_frameHeight", "minHeight", "maxHeight"];
+            dimensionKeys.forEach((key) => {
+              if (widget.styles && widget.styles[key] !== void 0) {
+                preservedDimensions[key] = widget.styles[key];
+              }
+            });
+            widget.styles = __spreadValues(__spreadValues({}, widget.styles), realStyles);
+            Object.keys(preservedDimensions).forEach((key) => {
+              widget.styles[key] = preservedDimensions[key];
+            });
+            if (node.type === "TEXT" && (widget.type === "heading" || widget.type === "text")) {
+              if (node.styledTextSegments && node.styledTextSegments.length > 1) {
+                const rich = buildHtmlFromSegments(node);
+                widget.content = rich.html;
+                widget.styles.customCss = rich.css;
+              } else {
+                widget.content = node.characters || widget.content || node.name;
+              }
+            }
+            if (!widget.imageId && (widget.type === "button" || widget.type === "icon" || widget.type === "icon-box")) {
+              const vectorChild = findVectorChildNode(node);
+              if (vectorChild) {
+                widget.imageId = vectorChild.id;
+              }
+            }
+          }
+        }
+      }
+      if (Array.isArray(container.children)) {
+        container.children.forEach(processContainer);
+      }
+    };
+    schema.containers.forEach(processContainer);
+  }
+  async function syncNavMenusLegacy(schema, wpConfig) {
+    var _a;
+    if (!schema || !schema.containers || schema.containers.length === 0) {
+      return;
+    }
+    log("[NAV MENU SYNC] ========== START ==========", "info");
+    const sendUiMessage = (level, message) => {
+      try {
+        figma.ui.postMessage({ type: "log", level, message });
+      } catch (err) {
+        console.warn("[NAV MENU SYNC] Unable to send UI message:", err);
+      }
+    };
+    const syncEnabled = !!(wpConfig && wpConfig.url && wpConfig.user && (wpConfig.password || wpConfig.token));
+    if (!syncEnabled) {
+      sendUiMessage("warn", "Sincroniza\xE7\xE3o de menus desativada: informe URL, usu\xE1rio e senha do WordPress para criar o menu.");
+      return;
+    }
+    const endpointBase = (wpConfig.url || "").replace(/\/$/, "");
+    const endpoint = `${endpointBase}/wp-json/figtoel-remote-menus/v1/sync`;
+    const btoaPolyfill = (str) => {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+      let output = "";
+      let i = 0;
+      while (i < str.length) {
+        const a = str.charCodeAt(i++);
+        const b = i < str.length ? str.charCodeAt(i++) : 0;
+        const c = i < str.length ? str.charCodeAt(i++) : 0;
+        const bitmap = a << 16 | b << 8 | c;
+        output += chars.charAt(bitmap >> 18 & 63);
+        output += chars.charAt(bitmap >> 12 & 63);
+        output += chars.charAt(b ? bitmap >> 6 & 63 : 64);
+        output += chars.charAt(c ? bitmap & 63 : 64);
+      }
+      return output;
+    };
+    const auth = "Basic " + btoaPolyfill(`${wpConfig.user}:${wpConfig.password || wpConfig.token}`);
+    try {
+      const checkResponse = await fetch(endpoint, {
+        method: "OPTIONS",
+        headers: { "Authorization": auth }
+      });
+      if (checkResponse.status === 404) {
+        sendUiMessage("error", "Instale e ative o plugin WordPress figtoel-remote-menus para habilitar o endpoint de sincroniza\xE7\xE3o de menus.");
+        return;
+      }
+      if (!checkResponse.ok && ![401, 403, 405].includes(checkResponse.status)) {
+        sendUiMessage("warn", `N\xE3o foi poss\xEDvel validar o endpoint de menus (status ${checkResponse.status}). Tentando sincronizar mesmo assim...`);
+      }
+    } catch (error) {
+      sendUiMessage("error", `N\xE3o foi poss\xEDvel verificar o endpoint do plugin figtoel-remote-menus: ${error}`);
+      return;
+    }
+    const navMenus = [];
+    const collectNavMenus = (container) => {
+      if (container.widgets) {
+        for (const widget of container.widgets) {
+          if (widget.type === "nav-menu") {
+            navMenus.push({ widget, container });
+          }
+        }
+      }
+      if (container.children) {
+        for (const child of container.children) {
+          collectNavMenus(child);
+        }
+      }
+    };
+    schema.containers.forEach(collectNavMenus);
+    if (navMenus.length === 0) {
+      log("[NAV MENU SYNC] No nav-menu widgets found.", "info");
+      return;
+    }
+    for (const { widget, container } of navMenus) {
+      const sourceId = ((_a = widget.styles) == null ? void 0 : _a.sourceId) || container.id;
+      const figmaNode = sourceId ? figma.getNodeById(sourceId) : null;
+      if (!figmaNode || !("children" in figmaNode)) {
+        log(`[NAV MENU SYNC] Cannot find Figma node for nav-menu: ${sourceId}`, "warn");
+        continue;
+      }
+      const items = extractMenuItemsFromNode(figmaNode);
+      const menuName2 = widget.content || figmaNode.name || "Menu Principal";
+      const payload = {
+        menu_name: menuName2,
+        menu_location: "primary",
+        replace_existing: true,
+        items
+      };
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": auth
+          },
+          body: JSON.stringify(payload)
+        });
+        let responseText = "";
+        let result = null;
+        try {
+          responseText = await response.text();
+          result = responseText ? JSON.parse(responseText) : null;
+        } catch (e) {
+          result = null;
+        }
+        if (response.ok && (result == null ? void 0 : result.success)) {
+          sendUiMessage("success", `Menu "${menuName2}" criado no WordPress com ${result.items_created} itens.`);
+        } else {
+          const detailedError = (result == null ? void 0 : result.error) || (result == null ? void 0 : result.message) || responseText || response.statusText || "Desconhecido";
+          sendUiMessage("error", `Erro ${response.status} ao criar o menu "${menuName2}": ${detailedError}`);
+        }
+      } catch (error) {
+        sendUiMessage("error", `Erro ao sincronizar menu "${menuName2}": ${error}`);
+      }
+    }
+  }
+  function extractMenuItemsFromNode(navMenuNode) {
+    const items = [];
+    if (!navMenuNode.children) return items;
+    for (const child of navMenuNode.children) {
+      if (child.type === "TEXT") {
+        const title = child.characters;
+        items.push({ title, url: "#" });
+        continue;
+      }
+      if (child.type === "FRAME" || child.type === "GROUP") {
+        let title = child.name;
+        if ("children" in child) {
+          const textChild = child.children.find((c) => c.type === "TEXT");
+          if (textChild) {
+            title = textChild.characters;
+          }
+        }
+        items.push({ title, url: "#" });
+      }
+    }
+    return items;
+  }
   async function runPipelineWithoutAI(serializedTree, wpConfig = {}) {
     const analyzed = analyzeTreeWithHeuristics(serializedTree);
     const schema = convertToFlexSchema(analyzed);
+    hydrateSchemaWithRealStyles(schema, serializedTree);
     if (SHADOW_MODE) {
       try {
         var rootNode = figma.getNodeById(serializedTree.id);
@@ -12513,7 +13112,29 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     noaiUploader.setWPConfig(normalizedWP);
     const uploadEnabled = !!(normalizedWP && normalizedWP.url && normalizedWP.user && normalizedWP.password && normalizedWP.exportImages);
     const uploadPromises = [];
+    const containerUploadPromises = [];
     await enforceWidgetTypes(schema);
+    const processContainerBackground = async (container) => {
+      if (!uploadEnabled || !noaiUploader) return;
+      const styles = container.styles || {};
+      const backgroundImage = styles.backgroundImage || (styles.background && styles.background.type === "image" ? styles.background : null);
+      const imageHash = backgroundImage == null ? void 0 : backgroundImage.imageHash;
+      if (!imageHash) return;
+      try {
+        const label = container.id || styles.sourceId || "container";
+        const uploaded = await noaiUploader.uploadImageHash(imageHash, String(label));
+        if (uploaded) {
+          if (!styles.backgroundImage || !styles.backgroundImage.imageHash) {
+            styles.backgroundImage = { type: "image", imageHash };
+          }
+          styles.backgroundImage.wpUrl = uploaded.url;
+          styles.backgroundImage.wpId = uploaded.id;
+          container.styles = styles;
+        }
+      } catch (error) {
+        console.error("[NO-AI] Failed to upload container background:", error);
+      }
+    };
     const processWidget = async (widget) => {
       const uploader = noaiUploader;
       if (!uploader) return;
@@ -12655,6 +13276,9 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
       }
     };
     const collectUploads = (container) => {
+      if (uploadEnabled) {
+        containerUploadPromises.push(processContainerBackground(container));
+      }
       for (const widget of container.widgets || []) {
         uploadPromises.push(processWidget(widget));
         if (widget.children && Array.isArray(widget.children)) {
@@ -12670,9 +13294,11 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     for (const container of schema.containers) {
       collectUploads(container);
     }
-    if (uploadPromises.length > 0) {
-      await Promise.all(uploadPromises);
+    const pendingUploads = [...uploadPromises, ...containerUploadPromises];
+    if (pendingUploads.length > 0) {
+      await Promise.all(pendingUploads);
     }
+    await syncNavMenusLegacy(schema, normalizedWP);
     const compiler = new ElementorCompiler();
     compiler.setWPConfig(normalizedWP);
     const json = compiler.compile(schema);

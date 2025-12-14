@@ -19,81 +19,53 @@ export class ImageUploader {
     }
 
     /**
-     * Faz upload de uma imagem para o WordPress
-     * @param node Nó do Figma a ser exportado
-     * @param format Formato da imagem
-     * @returns Objeto com URL e ID da imagem no WordPress ou null
+     * Faz upload de uma imagem baseada em um SceneNode do Figma.
      */
     async uploadToWordPress(node: SceneNode, format: ImageFormat = 'WEBP'): Promise<{ url: string, id: number } | null> {
-        if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
-            console.warn('[F2E] WP config ausente.');
-            return null;
-        }
+        if (!this.canUpload()) return null;
 
         try {
             const targetFormat = format === 'SVG' ? 'SVG' : 'WEBP';
             const result = await exportNodeAsImage(node, targetFormat, this.quality);
             if (!result) return null;
 
-            const { bytes, mime, ext, needsConversion } = result;
-
-            // Calcula hash para evitar uploads duplicados
-            const hash = await computeHash(bytes);
-            if (this.mediaHashCache.has(hash)) {
-                return this.mediaHashCache.get(hash)!;
-            }
-
-            this.nodeHashCache.set(node.id, hash);
-            const id = generateGUID();
             const safeId = node.id.replace(/[^a-z0-9]/gi, '_');
-            const name = `w_${safeId}_${hash}.${ext}`;
+            const hash = await computeHash(result.bytes);
+            this.nodeHashCache.set(node.id, hash);
+            return this.enqueueUpload(result.bytes, result.mime, result.ext, safeId, !!result.needsConversion);
+        } catch (error) {
+            console.error('[ImageUploader] Error preparing upload:', error);
+            return null;
+        }
+    }
 
-            // Cria uma promise que será resolvida quando a UI responder
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                    if (this.pendingUploads.has(id)) {
-                        this.pendingUploads.delete(id);
-                        resolve(null);
-                    }
-                }, 90000); // 90 segundos de timeout
+    /**
+     * Faz upload de um fill de imagem usando o hash do Figma.
+     */
+    async uploadImageHash(imageHash: string, nameHint: string = 'fill'): Promise<{ url: string, id: number } | null> {
+        if (!this.canUpload()) return null;
 
-                this.pendingUploads.set(id, (result: any) => {
-                    clearTimeout(timeout);
-                    if (result.success) {
-                        console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result.url}, ID: ${result.wpId}`);
-                        const mediaData = { url: result.url, id: result.wpId || 0 };
-                        this.mediaHashCache.set(hash, mediaData);
-                        resolve(mediaData);
-                    } else {
-                        console.error(`[ImageUploader] Falha no upload:`, result.error);
-                        resolve(null);
-                    }
-                });
+        const image = figma.getImageByHash(imageHash);
+        if (!image) {
+            console.warn('[ImageUploader] Não foi possível localizar imagem para o hash:', imageHash);
+            return null;
+        }
 
-                // Envia mensagem para a UI fazer o upload
-                figma.ui.postMessage({
-                    type: 'upload-image-request',
-                    id,
-                    name,
-                    mimeType: mime,
-                    targetMimeType: 'image/webp',
-                    data: bytes,
-                    needsConversion: !!needsConversion
-                });
-            });
-        } catch (e) {
-            console.error('Error preparing upload:', e);
+        try {
+            const bytes = await image.getBytesAsync();
+            const detected = this.detectImageFormat(bytes);
+            const safeId = `${nameHint}_${imageHash.replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'img'}`;
+            return this.enqueueUpload(bytes, detected.mime, detected.ext, safeId, false);
+        } catch (error) {
+            console.error('[ImageUploader] Falhou ao exportar imageHash:', error);
             return null;
         }
     }
 
     /**
      * Processa resposta de upload da UI
-     * @param id ID do upload
-     * @param result Resultado do upload
      */
     handleUploadResponse(id: string, result: any): void {
-        // console.log(`[ImageUploader] Recebida resposta para ${id}:`, result); // Log verboso removido
         const resolver = this.pendingUploads.get(id);
         if (resolver) {
             resolver(result);
@@ -103,32 +75,90 @@ export class ImageUploader {
         }
     }
 
-    /**
-     * Atualiza a qualidade de exportação
-     * @param quality Nova qualidade (0.1 a 1.0)
-     */
     setQuality(quality: number): void {
         this.quality = Math.max(0.1, Math.min(1.0, quality));
     }
 
-    /**
-     * Atualiza a configuração do WordPress
-     * @param wpConfig Nova configuração
-     */
     setWPConfig(wpConfig: WPConfig): void {
-        // Compat: token pode vir em "token"; usamos "password" esperado pelo fluxo legado
         this.wpConfig = {
             ...wpConfig,
             password: wpConfig?.password || (wpConfig as any)?.token
         };
     }
 
-    /**
-     * Limpa o cache de hashes
-     */
     clearCache(): void {
         this.mediaHashCache.clear();
         this.nodeHashCache.clear();
+    }
+
+    private canUpload(): boolean {
+        if (!this.wpConfig || !this.wpConfig.url || !this.wpConfig.user || !this.wpConfig.password) {
+            console.warn('[F2E] WP config ausente.');
+            return false;
+        }
+        return true;
+    }
+
+    private detectImageFormat(bytes: Uint8Array): { mime: string; ext: string } {
+        if (bytes.length >= 8 &&
+            bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+            return { mime: 'image/png', ext: 'png' };
+        }
+
+        if (bytes.length >= 3 &&
+            bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+            return { mime: 'image/jpeg', ext: 'jpg' };
+        }
+
+        if (bytes.length >= 3 &&
+            bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) {
+            return { mime: 'image/gif', ext: 'gif' };
+        }
+
+        return { mime: 'image/png', ext: 'png' };
+    }
+
+    private async enqueueUpload(bytes: Uint8Array, mime: string, ext: string, safeId: string, needsConversion: boolean): Promise<{ url: string, id: number } | null> {
+        const hash = await computeHash(bytes);
+        if (this.mediaHashCache.has(hash)) {
+            return this.mediaHashCache.get(hash)!;
+        }
+
+        const id = generateGUID();
+        const sanitizedId = safeId.replace(/[^a-z0-9]/gi, '_');
+        const name = `w_${sanitizedId}_${hash}.${ext}`;
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                if (this.pendingUploads.has(id)) {
+                    this.pendingUploads.delete(id);
+                    resolve(null);
+                }
+            }, 90000);
+
+            this.pendingUploads.set(id, (result: any) => {
+                clearTimeout(timeout);
+                if (result.success) {
+                    console.log(`[ImageUploader] Upload bem-sucedido. URL: ${result.url}, ID: ${result.wpId}`);
+                    const mediaData = { url: result.url, id: result.wpId || 0 };
+                    this.mediaHashCache.set(hash, mediaData);
+                    resolve(mediaData);
+                } else {
+                    console.error('[ImageUploader] Falha no upload:', result.error);
+                    resolve(null);
+                }
+            });
+
+            figma.ui.postMessage({
+                type: 'upload-image-request',
+                id,
+                name,
+                mimeType: mime,
+                targetMimeType: needsConversion ? 'image/webp' : mime,
+                data: bytes,
+                needsConversion: !!needsConversion
+            });
+        });
     }
 }
 

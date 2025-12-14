@@ -929,7 +929,23 @@ function detectWidget(node: SerializedNode): MaybeWidget {
         if (widgetType === 'button') {
             const buttonData = analyzeButtonStructure(node);
             const containerStyles = extractContainerStyles(node);
-            const mergedStyles = { ...styles, ...containerStyles, ...buttonData.textStyles };
+            const textStyles = { ...buttonData.textStyles };
+            delete textStyles.width;
+            delete textStyles.height;
+            delete textStyles._frameWidth;
+            delete textStyles._frameHeight;
+            delete textStyles.minHeight;
+            delete textStyles.maxHeight;
+            const mergedStyles = { ...styles, ...containerStyles, ...textStyles };
+            if (typeof (node as any).width === 'number') {
+                mergedStyles.width = (node as any).width;
+                mergedStyles._frameWidth = (node as any).width;
+            }
+            if (typeof (node as any).height === 'number') {
+                mergedStyles.height = (node as any).height;
+                mergedStyles._frameHeight = (node as any).height;
+                mergedStyles.minHeight = (node as any).height;
+            }
             if (!mergedStyles.background && (!node.fills || node.fills.length === 0)) {
                 mergedStyles.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, opacity: 0, visible: true }];
             }
@@ -1864,4 +1880,3 @@ export function generateCardCustomCSSFromNode(node: SerializedNode): string | nu
   ${cssRules.join(';\n  ')};
 }`;
 }
-
