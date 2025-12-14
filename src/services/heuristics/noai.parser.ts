@@ -16,9 +16,27 @@ import type { PipelineSchema, PipelineContainer, PipelineWidget } from '../../ty
 type MaybeWidget = PipelineWidget | null;
 
 const vectorTypes = ['VECTOR', 'STAR', 'ELLIPSE', 'POLYGON', 'BOOLEAN_OPERATION', 'LINE', 'RECTANGLE'];
+const LOCKED_IMAGE_PREFIX = 'w:image';
+
+function isLockedImageNode(node: any): boolean {
+    if (!node) return false;
+    if ((node as any).isLockedImage) return true;
+    if (node.locked && typeof node.name === 'string') {
+        const normalized = node.name.trim().toLowerCase();
+        if (normalized.startsWith(LOCKED_IMAGE_PREFIX)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 function isImageFill(node: any): boolean {
     if (!node) return false;
+
+    if (isLockedImageNode(node)) {
+        console.log('[IS IMAGE FILL] Locked image group detected:', node.name, 'ID:', node.id);
+        return true;
+    }
 
     // Detect IMAGE and VECTOR nodes (icons/SVGs)
     if (node.type === 'IMAGE' || node.type === 'VECTOR') {

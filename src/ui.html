@@ -2771,7 +2771,7 @@
             <input id="wp_overwrite_images" type="checkbox" />
             <span>Sobrescrever imagens existentes</span>
           </label>
-          <small class="input-hint">Quando habilitado, a mídia com o mesmo nome será substituída no WordPress.</small>
+          <small class="input-hint" id="overwrite_hint">Quando habilitado, a mídia com o mesmo nome será substituída no WordPress.</small>
 
           <div class="slider-group" id="webp_quality_group" style="margin: 12px 0; display: none;">
             <label class="input-label" for="wp_webp_quality">Qualidade WebP: <span
@@ -2961,6 +2961,7 @@
         wp_user: document.getElementById('wp_user'),
         wp_token: document.getElementById('wp_token'),
         wp_export_images: document.getElementById('wp_export_images'),
+        wp_overwrite_images: document.getElementById('wp_overwrite_images'),
         wp_webp_quality: document.getElementById('wp_webp_quality'),
         webp_quality_group: document.getElementById('webp_quality_group'),
         webp_quality_value: document.getElementById('webp_quality_value'),
@@ -2994,6 +2995,17 @@
         fields.wp_export_images.checked = isEnabled;
         if (fields.webp_quality_group) {
           fields.webp_quality_group.style.display = isEnabled ? 'block' : 'none';
+        }
+        if (fields.wp_overwrite_images) {
+          fields.wp_overwrite_images.disabled = !isEnabled;
+          const overwriteWrapper = fields.wp_overwrite_images.closest('.checkbox');
+          if (overwriteWrapper) {
+            overwriteWrapper.style.opacity = isEnabled ? '1' : '0.4';
+          }
+        }
+        const overwriteHint = document.getElementById('overwrite_hint');
+        if (overwriteHint) {
+          overwriteHint.style.display = isEnabled ? 'block' : 'none';
         }
       }
 
@@ -3184,6 +3196,11 @@
             updateExportImagesControls(checked);
           });
         }
+        if (fields.wp_overwrite_images) {
+          fields.wp_overwrite_images.addEventListener('change', () => {
+            send('save-setting', { key: 'gptel_overwrite_images', value: fields.wp_overwrite_images.checked });
+          });
+        }
         if (fields.wp_webp_quality) {
           fields.wp_webp_quality.addEventListener('input', () => {
             const quality = fields.wp_webp_quality.value;
@@ -3212,6 +3229,7 @@
                 user: fields.wp_user?.value || '',
                 token: fields.wp_token?.value || '',
                 exportImages: fields.wp_export_images?.checked || false,
+                overwriteImages: fields.wp_overwrite_images?.checked || false,
                 webpQuality: parseInt(fields.wp_webp_quality?.value || 85)
               },
               apiKey: fields.gemini_api_key?.value || '',
@@ -3292,7 +3310,7 @@
         });
       }
 
-      async function convertToWebP(uint8Array, originalMime) {
+      async function convertToWebP(uint8Array, originalMime, targetQuality) {
         const blob = new Blob([new Uint8Array(uint8Array)], { type: originalMime });
         const url = URL.createObjectURL(blob);
         const img = new Image();
@@ -3309,9 +3327,11 @@
         ctx.drawImage(img, 0, 0);
 
         return new Promise(resolve => {
-          // Get quality from slider (0-100) and convert to 0-1 range
           const qualitySlider = document.getElementById('wp_webp_quality');
-          const quality = qualitySlider ? parseInt(qualitySlider.value) / 100 : 0.85;
+          const sliderValue = qualitySlider ? parseInt(qualitySlider.value) / 100 : 0.85;
+          const quality = (typeof targetQuality === 'number' && targetQuality > 0 && targetQuality <= 1)
+            ? targetQuality
+            : sliderValue;
 
           canvas.toBlob(blob => {
             URL.revokeObjectURL(url);
@@ -3321,59 +3341,151 @@
       }
 
       async function uploadImage(msg) {
-        const { id, name, mimeType, data, needsConversion } = msg;
-        const url = (fields.wp_url.value || '').replace(/\/$/, '');
-        const user = fields.wp_user.value;
-        const token = fields.wp_token.value;
+        const { id, name, mimeType, data, needsConversion, quality, overwrite } = msg;
+        const wpUrl = (fields.wp_url?.value || '').replace(/\/+$/, '');
+        const wpUser = fields.wp_user?.value || '';
+        const wpToken = fields.wp_token?.value || '';
+        const respond = (payload) => send('upload-image-response', { id, ...payload });
 
-        if (!url || !user || !token) {
-          send('upload-image-response', { id, success: false, error: 'Credenciais WP ausentes na UI' });
+        if (!wpUrl || !wpUser || !wpToken) {
+          respond({ success: false, error: 'Credenciais WP ausentes na UI' });
           return;
         }
 
-        try {
-          let blob;
-          addLog('[UI] Uploading image: ' + name + ' needsConversion: ' + needsConversion, 'info');
-          if (needsConversion) {
-            addLog('[UI] Converting to WebP...', 'info');
-            try {
-              blob = await convertToWebP(data, mimeType);
-            } catch (e) {
-              console.warn('[UI] WebP conversion failed:', e);
-              addLog('[UI] WebP conversion failed. Using original format.', 'warn');
-              blob = new Blob([new Uint8Array(data)], { type: mimeType || 'image/png' });
+        const endpoint = `${wpUrl}/wp-json/wp/v2/media`;
+        const shouldOverwrite = typeof overwrite === 'boolean'
+          ? overwrite
+          : !!fields.wp_overwrite_images?.checked;
+
+        const fileName = name || 'upload.webp';
+        const fileBase = (fileName.replace(/\.[^.]+$/, '') || fileName).toLowerCase();
+        const normalizedSlug = fileBase.replace(/[^a-z0-9_-]+/g, '-');
+        const slugCandidates = Array.from(new Set([
+          fileBase,
+          normalizedSlug,
+          normalizedSlug.replace(/_/g, '-'),
+          normalizedSlug.replace(/-+/g, '-').replace(/^-|-$/g, '')
+        ])).filter(Boolean);
+        const needleVariants = Array.from(new Set([
+          fileBase,
+          fileBase.replace(/[_-]+/g, ''),
+          fileBase.replace(/[^a-z0-9]+/g, '')
+        ])).filter(Boolean);
+
+        const auth = btoa(`${wpUser}:${wpToken}`);
+
+        const fetchMediaList = async (query) => {
+          const url = `${endpoint}?per_page=50&_fields=id,slug,source_url,title,media_details&${query}`;
+          const res = await fetch(url, { headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' } });
+          if (!res.ok) {
+            const bodyText = await res.text().catch(() => '');
+            addLog(`Falha ao consultar mídia (${res.status}): ${bodyText || res.statusText}`, 'warn');
+            return [];
+          }
+          const items = await res.json().catch(() => []);
+          return Array.isArray(items) ? items : [];
+        };
+
+        const matchesCandidate = (value) => {
+          if (!value) return false;
+          const lower = value.toLowerCase();
+          return slugCandidates.some(candidate => lower === candidate || lower.startsWith(`${candidate}-`));
+        };
+
+        const matchesByNeedle = (value) => {
+          if (!value) return false;
+          const lower = value.toLowerCase();
+          return needleVariants.some(needle => needle && lower.includes(needle));
+        };
+
+        const lookupExistingMedia = async () => {
+          if (!shouldOverwrite) return [];
+          const matchedIds = new Set();
+
+          const collectMatches = (items) => {
+            items.forEach(item => {
+              const slug = (item?.slug || '').toLowerCase();
+              const title = (item?.title?.rendered || '').toLowerCase();
+              const source = (item?.source_url || '').toLowerCase();
+              const mediaFile = (item?.media_details?.file || '').toLowerCase();
+              const match =
+                matchesCandidate(slug) ||
+                matchesCandidate(title) ||
+                matchesByNeedle(slug) ||
+                matchesByNeedle(title) ||
+                matchesByNeedle(source) ||
+                matchesByNeedle(mediaFile);
+              if (match && item?.id) {
+                matchedIds.add(Number(item.id));
+              }
+            });
+          };
+
+          for (const slug of slugCandidates) {
+            const items = await fetchMediaList(`slug=${encodeURIComponent(slug)}`);
+            collectMatches(items);
+          }
+
+          if (!matchedIds.size) {
+            const items = await fetchMediaList(`search=${encodeURIComponent(fileBase)}`);
+            collectMatches(items);
+          }
+
+          return Array.from(matchedIds);
+        };
+
+        const deleteMedia = async (mediaId) => {
+          const deleteUrl = `${endpoint}/${mediaId}?force=true`;
+          const res = await fetch(deleteUrl, { method: 'DELETE', headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' } });
+          if (!res.ok) {
+            const bodyText = await res.text().catch(() => '');
+            throw new Error(bodyText || res.statusText || `Falha ao remover mídia (status ${res.status})`);
+          }
+          addLog(`Mídia existente (#${mediaId}) removida antes do upload.`, 'info');
+        };
+
+        (async () => {
+          try {
+            if (shouldOverwrite) {
+              const existingIds = await lookupExistingMedia();
+              for (const mediaId of existingIds) {
+                await deleteMedia(mediaId);
+              }
             }
-            addLog('[UI] Converted blob type: ' + blob.type + ' size: ' + blob.size, 'info');
-          } else {
-            blob = new Blob([new Uint8Array(data)], { type: mimeType });
-            addLog('[UI] Using original blob type: ' + blob.type, 'info');
+
+            const bytes = new Uint8Array(data || []);
+            let uploadBlob;
+            if (needsConversion) {
+              addLog(`[UI] Convertendo ${name} para WebP...`, 'info');
+              try {
+                uploadBlob = await convertToWebP(bytes, mimeType || 'image/png', quality);
+              } catch (conversionError) {
+                console.warn('[UI] Falha ao converter para WebP:', conversionError);
+                addLog('Falha ao converter para WebP. Usando formato original.', 'warn');
+                uploadBlob = new Blob([bytes], { type: mimeType || 'image/png' });
+              }
+            } else {
+              uploadBlob = new Blob([bytes], { type: mimeType || 'image/png' });
+            }
+
+            const form = new FormData();
+            form.append('file', uploadBlob, fileName);
+
+            const uploadRes = await fetch(endpoint, {
+              method: 'POST',
+              headers: { Authorization: `Basic ${auth}` },
+              body: form
+            });
+            const body = await uploadRes.json().catch(() => ({}));
+            if (!uploadRes.ok) {
+              respond({ success: false, error: body?.message || uploadRes.statusText });
+              return;
+            }
+            respond({ success: true, url: body?.source_url, wpId: body?.id });
+          } catch (err) {
+            respond({ success: false, error: err?.message || 'Erro de rede' });
           }
-
-          const formData = new FormData();
-          formData.append('file', blob, name);
-          formData.append('title', name.split('.')[0]);
-          formData.append('caption', 'Exported via FigToEL');
-
-          const auth = btoa(`${user}:${token}`);
-          const resp = await fetch(`${url}/wp-json/wp/v2/media`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`
-            },
-            body: formData
-          });
-
-          if (!resp.ok) {
-            const errText = await resp.text();
-            throw new Error(`HTTP ${resp.status}: ${errText}`);
-          }
-
-          const json = await resp.json();
-          send('upload-image-response', { id, success: true, url: json.source_url, wpId: json.id });
-
-        } catch (e) {
-          send('upload-image-response', { id, success: false, error: e.message });
-        }
+        })();
       }
 
       // ============================================================
@@ -3671,6 +3783,9 @@
               if (fields.wp_export_images) {
                 const enabled = msg.payload.exportImages === true;
                 updateExportImagesControls(enabled);
+              }
+              if (fields.wp_overwrite_images && typeof msg.payload.overwriteImages === 'boolean') {
+                fields.wp_overwrite_images.checked = !!msg.payload.overwriteImages;
               }
               if (fields.wp_webp_quality && typeof msg.payload.webpQuality === 'number') {
                 fields.wp_webp_quality.value = msg.payload.webpQuality;

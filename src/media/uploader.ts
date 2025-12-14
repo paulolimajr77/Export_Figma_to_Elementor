@@ -86,6 +86,11 @@ export class ImageUploader {
             password: wpConfig?.password || (wpConfig as any)?.token
         };
         this.overwriteExisting = !!(wpConfig as any)?.overwriteImages;
+        const rawQuality = (wpConfig as any)?.webpQuality;
+        if (typeof rawQuality === 'number' && !isNaN(rawQuality)) {
+            const normalized = rawQuality > 1 ? rawQuality / 100 : rawQuality;
+            this.quality = Math.max(0.05, Math.min(1, normalized));
+        }
     }
 
     clearCache(): void {
@@ -159,7 +164,8 @@ export class ImageUploader {
                 targetMimeType: needsConversion ? 'image/webp' : mime,
                 data: bytes,
                 needsConversion: !!needsConversion,
-                overwrite: this.overwriteExisting
+                overwrite: this.overwriteExisting,
+                quality: this.quality
             });
         });
     }

@@ -321,6 +321,41 @@
     });
   }
 
+  async function convertToWebP(uint8Array, originalMime, targetQuality) {
+    const blob = new Blob([new Uint8Array(uint8Array)], { type: originalMime || 'image/png' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = url;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+    }
+
+    return new Promise(resolve => {
+      const slider = document.getElementById('wp_webp_quality');
+      const sliderValue = slider ? parseInt(slider.value, 10) / 100 : 0.85;
+      const quality = (typeof targetQuality === 'number' && targetQuality > 0 && targetQuality <= 1)
+        ? targetQuality
+        : sliderValue;
+      canvas.toBlob(result => {
+        URL.revokeObjectURL(url);
+        if (result) {
+          resolve(result);
+        } else {
+          resolve(new Blob([new Uint8Array(uint8Array)], { type: 'image/webp' }));
+        }
+      }, 'image/webp', quality);
+    });
+  }
+
   window.onmessage = (event) => {
     const msg = (event.data || {}).pluginMessage;
     if (!msg) return;
@@ -388,7 +423,7 @@
         if (ws) ws.textContent = msg.message;
         break;
       case 'upload-image-request': {
-        const { id, name, mimeType, data, overwrite } = msg;
+        const { id, name, mimeType, data, overwrite, needsConversion, quality } = msg;
         const wpUrl = fields.wp_url?.value || '';
         const wpUser = fields.wp_user?.value || '';
         const wpToken = fields.wp_token?.value || '';
@@ -500,9 +535,22 @@
             }
 
             const bytes = new Uint8Array(data || []);
-            const blob = new Blob([bytes], { type: mimeType || 'image/webp' });
+            let uploadBlob: Blob;
+            if (needsConversion) {
+              addLog(`[UI] Convertendo ${name} para WebP...`, 'info');
+              try {
+                uploadBlob = await convertToWebP(bytes, mimeType || 'image/png', quality);
+              } catch (conversionError) {
+                console.warn('[UI] Falha ao converter para WebP:', conversionError);
+                addLog('Falha ao converter para WebP. Usando formato original.', 'warn');
+                uploadBlob = new Blob([bytes], { type: mimeType || 'image/png' });
+              }
+            } else {
+              uploadBlob = new Blob([bytes], { type: mimeType || 'image/png' });
+            }
+
             const form = new FormData();
-            form.append('file', blob, fileName);
+            form.append('file', uploadBlob, fileName);
 
             const uploadRes = await fetch(endpoint, {
               method: 'POST',

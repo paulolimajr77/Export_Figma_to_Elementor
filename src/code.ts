@@ -1550,6 +1550,15 @@ figma.ui.onmessage = async (msg) => {
                 await saveSetting('gptel_export_images', !!(cfg as any).exportImages);
                 await saveSetting('gptel_auto_page', !!autoPage);
                 await saveSetting('gptel_overwrite_images', !!(cfg as any).overwriteImages);
+                const incomingQuality = typeof (cfg as any).webpQuality === 'number' ? Number((cfg as any).webpQuality) : undefined;
+                let normalizedQuality: number;
+                if (incomingQuality !== undefined && !isNaN(incomingQuality)) {
+                    const percentBased = incomingQuality <= 1 ? incomingQuality * 100 : incomingQuality;
+                    normalizedQuality = Math.max(1, Math.min(100, Math.round(percentBased)));
+                } else {
+                    normalizedQuality = await loadSetting<number>('gptel_webp_quality', 85);
+                }
+                await saveSetting('gptel_webp_quality', normalizedQuality);
                 figma.ui.postMessage({ type: 'wp-status', success: true, message: 'Conexao com WordPress verificada.' });
             } catch (e: any) {
                 const wpError = (safeGet(e, 'message') as string) || e;

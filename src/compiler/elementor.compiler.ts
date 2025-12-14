@@ -782,6 +782,13 @@ export class ElementorCompiler {
                 break;
         }
 
+        if (widgetType !== 'button') {
+            const gradientSource = widget.styles?.backgroundGradient || (widget.styles?.background?.type === 'gradient' ? widget.styles.background : undefined);
+            if (gradientSource?.stops && gradientSource.stops.length > 2 && settings.background_background === 'gradient') {
+                this.applyGradientCustomCss(settings, gradientSource, '{{WRAPPER}}');
+            }
+        }
+
         const finalSettings = this.normalizeIconSettings(widgetType, settings, widget);
 
         // SAFEGUARD: Ensure background_color is a string (Elementor crash prevention)

@@ -4,7 +4,7 @@ import { geminiProvider } from './api_gemini';
 import { ElementorCompiler } from './compiler/elementor.compiler';
 import { ImageUploader } from './media/uploader';
 import { PipelineSchema, PipelineContainer, PipelineWidget } from './types/pipeline.schema';
-import { ElementorJSON, WPConfig } from './types/elementor.types';
+import { ElementorJSON, WPConfig, ImageFormat } from './types/elementor.types';
 import { validatePipelineSchema, validateElementorJSON, computeCoverage } from './utils/validation';
 import { SchemaProvider, GenerateSchemaInput, PipelineRunOptions, DeterministicDiffMode } from './types/providers';
 import { ANALYZE_RECREATE_PROMPT, OPTIMIZE_SCHEMA_PROMPT } from './config/prompts';
@@ -582,14 +582,19 @@ ${JSON.stringify(baseSchema, null, 2)}
             return false;
         };
 
+
         const uploadNodeImage = async (nodeId: string, preferSvg: boolean = false) => {
             if (!nodeId) return null;
             const node = figma.getNodeById(nodeId);
             if (!node) {
-                console.error(`[PIPELINE] ❌ Node not found for upload: ${nodeId}`);
+                console.error(`[PIPELINE] Node not found for upload: ${nodeId}`);
                 return null;
             }
-            let format: any = preferSvg ? 'SVG' : 'WEBP';
+
+            let format: ImageFormat = preferSvg ? 'SVG' : 'WEBP';
+            const isExplicitImageName = (n?: SceneNode | null) =>
+                !!n?.name && n.name.trim().toLowerCase().startsWith('w:image');
+
             const hasImageChildren = (n: SceneNode): boolean => {
                 if ('fills' in n && Array.isArray((n as any).fills)) {
                     if ((n as any).fills.some((f: any) => f.type === 'IMAGE')) return true;
@@ -600,32 +605,48 @@ ${JSON.stringify(baseSchema, null, 2)}
                 return false;
             };
 
-            if (('locked' in node && (node as any).locked)) {
-                // Se trancado: prioridade para WebP se tiver imagem, senão SVG se tiver vetor
-                if (hasImageChildren(node as SceneNode)) {
-                    format = 'WEBP';
-                } else if (hasVectorChildren(node as SceneNode)) {
-                    format = 'SVG';
-                } else {
-                    // Trancado mas sem imagem nem vetor (ex: texto puro ou frame vazio)
-                    // Mantém o default (WEBP)
-                    format = 'WEBP';
-                }
+            const isLocked = ('locked' in node && (node as any).locked);
+
+            if (isLocked || isExplicitImageName(node)) {
+                // Locked frames must always export as raster to respect the designer intent.
+                format = 'WEBP';
             } else if (hasVectorChildren(node as SceneNode)) {
                 format = 'SVG';
-            }
-
-            console.log(`[PIPELINE] 📤 Uploading ${preferSvg ? 'ICON' : 'IMAGE'} for node ${node.name} (${node.id}) as ${format}`);
-            return this.imageUploader.uploadToWordPress(node as SceneNode, format);
-        };
-
+            } else if (hasImageChildren(node as SceneNode)) {
+                format = 'WEBP';
+            }
+
+            const label = format === 'SVG' ? 'ICON' : 'IMAGE';
+            console.log(`[PIPELINE] Uploading ${label} for node ${node.name} (${node.id}) as ${format}`);
+            return this.imageUploader.uploadToWordPress(node as SceneNode, format);
+        };
+
         const processWidget = async (widget: PipelineWidget) => {
             console.log(`[PIPELINE] Processing widget: ${widget.type} (ID: ${widget.imageId || 'none'})`);
 
-            // Widgets simples com imageId
-            if (widget.imageId && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'icon-list' || widget.type === 'list-item')) {
+            const sourceName = (widget.styles?.sourceName || '').toLowerCase();
+            const forceRaster = sourceName.startsWith('w:image') || !!(widget.styles as any)?.forceRaster;
+
+            let resolvedImageId = widget.imageId;
+            if (forceRaster) {
+                const candidateNode = resolvedImageId ? figma.getNodeById(resolvedImageId) : null;
+                const treatAsVector = candidateNode ? isVectorNode(candidateNode as SceneNode) || hasVectorChildren(candidateNode as SceneNode) : true;
+                if (!resolvedImageId || treatAsVector) {
+                    resolvedImageId = widget.styles?.sourceId || resolvedImageId;
+                }
+            }
+
+            const nodeIdForUpload =
+                resolvedImageId ||
+                widget.styles?.sourceId ||
+                widget.id ||
+                null;
+            const preferSvgUpload = !forceRaster && (widget.type === 'icon' || widget.type === 'icon-box' || widget.type === 'icon-list' || widget.type === 'list-item');
+
+            // Widgets simples com imageId/sourceId válido
+            if (nodeIdForUpload && (widget.type === 'image' || widget.type === 'custom' || widget.type === 'icon' || widget.type === 'image-box' || widget.type === 'icon-box' || widget.type === 'icon-list' || widget.type === 'list-item')) {
                 try {
-                    const result = await uploadNodeImage(widget.imageId, widget.type === 'icon' || widget.type === 'icon-box' || widget.type === 'icon-list' || widget.type === 'list-item');
+                    const result = await uploadNodeImage(nodeIdForUpload, preferSvgUpload);
                     if (result) {
                         if (widget.type === 'image-box') {
                             if (!widget.styles) widget.styles = {};

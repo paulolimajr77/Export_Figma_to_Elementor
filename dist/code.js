@@ -849,6 +849,41 @@ ${refText}` });
     }
     return typeof value === "string" ? value : "#000000";
   }
+  function appendCustomCss(settings, css) {
+    if (!css) return;
+    const snippet = css.trim();
+    if (!snippet) return;
+    settings.custom_css = settings.custom_css ? `${settings.custom_css}
+${snippet}`.trim() : snippet;
+  }
+  function normalizeStopPosition(value, index, total) {
+    if (typeof value === "number") {
+      if (value <= 1 && value >= 0) return Math.round(value * 100);
+      return Math.round(value);
+    }
+    if (total <= 1) return 0;
+    return Math.round(index / (total - 1) * 100);
+  }
+  function buildGradientCssString(gradient) {
+    if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length < 2) return null;
+    const stops = gradient.stops.map((stop, idx) => {
+      const color = typeof (stop == null ? void 0 : stop.color) === "string" ? stop.color : toHex(stop == null ? void 0 : stop.color);
+      const pos = normalizeStopPosition(stop == null ? void 0 : stop.position, idx, gradient.stops.length);
+      return `${color} ${pos}%`;
+    });
+    if (stops.length < 2) return null;
+    if ((gradient.gradientType || "").toLowerCase() === "radial") {
+      return `radial-gradient(circle, ${stops.join(", ")})`;
+    }
+    const angle = typeof gradient.angle === "number" ? gradient.angle : 180;
+    return `linear-gradient(${angle}deg, ${stops.join(", ")})`;
+  }
+  function applyGradientCustomCss(settings, gradient, selector) {
+    if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length <= 2) return;
+    const cssValue = buildGradientCssString(gradient);
+    if (!cssValue) return;
+    appendCustomCss(settings, `${selector} { background-image: ${cssValue} !important; }`);
+  }
   function stubDefinition(key, family = "misc", aliases = []) {
     const widgetType = slugFromKey(key);
     return {
@@ -1033,6 +1068,7 @@ ${refText}` });
                 settings.background_color_b_stop = { unit: "%", size: stopB || 100, sizes: [] };
               }
             }
+            applyGradientCustomCss(settings, bg, "{{WRAPPER}} .elementor-button");
           } else if (bg.type === "solid" || bg.color) {
             settings.background_background = "classic";
             settings.background_color = toHex(bg.color || bg);
@@ -1053,6 +1089,11 @@ ${refText}` });
                 settings.background_color_b_stop = { unit: "%", size: Math.round(last.position * 100), sizes: [] };
               }
             }
+            applyGradientCustomCss(
+              settings,
+              { gradientType: "linear", stops: gradientFill.gradientStops, angle: 180 },
+              "{{WRAPPER}} .elementor-button"
+            );
           } else if (solidFill && solidFill.color) {
             settings.background_background = "classic";
             settings.background_color = toHex(solidFill.color);
@@ -2528,6 +2569,47 @@ ${refText}` });
       }
       return typeof value === "string" ? value : "#000000";
     }
+    appendCustomCss(settings, css) {
+      if (!css) return;
+      const snippet = css.trim();
+      if (!snippet) return;
+      settings.custom_css = settings.custom_css ? `${settings.custom_css}
+${snippet}`.trim() : snippet;
+    }
+    normalizeStopPosition(value, index, total) {
+      if (typeof value === "number") {
+        if (value <= 1 && value >= 0) return Math.round(value * 100);
+        return Math.round(value);
+      }
+      if (total <= 1) return 0;
+      return Math.round(index / (total - 1) * 100);
+    }
+    formatGradientColor(value) {
+      if (!value) return "#000000";
+      if (typeof value === "string") return value;
+      return this.sanitizeColor(value) || "#000000";
+    }
+    buildGradientCssString(gradient) {
+      if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length < 2) return null;
+      const stops = gradient.stops.map((stop, idx) => {
+        const color = this.formatGradientColor(stop == null ? void 0 : stop.color);
+        const pos = this.normalizeStopPosition(stop == null ? void 0 : stop.position, idx, gradient.stops.length);
+        return `${color} ${pos}%`;
+      });
+      if (stops.length < 2) return null;
+      if ((gradient.gradientType || "").toLowerCase() === "radial") {
+        return `radial-gradient(circle, ${stops.join(", ")})`;
+      }
+      const angle = typeof gradient.angle === "number" ? gradient.angle : 180;
+      return `linear-gradient(${angle}deg, ${stops.join(", ")})`;
+    }
+    applyGradientCustomCss(settings, gradient, selector, property = "background-image") {
+      if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length <= 2) return;
+      const cssValue = this.buildGradientCssString(gradient);
+      if (!cssValue) return;
+      const rule = `${selector} { ${property}: ${cssValue} !important; }`;
+      this.appendCustomCss(settings, rule);
+    }
     compile(schema) {
       var _a;
       const elements = schema.containers.map((container) => this.compileContainer(container, false));
@@ -2648,7 +2730,7 @@ ${refText}` });
           settings._padding = paddingValue;
         }
       }
-      const applyGradientValues = (target, gradient) => {
+      const applyGradientValues = (target, gradient, options) => {
         var _a2, _b2, _c2;
         const stops = Array.isArray(gradient.stops) ? gradient.stops : [];
         if (stops.length === 0) return;
@@ -2661,6 +2743,10 @@ ${refText}` });
         settings[target.colorBKey] = lastStop.color;
         settings[target.colorBStopKey] = { unit: "%", size: (_b2 = lastStop.position) != null ? _b2 : 100, sizes: [] };
         settings[target.angleKey] = { unit: "deg", size: (_c2 = gradient.angle) != null ? _c2 : 180, sizes: [] };
+        if (stops.length > 2) {
+          const selector = (options == null ? void 0 : options.selector) || "{{WRAPPER}}";
+          this.applyGradientCustomCss(settings, gradient, selector, (options == null ? void 0 : options.property) || "background-image");
+        }
       };
       const backgroundImage = styles.backgroundImage || (((_a = styles.background) == null ? void 0 : _a.type) === "image" ? styles.background : void 0);
       const backgroundGradient = styles.backgroundGradient || (((_b = styles.background) == null ? void 0 : _b.type) === "gradient" ? styles.background : void 0);
@@ -2689,6 +2775,7 @@ ${refText}` });
         settings.background_color_b_stop = { unit: "%", size: lastStop.position, sizes: [] };
         const angle = backgroundGradient.angle !== void 0 ? backgroundGradient.angle : 180;
         settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
+        this.applyGradientCustomCss(settings, backgroundGradient, "{{WRAPPER}}");
       } else if (backgroundSolid && backgroundSolid.color) {
         const sanitizedColor = this.sanitizeColor(backgroundSolid.color);
         if (sanitizedColor) {
@@ -2710,6 +2797,7 @@ ${refText}` });
           settings.background_color_b_stop = { unit: "%", size: lastStop.position, sizes: [] };
           const angle = bg.angle !== void 0 ? bg.angle : 180;
           settings.background_gradient_angle = { unit: "deg", size: angle, sizes: [] };
+          this.applyGradientCustomCss(settings, bg, "{{WRAPPER}}");
         } else if (bg.type === "solid" || bg.color) {
           const sanitizedColor = this.sanitizeColor(bg.color);
           if (sanitizedColor) {
@@ -2729,7 +2817,8 @@ ${refText}` });
             typeKey: "background_overlay_gradient_type",
             angleKey: "background_overlay_gradient_angle"
           },
-          styles.backgroundOverlay
+          styles.backgroundOverlay,
+          { selector: "{{WRAPPER}} > .elementor-background-overlay" }
         );
         if (!settings.background_overlay_opacity) {
           settings.background_overlay_opacity = { unit: "%", size: 100, sizes: [] };
@@ -2914,7 +3003,7 @@ ${refText}` });
       return normalized;
     }
     compileWidget(widget) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
       const widgetId = generateGUID();
       const baseSettings = __spreadValues({ _element_id: widgetId }, this.sanitizeSettings(widget.styles || {}));
       Object.assign(baseSettings, this.mapTypography(widget.styles || {}));
@@ -3011,6 +3100,7 @@ ${refText}` });
                   settings.background_color_b_stop = { unit: "%", size: stopB || 100, sizes: [] };
                 }
               }
+              this.applyGradientCustomCss(settings, bg, "{{WRAPPER}} .elementor-button");
             } else if (bg.type === "image") {
               settings.background_background = "classic";
               settings.background_image = { url: "", id: 0, imageHash: bg.imageHash };
@@ -3096,6 +3186,12 @@ ${refText}` });
           widgetType = "html";
           settings.html = widget.content || "";
           break;
+      }
+      if (widgetType !== "button") {
+        const gradientSource = ((_u = widget.styles) == null ? void 0 : _u.backgroundGradient) || (((_w = (_v = widget.styles) == null ? void 0 : _v.background) == null ? void 0 : _w.type) === "gradient" ? widget.styles.background : void 0);
+        if ((gradientSource == null ? void 0 : gradientSource.stops) && gradientSource.stops.length > 2 && settings.background_background === "gradient") {
+          this.applyGradientCustomCss(settings, gradientSource, "{{WRAPPER}}");
+        }
       }
       const finalSettings = this.normalizeIconSettings(widgetType, settings, widget);
       if (finalSettings.background_color && typeof finalSettings.background_color === "object") {
@@ -3250,6 +3346,7 @@ ${refText}` });
       __publicField(this, "nodeHashCache", /* @__PURE__ */ new Map());
       __publicField(this, "quality", 0.85);
       __publicField(this, "wpConfig");
+      __publicField(this, "overwriteExisting", false);
       this.wpConfig = wpConfig;
       this.quality = quality;
     }
@@ -3310,6 +3407,12 @@ ${refText}` });
       this.wpConfig = __spreadProps(__spreadValues({}, wpConfig), {
         password: (wpConfig == null ? void 0 : wpConfig.password) || (wpConfig == null ? void 0 : wpConfig.token)
       });
+      this.overwriteExisting = !!(wpConfig == null ? void 0 : wpConfig.overwriteImages);
+      const rawQuality = wpConfig == null ? void 0 : wpConfig.webpQuality;
+      if (typeof rawQuality === "number" && !isNaN(rawQuality)) {
+        const normalized = rawQuality > 1 ? rawQuality / 100 : rawQuality;
+        this.quality = Math.max(0.05, Math.min(1, normalized));
+      }
     }
     clearCache() {
       this.mediaHashCache.clear();
@@ -3368,7 +3471,9 @@ ${refText}` });
           mimeType: mime,
           targetMimeType: needsConversion ? "image/webp" : mime,
           data: bytes,
-          needsConversion: !!needsConversion
+          needsConversion: !!needsConversion,
+          overwrite: this.overwriteExisting,
+          quality: this.quality
         });
       });
     }
@@ -4624,8 +4729,24 @@ Retorne APENAS o JSON otimizado. Sem markdown, sem explica\xE7\xF5es.
 
   // src/services/heuristics/noai.parser.ts
   var vectorTypes = ["VECTOR", "STAR", "ELLIPSE", "POLYGON", "BOOLEAN_OPERATION", "LINE", "RECTANGLE"];
+  var LOCKED_IMAGE_PREFIX = "w:image";
+  function isLockedImageNode(node) {
+    if (!node) return false;
+    if (node.isLockedImage) return true;
+    if (node.locked && typeof node.name === "string") {
+      const normalized = node.name.trim().toLowerCase();
+      if (normalized.startsWith(LOCKED_IMAGE_PREFIX)) {
+        return true;
+      }
+    }
+    return false;
+  }
   function isImageFill(node) {
     if (!node) return false;
+    if (isLockedImageNode(node)) {
+      console.log("[IS IMAGE FILL] Locked image group detected:", node.name, "ID:", node.id);
+      return true;
+    }
     if (node.type === "IMAGE" || node.type === "VECTOR") {
       console.log("[IS IMAGE FILL] \u2705 Detected", node.type, "node:", node.name, "ID:", node.id);
       return true;
@@ -6621,10 +6742,11 @@ ${JSON.stringify(baseSchema, null, 2)}
         if (!nodeId) return null;
         const node = figma.getNodeById(nodeId);
         if (!node) {
-          console.error(`[PIPELINE] \u274C Node not found for upload: ${nodeId}`);
+          console.error(`[PIPELINE] Node not found for upload: ${nodeId}`);
           return null;
         }
         let format = preferSvg ? "SVG" : "WEBP";
+        const isExplicitImageName = (n) => !!(n == null ? void 0 : n.name) && n.name.trim().toLowerCase().startsWith("w:image");
         const hasImageChildren = (n) => {
           if ("fills" in n && Array.isArray(n.fills)) {
             if (n.fills.some((f) => f.type === "IMAGE")) return true;
@@ -6634,26 +6756,36 @@ ${JSON.stringify(baseSchema, null, 2)}
           }
           return false;
         };
-        if ("locked" in node && node.locked) {
-          if (hasImageChildren(node)) {
-            format = "WEBP";
-          } else if (hasVectorChildren(node)) {
-            format = "SVG";
-          } else {
-            format = "WEBP";
-          }
+        const isLocked = "locked" in node && node.locked;
+        if (isLocked || isExplicitImageName(node)) {
+          format = "WEBP";
         } else if (hasVectorChildren(node)) {
           format = "SVG";
+        } else if (hasImageChildren(node)) {
+          format = "WEBP";
         }
-        console.log(`[PIPELINE] \u{1F4E4} Uploading ${preferSvg ? "ICON" : "IMAGE"} for node ${node.name} (${node.id}) as ${format}`);
+        const label = format === "SVG" ? "ICON" : "IMAGE";
+        console.log(`[PIPELINE] Uploading ${label} for node ${node.name} (${node.id}) as ${format}`);
         return this.imageUploader.uploadToWordPress(node, format);
       };
       const processWidget = async (widget) => {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         console.log(`[PIPELINE] Processing widget: ${widget.type} (ID: ${widget.imageId || "none"})`);
-        if (widget.imageId && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item")) {
+        const sourceName = (((_a = widget.styles) == null ? void 0 : _a.sourceName) || "").toLowerCase();
+        const forceRaster = sourceName.startsWith("w:image") || !!((_b = widget.styles) == null ? void 0 : _b.forceRaster);
+        let resolvedImageId = widget.imageId;
+        if (forceRaster) {
+          const candidateNode = resolvedImageId ? figma.getNodeById(resolvedImageId) : null;
+          const treatAsVector = candidateNode ? isVectorNode(candidateNode) || hasVectorChildren(candidateNode) : true;
+          if (!resolvedImageId || treatAsVector) {
+            resolvedImageId = ((_c = widget.styles) == null ? void 0 : _c.sourceId) || resolvedImageId;
+          }
+        }
+        const nodeIdForUpload = resolvedImageId || ((_d = widget.styles) == null ? void 0 : _d.sourceId) || widget.id || null;
+        const preferSvgUpload = !forceRaster && (widget.type === "icon" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item");
+        if (nodeIdForUpload && (widget.type === "image" || widget.type === "custom" || widget.type === "icon" || widget.type === "image-box" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item")) {
           try {
-            const result = await uploadNodeImage(widget.imageId, widget.type === "icon" || widget.type === "icon-box" || widget.type === "icon-list" || widget.type === "list-item");
+            const result = await uploadNodeImage(nodeIdForUpload, preferSvgUpload);
             if (result) {
               if (widget.type === "image-box") {
                 if (!widget.styles) widget.styles = {};
@@ -6664,7 +6796,7 @@ ${JSON.stringify(baseSchema, null, 2)}
               } else if (widget.type === "icon") {
                 if (!widget.styles) widget.styles = {};
                 widget.styles.selected_icon = { value: { id: result.id, url: result.url }, library: "svg" };
-              } else if (((_a = widget.styles) == null ? void 0 : _a.icon) && widget.type === "icon-list") {
+              } else if (((_e = widget.styles) == null ? void 0 : _e.icon) && widget.type === "icon-list") {
                 widget.styles.icon = { value: { id: result.id, url: result.url }, library: "svg" };
               } else if (widget.type === "list-item") {
                 if (!widget.styles) widget.styles = {};
@@ -6678,7 +6810,7 @@ ${JSON.stringify(baseSchema, null, 2)}
             console.error("Failed to upload image for widget:", widget.type, e);
           }
         }
-        if (widget.type === "image-carousel" && ((_b = widget.styles) == null ? void 0 : _b.slides) && Array.isArray(widget.styles.slides)) {
+        if (widget.type === "image-carousel" && ((_f = widget.styles) == null ? void 0 : _f.slides) && Array.isArray(widget.styles.slides)) {
           const uploads = widget.styles.slides.map(async (slide, idx) => {
             const nodeId = (slide == null ? void 0 : slide.id) || (slide == null ? void 0 : slide.imageId);
             if (!nodeId) return;
@@ -6697,7 +6829,7 @@ ${JSON.stringify(baseSchema, null, 2)}
           });
           await Promise.all(uploads);
         }
-        if ((widget.type === "gallery" || widget.type === "basic-gallery") && ((_c = widget.styles) == null ? void 0 : _c.gallery) && Array.isArray(widget.styles.gallery)) {
+        if ((widget.type === "gallery" || widget.type === "basic-gallery") && ((_g = widget.styles) == null ? void 0 : _g.gallery) && Array.isArray(widget.styles.gallery)) {
           const uploads = widget.styles.gallery.map(async (imageItem) => {
             const nodeId = (imageItem == null ? void 0 : imageItem.id) || (imageItem == null ? void 0 : imageItem.imageId);
             if (!nodeId) return;
@@ -6717,7 +6849,7 @@ ${JSON.stringify(baseSchema, null, 2)}
         }
         if (widget.type === "button") {
           let iconNodeId = widget.imageId;
-          if (!iconNodeId && ((_d = widget.styles) == null ? void 0 : _d.sourceId)) {
+          if (!iconNodeId && ((_h = widget.styles) == null ? void 0 : _h.sourceId)) {
             const buttonNode = figma.getNodeById(widget.styles.sourceId);
             if (buttonNode && "children" in buttonNode) {
               const iconChild = buttonNode.children.find((c) => {
@@ -12630,6 +12762,7 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     const user = await loadSetting("gptel_wp_user", "");
     const token = await loadSetting("gptel_wp_token", "");
     const exportImages = await loadSetting("gptel_export_images", false);
+    const overwriteImages = await loadSetting("gptel_overwrite_images", false);
     const webpQuality = await loadSetting("gptel_webp_quality", 85);
     if (!url || !token || !user) {
       const legacy = await loadSetting("wp_config", null);
@@ -12639,11 +12772,12 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
           user: legacy.user || user,
           token: legacy.auth || token,
           exportImages,
+          overwriteImages,
           webpQuality
         };
       }
     }
-    return { url, user, token, exportImages, webpQuality };
+    return { url, user, token, exportImages, overwriteImages, webpQuality };
   }
   async function resolveProviderConfig(msg) {
     const providerFromMsg = safeGet(msg, "providerAi");
@@ -12774,14 +12908,16 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     if (!root) return;
     const THRESHOLD = 1.5;
     const issues = [];
-    const ensureIssue = (fontSize, lineHeight, nodeName) => {
-      if (!fontSize || !lineHeight) return false;
+    const ensureIssue = (node, fontSize, lineHeight) => {
+      if (!node || !fontSize || !lineHeight) return false;
       const px = resolveLineHeightPx(lineHeight, fontSize);
       if (!px) return false;
       const ratio = px / fontSize;
       if (ratio > THRESHOLD) {
+        const name = node.name || (node.characters ? node.characters.slice(0, 40) : node.id || "Texto");
         issues.push({
-          nodeName: nodeName || "Texto",
+          nodeId: node.id || "",
+          nodeName: name,
           linePx: px,
           fontSize,
           ratio
@@ -12793,16 +12929,15 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     const walk = (node) => {
       if (!node) return;
       if (node.type === "TEXT") {
-        const name = node.name || (node.characters ? node.characters.slice(0, 40) : node.id);
         const baseFontSize = typeof node.fontSize === "number" ? node.fontSize : void 0;
         const baseLineHeight = node.lineHeight;
-        let warned = ensureIssue(baseFontSize, baseLineHeight, name);
+        let warned = ensureIssue(node, baseFontSize, baseLineHeight);
         const segments = node.styledTextSegments;
         if (!warned && Array.isArray(segments)) {
           for (const segment of segments) {
             const segFont = typeof segment.fontSize === "number" ? segment.fontSize : baseFontSize;
             const segLine = segment.lineHeight || baseLineHeight;
-            if (ensureIssue(segFont, segLine, name)) {
+            if (ensureIssue(node, segFont, segLine)) {
               warned = true;
               break;
             }
@@ -12817,9 +12952,21 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     walk(root);
     if (issues.length > 0) {
       issues.forEach((issue) => {
-        const message = `Line-height alto detectado em "${issue.nodeName}": ${issue.linePx.toFixed(1)}px (${issue.ratio.toFixed(2)}x o font-size ${issue.fontSize}px). Ajuste no Figma para evitar esticar o bot\xE3o.`;
+        const message = `Line-height alto detectado em "${issue.nodeName}": ${issue.linePx.toFixed(1)}px (${issue.ratio.toFixed(2)}x o font-size ${issue.fontSize}px). Ajuste no Figma para evitar esticar o bot?o.`;
         log(message, "warn");
       });
+      const summary = issues.length === 1 ? `Line-height alto em "${issues[0].nodeName}".` : `${issues.length} textos com line-height acima de ${THRESHOLD}x.`;
+      safeInvoke(() => figma.notify(`${summary} Ajuste-os no Figma para evitar bot?es esticados.`, { timeout: 5e3 }));
+      safeInvoke(() => figma.ui.postMessage({
+        type: "line-height-warning",
+        issues: issues.map((issue) => ({
+          nodeId: issue.nodeId,
+          nodeName: issue.nodeName,
+          lineHeightPx: issue.linePx,
+          fontSize: issue.fontSize,
+          ratio: issue.ratio
+        }))
+      }));
     }
   }
   function resolveLineHeightPx(lineHeight, fontSize) {
@@ -13324,6 +13471,8 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
     const wpUser = await loadSetting("gptel_wp_user", "");
     const wpToken = await loadSetting("gptel_wp_token", "");
     const exportImages = await loadSetting("gptel_export_images", false);
+    const overwriteImages = await loadSetting("gptel_overwrite_images", false);
+    const autoPage = await loadSetting("gptel_auto_page", false);
     const webpQuality = await loadSetting("gptel_webp_quality", 85);
     const darkMode = await loadSetting("gptel_dark_mode", false);
     const useAI = await loadSetting("gptel_use_ai", true);
@@ -13348,6 +13497,8 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
         wpUser,
         wpToken,
         exportImages,
+        overwriteImages,
+        autoPage,
         webpQuality,
         darkMode,
         useAI,
@@ -13617,6 +13768,16 @@ Sugest\xF5es v\xE1lidas (taxonomia oficial):
           await saveSetting("gptel_wp_token", token);
           await saveSetting("gptel_export_images", !!cfg.exportImages);
           await saveSetting("gptel_auto_page", !!autoPage);
+          await saveSetting("gptel_overwrite_images", !!cfg.overwriteImages);
+          const incomingQuality = typeof cfg.webpQuality === "number" ? Number(cfg.webpQuality) : void 0;
+          let normalizedQuality;
+          if (incomingQuality !== void 0 && !isNaN(incomingQuality)) {
+            const percentBased = incomingQuality <= 1 ? incomingQuality * 100 : incomingQuality;
+            normalizedQuality = Math.max(1, Math.min(100, Math.round(percentBased)));
+          } else {
+            normalizedQuality = await loadSetting("gptel_webp_quality", 85);
+          }
+          await saveSetting("gptel_webp_quality", normalizedQuality);
           figma.ui.postMessage({ type: "wp-status", success: true, message: "Conexao com WordPress verificada." });
         } catch (e) {
           const wpError = safeGet(e, "message") || e;
